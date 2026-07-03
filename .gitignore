@@ -1,0 +1,54 @@
+# --- Dependencies ---
+node_modules/
+jspm_packages/
+web_modules/
+
+# --- Build & Distribution ---
+# Vite builds to 'dist' by default. If you use other bundlers (like Rollup/Webpack)
+# or custom output directories, adjust this list.
+dist/
+build/
+out/
+.parcel-cache/
+.cache/
+.vite/
+
+# --- Environment Variables & Secrets ---
+# Keep local environment configs, API keys, and credentials out of git
+.env
+.env.local
+.env.*.local
+*.pem
+
+# --- Testing & Coverage ---
+coverage/
+.nyc_output/
+.playwright/
+.cypress/
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# --- IDEs and Editors ---
+# Common developer files (can also be configured globally on your machine)
+.vscode/
+# (Optional) If you want to share VSCode tasks/debug configurations, uncomment the line below:
+# !.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- OS / System Files ---
+.DS_Store
+.DS_Store?
+._*
+ehthumbs.db
+Thumbs.db
