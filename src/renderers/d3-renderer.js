@@ -1,6 +1,10 @@
+// @ts-check
 import * as d3 from 'd3';
 
 export class D3Renderer {
+    /**
+     * @param {any} context
+     */
     render(context) {
         const { container, scene, width, height, margins, scales, onEvent, planeOnTop = false } = context;
 
@@ -8,6 +12,7 @@ export class D3Renderer {
         const innerHeight = height - margins.top - margins.bottom;
 
         // Ensure SVG exists
+        /** @type {any} */
         let svg = d3.select(container).select('svg');
         if (svg.empty()) {
             svg = d3.select(container).append('svg')
@@ -46,6 +51,7 @@ export class D3Renderer {
 
         const g = svg.select('.scene-container');
         const plane = g.select('rect.plane');
+        /** @param {any} event */
         const pointer = (event) => d3.pointer(event, g.node());
 
         // Plane gestures emit node-less events that the core routes to plane
@@ -55,25 +61,25 @@ export class D3Renderer {
         // distinguishing a click from a drag ourselves and keeping gesture state
         // on the renderer instance so it survives re-renders mid-drag.
         plane
-            .on('click', (event) => {
+            .on('click', (/** @type {any} */ event) => {
                 const [px, py] = pointer(event);
                 onEvent({ type: 'click', x: px, y: py, rawEvent: event });
             })
-            .on('dblclick', (event) => {
+            .on('dblclick', (/** @type {any} */ event) => {
                 const [px, py] = pointer(event);
                 onEvent({ type: 'dblclick', x: px, y: py, rawEvent: event });
             });
 
         if (planeOnTop) {
             plane
-                .on('pointerdown', (event) => {
+                .on('pointerdown', (/** @type {any} */ event) => {
                     const [px, py] = pointer(event);
                     this._planeGesture = { startX: px, startY: py, down: true, dragging: false };
                     if (event.target.setPointerCapture) {
                         try { event.target.setPointerCapture(event.pointerId); } catch (e) { /* ignore */ }
                     }
                 })
-                .on('pointermove', (event) => {
+                .on('pointermove', (/** @type {any} */ event) => {
                     const [px, py] = pointer(event);
                     const gesture = this._planeGesture;
                     if (gesture && gesture.down) {
@@ -88,7 +94,7 @@ export class D3Renderer {
                         onEvent({ type: 'hover', x: px, y: py, rawEvent: event });
                     }
                 })
-                .on('pointerup', (event) => {
+                .on('pointerup', (/** @type {any} */ event) => {
                     const [px, py] = pointer(event);
                     const gesture = this._planeGesture;
                     if (gesture && gesture.dragging) {
@@ -96,7 +102,7 @@ export class D3Renderer {
                     }
                     this._planeGesture = null;
                 })
-                .on('pointerleave', (event) => {
+                .on('pointerleave', (/** @type {any} */ event) => {
                     if (!this._planeGesture || !this._planeGesture.down) {
                         onEvent({ type: 'hoverout', rawEvent: event });
                     }
@@ -106,6 +112,7 @@ export class D3Renderer {
         // Setup drag behavior. clickDistance lets a press that moves < N px still
         // count as a click (d3 otherwise suppresses the click on any movement),
         // so mark-click editors like cycleChannel fire reliably alongside drag.
+        /** @type {any} */
         const dragBehavior = d3.drag()
             .clickDistance(4)
             .on('start', function(event, d) {
@@ -130,33 +137,37 @@ export class D3Renderer {
         // Split nodes by type/role. Guide regions are drawn first (behind marks),
         // then interactive mark rects, then lines, then text labels — so guides
         // read as background/foreground annotations rather than targets.
-        const allRects = scene.children.filter(n => n.type === 'rect');
-        const guideRects = allRects.filter(n => n.guide);
-        const markRects = allRects.filter(n => !n.guide);
-        const allCircles = scene.children.filter(n => n.type === 'circle');
-        const guideCircles = allCircles.filter(n => n.guide);
-        const markCircles = allCircles.filter(n => !n.guide);
-        const lines = scene.children.filter(n => n.type === 'line');
-        const texts = scene.children.filter(n => n.type === 'text');
+        const allRects = scene.children.filter((/** @type {any} */ n) => n.type === 'rect');
+        const guideRects = allRects.filter((/** @type {any} */ n) => n.guide);
+        const markRects = allRects.filter((/** @type {any} */ n) => !n.guide);
+        const allCircles = scene.children.filter((/** @type {any} */ n) => n.type === 'circle');
+        const guideCircles = allCircles.filter((/** @type {any} */ n) => n.guide);
+        const markCircles = allCircles.filter((/** @type {any} */ n) => !n.guide);
+        const lines = scene.children.filter((/** @type {any} */ n) => n.type === 'line');
+        const texts = scene.children.filter((/** @type {any} */ n) => n.type === 'text');
 
         // Render guide regions (non-interactive shaded bands / outlines)
         g.selectAll('rect.guide-region')
             .data(guideRects)
             .join('rect')
             .attr('class', 'guide-region')
-            .attr('x', d => d.x)
-            .attr('y', d => d.y)
-            .attr('width', d => d.width)
-            .attr('height', d => Math.max(0, d.height))
-            .attr('fill', d => d.fill || 'none')
-            .attr('stroke', d => d.stroke || 'none')
-            .attr('stroke-width', d => d.strokeWidth != null ? d.strokeWidth : 1)
-            .attr('opacity', d => d.opacity != null ? d.opacity : 1)
+            .attr('x', (/** @type {any} */ d) => d.x)
+            .attr('y', (/** @type {any} */ d) => d.y)
+            .attr('width', (/** @type {any} */ d) => d.width)
+            .attr('height', (/** @type {any} */ d) => Math.max(0, d.height))
+            .attr('fill', (/** @type {any} */ d) => d.fill || 'none')
+            .attr('stroke', (/** @type {any} */ d) => d.stroke || 'none')
+            .attr('stroke-width', (/** @type {any} */ d) => d.strokeWidth != null ? d.strokeWidth : 1)
+            .attr('opacity', (/** @type {any} */ d) => d.opacity != null ? d.opacity : 1)
             .style('pointer-events', 'none');
 
         // Fire a mark-scoped click (routed to the mark's click interactors, e.g.
         // cycleChannel). d3.drag suppresses the click after a real drag, so this
         // only fires on a click without movement — drag moves, click edits.
+        /**
+         * @param {any} event
+         * @param {any} d
+         */
         const markClick = (event, d) => {
             const [px, py] = pointer(event);
             onEvent({ type: 'click', x: px, y: py, node: d, rawEvent: event });
@@ -167,12 +178,12 @@ export class D3Renderer {
             .data(markRects)
             .join('rect')
             .attr('class', 'mark')
-            .attr('x', d => d.x)
-            .attr('y', d => d.y)
-            .attr('width', d => d.width)
-            .attr('height', d => Math.max(0, d.height)) // prevent negative height
-            .attr('fill', d => d.fill || 'black')
-            .style('cursor', d => (d.interactors && d.interactors.length > 0) ? 'ns-resize' : 'default')
+            .attr('x', (/** @type {any} */ d) => d.x)
+            .attr('y', (/** @type {any} */ d) => d.y)
+            .attr('width', (/** @type {any} */ d) => d.width)
+            .attr('height', (/** @type {any} */ d) => Math.max(0, d.height)) // prevent negative height
+            .attr('fill', (/** @type {any} */ d) => d.fill || 'black')
+            .style('cursor', (/** @type {any} */ d) => (d.interactors && d.interactors.length > 0) ? 'ns-resize' : 'default')
             .on('click', markClick)
             .call(dragBehavior); // attach drag to all rects; only nodes with interactors change state
 
@@ -181,11 +192,11 @@ export class D3Renderer {
             .data(markCircles)
             .join('circle')
             .attr('class', 'mark')
-            .attr('cx', d => d.cx)
-            .attr('cy', d => d.cy)
-            .attr('r', d => d.r != null ? d.r : 5)
-            .attr('fill', d => d.fill || 'black')
-            .style('cursor', d => (d.interactors && d.interactors.length > 0) ? 'move' : 'default')
+            .attr('cx', (/** @type {any} */ d) => d.cx)
+            .attr('cy', (/** @type {any} */ d) => d.cy)
+            .attr('r', (/** @type {any} */ d) => d.r != null ? d.r : 5)
+            .attr('fill', (/** @type {any} */ d) => d.fill || 'black')
+            .style('cursor', (/** @type {any} */ d) => (d.interactors && d.interactors.length > 0) ? 'move' : 'default')
             .on('click', markClick)
             .call(dragBehavior);
 
@@ -194,14 +205,14 @@ export class D3Renderer {
             .data(guideCircles)
             .join('circle')
             .attr('class', 'guide-circle')
-            .attr('cx', d => d.cx)
-            .attr('cy', d => d.cy)
-            .attr('r', d => Math.max(0, d.r != null ? d.r : 5))
-            .attr('fill', d => d.fill || 'none')
-            .attr('stroke', d => d.stroke || 'none')
-            .attr('stroke-width', d => d.strokeWidth != null ? d.strokeWidth : 1)
-            .attr('stroke-dasharray', d => d.strokeDasharray || null)
-            .attr('opacity', d => d.opacity != null ? d.opacity : 1)
+            .attr('cx', (/** @type {any} */ d) => d.cx)
+            .attr('cy', (/** @type {any} */ d) => d.cy)
+            .attr('r', (/** @type {any} */ d) => Math.max(0, d.r != null ? d.r : 5))
+            .attr('fill', (/** @type {any} */ d) => d.fill || 'none')
+            .attr('stroke', (/** @type {any} */ d) => d.stroke || 'none')
+            .attr('stroke-width', (/** @type {any} */ d) => d.strokeWidth != null ? d.strokeWidth : 1)
+            .attr('stroke-dasharray', (/** @type {any} */ d) => d.strokeDasharray || null)
+            .attr('opacity', (/** @type {any} */ d) => d.opacity != null ? d.opacity : 1)
             .style('pointer-events', 'none');
 
         // Render Lines (reference rules and guide boundaries)
@@ -209,29 +220,29 @@ export class D3Renderer {
             .data(lines)
             .join('line')
             .attr('class', 'mark')
-            .attr('x1', d => d.x1)
-            .attr('x2', d => d.x2)
-            .attr('y1', d => d.y1)
-            .attr('y2', d => d.y2)
-            .attr('stroke', d => d.stroke || 'black')
-            .attr('stroke-width', d => d.strokeWidth != null ? d.strokeWidth : 1)
-            .attr('stroke-dasharray', d => d.strokeDasharray || null)
-            .attr('opacity', d => d.opacity != null ? d.opacity : 1)
-            .style('pointer-events', d => d.pointerEvents || 'auto');
+            .attr('x1', (/** @type {any} */ d) => d.x1)
+            .attr('x2', (/** @type {any} */ d) => d.x2)
+            .attr('y1', (/** @type {any} */ d) => d.y1)
+            .attr('y2', (/** @type {any} */ d) => d.y2)
+            .attr('stroke', (/** @type {any} */ d) => d.stroke || 'black')
+            .attr('stroke-width', (/** @type {any} */ d) => d.strokeWidth != null ? d.strokeWidth : 1)
+            .attr('stroke-dasharray', (/** @type {any} */ d) => d.strokeDasharray || null)
+            .attr('opacity', (/** @type {any} */ d) => d.opacity != null ? d.opacity : 1)
+            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto');
 
         // Render Text labels (guide annotations)
         g.selectAll('text.guide-label')
             .data(texts)
             .join('text')
             .attr('class', 'guide-label')
-            .attr('x', d => d.x)
-            .attr('y', d => d.y)
-            .attr('text-anchor', d => d.textAnchor || 'start')
-            .attr('fill', d => d.fill || 'black')
-            .attr('font-size', d => d.fontSize != null ? d.fontSize : 10)
-            .attr('opacity', d => d.opacity != null ? d.opacity : 1)
+            .attr('x', (/** @type {any} */ d) => d.x)
+            .attr('y', (/** @type {any} */ d) => d.y)
+            .attr('text-anchor', (/** @type {any} */ d) => d.textAnchor || 'start')
+            .attr('fill', (/** @type {any} */ d) => d.fill || 'black')
+            .attr('font-size', (/** @type {any} */ d) => d.fontSize != null ? d.fontSize : 10)
+            .attr('opacity', (/** @type {any} */ d) => d.opacity != null ? d.opacity : 1)
             .style('pointer-events', 'none')
-            .text(d => d.text);
+            .text((/** @type {any} */ d) => d.text);
 
         // In plane-on-top (proximity) mode the plane must sit above the marks and
         // own all pointer events; the marks become purely visual. Guides use

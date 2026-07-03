@@ -1,3 +1,4 @@
+// @ts-check
 // route.js — how the engine finds and prepares a feature's edits.
 //
 // Edits are declared in two places: co-located on a channel (encoding[ch].edit,
@@ -12,7 +13,12 @@
 // edit is attached to, there is no implicit valueKey to inherit (the P1 fix,
 // now structural).
 
+/**
+ * @param {any} feature
+ * @returns {import('../types').Edit[]}
+ */
 export function collectEdits(feature) {
+    /** @type {import('../types').Edit[]} */
     const edits = [];
     const enc = feature.encoding || {};
     for (const [name, chSpec] of Object.entries(enc)) {
@@ -26,21 +32,32 @@ export function collectEdits(feature) {
     return edits;
 }
 
+/**
+ * @param {string[] | null} names
+ * @param {any} encoding
+ * @param {import('../types').ScaleMap} scales
+ * @returns {import('../types').ResolvedChannel[]}
+ */
 export function resolveChannels(names, encoding, scales) {
     return (names || []).map((name) => ({
         name,
         field: encoding[name] && encoding[name].field,
-        scale: scales[name]
+        scale: scales[name] || undefined
     }));
 }
 
-// The field/scale a constraint defaults to for this edit: its primary (first)
-// channel. The engine puts these on the context as valueKey/valueScale so a
-// constraint with no explicit field governs the edit's own channel — correct by
-// construction, never inherited from whatever gesture ran.
+/**
+ * The field/scale a constraint defaults to for this edit: its primary (first)
+ * channel. The engine puts these on the context as valueKey/valueScale so a
+ * constraint with no explicit field governs the edit's own channel — correct by
+ * construction, never inherited from whatever gesture ran.
+ * @param {import('../types').ResolvedChannel[]} resolvedChannels
+ * @returns {{ valueKey?: string, valueScale?: import('../types').Scale }}
+ */
 export function primaryValue(resolvedChannels) {
     const primary = resolvedChannels[0];
     return primary
-        ? { valueKey: primary.field, valueScale: primary.scale }
+        ? { valueKey: primary.field, valueScale: primary.scale || undefined }
         : {};
 }
+

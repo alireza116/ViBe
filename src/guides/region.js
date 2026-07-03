@@ -1,16 +1,27 @@
+// @ts-check
 // guides.region — a declarative shaded band between two values on an axis (an
 // "acceptable range", a target zone). Like guides.rule it positions in data
 // space through scale.encode, so it composes across scale types.
 //
 //   vibe.guides.region({ y: [40, 60] })          // horizontal band, y in [40,60]
 //   vibe.guides.region({ x: ["Agree", "Strongly agree"] })
+
+/**
+ * @param {{ x?: any[], y?: any[], fill?: string, opacity?: number }} [options]
+ * @returns {any}
+ */
 export function region(options = {}) {
     const { x, y, fill = '#64748b', opacity = 0.1 } = options;
 
     return {
         isGuide: true,
+        /**
+         * @param {any} ctx
+         * @returns {import('../types').FeatureNode[]}
+         */
         build: (ctx) => {
             const { scales, width, height } = ctx;
+            /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 
             if (Array.isArray(y) && scales.y) {

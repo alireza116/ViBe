@@ -1,3 +1,4 @@
+// @ts-check
 // guides.rule — a declarative reference line, positioned in DATA space through
 // the scales. It's the guide counterpart of a mark: you give it a value on a
 // channel and it draws a line across the plot at that position, using the SAME
@@ -9,13 +10,23 @@
 // Because it positions through scale.encode, it works on any scale type (linear
 // pixel, band centre) with no special-casing — a reference line on a Likert band
 // axis is the same call as one on a continuous axis.
+
+/**
+ * @param {{ x?: any, y?: any, stroke?: string, strokeDasharray?: string, label?: string }} [options]
+ * @returns {any}
+ */
 export function rule(options = {}) {
     const { x, y, stroke = '#64748b', strokeDasharray = '5 4', label } = options;
 
     return {
         isGuide: true,
+        /**
+         * @param {any} ctx
+         * @returns {import('../types').FeatureNode[]}
+         */
         build: (ctx) => {
             const { scales, width, height } = ctx;
+            /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 
             if (y !== undefined && scales.y) {

@@ -1,3 +1,4 @@
+// @ts-check
 // channel.js — editors for a discrete (categorical) channel, e.g. recolouring a
 // mark by changing its `color` field.
 //
@@ -16,8 +17,13 @@
 
 import { assignChannel } from '../core/encoding.js';
 
-// Resolve the field + discrete domain a channel editor operates on, from the
-// interaction context (encoding gives the field, the scale gives the domain).
+/**
+ * Resolve the field + discrete domain a channel editor operates on, from the
+ * interaction context (encoding gives the field, the scale gives the domain).
+ * @param {any} context
+ * @param {string} channel
+ * @returns {{ field: string, domain: any[] } | null}
+ */
 function channelTarget(context, channel) {
     const field = context.encoding && context.encoding[channel] && context.encoding[channel].field;
     const scale = context.scales && context.scales[channel];
@@ -26,9 +32,13 @@ function channelTarget(context, channel) {
     return { field, domain };
 }
 
-// cycleChannel — the in-plot reference editor: clicking a mark advances its value
-// to the next member of the channel's domain (wrapping around). No extra UI, so
-// it works anywhere a mark is clickable; best for small domains.
+/**
+ * cycleChannel — the in-plot reference editor: clicking a mark advances its value
+ * to the next member of the channel's domain (wrapping around). No extra UI, so
+ * it works anywhere a mark is clickable; best for small domains.
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function cycleChannel(options = {}) {
     const { channel = 'color', onChange, constraints = [] } = options;
 
@@ -39,6 +49,10 @@ export function cycleChannel(options = {}) {
         constraints,
         channel,
 
+        /**
+         * @param {any} context
+         * @returns {any[] | undefined}
+         */
         click: (context) => {
             const { data, nodeIndex } = context;
             if (nodeIndex == null) return undefined;
@@ -54,14 +68,18 @@ export function cycleChannel(options = {}) {
     };
 }
 
-// legendChannel — a legend/swatch picker over the SAME core. The value is chosen
-// by clicking a legend swatch rather than cycling; the target datum is the one
-// currently selected (via a proximity/hover selection in shared ui state).
-//
-// The value-selection here is a plain method (`pick`) so the interface is
-// transport-agnostic: an interactive legend, a menu, or a keyboard shortcut can
-// all drive it. The legend *rendering* (interactive swatches) is a separate
-// concern layered on top — this object is the logic seam it plugs into.
+/**
+ * legendChannel — a legend/swatch picker over the SAME core. The value is chosen
+ * by clicking a legend swatch rather than cycling; the target datum is the one
+ * currently selected (via a proximity/hover selection in shared ui state).
+ *
+ * The value-selection here is a plain method (`pick`) so the interface is
+ * transport-agnostic: an interactive legend, a menu, or a keyboard shortcut can
+ * all drive it. The legend *rendering* (interactive swatches) is a separate
+ * concern layered on top — this object is the logic seam it plugs into.
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function legendChannel(options = {}) {
     const { channel = 'color', onChange, constraints = [] } = options;
 
@@ -75,6 +93,12 @@ export function legendChannel(options = {}) {
         // Called by the value source (legend swatch / menu) with the chosen
         // domain value and the index of the datum being edited. Returns the
         // proposed dataset, so it flows through constraints like any edit.
+        /**
+         * @param {any} context
+         * @param {any} value
+         * @param {number} index
+         * @returns {any[] | undefined}
+         */
         pick: (context, value, index) => {
             const target = channelTarget(context, channel);
             if (!target) return undefined;

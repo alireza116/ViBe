@@ -1,3 +1,9 @@
+// @ts-check
+
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function ruleY(options = {}) {
     const {
         y = 0,
@@ -8,9 +14,16 @@ export function ruleY(options = {}) {
 
     return {
         id,
+        /**
+         * @param {any[]} currentData
+         * @param {import('../types').ScaleMap} scales
+         * @param {number} width
+         * @param {number} height
+         * @returns {import('../types').FeatureNode[]}
+         */
         build: (currentData, scales, width, height) => {
             const { y: yScale } = scales;
-            const yPos = yScale(y);
+            const yPos = yScale ? yScale(y) : 0;
 
             return [{
                 type: 'line',

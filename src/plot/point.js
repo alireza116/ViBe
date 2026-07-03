@@ -1,3 +1,4 @@
+// @ts-check
 // point.js — a channel-driven mark (the encoding-layer counterpart to dot.js).
 // Instead of fixed x/y accessors + a static fill option, it reads an `encoding`
 // map and resolves every channel — positional or not — through the same GLOBAL
@@ -18,8 +19,16 @@
 // A missing positional channel parks the dot at the centre of that dimension —
 // symmetric across x and y, so 1D-along-x and 1D-along-y are the same code path.
 
-// Map a datum through one channel using the global scale. Handles constant
-// channels ({ value }) and missing scales (fall back to a default).
+/**
+ * Map a datum through one channel using the global scale. Handles constant
+ * channels ({ value }) and missing scales (fall back to a default).
+ * @param {import('../types').ScaleMap} scales
+ * @param {Record<string, any>} encoding
+ * @param {string} channel
+ * @param {import('../types').Datum} datum
+ * @param {any} fallback
+ * @returns {any}
+ */
 function encodeChannel(scales, encoding, channel, datum, fallback) {
     const spec = encoding[channel];
     if (!spec) return fallback;
@@ -33,6 +42,10 @@ function encodeChannel(scales, encoding, channel, datum, fallback) {
     return scale.encode(raw, fallback);
 }
 
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function point(options = {}) {
     const { data = [], encoding = {}, id, interactors, edits, onChange } = options;
 
@@ -49,6 +62,13 @@ export function point(options = {}) {
         xKey: encoding.x && encoding.x.field,
         yKey: encoding.y && encoding.y.field,
 
+        /**
+         * @param {any[]} currentData
+         * @param {import('../types').ScaleMap} scales
+         * @param {number} width
+         * @param {number} height
+         * @returns {import('../types').FeatureNode[]}
+         */
         build: (currentData, scales, width, height) => {
             return currentData.map((d, i) => ({
                 type: 'circle',

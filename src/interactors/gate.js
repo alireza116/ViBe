@@ -1,3 +1,4 @@
+// @ts-check
 // gate.js — gesture arbitration as a SEPARATE, swappable layer over interactions.
 //
 // An interactor describes *what* an edit does (move, resize, recolor). A gate
@@ -14,15 +15,28 @@
 // The core skips an interactor whose `when(context)` returns false (see
 // applyInteraction in core/elicit.js).
 
-// Wrap an interactor so it only acts on gestures where `when(context)` is truthy.
-// Returns a new interactor object; the original is untouched.
+/**
+ * Wrap an interactor so it only acts on gestures where `when(context)` is truthy.
+ * Returns a new interactor object; the original is untouched.
+ * @param {any} interactor
+ * @param {function} when
+ * @returns {any}
+ */
 export function gate(interactor, when) {
     return { ...interactor, when };
 }
 
-// Predicate: a keyboard modifier is held during the gesture.
-// key is a DOM event flag: 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'.
+/**
+ * Predicate: a keyboard modifier is held during the gesture.
+ * key is a DOM event flag: 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'.
+ * @param {string} [key]
+ * @returns {(ctx: any) => boolean}
+ */
 export const modifierHeld = (key = 'shiftKey') => (ctx) => !!(ctx.event && ctx.event[key]);
 
-// Predicate: that modifier is NOT held (the default/plain gesture).
+/**
+ * Predicate: that modifier is NOT held (the default/plain gesture).
+ * @param {string} [key]
+ * @returns {(ctx: any) => boolean}
+ */
 export const modifierFree = (key = 'shiftKey') => (ctx) => !(ctx.event && ctx.event[key]);

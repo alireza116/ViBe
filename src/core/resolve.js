@@ -1,3 +1,4 @@
+// @ts-check
 // resolve.js — the Observable Plot scale model for the engine.
 //
 // One scale per channel, GLOBAL to the plot, shared by every mark. Each mark is
@@ -22,19 +23,32 @@ import {
     channelRange
 } from './encoding.js';
 
+/**
+ * Resolves global scales across features.
+ * @param {any[]} features
+ * @param {Record<string, any[]>} state
+ * @param {import('../types').ElicitSpec} spec
+ * @param {{ width: number, height: number }} dims
+ * @returns {import('../types').ScaleMap}
+ */
 export function resolveScales(features, state, spec, dims) {
     // Accumulate, per channel: an explicit spec (type/domain/range) and the flat
     // list of its values across all marks (for domain inference).
+    /** @type {Record<string, { type?: import('../types').ScaleType, domain?: any[], range?: any[], values: any[] }>} */
     const acc = {};
+    
+    /** @param {string} ch */
     const ensure = (ch) => (acc[ch] || (acc[ch] = { values: [] }));
 
     // 1. Legacy top-level positional scale specs.
+    /** @type {any} */
+    const rawSpec = spec;
     for (const ch of ['x', 'y']) {
-        if (spec[ch]) {
+        if (rawSpec[ch]) {
             const a = ensure(ch);
-            a.type = spec[ch].type;
-            a.domain = spec[ch].domain;
-            a.range = spec[ch].range;
+            a.type = rawSpec[ch].type;
+            a.domain = rawSpec[ch].domain;
+            a.range = rawSpec[ch].range;
         }
     }
 
@@ -54,6 +68,7 @@ export function resolveScales(features, state, spec, dims) {
     }
 
     // Build one scale per channel that is actually used.
+    /** @type {import('../types').ScaleMap} */
     const scales = {};
     for (const [ch, a] of Object.entries(acc)) {
         const hasSpec = a.type != null || a.domain != null;
@@ -63,8 +78,12 @@ export function resolveScales(features, state, spec, dims) {
         const type = a.type || inferScaleType(ch, a.values);
         const domain = a.domain || inferDomainFromValues(type, a.values);
         const range = a.range || channelRange(ch, type, dims);
-        scales[ch] = createScale({ type, domain }, range);
+        const scale = createScale({ type, domain }, range);
+        if (scale) {
+            scales[ch] = scale;
+        }
     }
 
     return scales;
 }
+

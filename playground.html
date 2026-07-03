@@ -13,9 +13,15 @@
         --muted: #6b7684;
         --accent: #4f46e5;
       }
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
       body {
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
         margin: 0;
         background: var(--bg);
         color: var(--ink);
@@ -25,20 +31,46 @@
         border-bottom: 1px solid var(--line);
         background: var(--panel);
       }
-      header h1 { margin: 0; font-size: 1.15rem; }
-      header p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.85rem; }
-      header code { background: #eef0f3; padding: 0.05rem 0.3rem; border-radius: 4px; }
-      .layout { display: flex; gap: 1.25rem; padding: 1.25rem; align-items: flex-start; }
+      header h1 {
+        margin: 0;
+        font-size: 1.15rem;
+      }
+      header p {
+        margin: 0.25rem 0 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      header code {
+        background: #eef0f3;
+        padding: 0.05rem 0.3rem;
+        border-radius: 4px;
+      }
+      .layout {
+        display: flex;
+        gap: 1.25rem;
+        padding: 1.25rem;
+        align-items: flex-start;
+      }
       .panel {
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 10px;
         padding: 1rem 1.1rem;
       }
-      .controls { width: 300px; flex: 0 0 300px; }
-      .stage { flex: 1 1 auto; min-width: 0; }
-      .group { margin-bottom: 1.1rem; }
-      .group:last-child { margin-bottom: 0; }
+      .controls {
+        width: 300px;
+        flex: 0 0 300px;
+      }
+      .stage {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .group {
+        margin-bottom: 1.1rem;
+      }
+      .group:last-child {
+        margin-bottom: 0;
+      }
       .group h3 {
         margin: 0 0 0.55rem;
         font-size: 0.72rem;
@@ -46,23 +78,60 @@
         text-transform: uppercase;
         color: var(--muted);
       }
-      .field { display: flex; align-items: center; justify-content: space-between; margin: 0.4rem 0; gap: 0.5rem; }
-      .field label { font-size: 0.85rem; }
-      select, input[type="range"] { font: inherit; }
-      select, input[type="text"], input[type="number"] {
+      .field {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 0.4rem 0;
+        gap: 0.5rem;
+      }
+      .field label {
+        font-size: 0.85rem;
+      }
+      select,
+      input[type="range"] {
+        font: inherit;
+      }
+      select,
+      input[type="text"],
+      input[type="number"] {
         padding: 0.25rem 0.4rem;
         border: 1px solid var(--line);
         border-radius: 6px;
         background: #fff;
       }
-      select { min-width: 140px; }
-      input.cats { min-width: 140px; width: 140px; }
-      input.num { width: 58px; }
-      .domain { color: var(--muted); }
-      .domain .sep { padding: 0 0.2rem; color: var(--muted); }
-      .domain[hidden] { display: none; }
-      .check { display: flex; align-items: center; gap: 0.45rem; margin: 0.4rem 0; font-size: 0.85rem; }
-      .check code { background: #eef0f3; padding: 0.02rem 0.25rem; border-radius: 4px; }
+      select {
+        min-width: 140px;
+      }
+      input.cats {
+        min-width: 140px;
+        width: 140px;
+      }
+      input.num {
+        width: 58px;
+      }
+      .domain {
+        color: var(--muted);
+      }
+      .domain .sep {
+        padding: 0 0.2rem;
+        color: var(--muted);
+      }
+      .domain[hidden] {
+        display: none;
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin: 0.4rem 0;
+        font-size: 0.85rem;
+      }
+      .check code {
+        background: #eef0f3;
+        padding: 0.02rem 0.25rem;
+        border-radius: 4px;
+      }
       button {
         font: inherit;
         padding: 0.4rem 0.7rem;
@@ -71,7 +140,10 @@
         background: #fff;
         cursor: pointer;
       }
-      button:hover { border-color: var(--accent); color: var(--accent); }
+      button:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
       .hint {
         margin: 0 0 1rem;
         padding: 0.6rem 0.75rem;
@@ -81,8 +153,12 @@
         border: 1px solid #ffd8a8;
         color: #8a5a00;
       }
-      .hint:empty { display: none; }
-      #chart { min-height: 160px; }
+      .hint:empty {
+        display: none;
+      }
+      #chart {
+        min-height: 160px;
+      }
       .meta {
         margin-top: 1rem;
         display: grid;
@@ -90,10 +166,20 @@
         gap: 0.2rem 0.9rem;
         font-size: 0.82rem;
       }
-      .meta dt { color: var(--muted); }
-      .meta dd { margin: 0; font-variant-numeric: tabular-nums; }
-      .meta code { background: #eef0f3; padding: 0.05rem 0.3rem; border-radius: 4px; }
-      pre.state, pre.code {
+      .meta dt {
+        color: var(--muted);
+      }
+      .meta dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      .meta code {
+        background: #eef0f3;
+        padding: 0.05rem 0.3rem;
+        border-radius: 4px;
+      }
+      pre.state,
+      pre.code {
         margin: 0.35rem 0 0;
         padding: 0.7rem 0.8rem;
         background: #0f172a;
@@ -104,26 +190,58 @@
         overflow: auto;
         white-space: pre;
       }
-      pre.state { max-height: 150px; }
-      pre.code { max-height: 360px; }
-      pre.code .tok-key { color: #7dd3fc; }
-      pre.code .tok-str { color: #86efac; }
-      pre.code .tok-fn { color: #fca5a5; }
-      pre.code .tok-com { color: #64748b; }
-      .panel-label {
-        margin: 1rem 0 0; font-size: 0.72rem; letter-spacing: 0.06em;
-        text-transform: uppercase; color: var(--muted);
+      pre.state {
+        max-height: 150px;
       }
-      .row { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
-      .presets { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-      .presets button { font-size: 0.8rem; padding: 0.3rem 0.55rem; }
-      .group[hidden] { display: none; }
+      pre.code {
+        max-height: 360px;
+      }
+      pre.code .tok-key {
+        color: #7dd3fc;
+      }
+      pre.code .tok-str {
+        color: #86efac;
+      }
+      pre.code .tok-fn {
+        color: #fca5a5;
+      }
+      pre.code .tok-com {
+        color: #64748b;
+      }
+      .panel-label {
+        margin: 1rem 0 0;
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.6rem;
+      }
+      .presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+      .presets button {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.55rem;
+      }
+      .group[hidden] {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <header>
       <h1>VibeJS · Composition Playground</h1>
-      <p>Compose an elicitation device from channels + edits. Each channel owns its <code>edit</code> (gesture→data); the spec is built and rendered live.</p>
+      <p>
+        Compose an elicitation device from channels + edits. Each channel owns
+        its <code>edit</code> (gesture→data); the spec is built and rendered
+        live.
+      </p>
     </header>
 
     <div class="layout">
@@ -162,7 +280,12 @@
           </div>
           <div class="field domain" id="xLinearDomain">
             <label for="xMin">X domain</label>
-            <span><input class="num" id="xMin" type="number" value="0" /><span class="sep">–</span><input class="num" id="xMax" type="number" value="100" /></span>
+            <span
+              ><input class="num" id="xMin" type="number" value="0" /><span
+                class="sep"
+                >–</span
+              ><input class="num" id="xMax" type="number" value="100"
+            /></span>
           </div>
           <div class="field domain" id="xBandDomain" hidden>
             <label for="xCats">X categories</label>
@@ -178,7 +301,12 @@
           </div>
           <div class="field domain" id="yLinearDomain">
             <label for="yMin">Y domain</label>
-            <span><input class="num" id="yMin" type="number" value="0" /><span class="sep">–</span><input class="num" id="yMax" type="number" value="100" /></span>
+            <span
+              ><input class="num" id="yMin" type="number" value="0" /><span
+                class="sep"
+                >–</span
+              ><input class="num" id="yMax" type="number" value="100"
+            /></span>
           </div>
           <div class="field domain" id="yBandDomain" hidden>
             <label for="yCats">Y categories</label>
@@ -203,8 +331,16 @@
               <option value="mag">by mag</option>
             </select>
           </div>
-          <label class="check"><input type="checkbox" id="colorEdit" /> Edit color: <code>edit: cycle()</code> — click a point to cycle its category</label>
-          <label class="check"><input type="checkbox" id="resize" /> Resize: <code>edit: resize()</code> — Shift-drag to change size (plain drag moves)</label>
+          <label class="check"
+            ><input type="checkbox" id="colorEdit" /> Edit color:
+            <code>edit: cycle()</code> — click a point to cycle its
+            category</label
+          >
+          <label class="check"
+            ><input type="checkbox" id="resize" /> Resize:
+            <code>edit: resize()</code> — Shift-drag to change size (plain drag
+            moves)</label
+          >
         </div>
 
         <div class="group">
@@ -220,8 +356,14 @@
             <label for="threshold">Threshold</label>
             <input id="threshold" type="range" min="10" max="120" value="50" />
           </div>
-          <label class="check"><input type="checkbox" id="create" /> Enable create (edit.create — click the plane to add a mark)</label>
-          <label class="check"><input type="checkbox" id="single" /> Single mark (count max 1 — Likert)</label>
+          <label class="check"
+            ><input type="checkbox" id="create" /> Enable create (edit.create —
+            click the plane to add a mark)</label
+          >
+          <label class="check"
+            ><input type="checkbox" id="single" /> Single mark (count max 1 —
+            Likert)</label
+          >
         </div>
 
         <div class="group">
@@ -239,8 +381,17 @@
 
         <div class="group">
           <h3>Guides</h3>
-          <label class="check"><input type="checkbox" id="gGuide" checked /> Self-drawn <code>guide: true</code> <span style="color:var(--muted)">(snap ring + constraint bounds, on the edit)</span></label>
-          <label class="check"><input type="checkbox" id="gRule" /> Reference line <span style="color:var(--muted)">(declarative)</span></label>
+          <label class="check"
+            ><input type="checkbox" id="gGuide" checked /> Self-drawn
+            <code>guide: true</code>
+            <span style="color: var(--muted)"
+              >(snap ring + constraint bounds, on the edit)</span
+            ></label
+          >
+          <label class="check"
+            ><input type="checkbox" id="gRule" /> Reference line
+            <span style="color: var(--muted)">(declarative)</span></label
+          >
         </div>
 
         <div class="row">
@@ -276,7 +427,11 @@
       // Extra fields every row carries so the color/size channels always have
       // something to bind to: `group` (categorical) and `mag` (numeric).
       const GROUPS = ["alpha", "beta", "gamma"];
-      const decorate = (row) => ({ ...row, group: pick(GROUPS), mag: rand(5, 95) });
+      const decorate = (row) => ({
+        ...row,
+        group: pick(GROUPS),
+        mag: rand(5, 95),
+      });
 
       // ---- Data generation, cached by structural signature -------------------
       let cachedData = null;
@@ -296,9 +451,10 @@
 
         if (mark === "bar") {
           // Bars: one category axis, one value axis (one row per category).
-          return (xBand
-            ? xCats.map((c) => ({ x: c, y: inDomain(yDomain) }))
-            : yCats.map((c) => ({ x: inDomain(xDomain), y: c }))
+          return (
+            xBand
+              ? xCats.map((c) => ({ x: c, y: inDomain(yDomain) }))
+              : yCats.map((c) => ({ x: inDomain(xDomain), y: c }))
           ).map(decorate);
         }
 
@@ -319,9 +475,13 @@
         // Signature captures anything that changes the generated dataset, so
         // editing a domain or category list regenerates rather than reuses.
         const sig = [
-          opts.mark, opts.xType, opts.yType,
-          opts.xDomain.join(","), opts.yDomain.join(","),
-          opts.xCats.join(","), opts.yCats.join(","),
+          opts.mark,
+          opts.xType,
+          opts.yType,
+          opts.xDomain.join(","),
+          opts.yDomain.join(","),
+          opts.xCats.join(","),
+          opts.yCats.join(","),
         ].join("|");
         if (forceRegen || sig !== cachedSig) {
           cachedData = makeData(opts);
@@ -352,7 +512,11 @@
       // A Raw marker lets us drop real API-call source (an edit()/constraint()
       // call) into the serialized encoding object verbatim, so the printed spec
       // matches the live one exactly.
-      class Raw { constructor(s) { this.s = s; } }
+      class Raw {
+        constructor(s) {
+          this.s = s;
+        }
+      }
       const raw = (s) => new Raw(s);
 
       // Pretty-print a value as JS source. Raw prints as-is; short objects/arrays
@@ -363,7 +527,13 @@
           if (!v.length) return "[]";
           const inline = "[" + v.map((x) => js(x)).join(", ") + "]";
           if (inline.length <= 76) return inline;
-          return "[\n" + v.map((x) => indent + "  " + js(x, indent + "  ")).join(",\n") + "\n" + indent + "]";
+          return (
+            "[\n" +
+            v.map((x) => indent + "  " + js(x, indent + "  ")).join(",\n") +
+            "\n" +
+            indent +
+            "]"
+          );
         }
         if (v && typeof v === "object") {
           const keys = Object.keys(v);
@@ -371,7 +541,15 @@
           const parts = keys.map((k) => `${k}: ${js(v[k], indent + "  ")}`);
           const inline = "{ " + parts.join(", ") + " }";
           if (inline.length <= 76) return inline;
-          return "{\n" + keys.map((k) => indent + "  " + `${k}: ${js(v[k], indent + "  ")}`).join(",\n") + "\n" + indent + "}";
+          return (
+            "{\n" +
+            keys
+              .map((k) => indent + "  " + `${k}: ${js(v[k], indent + "  ")}`)
+              .join(",\n") +
+            "\n" +
+            indent +
+            "}"
+          );
         }
         return JSON.stringify(v);
       }
@@ -380,18 +558,34 @@
       // the live constraint and its printed source. ----------------------------
       function valueConstraints(opts) {
         if (opts.constraint === "clamp")
-          return [{ real: vibe.constraints.clamp({ min: 0, max: 80 }),
-                    code: `vibe.constraints.clamp({ min: 0, max: 80 })` }];
+          return [
+            {
+              real: vibe.constraints.clamp({ min: 0, max: 80 }),
+              code: `vibe.constraints.clamp({ min: 0, max: 80 })`,
+            },
+          ];
         if (opts.constraint === "sum")
-          return [{ real: vibe.constraints.maintainSum({ targetSum: 200 }),
-                    code: `vibe.constraints.maintainSum({ targetSum: 200 })` }];
+          return [
+            {
+              real: vibe.constraints.maintainSum({ targetSum: 200 }),
+              code: `vibe.constraints.maintainSum({ targetSum: 200 })`,
+            },
+          ];
         if (opts.constraint === "snap")
-          return [{ real: vibe.constraints.define(({ value }) => Math.round(value / 5) * 5),
-                    code: `vibe.constraints.define(({ value }) => Math.round(value / 5) * 5)` }];
+          return [
+            {
+              real: vibe.constraints.define(
+                ({ value }) => Math.round(value / 5) * 5,
+              ),
+              code: `vibe.constraints.define(({ value }) => Math.round(value / 5) * 5)`,
+            },
+          ];
         return [];
       }
-      const COUNT1 = { real: vibe.constraints.count({ max: 1 }),
-                       code: `vibe.constraints.count({ max: 1 })` };
+      const COUNT1 = {
+        real: vibe.constraints.count({ max: 1 }),
+        code: `vibe.constraints.count({ max: 1 })`,
+      };
 
       // ---- Edit pairs --------------------------------------------------------
       // A positional drag edit. pick / when / constrain / guide are optional and
@@ -399,11 +593,27 @@
       function dragEdit({ pick, threshold, when, constrain, guide }) {
         const o = {};
         const parts = [];
-        if (pick === "nearest") { o.pick = "nearest"; o.threshold = threshold; parts.push(`pick: "nearest"`, `threshold: ${threshold}`); }
-        if (when) { o.when = when.fn; parts.push(`when: ${when.code}`); }
-        if (constrain && constrain.length) { o.constrain = constrain.map((c) => c.real); parts.push(`constrain: [${constrain.map((c) => c.code).join(", ")}]`); }
-        if (guide) { o.guide = true; parts.push(`guide: true`); }
-        return { real: drag(o), code: parts.length ? `drag({ ${parts.join(", ")} })` : `drag()` };
+        if (pick === "nearest") {
+          o.pick = "nearest";
+          o.threshold = threshold;
+          parts.push(`pick: "nearest"`, `threshold: ${threshold}`);
+        }
+        if (when) {
+          o.when = when.fn;
+          parts.push(`when: ${when.code}`);
+        }
+        if (constrain && constrain.length) {
+          o.constrain = constrain.map((c) => c.real);
+          parts.push(`constrain: [${constrain.map((c) => c.code).join(", ")}]`);
+        }
+        if (guide) {
+          o.guide = true;
+          parts.push(`guide: true`);
+        }
+        return {
+          real: drag(o),
+          code: parts.length ? `drag({ ${parts.join(", ")} })` : `drag()`,
+        };
       }
       const WHEN_NOSHIFT = { fn: vibe.when.noShift, code: `vibe.when.noShift` };
 
@@ -411,83 +621,132 @@
       function compose(opts, data, onChange) {
         const x = axisChannel("x", opts.xType, opts.xDomain, opts.xCats);
         const y = axisChannel("y", opts.yType, opts.yDomain, opts.yCats);
-        const pos = [["x", x], ["y", y]].filter(([, s]) => s);
-        if (pos.length === 0) return { error: "Pick at least one positional axis (x or y)." };
+        const pos = [
+          ["x", x],
+          ["y", y],
+        ].filter(([, s]) => s);
+        if (pos.length === 0)
+          return { error: "Pick at least one positional axis (x or y)." };
 
         const isBar = opts.mark === "bar";
         if (isBar) {
           const bands = pos.filter(([, s]) => s.type === "band").length;
           if (pos.length !== 2 || bands !== 1)
-            return { error: "A bar needs exactly one band axis and one linear axis." };
+            return {
+              error: "A bar needs exactly one band axis and one linear axis.",
+            };
         }
 
         // The value axis carries the constraints + self-drawn guide: for a bar
         // it's the linear axis; for a point it's y if present, else x.
         const valueAxis = isBar
-          ? (x && x.type !== "band" ? "x" : "y")
-          : (y ? "y" : "x");
+          ? x && x.type !== "band"
+            ? "x"
+            : "y"
+          : y
+            ? "y"
+            : "x";
 
         // Non-positional edits (color cycle, size resize) act on the touched mark
         // and so need direct picking — the proximity plane on top would swallow
         // their click/drag. So either forces pick:"direct" for the whole feature.
-        const wantColorEdit = !isBar && opts.colorEdit && opts.color === "group";
+        const wantColorEdit =
+          !isBar && opts.colorEdit && opts.color === "group";
         const wantResize = !isBar && opts.resize && opts.size === "mag";
-        const useNearest = (opts.interaction === "proximity") && !wantColorEdit && !wantResize;
+        const useNearest =
+          opts.interaction === "proximity" && !wantColorEdit && !wantResize;
         const pickMode = useNearest ? "nearest" : "direct";
         const moveWhen = wantResize ? WHEN_NOSHIFT : null; // plain drag moves, Shift resizes
         const cons = valueConstraints(opts);
 
         // Build the encoding in parallel: enc (live) + encCode (Raw source).
-        const enc = {}, encCode = {};
+        const enc = {},
+          encCode = {};
         const setCh = (name, base, editPair) => {
           enc[name] = editPair ? { ...base, edit: editPair.real } : { ...base };
-          encCode[name] = editPair ? { ...base, edit: raw(editPair.code) } : { ...base };
+          encCode[name] = editPair
+            ? { ...base, edit: raw(editPair.code) }
+            : { ...base };
         };
 
         for (const [name, base] of pos) {
           // A bar's band (category) axis isn't draggable; every other positional
           // channel gets a drag edit. Only the value axis carries constraints/guide.
-          if (isBar && base.type === "band") { setCh(name, base); continue; }
+          if (isBar && base.type === "band") {
+            setCh(name, base);
+            continue;
+          }
           const isValue = name === valueAxis;
-          setCh(name, base, dragEdit({
-            pick: pickMode, threshold: opts.threshold, when: moveWhen,
-            constrain: isValue ? cons : [],
-            guide: isValue && opts.gGuide,
-          }));
+          setCh(
+            name,
+            base,
+            dragEdit({
+              pick: pickMode,
+              threshold: opts.threshold,
+              when: moveWhen,
+              constrain: isValue ? cons : [],
+              guide: isValue && opts.gGuide,
+            }),
+          );
         }
 
         // Non-positional channels (point): color (+ optional cycle), size (+ resize).
         if (!isBar) {
           if (opts.color === "group")
-            setCh("color", { field: "group", domain: GROUPS },
-              wantColorEdit ? { real: cycle(), code: `cycle()` } : null);
-          else if (opts.color === "mag")
-            setCh("color", { field: "mag" });
+            setCh(
+              "color",
+              { field: "group", domain: GROUPS },
+              wantColorEdit ? { real: cycle(), code: `cycle()` } : null,
+            );
+          else if (opts.color === "mag") setCh("color", { field: "mag" });
           if (opts.size === "mag")
-            setCh("size", { field: "mag", domain: [0, 100], range: [4, 40] },
-              wantResize ? { real: resize({ when: vibe.when.shift }), code: `resize({ when: vibe.when.shift })` } : null);
+            setCh(
+              "size",
+              { field: "mag", domain: [0, 100], range: [4, 40] },
+              wantResize
+                ? {
+                    real: resize({ when: vibe.when.shift }),
+                    code: `resize({ when: vibe.when.shift })`,
+                  }
+                : null,
+            );
         }
 
         // Mark-level edits: create is its own declaration (a plane edit). Under
         // nearest it fires on dblclick so it doesn't fight the drag-to-grab.
-        const markEdits = [], markEditCodes = [];
+        const markEdits = [],
+          markEditCodes = [];
         if (opts.create) {
           const trigger = useNearest ? "dblclick" : "click";
           const cp = opts.single ? [...cons, COUNT1] : cons;
           const defaults = {};
-          if (opts.mark === "point" && opts.color === "group") defaults.group = GROUPS[0];
+          if (opts.mark === "point" && opts.color === "group")
+            defaults.group = GROUPS[0];
           if (opts.mark === "point" && opts.size === "mag") defaults.mag = 50;
-          const o = {}, parts = [];
-          if (trigger !== "click") { o.trigger = trigger; parts.push(`trigger: "${trigger}"`); }
-          if (Object.keys(defaults).length) { o.defaults = defaults; parts.push(`defaults: ${js(defaults)}`); }
-          if (cp.length) { o.constrain = cp.map((c) => c.real); parts.push(`constrain: [${cp.map((c) => c.code).join(", ")}]`); }
+          const o = {},
+            parts = [];
+          if (trigger !== "click") {
+            o.trigger = trigger;
+            parts.push(`trigger: "${trigger}"`);
+          }
+          if (Object.keys(defaults).length) {
+            o.defaults = defaults;
+            parts.push(`defaults: ${js(defaults)}`);
+          }
+          if (cp.length) {
+            o.constrain = cp.map((c) => c.real);
+            parts.push(`constrain: [${cp.map((c) => c.code).join(", ")}]`);
+          }
           markEdits.push(create(o));
-          markEditCodes.push(parts.length ? `create({ ${parts.join(", ")} })` : `create()`);
+          markEditCodes.push(
+            parts.length ? `create({ ${parts.join(", ")} })` : `create()`,
+          );
         }
 
         // Declarative guide (positioned by value through the scale) — the only
         // guide not owned by an edit. Introspective guides are `guide: true` above.
-        const guides = [], guideCodes = [];
+        const guides = [],
+          guideCodes = [];
         if (opts.gRule) {
           if (y && y.type !== "band") {
             guides.push(vibe.guides.rule({ y: 50, label: "target 50" }));
@@ -495,26 +754,43 @@
           } else if (x && x.type === "band") {
             const mid = opts.xCats[Math.floor(opts.xCats.length / 2)];
             guides.push(vibe.guides.rule({ x: mid, label: "midpoint" }));
-            guideCodes.push(`vibe.guides.rule({ x: ${JSON.stringify(mid)}, label: "midpoint" })`);
+            guideCodes.push(
+              `vibe.guides.rule({ x: ${JSON.stringify(mid)}, label: "midpoint" })`,
+            );
           }
         }
 
         const feature = MARKS[opts.mark]({
-          id: FEATURE_ID, data, encoding: enc, edits: markEdits, onChange,
+          id: FEATURE_ID,
+          data,
+          encoding: enc,
+          edits: markEdits,
+          onChange,
           ...(isBar ? { fill: "#4f46e5" } : {}),
         });
 
         const oneD = pos.length < 2;
         return {
-          spec: { width: 600, height: oneD ? 200 : 380, features: [feature], guides },
+          spec: {
+            width: 600,
+            height: oneD ? 200 : 380,
+            features: [feature],
+            guides,
+          },
           code: generateCode(opts, encCode, markEditCodes, guideCodes, oneD),
           meta: {
             mark: opts.mark,
             channels: Object.keys(enc).join(", "),
-            valueAxis, pick: pickMode,
-            interaction: wantResize ? "drag (move) + Shift resize" : (useNearest ? "nearest drag" : "direct drag"),
+            valueAxis,
+            pick: pickMode,
+            interaction: wantResize
+              ? "drag (move) + Shift resize"
+              : useNearest
+                ? "nearest drag"
+                : "direct drag",
             constraint: opts.constraint,
-            forcedDirect: (wantColorEdit || wantResize) && opts.interaction === "proximity",
+            forcedDirect:
+              (wantColorEdit || wantResize) && opts.interaction === "proximity",
             single: opts.create && opts.single,
           },
         };
@@ -522,7 +798,8 @@
 
       // ---- Codegen: print the exact spec for the current selection -----------
       function generateCode(opts, encCode, markEditCodes, guideCodes, oneD) {
-        const markFn = opts.mark === "bar" ? "vibe.plot.bar" : "vibe.plot.point";
+        const markFn =
+          opts.mark === "bar" ? "vibe.plot.bar" : "vibe.plot.point";
         const out = [];
         out.push(`const { drag, resize, cycle, create } = vibe.edit;`);
         out.push(``);
@@ -553,25 +830,54 @@
 
       // Minimal syntax highlighting for the code panel (escape first, then wrap).
       function highlightCode(code) {
-        const esc = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const esc = code
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
         return esc
           .replace(/(\/\/[^\n]*)/g, '<span class="tok-com">$1</span>')
-          .replace(/(&quot;|")([^"]*)(")/g, '<span class="tok-str">$1$2$3</span>')
-          .replace(/\b(vibe(?:\.[a-zA-Z]+)+)/g, '<span class="tok-fn">$1</span>');
+          .replace(
+            /(&quot;|")([^"]*)(")/g,
+            '<span class="tok-str">$1$2$3</span>',
+          )
+          .replace(
+            /\b(vibe(?:\.[a-zA-Z]+)+)/g,
+            '<span class="tok-fn">$1</span>',
+          );
       }
 
       // ---- Wiring ------------------------------------------------------------
       const ids = [
-        "mark", "xType", "yType", "xMin", "xMax", "yMin", "yMax", "xCats", "yCats",
-        "color", "size", "colorEdit", "resize", "interaction", "threshold", "create", "single",
-        "constraint", "gGuide", "gRule",
+        "mark",
+        "xType",
+        "yType",
+        "xMin",
+        "xMax",
+        "yMin",
+        "yMax",
+        "xCats",
+        "yCats",
+        "color",
+        "size",
+        "colorEdit",
+        "resize",
+        "interaction",
+        "threshold",
+        "create",
+        "single",
+        "constraint",
+        "gGuide",
+        "gRule",
       ];
       const el = (id) => document.getElementById(id);
 
       // Parse "A, B, C" into ["A","B","C"]; falls back to a single bucket so a
       // band scale is never left with an empty domain.
       const parseCats = (str) => {
-        const cats = str.split(",").map((s) => s.trim()).filter(Boolean);
+        const cats = str
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
         return cats.length ? cats : ["A"];
       };
       // Read a [min, max] domain, tolerating blank/reversed input.
@@ -622,13 +928,18 @@
 
       function showMeta(meta, opts) {
         const notes = [];
-        if (meta.forcedDirect) notes.push("color/size edit needs direct picking — nearest disabled");
+        if (meta.forcedDirect)
+          notes.push("color/size edit needs direct picking — nearest disabled");
         if (opts.create)
-          notes.push(`create on ${meta.pick === "nearest" ? "dblclick" : "click"} → ${meta.single ? "replaces (count max 1)" : "adds a mark"}`);
+          notes.push(
+            `create on ${meta.pick === "nearest" ? "dblclick" : "click"} → ${meta.single ? "replaces (count max 1)" : "adds a mark"}`,
+          );
         if (opts.mark === "point" && opts.colorEdit && opts.color === "group")
           notes.push("click a mark to cycle its color (edit.cycle)");
         else if (opts.colorEdit && opts.color !== "group")
-          notes.push("color edit needs Color = by group (a categorical channel)");
+          notes.push(
+            "color edit needs Color = by group (a categorical channel)",
+          );
         if (opts.mark === "point" && opts.resize && opts.size === "mag")
           notes.push("drag to move, Shift-drag to resize (edit.resize)");
         else if (opts.resize && opts.size !== "mag")
@@ -666,7 +977,9 @@
         showState(data);
       }
 
-      ids.forEach((id) => el(id).addEventListener("input", () => rebuild(false)));
+      ids.forEach((id) =>
+        el(id).addEventListener("input", () => rebuild(false)),
+      );
       el("regen").addEventListener("click", () => rebuild(true));
 
       // ---- Presets: one click configures all controls for an archetype -------
@@ -674,28 +987,58 @@
         likert: {
           // 1D band scale, single answer: click a category to place it (create on
           // plain click + count max 1). Direct pick lets you nudge it too.
-          mark: "point", xType: "band",
+          mark: "point",
+          xType: "band",
           xCats: "Strongly disagree, Disagree, Neutral, Agree, Strongly agree",
-          yType: "none", color: "none", size: "none",
-          interaction: "direct", create: true, single: true, constraint: "none",
+          yType: "none",
+          color: "none",
+          size: "none",
+          interaction: "direct",
+          create: true,
+          single: true,
+          constraint: "none",
         },
         scatter: {
-          mark: "point", xType: "linear", yType: "linear",
-          xMin: "0", xMax: "100", yMin: "0", yMax: "100",
-          color: "group", size: "mag",
-          interaction: "proximity", create: true, single: false, constraint: "none",
+          mark: "point",
+          xType: "linear",
+          yType: "linear",
+          xMin: "0",
+          xMax: "100",
+          yMin: "0",
+          yMax: "100",
+          color: "group",
+          size: "mag",
+          interaction: "proximity",
+          create: true,
+          single: false,
+          constraint: "none",
         },
         categorical: {
-          mark: "point", xType: "band", xCats: "A, B, C",
-          yType: "band", yCats: "Low, Mid, High",
-          color: "group", size: "none",
-          interaction: "proximity", create: true, single: false, constraint: "none",
+          mark: "point",
+          xType: "band",
+          xCats: "A, B, C",
+          yType: "band",
+          yCats: "Low, Mid, High",
+          color: "group",
+          size: "none",
+          interaction: "proximity",
+          create: true,
+          single: false,
+          constraint: "none",
         },
         bars: {
-          mark: "bar", xType: "band", xCats: "A, B, C, D",
-          yType: "linear", yMin: "0", yMax: "100",
-          color: "none", size: "none",
-          interaction: "proximity", create: false, single: false, constraint: "sum",
+          mark: "bar",
+          xType: "band",
+          xCats: "A, B, C, D",
+          yType: "linear",
+          yMin: "0",
+          yMax: "100",
+          color: "none",
+          size: "none",
+          interaction: "proximity",
+          create: false,
+          single: false,
+          constraint: "sum",
         },
       };
 
@@ -711,9 +1054,11 @@
         rebuild(true);
       }
 
-      document.querySelectorAll(".presets button").forEach((btn) =>
-        btn.addEventListener("click", () => applyPreset(btn.dataset.preset))
-      );
+      document
+        .querySelectorAll(".presets button")
+        .forEach((btn) =>
+          btn.addEventListener("click", () => applyPreset(btn.dataset.preset)),
+        );
 
       applyPreset("scatter");
     </script>

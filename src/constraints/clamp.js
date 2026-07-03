@@ -1,3 +1,4 @@
+// @ts-check
 import { defineConstraint } from './define.js';
 
 // clamp: restricts a field's value to a [min, max] range.
@@ -6,6 +7,11 @@ import { defineConstraint } from './define.js';
 // at `min` / `max`. When a bound is omitted, the field's scale domain is used.
 // `field` (+ optional `channel` for the scale) names the field it governs; when
 // omitted it falls back to the interaction's value axis (legacy).
+
+/**
+ * @param {{ min?: number, max?: number, field?: string, channel?: string }} [options]
+ * @returns {import('../types').Constraint}
+ */
 export function clamp(options = {}) {
     const { min, max, field, channel } = options;
 
@@ -17,10 +23,11 @@ export function clamp(options = {}) {
             if (hi === undefined && valueScale && valueScale.domainConfig) hi = Math.max(...valueScale.domainConfig);
 
             let v = value;
-            if (lo !== undefined) v = Math.max(lo, v);
-            if (hi !== undefined) v = Math.min(hi, v);
+            if (lo !== undefined && v !== undefined) v = Math.max(lo, v);
+            if (hi !== undefined && v !== undefined) v = Math.min(hi, v);
             return v;
         },
         { type: 'clamp', options: { min, max }, field, channel }
     );
 }
+

@@ -1,3 +1,4 @@
+// @ts-check
 import { SceneGraph } from './scene.js';
 import { resolveScales } from './resolve.js';
 import { collectEdits, resolveChannels, primaryValue } from '../edit/route.js';
@@ -6,6 +7,10 @@ import { buildEditGuide } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
 import * as guideBuilders from '../guides/index.js';
 
+/**
+ * @param {import('../types').ElicitSpec} spec
+ * @returns {HTMLDivElement}
+ */
 export function Elicit(spec) {
     const {
         width = 600,
@@ -24,6 +29,7 @@ export function Elicit(spec) {
     // 1. Maintain data state (store).
     // Each feature that provides data keeps its own array within the state,
     // keyed by feature id.
+    /** @type {Record<string, any[]>} */
     const state = {};
     features.forEach((feature, index) => {
         const id = feature.id || `feature-${index}`;
@@ -39,8 +45,16 @@ export function Elicit(spec) {
     //   - `showGuides` -> a constraints guide (where constraints limit dragging).
     //   - `highlight`  -> a proximity guide (highlights the nearest-mark selection).
     // Deduped per (feature, guide type).
+    /** @type {any[]} */
     const autoGuides = [];
+    /** @type {Set<string>} */
     const seenAutoGuides = new Set();
+    
+    /**
+     * @param {string} kind
+     * @param {string} featureId
+     * @param {any} guide
+     */
     const addAutoGuide = (kind, featureId, guide) => {
         const key = `${featureId}:${kind}`;
         if (!seenAutoGuides.has(key)) {
@@ -49,7 +63,7 @@ export function Elicit(spec) {
         }
     };
     features.forEach(feature => {
-        (feature.interactors || []).forEach(interactor => {
+        (feature.interactors || []).forEach((/** @type {any} */ interactor) => {
             if (interactor.showGuides) {
                 const opts = typeof interactor.showGuides === 'object' ? interactor.showGuides : {};
                 addAutoGuide('constraints', feature.id, guideBuilders.constraints({ target: feature.id, ...opts }));
@@ -67,6 +81,7 @@ export function Elicit(spec) {
             if (!edit.guide) return;
             addAutoGuide(`edit-${edit.type}-${i}`, feature.id, {
                 isGuide: true,
+                /** @param {any} ctx */
                 build: (ctx) => buildEditGuide(feature, edit, ctx)
             });
         });
@@ -80,7 +95,7 @@ export function Elicit(spec) {
     // the plane to own the gesture. The renderer reads this flag.
     const planeOnTop =
         features.some(feature =>
-            (feature.interactors || []).some(i =>
+            (feature.interactors || []).some((/** @type {any} */ i) =>
                 (i.target || 'mark') === 'plane' && (i.hover || i.dragstart || i.drag)
             )
         ) ||
@@ -90,10 +105,12 @@ export function Elicit(spec) {
 
     // Transient interaction (UI) state, separate from the belief data `state`.
     // Guides and plane interactors read/write it (e.g. proximity selection).
+    /** @type {any} */
     const ui = { proximity: {} };
 
     // The most recently built scene nodes per feature, so plane interactors can
     // hit-test against exact mark geometry and guides can look marks up by index.
+    /** @type {Record<string, any[]>} */
     const featureNodes = {};
 
     // 2. Calculate scales (Observable Plot model): one GLOBAL scale per channel,
@@ -128,10 +145,10 @@ export function Elicit(spec) {
             // existing marks). Plane-scoped interactors are routed via the plane,
             // not the marks, so they are not attached here.
             const markInteractors = (feature.interactors || [])
-                .filter(i => (i.target || 'mark') === 'mark');
+                .filter((/** @type {any} */ i) => (i.target || 'mark') === 'mark');
             if (markInteractors.length > 0) {
-                nodes.forEach(node => {
-                    node.interactors = markInteractors.map(interactorDef => ({
+                nodes.forEach((/** @type {any} */ node) => {
+                    node.interactors = markInteractors.map((/** @type {any} */ interactorDef) => ({
                         type: interactorDef.type,
                         featureId: feature.id
                     }));
@@ -140,9 +157,9 @@ export function Elicit(spec) {
 
             // Tag every mark node with its feature so gesture events can find the
             // feature's edits (the new `edit` dispatch path).
-            nodes.forEach(node => { node.featureId = feature.id; });
+            nodes.forEach((/** @type {any} */ node) => { node.featureId = feature.id; });
 
-            nodes.forEach(node => scene.add(node));
+            nodes.forEach((/** @type {any} */ node) => scene.add(node));
         });
 
         // Build guides last so they can read the freshly-updated state of every
@@ -158,7 +175,7 @@ export function Elicit(spec) {
         };
         allGuides.forEach(guide => {
             const nodes = guide.build(guideCtx) || [];
-            nodes.forEach(node => {
+            nodes.forEach((/** @type {any} */ node) => {
                 node.guide = true;
                 scene.add(node);
             });
@@ -180,6 +197,12 @@ export function Elicit(spec) {
     // Apply a single interactor to an event: build context, run the handler and
     // its constraints, then commit to state. Returns whether a re-render is
     // needed (data committed, or a handler requested a redraw for UI state).
+    /**
+     * @param {any} feature
+     * @param {any} interactorDef
+     * @param {any} event
+     * @returns {boolean}
+     */
     const applyInteraction = (feature, interactorDef, event) => {
         const handler = interactorDef[event.type];
         if (!handler) return false;
@@ -251,6 +274,13 @@ export function Elicit(spec) {
     // context (field + scale) is resolved so nothing is inherited implicitly, then
     // apply -> the edit's OWN constraints (with primaryValue setting the value
     // field = the edit's own channel) -> commit. Returns whether data changed.
+    /**
+     * @param {any} feature
+     * @param {import('../types').Edit} edit
+     * @param {any} event
+     * @param {number | null} index
+     * @returns {boolean}
+     */
     const runEdit = (feature, edit, event, index) => {
         const currentData = state[feature.id] || [];
         const encoding = feature.encoding || {};
@@ -302,6 +332,11 @@ export function Elicit(spec) {
     // Direct-pick edits: the gesture landed on a mark (event.node). Fan the
     // gesture out to every direct edit whose `gesture` matches; `when` arbitrates
     // between edits sharing a gesture (plain-drag move vs Shift-drag resize).
+    /**
+     * @param {any} feature
+     * @param {any} event
+     * @returns {boolean}
+     */
     const dispatchDirectEdits = (feature, event) => {
         const index = event.node ? event.node.index : undefined;
         if (index == null) return false;
@@ -317,12 +352,26 @@ export function Elicit(spec) {
     //   - nearest (pick 'nearest'): resolve the closest mark within threshold and
     //     edit it, holding a lock across the drag (like the old proximityDrag).
     // Nearest also maintains the transient ui.proximity selection its guide draws.
+    /**
+     * @param {string} fid
+     * @returns {any}
+     */
     const readSel = (fid) => (ui.proximity && ui.proximity[fid]) || null;
+    
+    /**
+     * @param {string} fid
+     * @param {any} patch
+     */
     const writeSel = (fid, patch) => {
         ui.proximity = ui.proximity || {};
         ui.proximity[fid] = { ...(ui.proximity[fid] || {}), ...patch };
     };
 
+    /**
+     * @param {any} feature
+     * @param {any} event
+     * @returns {boolean}
+     */
     const dispatchPlaneEdits = (feature, event) => {
         const planeEdits = collectEdits(feature).filter(e => e.pick === 'plane' || e.pick === 'nearest');
         if (planeEdits.length === 0) return false;
@@ -378,6 +427,9 @@ export function Elicit(spec) {
     //      and route to that mark's edits (new) or interactors (legacy).
     //    - Events without a `node` are plane-scoped (create new elements) and
     //      route to every feature's plane-target interactors.
+    /**
+     * @param {any} event
+     */
     const handleEvent = (event) => {
         let shouldRender = false;
 
@@ -393,16 +445,16 @@ export function Elicit(spec) {
         }
 
         if (event.node && event.node.interactors) {
-            event.node.interactors.forEach(nodeInteractor => {
+            event.node.interactors.forEach((/** @type {any} */ nodeInteractor) => {
                 const feature = features.find(f => f.id === nodeInteractor.featureId);
-                const interactorDef = feature.interactors.find(i => i.type === nodeInteractor.type);
+                const interactorDef = feature.interactors.find((/** @type {any} */ i) => i.type === nodeInteractor.type);
                 if (interactorDef && applyInteraction(feature, interactorDef, event)) {
                     shouldRender = true;
                 }
             });
         } else if (!event.node) {
             features.forEach(feature => {
-                (feature.interactors || []).forEach(interactorDef => {
+                (feature.interactors || []).forEach((/** @type {any} */ interactorDef) => {
                     if ((interactorDef.target || 'mark') === 'plane' && interactorDef[event.type]) {
                         if (applyInteraction(feature, interactorDef, event)) {
                             shouldRender = true;

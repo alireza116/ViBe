@@ -1,3 +1,4 @@
+// @ts-check
 // create: a "create" interaction bound to the plot plane (background) rather
 // than to an existing mark. Clicking empty space appends a new datum at the
 // clicked location.
@@ -15,9 +16,17 @@
 //   vibe.interactors.create({ trigger: "dblclick", defaults: { group: "a" } })
 import { invertOnScale } from '../core/scales.js';
 
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function create(options = {}) {
     const { onChange, constraints = [], showGuides = false, defaults = {}, trigger = 'click' } = options;
 
+    /**
+     * @param {any} context
+     * @returns {any[] | undefined}
+     */
     const handler = (context) => {
         const { x, y, data, scales, xKey = 'x', yKey = 'y' } = context;
 
@@ -44,6 +53,7 @@ export function create(options = {}) {
         return [...data, point];
     };
 
+    /** @type {any} */
     const interactor = {
         type: 'create',
         target: 'plane', // listens on the background, not on marks

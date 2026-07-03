@@ -1,3 +1,4 @@
+// @ts-check
 // defineConstraint: the abstract base every constraint is built on, and the
 // extension point for user-authored constraints.
 //
@@ -25,7 +26,15 @@
 //
 // `meta` may carry { type, options } for guide introspection, and/or a
 // `guide(ctx)` function so a custom constraint can draw its own visual guide.
+
+/**
+ * Creates a constraint.
+ * @param {(ctx: import('../types').ConstraintContext) => any} reducer
+ * @param {any} [meta]
+ * @returns {import('../types').Constraint}
+ */
 export function defineConstraint(reducer, meta = {}) {
+    /** @type {import('../types').Constraint} */
     const constraint = (newData, oldData, context) => {
         const xKey = context.xKey || 'x';
         const yKey = context.yKey || 'y';
@@ -62,7 +71,12 @@ export function defineConstraint(reducer, meta = {}) {
             index,
             active,
             activeX: active ? active[xKey] : (nodeData ? nodeData[xKey] : undefined),
-            value: active ? active[valueKey] : undefined
+            value: active ? active[valueKey] : undefined,
+            pointer: context.pointer,
+            node: context.node,
+            event: context.event,
+            channels: context.channels,
+            encoding: context.encoding
         };
 
         const result = reducer(ctx);
@@ -95,3 +109,4 @@ export function defineConstraint(reducer, meta = {}) {
 
     return constraint;
 }
+

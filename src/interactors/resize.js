@@ -1,3 +1,4 @@
+// @ts-check
 // resize.js — edit a magnitude channel (default `size`) by dragging radially
 // from the mark's centre.
 //
@@ -15,7 +16,11 @@
 // OUTSIDE the interaction with gate() — e.g. gate(resize(), modifierHeld('shift'))
 // for plain-drag = move, Shift-drag = resize. The interaction stays unaware.
 
-// Centre of a scene node: circles carry cx/cy; rects carry x/y/width/height.
+/**
+ * Centre of a scene node: circles carry cx/cy; rects carry x/y/width/height.
+ * @param {any} node
+ * @returns {{ cx: number, cy: number } | null}
+ */
 function markCenter(node) {
     if (!node) return null;
     if (node.cx != null) return { cx: node.cx, cy: node.cy };
@@ -25,6 +30,10 @@ function markCenter(node) {
     return null;
 }
 
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function resize(options = {}) {
     const { channel = 'size', onChange, constraints = [] } = options;
 
@@ -35,6 +44,10 @@ export function resize(options = {}) {
         constraints,
         channel,
 
+        /**
+         * @param {any} context
+         * @returns {any[] | undefined}
+         */
         drag: (context) => {
             const { data, nodeIndex, node, x, y, encoding, scales } = context;
             if (nodeIndex == null) return undefined;
@@ -54,7 +67,7 @@ export function resize(options = {}) {
             // the active value when valueKey is set).
             context.valueKey = field;
             context.valueScale = scale;
-            return data.map((d, i) => (i === nodeIndex ? { ...d, [field]: value } : d));
+            return data.map((/** @type {any} */ d, /** @type {number} */ i) => (i === nodeIndex ? { ...d, [field]: value } : d));
         }
     };
 }

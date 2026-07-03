@@ -1,3 +1,4 @@
+// @ts-check
 import { defineConstraint } from './define.js';
 
 // maintainSum: keeps the total of all values at or below `targetSum`.
@@ -9,12 +10,17 @@ import { defineConstraint } from './define.js';
 // `field` (and optional `channel` for its scale) names the field summed. When
 // omitted it falls back to the interaction's value axis (legacy). Naming it makes
 // the constraint mean the same field no matter which edit runs it.
-export function maintainSum(options = {}) {
+
+/**
+ * @param {{ targetSum: number, field?: string, channel?: string }} options
+ * @returns {import('../types').Constraint}
+ */
+export function maintainSum(options) {
     const { targetSum, field, channel } = options;
 
     return defineConstraint(
         ({ data, value, activeX, xKey, valueKey }) => {
-            if (activeX === undefined) return value;
+            if (activeX === undefined || value === undefined || !valueKey) return value;
 
             // Sum of every datum except the one being dragged. `valueKey` resolves
             // to the constraint's own `field` when set, so this always sums the
@@ -29,3 +35,4 @@ export function maintainSum(options = {}) {
         { type: 'maintainSum', options: { targetSum }, field, channel }
     );
 }
+

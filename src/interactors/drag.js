@@ -1,3 +1,9 @@
+// @ts-check
+
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function dragY(options = {}) {
     const { onChange, constraints = [], showGuides = false } = options;
 
@@ -12,6 +18,10 @@ export function dragY(options = {}) {
         showGuides,
 
         // Event handlers
+        /**
+         * @param {any} context
+         * @returns {any[] | undefined}
+         */
         drag: (context) => {
             const { y, data, scales, nodeData, xKey = 'x', yKey = 'y' } = context;
 
@@ -24,7 +34,7 @@ export function dragY(options = {}) {
 
             // Produce the proposed dataset: update only the dragged datum,
             // matched by its x-accessor value.
-            const updatedData = data.map(d =>
+            const updatedData = data.map((/** @type {any} */ d) =>
                 d[xKey] === nodeData[xKey] ? { ...d, [yKey]: newY } : d
             );
 
@@ -35,6 +45,10 @@ export function dragY(options = {}) {
 
 // dragXY: 2D "change" interaction for scatter marks. Moves the dragged datum in
 // both x and y. Requires continuous (linear) x and y scales.
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function dragXY(options = {}) {
     const { onChange, constraints = [], showGuides = false } = options;
 
@@ -45,6 +59,10 @@ export function dragXY(options = {}) {
         constraints,
         showGuides,
 
+        /**
+         * @param {any} context
+         * @returns {any[] | undefined}
+         */
         drag: (context) => {
             const { x, y, data, scales, nodeIndex, xKey = 'x', yKey = 'y' } = context;
 
@@ -52,12 +70,13 @@ export function dragXY(options = {}) {
 
             // Unified scale API: works for linear, band, or mixed x/y. A missing
             // channel scale (1D) simply isn't updated.
+            /** @type {Record<string, any>} */
             const patch = {};
             if (scales.x) patch[xKey] = scales.x.invertValue(x);
             if (scales.y) patch[yKey] = scales.y.invertValue(y);
 
             // Match the dragged datum by index (data values aren't unique in 2D).
-            return data.map((d, i) =>
+            return data.map((/** @type {any} */ d, /** @type {number} */ i) =>
                 i === nodeIndex ? { ...d, ...patch } : d
             );
         }

@@ -1,3 +1,4 @@
+// @ts-check
 import { Elicit } from './core/elicit.js';
 import * as plot from './plot/index.js';
 import * as interactors from './interactors/index.js';

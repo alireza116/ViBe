@@ -1,3 +1,4 @@
+// @ts-check
 import { positionOnScale } from '../core/scales.js';
 
 // dot: a circle mark that composes across scale types and dimensionality.
@@ -7,6 +8,11 @@ import { positionOnScale } from '../core/scales.js';
 //   - band x   + linear y      -> categorical scatter (dot centered in its band)
 //   - linear x (no y)          -> 1D strip plot (place a dot on the scale)
 // A missing scale (1D) parks the dot at the center of that dimension.
+
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function dot(options = {}) {
     const {
         data = [],
@@ -24,6 +30,13 @@ export function dot(options = {}) {
         interactors,
         xKey: x,
         yKey: y,
+        /**
+         * @param {any[]} currentData
+         * @param {import('../types').ScaleMap} scales
+         * @param {number} width
+         * @param {number} height
+         * @returns {import('../types').FeatureNode[]}
+         */
         build: (currentData, scales, width, height) => {
             const { x: xScale, y: yScale } = scales;
 

@@ -1,3 +1,4 @@
+// @ts-check
 // proximityDrag: a "change" interaction that selects the nearest mark by
 // proximity instead of requiring a precise hit on the mark itself. It lives on
 // the plane (background), so it captures the pointer anywhere and resolves the
@@ -11,12 +12,18 @@
 //   vibe.interactors.proximityDrag({ threshold: 40, axis: "y" })   // bars
 //   vibe.interactors.proximityDrag({ threshold: 40, axis: "xy" })  // scatter
 
-// Distance from pointer to a mark, using a per-mark-type metric:
-//   circle -> euclidean distance to the center.
-//   rect   -> distance to the bar's band interval (the category slot), measured
-//             along the band axis so any point in the column/row selects the bar
-//             regardless of the bar's length. `bandAxis` ('x' for vertical bars,
-//             'y' for horizontal bars) is set by the bar mark.
+/**
+ * Distance from pointer to a mark, using a per-mark-type metric:
+ *   circle -> euclidean distance to the center.
+ *   rect   -> distance to the bar's band interval (the category slot), measured
+ *             along the band axis so any point in the column/row selects the bar
+ *             regardless of the bar's length. `bandAxis` ('x' for vertical bars,
+ *             'y' for horizontal bars) is set by the bar mark.
+ * @param {any} mark
+ * @param {number} px
+ * @param {number} py
+ * @returns {number}
+ */
 function distanceToMark(mark, px, py) {
     if (mark.type === 'circle') {
         return Math.hypot(px - mark.cx, py - mark.cy);
@@ -38,6 +45,13 @@ function distanceToMark(mark, px, py) {
     return Infinity;
 }
 
+/**
+ * @param {any[]} marks
+ * @param {number} px
+ * @param {number} py
+ * @param {number} threshold
+ * @returns {any}
+ */
 function nearestMark(marks, px, py, threshold) {
     let best = null;
     let bestDist = Infinity;
@@ -51,6 +65,10 @@ function nearestMark(marks, px, py, threshold) {
     return best && bestDist <= threshold ? best : null;
 }
 
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function proximityDrag(options = {}) {
     const {
         threshold = 40,
@@ -63,12 +81,30 @@ export function proximityDrag(options = {}) {
 
     // Transient selection state lives in the shared `ui` object, keyed by
     // feature id, so the highlight guide can read it.
+    /**
+     * @param {any} ui
+     * @param {string} featureId
+     * @param {any} patch
+     */
     const writeInfo = (ui, featureId, patch) => {
         ui.proximity = ui.proximity || {};
         ui.proximity[featureId] = { ...(ui.proximity[featureId] || {}), ...patch };
     };
+    
+    /**
+     * @param {any} ui
+     * @param {string} featureId
+     * @returns {any}
+     */
     const readInfo = (ui, featureId) => (ui.proximity && ui.proximity[featureId]) || null;
 
+    /**
+     * @param {any} context
+     * @param {number} index
+     * @param {number} x
+     * @param {number} y
+     * @returns {any[]}
+     */
     const moveDatum = (context, index, x, y) => {
         const { data, scales, xKey = 'x', yKey = 'y' } = context;
         const updated = { ...data[index] };
@@ -84,7 +120,7 @@ export function proximityDrag(options = {}) {
         context.nodeData = updated;
         context.valueKey = axis === 'x' ? xKey : yKey;
         context.valueScale = axis === 'x' ? scales.x : scales.y;
-        return data.map((d, i) => (i === index ? updated : d));
+        return data.map((/** @type {any} */ d, /** @type {number} */ i) => (i === index ? updated : d));
     };
 
     return {
@@ -100,6 +136,10 @@ export function proximityDrag(options = {}) {
         axis,
 
         // Pointer moved (no button): update the hovered selection + ring.
+        /**
+         * @param {any} context
+         * @returns {boolean}
+         */
         hover: (context) => {
             const { marks, x, y, ui, featureId } = context;
             const hit = nearestMark(marks, x, y, threshold);
@@ -111,6 +151,10 @@ export function proximityDrag(options = {}) {
         },
 
         // Pointer left the plane: clear the highlight.
+        /**
+         * @param {any} context
+         * @returns {boolean}
+         */
         hoverout: (context) => {
             const { ui, featureId } = context;
             if (ui.proximity) delete ui.proximity[featureId];
@@ -118,6 +162,10 @@ export function proximityDrag(options = {}) {
         },
 
         // Drag started: lock onto the nearest mark within threshold (if any).
+        /**
+         * @param {any} context
+         * @returns {boolean}
+         */
         dragstart: (context) => {
             const { marks, x, y, ui, featureId } = context;
             const hit = nearestMark(marks, x, y, threshold);
@@ -130,6 +178,10 @@ export function proximityDrag(options = {}) {
         },
 
         // Dragging: move the locked mark's datum (axis-constrained).
+        /**
+         * @param {any} context
+         * @returns {any[] | boolean}
+         */
         drag: (context) => {
             const { x, y, ui, featureId } = context;
             const info = readInfo(ui, featureId);
@@ -140,6 +192,10 @@ export function proximityDrag(options = {}) {
         },
 
         // Drag ended: release the lock (keep hover highlight).
+        /**
+         * @param {any} context
+         * @returns {boolean}
+         */
         dragend: (context) => {
             const { ui, featureId } = context;
             const info = readInfo(ui, featureId);

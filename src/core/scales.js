@@ -1,18 +1,25 @@
+// @ts-check
 // pure math scale definitions to avoid tying the core directly to d3-scale if not needed,
 // though we can use d3-scale under the hood for now.
 import * as d3 from 'd3';
 
-// The single scale factory for every channel — positional (x/y) and beyond
-// (color, size, opacity). `range` is the channel's visual output range: pixels
-// for x/y, a radius interval for size, a palette or two-stop ramp for color.
-//   linear     -> continuous field -> continuous output (pixel | radius | …)
-//   band       -> categorical field -> position (drives band center)
-//   ordinal    -> discrete field    -> discrete output (category -> colour)
-//   sequential -> continuous field  -> continuous colour along a ramp
+/**
+ * The single scale factory for every channel — positional (x/y) and beyond
+ * (color, size, opacity). `range` is the channel's visual output range: pixels
+ * for x/y, a radius interval for size, a palette or two-stop ramp for color.
+ *   linear     -> continuous field -> continuous output (pixel | radius | …)
+ *   band       -> categorical field -> position (drives band center)
+ *   ordinal    -> discrete field    -> discrete output (category -> colour)
+ *   sequential -> continuous field  -> continuous colour along a ramp
+ * @param {any} spec
+ * @param {any[]} range
+ * @returns {import('../types').Scale | null}
+ */
 export function createScale(spec, range) {
     if (!spec) return null;
 
     const type = spec.type || 'linear';
+    /** @type {any} */
     let scale;
 
     if (type === 'band') {
@@ -24,7 +31,7 @@ export function createScale(spec, range) {
         const [lo, hi] = [Math.min(...spec.domain), Math.max(...spec.domain)];
         const t = d3.scaleLinear().domain([lo, hi]).range([0, 1]).clamp(true);
         const ramp = d3.interpolateRgb(range[0], range[1]);
-        scale = (value) => ramp(t(value));
+        scale = (/** @type {any} */ value) => ramp(t(value));
         scale.domain = () => spec.domain;
         scale.range = () => range;
     } else {
@@ -46,8 +53,8 @@ export function createScale(spec, range) {
     // These are the x/y special case of the general channel model in
     // core/encoding.js; positionOnScale/invertOnScale are the shared impl.
     scale.invertible = (type === 'linear' || type === 'band');
-    scale.encode = (value, fallback) => positionOnScale(scale, value, fallback);
-    scale.invertValue = scale.invertible ? (pixel) => invertOnScale(scale, pixel) : () => undefined;
+    scale.encode = (/** @type {any} */ value, /** @type {any} */ fallback) => positionOnScale(scale, value, fallback);
+    scale.invertValue = scale.invertible ? (/** @type {any} */ pixel) => invertOnScale(scale, pixel) : () => undefined;
 
     return scale;
 }
@@ -56,20 +63,34 @@ export function createScale(spec, range) {
 // These let marks be composed across scale types (band vs linear) and axis
 // orientations without special-casing each mark.
 
+/**
+ * @param {any} scale
+ * @returns {boolean}
+ */
 export function isBand(scale) {
     return !!scale && scale.type === 'band';
 }
 
-// The min/max pixel bounds of a scale's (possibly reversed) range.
+/**
+ * The min/max pixel bounds of a scale's (possibly reversed) range.
+ * @param {any} scale
+ * @returns {[number, number]}
+ */
 export function rangeExtent(scale) {
     const r = scale.range();
     return [Math.min(r[0], r[1]), Math.max(r[0], r[1])];
 }
 
-// Center pixel position of a value on a scale:
-//   band   -> band start + bandwidth/2 (the category's center)
-//   linear -> scale(value)
-//   missing scale (1D plots) -> the provided fallback (usually the range center)
+/**
+ * Center pixel position of a value on a scale:
+ *   band   -> band start + bandwidth/2 (the category's center)
+ *   linear -> scale(value)
+ *   missing scale (1D plots) -> the provided fallback (usually the range center)
+ * @param {any} scale
+ * @param {any} value
+ * @param {any} [fallback]
+ * @returns {any}
+ */
 export function positionOnScale(scale, value, fallback) {
     if (!scale) return fallback;
     if (scale.type === 'band') {
@@ -79,19 +100,29 @@ export function positionOnScale(scale, value, fallback) {
     return scale(value);
 }
 
-// Thickness a band occupies (bar width/height); fallback for non-band scales.
+/**
+ * Thickness a band occupies (bar width/height); fallback for non-band scales.
+ * @param {any} scale
+ * @param {any} [fallback]
+ * @returns {any}
+ */
 export function bandwidthOf(scale, fallback) {
     return scale && scale.bandwidth ? scale.bandwidth() : fallback;
 }
 
-// Inverse of positionOnScale: map a pixel position back to a data value.
-// The mirror image of how marks are placed, so any scale a mark can be drawn
-// on is also a scale a mark can be created on.
-//   linear -> scale.invert(pixel), clamped into the domain
-//   band   -> the category whose band center is nearest the pixel (band scales
-//             have no invert(); we pick the closest category instead)
-//   missing scale (1D plots) -> undefined (that channel isn't positionable)
-// Returns undefined when the value can't be resolved (e.g. empty band domain).
+/**
+ * Inverse of positionOnScale: map a pixel position back to a data value.
+ * The mirror image of how marks are placed, so any scale a mark can be drawn
+ * on is also a scale a mark can be created on.
+ *   linear -> scale.invert(pixel), clamped into the domain
+ *   band   -> the category whose band center is nearest the pixel (band scales
+ *             have no invert(); we pick the closest category instead)
+ *   missing scale (1D plots) -> undefined (that channel isn't positionable)
+ * Returns undefined when the value can't be resolved (e.g. empty band domain).
+ * @param {any} scale
+ * @param {number} pixel
+ * @returns {any}
+ */
 export function invertOnScale(scale, pixel) {
     if (!scale) return undefined;
     // Colour scales (ordinal/sequential) don't map a pixel back to data.
@@ -125,10 +156,15 @@ export function invertOnScale(scale, pixel) {
     return Math.max(lo, Math.min(hi, value));
 }
 
-// Pixel baseline (value origin) of a value scale — where a bar starts from.
-// Uses 0 when in the domain, clamped into the range so bars never escape it.
+/**
+ * Pixel baseline (value origin) of a value scale — where a bar starts from.
+ * Uses 0 when in the domain, clamped into the range so bars never escape it.
+ * @param {any} valueScale
+ * @returns {number}
+ */
 export function baselineOf(valueScale) {
     const [lo, hi] = rangeExtent(valueScale);
     const zero = valueScale(0);
     return Math.max(lo, Math.min(hi, zero));
 }
+

@@ -1,3 +1,4 @@
+// @ts-check
 // guides.proximity: highlights the current proximity selection produced by a
 // proximityDrag interactor. It reads the transient interaction state (ui) and
 // draws:
@@ -10,15 +11,24 @@
 
 const DEFAULT_COLOR = '#ff9800';
 
-export function proximity(options = {}) {
+/**
+ * @param {{ target: string, color?: string }} options
+ * @returns {any}
+ */
+export function proximity(options) {
     const { target, color = DEFAULT_COLOR } = options;
 
     return {
         isGuide: true,
+        /**
+         * @param {any} ctx
+         * @returns {import('../types').FeatureNode[]}
+         */
         build: (ctx) => {
             const info = ctx.ui && ctx.ui.proximity && ctx.ui.proximity[target];
             if (!info) return [];
 
+            /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 
             // Threshold ring at the pointer (the snap zone).

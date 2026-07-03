@@ -1,3 +1,4 @@
+// @ts-check
 import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
 
 // bar: a rectangular mark that composes across orientations. The band axis is
@@ -11,6 +12,12 @@ import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
 // `orientation`); `barY` / `barX` force one. In all cases the mark reads the
 // x-channel via the `x` accessor and the y-channel via `y`, so which channel is
 // the "value" and which is the "category" follows the scales — matching the spec.
+
+/**
+ * @param {any} options
+ * @param {string | null} forcedOrientation
+ * @returns {any}
+ */
 function buildBar(options, forcedOrientation) {
     const {
         data = [],
@@ -38,6 +45,11 @@ function buildBar(options, forcedOrientation) {
         onChange,
         xKey,
         yKey,
+        /**
+         * @param {any[]} currentData
+         * @param {import('../types').ScaleMap} scales
+         * @returns {import('../types').FeatureNode[]}
+         */
         build: (currentData, scales) => {
             const { x: xScale, y: yScale } = scales;
 
@@ -51,10 +63,10 @@ function buildBar(options, forcedOrientation) {
             return currentData.map((d, i) => {
                 if (orientation === 'horizontal') {
                     // Category on y (band), value/length on x (linear).
-                    const bandStart = yScale(d[yKey]);
+                    const bandStart = yScale ? yScale(d[yKey]) : 0;
                     const thickness = bandwidthOf(yScale, 20);
                     const baseline = baselineOf(xScale);
-                    const valuePos = xScale(d[xKey]);
+                    const valuePos = xScale ? xScale(d[xKey]) : 0;
                     return {
                         type: 'rect',
                         x: Math.min(valuePos, baseline),
@@ -70,10 +82,10 @@ function buildBar(options, forcedOrientation) {
                 }
 
                 // Vertical: category on x (band), value/length on y (linear).
-                const bandStart = xScale(d[xKey]);
+                const bandStart = xScale ? xScale(d[xKey]) : 0;
                 const thickness = bandwidthOf(xScale, 20);
                 const baseline = baselineOf(yScale);
-                const valuePos = yScale(d[yKey]);
+                const valuePos = yScale ? yScale(d[yKey]) : 0;
                 return {
                     type: 'rect',
                     x: bandStart,
@@ -91,14 +103,26 @@ function buildBar(options, forcedOrientation) {
     };
 }
 
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function bar(options = {}) {
     return buildBar(options, null);
 }
 
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function barY(options = {}) {
     return buildBar(options, 'vertical');
 }
 
+/**
+ * @param {any} [options]
+ * @returns {any}
+ */
 export function barX(options = {}) {
     return buildBar(options, 'horizontal');
 }

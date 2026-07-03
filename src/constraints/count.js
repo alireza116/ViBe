@@ -1,3 +1,4 @@
+// @ts-check
 import { defineConstraint } from './define.js';
 
 // count: a dataset *cardinality* constraint — keeps the number of data elements
@@ -11,6 +12,11 @@ import { defineConstraint } from './define.js';
 // A Likert "one point on the scale" is just count({ max: 1 }): each create
 // appends, then this trims back to the single newest point (a place-to-replace).
 // count({ max: 5 }) gives "pick your top five", etc.
+
+/**
+ * @param {{ max?: number, strategy?: 'replace' | 'reject' }} [options]
+ * @returns {import('../types').Constraint}
+ */
 export function count(options = {}) {
     const { max = Infinity, strategy = 'replace' } = options;
 
@@ -23,3 +29,4 @@ export function count(options = {}) {
         { type: 'count', options: { max, strategy } }
     );
 }
+
