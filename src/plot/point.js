@@ -47,7 +47,7 @@ function encodeChannel(scales, encoding, channel, datum, fallback) {
  * @returns {any}
  */
 export function point(options = {}) {
-    const { data = [], encoding = {}, id, interactors, edits, onChange } = options;
+    const { data = [], encoding = {}, id, interactors, edits, constraints, onChange } = options;
 
     return {
         id,
@@ -57,7 +57,11 @@ export function point(options = {}) {
         // Mark-level edits (joint / arbitrary); channel-level edits live in
         // encoding[ch].edit. Both are gathered by the engine via collectEdits.
         edits,
+        // Feature-level data invariants, run on every edit commit (see elicit.js).
+        constraints,
         onChange,
+        // A dot's categorical axis wants a point per category (a tick, no width).
+        categoricalScale: 'point',
         // Field keys the interaction/constraint layer reads, derived from encoding.
         xKey: encoding.x && encoding.x.field,
         yKey: encoding.y && encoding.y.field,

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VibeJS · Categorical grid (band × band)</title>
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 1.5rem 2rem; max-width: 820px; color: #1f2733; }
+      h1 { font-size: 1.25rem; }
+      p  { color: #55606c; font-size: 0.9rem; }
+      code { background: #eef0f3; padding: 0.05rem 0.3rem; border-radius: 4px; }
+      .chart { border: 1px solid #e3e6ea; border-radius: 8px; display: inline-block; }
+      .note { background: #fff4e5; border: 1px solid #ffd8a8; color: #8a5a00;
+              padding: 0.5rem 0.7rem; border-radius: 8px; font-size: 0.84rem; }
+      .cols { display: flex; gap: 1.25rem; align-items: flex-start; margin-top: 1rem; }
+      pre { background: #0f172a; color: #d7e2f4; padding: 0.7rem 0.9rem; border-radius: 8px;
+            font-size: 0.78rem; line-height: 1.5; max-height: 380px; overflow: auto; min-width: 220px; }
+      .log { color: #64748b; font-size: 0.78rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Categorical grid — one mark per cell</h1>
+    <p>
+      A <b>band × band</b> point plot (3 columns × 3 rows). Both positional
+      channels are categorical, so a mark lives in a discrete <b>cell</b>.
+    </p>
+    <ul style="font-size:0.9rem; color:#55606c">
+      <li><b>Drag</b> a circle to move it to another cell (2D drag over two band scales — it snaps to the nearest cell).</li>
+      <li><b>Click an empty cell</b> to create a circle there.</li>
+      <li><b>Alt-click</b> a circle to delete it.</li>
+    </ul>
+    <p style="font-size:0.84rem;color:#55606c">
+      Both axes are categorical on a circle mark, so they resolve to
+      <code>d3.scalePoint</code> automatically (a dot sits on the tick) — not
+      <code>scaleBand</code>, which is for bars.
+    </p>
+    <p class="note">
+      The rule is <code>unique({ field: ["x", "y"] })</code> — a <b>composite</b>
+      key over both axes, so at most one mark per <code>(x, y)</code> cell. Two
+      marks may share a column or a row, just not the same cell. A create on an
+      occupied cell, or a drag onto one, is <b>rejected</b> (the mark stays put).
+      This is a data-layer invariant, so it holds for <i>both</i> create and move.
+    </p>
+
+    <div class="cols">
+      <div id="chart" class="chart"></div>
+      <div>
+        <div class="log" id="log">interactions log here…</div>
+        <pre id="state"></pre>
+      </div>
+    </div>
+
+    <script type="module">
+      import * as vibe from "./src/index.js";
+      const { drag, create, remove } = vibe.edit;
+      const { unique } = vibe.constraints;
+
+      const COLS = ["A", "B", "C"];
+      const ROWS = ["Low", "Mid", "High"];
+
+      const stateEl = document.getElementById("state");
+      const logEl = document.getElementById("log");
+      const show = (data) => {
+        stateEl.textContent = JSON.stringify(data, null, 1);
+        logEl.textContent = `${data.length} mark(s) — last change ${new Date().toLocaleTimeString()}`;
+      };
+
+      const chart = vibe.Elicit({
+        width: 520,
+        height: 420,
+        features: [
+          vibe.plot.point({
+            id: "grid",
+            onChange: show,
+            data: [
+              { x: "A", y: "Low", group: "alpha" },
+              { x: "B", y: "Mid", group: "beta" },
+              { x: "C", y: "High", group: "gamma" },
+            ],
+            encoding: {
+              // No explicit scale type: a point mark infers `point` (scalePoint)
+              // for categorical data — a circle sits on the category's tick.
+              x: { field: "x", domain: COLS },
+              y: { field: "y", domain: ROWS },
+              size: { value: 12 },
+              color: { field: "group", type: "ordinal", domain: ["alpha", "beta", "gamma"] },
+            },
+            // Mark-level edits: one 2D drag over both band axes (move between
+            // cells), a create (click an empty cell), and Alt-click to delete.
+            edits: [
+              drag({ channels: ["x", "y"] }),
+              create({ defaults: { group: "alpha" } }),
+              remove({ when: vibe.when.alt }),
+            ],
+            // One mark per (x, y) cell — holds for create AND move.
+            constraints: [ unique({ field: ["x", "y"], max: 1 }) ],
+          }),
+        ],
+      });
+      document.getElementById("chart").appendChild(chart);
+      show([
+        { x: "A", y: "Low", group: "alpha" },
+        { x: "B", y: "Mid", group: "beta" },
+        { x: "C", y: "High", group: "gamma" },
+      ]);
+    </script>
+  </body>
+</html>

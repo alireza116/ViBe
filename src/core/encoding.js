@@ -37,17 +37,20 @@ export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
 // ---------------------------------------------------------------------------
 
 /**
- * Choose a scale type from a channel name + its data values.
+ * Choose a scale type from a channel name + its data values. `categorical` is the
+ * concrete categorical scale to use for non-numeric positional data — the MARK
+ * decides it ('band' for bars, 'point' for dots), defaulting to 'band'.
  * @param {string} channelName
  * @param {any[]} values
+ * @param {import('../types').ScaleType} [categorical]
  * @returns {import('../types').ScaleType}
  */
-export function inferScaleType(channelName, values) {
+export function inferScaleType(channelName, values, categorical = 'band') {
     const sample = values.find((v) => v != null);
     const isNumeric = typeof sample === 'number';
     if (channelName === 'color') return isNumeric ? 'sequential' : 'ordinal';
-    // positional / size / opacity: strings are categorical (band), else linear.
-    return isNumeric ? 'linear' : (sample !== undefined ? 'band' : 'linear');
+    // positional / size / opacity: strings are categorical (band|point), else linear.
+    return isNumeric ? 'linear' : (sample !== undefined ? categorical : 'linear');
 }
 
 /**
@@ -58,7 +61,7 @@ export function inferScaleType(channelName, values) {
  * @returns {any[]}
  */
 export function inferDomainFromValues(type, values) {
-    if (type === 'band' || type === 'ordinal') {
+    if (type === 'band' || type === 'point' || type === 'ordinal') {
         return [...new Set(values.filter((v) => v != null))];
     }
     const nums = values.filter((v) => v != null);

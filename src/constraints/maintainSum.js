@@ -1,38 +1,36 @@
 // @ts-check
 import { defineConstraint } from './define.js';
 
-// maintainSum: keeps the total of all values at or below `targetSum`.
+// maintainSum: keeps the total of a field at or below `targetSum` — a cross-datum
+// data invariant.
 //
-// A *limiting* constraint (cross-datum): rather than rejecting an overshoot
-// (which freezes the drag), it bounds the value of the datum being dragged so
-// the total can rise only until it reaches `targetSum`. The user can drag freely
-// up to the remaining "budget" and is stopped there.
-// `field` (and optional `channel` for its scale) names the field summed. When
-// omitted it falls back to the interaction's value axis (legacy). Naming it makes
-// the constraint mean the same field no matter which edit runs it.
+// Rather than rejecting an overshoot (which would freeze the gesture), it bounds
+// the value of the datum just touched so the total can rise only until it reaches
+// `targetSum`: the user drags freely up to the remaining budget and stops there.
+// `field` names the data field summed (default 'y'). Because this is a dataset
+// invariant, it holds no matter which edit moved a value — a drag, a resize, or a
+// create can't push the total past the target.
 
 /**
- * @param {{ targetSum: number, field?: string, channel?: string }} options
+ * @param {{ targetSum: number, field?: string }} options
  * @returns {import('../types').Constraint}
  */
 export function maintainSum(options) {
-    const { targetSum, field, channel } = options;
+    const { targetSum, field = 'y' } = options;
 
     return defineConstraint(
-        ({ data, value, activeX, xKey, valueKey }) => {
-            if (activeX === undefined || value === undefined || !valueKey) return value;
+        ({ data, activeIndex, value }) => {
+            if (activeIndex == null || value === undefined) return value;
 
-            // Sum of every datum except the one being dragged. `valueKey` resolves
-            // to the constraint's own `field` when set, so this always sums the
-            // intended field regardless of which edit invoked it.
+            // Sum of every datum except the one just touched (by index, so ties on
+            // the category key don't matter).
             const sumOthers = data.reduce(
-                (sum, d) => (d[xKey] === activeX ? sum : sum + d[valueKey]),
+                (sum, d, i) => (i === activeIndex ? sum : sum + (d[field] || 0)),
                 0
             );
             const headroom = Math.max(0, targetSum - sumOthers);
             return Math.min(value, headroom);
         },
-        { type: 'maintainSum', options: { targetSum }, field, channel }
+        { type: 'maintainSum', options: { targetSum }, field }
     );
 }
-

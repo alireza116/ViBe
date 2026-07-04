@@ -24,18 +24,20 @@
     </p>
     <p class="note">
       One bidirectional model: change-edits (drag / resize / cycle / custom),
-      <code>create</code> as its own edit, <code>pick: "nearest"</code> proximity
-      targeting, per-edit <code>when</code> arbitration, field-correct constraints,
-      and edits that self-draw their guide via <code>guide: true</code> (no
-      <code>target</code>).
+      <code>create</code> and <code>remove</code> as their own edits,
+      <code>pick: "nearest"</code> proximity targeting, per-edit <code>when</code>
+      arbitration, and edits that self-draw their guide via <code>guide: true</code>.
+      Constraints are <b>data-layer invariants</b> declared at feature level
+      (<code>constraints: []</code>) — pure rules over the dataset, named by data
+      field, that hold no matter which edit fired.
     </p>
 
     <h2>1 · Vertical bars — drag to set the value</h2>
     <p><code>y</code> is a linear channel carrying <code>edit: drag()</code>. Dragging a bar sets its <code>y</code>.</p>
     <div id="c1" class="chart"></div>
 
-    <h2>2 · Bars — maintainSum(100), field-correct</h2>
-    <p>The sum constraint sits on the <code>y</code> edit with <b>no explicit field</b> — it defaults to that channel. Bars grow until the total hits 100. The dashed line is a declarative guide.</p>
+    <h2>2 · Bars — maintainSum(100) as a data invariant</h2>
+    <p>The sum rule is declared at <b>feature level</b> (<code>constraints: [maintainSum(...)]</code>), so it holds for <i>every</i> edit, not just the drag. Bars grow until the total hits 100. The dashed line is a declarative guide.</p>
     <div id="c2" class="chart"></div>
 
     <h2>3 · Scatter — 2D move</h2>
@@ -47,7 +49,7 @@
     <div id="c4" class="chart"></div>
 
     <h2>5 · Likert — drag a point, or click an empty slot to place one</h2>
-    <p>1D band <code>x</code>: <code>edit: drag()</code> snaps the dot to the nearest category, and a mark-level <code>edit.create()</code> lets a click on an empty slot mint a response (same scale inverse, one new datum).</p>
+    <p>1D categorical <code>x</code> on a dot resolves to a <b>point scale</b> (scalePoint — the dot sits on the category tick): <code>edit: drag()</code> snaps to the nearest category, and a mark-level <code>edit.create()</code> lets a click on an empty slot mint a response.</p>
     <div id="c5" class="chart"></div>
 
     <h2>6 · Custom edit — the escape hatch</h2>
@@ -59,12 +61,21 @@
     <div id="c7" class="chart"></div>
 
     <h2>8 · Nearest pick + self-drawn guide</h2>
-    <p>Thin bars are hard to hit, so the <code>y</code> edit uses <code>pick: "nearest"</code> — grab a bar from anywhere in its column. <code>guide: true</code> makes the edit draw its own snap ring and its <code>clamp</code> bounds; no <code>target</code>, no separate guide declaration.</p>
+    <p>Thin bars are hard to hit, so the <code>y</code> edit uses <code>pick: "nearest"</code> — grab a bar from anywhere in its column. <code>guide: true</code> makes the edit draw its own snap ring plus the <code>clamp</code> bounds for its channel (read from the feature's data invariants).</p>
     <div id="c8" class="chart"></div>
+
+    <h2>9 · unique — one bar per category</h2>
+    <p><code>create</code> mints a bar wherever you click, but the <code>unique({ field: "x" })</code> data invariant forbids two bars in the same band slot: a click on an occupied category is rejected, an empty one is filled.</p>
+    <div id="c9" class="chart"></div>
+
+    <h2>10 · remove — Alt-click to delete</h2>
+    <p><code>remove()</code> is just another edit. Here <b>click</b> recolours (<code>cycle</code>) and <b>Alt-click</b> deletes — the two share the click gesture, arbitrated by <code>when</code> (<code>noAlt</code> vs <code>alt</code>). <b>drag</b> still moves.</p>
+    <div id="c10" class="chart"></div>
 
     <script type="module">
       import * as vibe from "./src/index.js";
-      const { drag, resize, cycle, custom, create } = vibe.edit;
+      const { drag, resize, cycle, custom, create, remove } = vibe.edit;
+      const { clamp, maintainSum, count, unique } = vibe.constraints;
       const mount = (id, el) => document.getElementById(id).appendChild(el);
       const log = (label) => (data) => console.log(label, data);
 
@@ -93,12 +104,13 @@
             data: [{ x: "A", y: 25 }, { x: "B", y: 25 }, { x: "C", y: 25 }, { x: "D", y: 25 }],
             encoding: {
               x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-              y: { field: "y", type: "linear", domain: [0, 100],
-                   edit: drag({ constrain: [
-                     vibe.constraints.clamp({ min: 0 }),
-                     vibe.constraints.maintainSum({ targetSum: 100 }),
-                   ] }) },
+              y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ guide: true }) },
             },
+            // Data invariants: the dataset must always satisfy these, whatever edit ran.
+            constraints: [
+              clamp({ field: "y", min: 0 }),
+              maintainSum({ field: "y", targetSum: 100 }),
+            ],
           }),
         ],
       }));
@@ -151,7 +163,7 @@
             id: "lk5", onChange: log("likert"),
             data: [{ response: "Neutral" }],
             encoding: {
-              x: { field: "response", type: "band", domain: likert, edit: drag() },
+              x: { field: "response", domain: likert, edit: drag() }, // -> point scale
               size: { value: 10 }, color: { value: "#e4572e" },
             },
             // Click an empty slot to place a new response (create = plane edit).
@@ -195,11 +207,11 @@
               y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
               size: { value: 8 }, color: { value: "#0d9488" },
             },
-            // create is its own edit: plane click -> new datum (with defaults),
-            // capped at 8 points. Editing it afterwards uses the channel drags above.
-            edits: [
-              create({ defaults: { group: "a" }, constrain: [ vibe.constraints.count({ max: 8 }) ] }),
-            ],
+            // create is its own edit: plane click -> new datum (with defaults).
+            // Editing it afterwards uses the channel drags above.
+            edits: [ create({ defaults: { group: "a" } }) ],
+            // count is a dataset invariant — caps total at 8 regardless of edit.
+            constraints: [ count({ max: 8 }) ],
           }),
         ],
       }));
@@ -214,11 +226,52 @@
             encoding: {
               x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
               y: { field: "y", type: "linear", domain: [0, 100],
-                   edit: drag({
-                     pick: "nearest", threshold: 40, guide: true,
-                     constrain: [ vibe.constraints.clamp({ min: 0, max: 90 }) ],
-                   }) },
+                   edit: drag({ pick: "nearest", threshold: 40, guide: true }) },
             },
+            constraints: [ clamp({ field: "y", min: 0, max: 90 }) ],
+          }),
+        ],
+      }));
+
+      // 9 · unique — create is blocked on an occupied category, allowed on empty.
+      mount("c9", vibe.Elicit({
+        width: 560, height: 320,
+        features: [
+          vibe.plot.bar({
+            id: "bars9", fill: "#0d9488", onChange: log("unique"),
+            data: [{ x: "A", y: 40 }, { x: "C", y: 60 }],
+            encoding: {
+              x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
+              y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
+            },
+            edits: [ create({ defaults: { y: 20 } }) ],
+            // one datum per band slot; a create on a filled slot is rejected.
+            constraints: [ unique({ field: "x", max: 1 }) ],
+          }),
+        ],
+      }));
+
+      // 10 · remove — click recolours, Alt-click deletes, drag moves.
+      mount("c10", vibe.Elicit({
+        width: 560, height: 320,
+        features: [
+          vibe.plot.point({
+            id: "rm10", onChange: log("remove"),
+            data: [
+              { x: 25, y: 40, group: "alpha" },
+              { x: 55, y: 65, group: "beta" },
+              { x: 80, y: 30, group: "gamma" },
+            ],
+            encoding: {
+              x: { field: "x", type: "linear", domain: [0, 100], edit: drag() },
+              y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
+              size: { value: 10 },
+              // click recolours — but only a plain (non-Alt) click.
+              color: { field: "group", type: "ordinal",
+                       domain: ["alpha", "beta", "gamma"], edit: cycle({ when: vibe.when.noAlt }) },
+            },
+            // Alt-click deletes; shares the click gesture with cycle, arbitrated by `when`.
+            edits: [ remove({ when: vibe.when.alt }) ],
           }),
         ],
       }));

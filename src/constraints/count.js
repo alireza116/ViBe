@@ -1,9 +1,8 @@
 // @ts-check
 import { defineConstraint } from './define.js';
 
-// count: a dataset *cardinality* constraint — keeps the number of data elements
-// within `max`. Like maintainSum it is a whole-dataset (cross-datum) rule, so it
-// returns a full dataset and composes in the constraint pipeline.
+// count: a dataset *cardinality* invariant — keeps the number of data elements
+// within `max`. A whole-dataset rule (no field), so it returns a full dataset.
 //
 // When an interaction pushes the count over the limit:
 //   strategy 'replace' (default) -> keep the newest `max` (drop the oldest)
@@ -29,4 +28,3 @@ export function count(options = {}) {
         { type: 'count', options: { max, strategy } }
     );
 }
-

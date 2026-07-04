@@ -1,33 +1,31 @@
 // @ts-check
 import { defineConstraint } from './define.js';
 
-// clamp: restricts a field's value to a [min, max] range.
+// clamp: restricts a field's value to a [min, max] range — a data invariant.
 //
-// A *limiting* constraint: the point being dragged follows the cursor but stops
-// at `min` / `max`. When a bound is omitted, the field's scale domain is used.
-// `field` (+ optional `channel` for the scale) names the field it governs; when
-// omitted it falls back to the interaction's value axis (legacy).
+// The active datum's `field` is bounded to [min, max]. When a bound is omitted it
+// falls back to that field's declared domain (in data space). `field` names the
+// data field it governs (default 'y', the conventional value axis).
 
 /**
- * @param {{ min?: number, max?: number, field?: string, channel?: string }} [options]
+ * @param {{ min?: number, max?: number, field?: string }} [options]
  * @returns {import('../types').Constraint}
  */
 export function clamp(options = {}) {
-    const { min, max, field, channel } = options;
+    const { min, max, field = 'y' } = options;
 
     return defineConstraint(
-        ({ value, valueScale }) => {
+        ({ value, domain }) => {
             let lo = min;
             let hi = max;
-            if (lo === undefined && valueScale && valueScale.domainConfig) lo = Math.min(...valueScale.domainConfig);
-            if (hi === undefined && valueScale && valueScale.domainConfig) hi = Math.max(...valueScale.domainConfig);
+            if (lo === undefined && domain) lo = Math.min(...domain);
+            if (hi === undefined && domain) hi = Math.max(...domain);
 
             let v = value;
             if (lo !== undefined && v !== undefined) v = Math.max(lo, v);
             if (hi !== undefined && v !== undefined) v = Math.min(hi, v);
             return v;
         },
-        { type: 'clamp', options: { min, max }, field, channel }
+        { type: 'clamp', options: { min, max }, field }
     );
 }
-

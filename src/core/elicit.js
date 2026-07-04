@@ -1,7 +1,7 @@
 // @ts-check
 import { SceneGraph } from './scene.js';
 import { resolveScales } from './resolve.js';
-import { collectEdits, resolveChannels, primaryValue } from '../edit/route.js';
+import { collectEdits, resolveChannels } from '../edit/route.js';
 import { nearestMark, pickThreshold } from '../edit/pick.js';
 import { buildEditGuide } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
@@ -270,10 +270,11 @@ export function Elicit(spec) {
     };
 
     // Run one edit against a resolved target and commit. `index` addresses the
-    // datum being edited (null for create, which appends). The edit's channel
-    // context (field + scale) is resolved so nothing is inherited implicitly, then
-    // apply -> the edit's OWN constraints (with primaryValue setting the value
-    // field = the edit's own channel) -> commit. Returns whether data changed.
+    // datum being edited (null for create, which appends). The gesture is inverted
+    // through the scales in apply(), producing a data-space proposal; that proposal
+    // is then judged by the DATA-LAYER INVARIANTS (feature.constraints, plus any
+    // edit-scoped constrain sugar) before it commits. Constraints never see pixels.
+    // Returns whether data changed.
     /**
      * @param {any} feature
      * @param {import('../types').Edit} edit
@@ -303,21 +304,24 @@ export function Elicit(spec) {
         const result = edit.apply(ctx);
         if (result === undefined) return false;
 
-        // A plane edit (create) returns the whole appended dataset; a mark edit
-        // returns the new datum, spliced in at `index`.
-        const targetIndex = index != null ? index : currentData.length;
+        // A whole-dataset edit (create appends, remove filters) returns an array; a
+        // mark edit returns the new datum, spliced in at `index`.
         let newData = Array.isArray(result)
             ? result
             : currentData.map((d, i) => (i === index ? result : d));
 
-        const cctx = {
-            ...ctx,
-            ...primaryValue(resolved),
-            nodeIndex: targetIndex,
-            nodeData: newData[targetIndex]
-        };
+        // Which datum the gesture touched, for invariants that resolve a violation
+        // relative to it (create -> the appended one; remove -> none; else `index`).
+        const activeIndex = edit.type === 'create' ? newData.length - 1
+            : edit.type === 'remove' ? null
+                : index;
+
+        // Data-layer invariants: feature-wide first (hold for every edit), then any
+        // edit-scoped guard sugar. Pure data context — no scales-as-geometry.
+        const invariants = [...(feature.constraints || []), ...edit.constrain];
+        const cctx = { activeIndex, scales, encoding };
         let rejected = false;
-        for (const constraint of edit.constrain) {
+        for (const constraint of invariants) {
             const r = constraint(newData, currentData, cctx);
             if (r === false) { rejected = true; break; }
             if (r !== true && r !== undefined) newData = r;
@@ -405,17 +409,21 @@ export function Elicit(spec) {
                 if (info) info.activeIndex = null;
                 changed = true;
             } else {
-                // drag (or any other gesture a nearest edit declares): edit the
-                // locked mark, and keep the ring following the pointer.
+                // Any other gesture a nearest edit declares — a drag (uses the
+                // lock set on dragstart) or a discrete gesture like a click/dblclick
+                // delete (resolve a fresh nearest target). Keep the ring at the
+                // pointer either way.
                 const info = readSel(fid);
                 if (info) { info.px = event.x; info.py = event.y; }
-                const index = info ? info.activeIndex : null;
-                if (index != null) {
-                    nearestEdits
-                        .filter(e => e.gesture === event.type)
-                        .forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
+                const matching = nearestEdits.filter(e => e.gesture === event.type);
+                if (matching.length > 0) {
+                    let index = info ? info.activeIndex : null;
+                    if (index == null) index = nearestMark(marks, event.x, event.y, threshold);
+                    if (index != null) {
+                        matching.forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
+                    }
                 } else if (info) {
-                    changed = true; // nothing locked; still redraw the ring
+                    changed = true; // nothing to run; still redraw the ring
                 }
             }
         }

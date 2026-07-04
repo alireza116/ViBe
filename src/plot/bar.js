@@ -26,6 +26,7 @@ function buildBar(options, forcedOrientation) {
         id,
         interactors,
         edits,
+        constraints,
         onChange,
         orientation: orientationOption
     } = options;
@@ -42,7 +43,10 @@ function buildBar(options, forcedOrientation) {
         interactors,
         encoding,
         edits,
+        constraints,
         onChange,
+        // A bar's categorical axis wants the band interval (its thickness).
+        categoricalScale: 'band',
         xKey,
         yKey,
         /**

@@ -7,10 +7,18 @@ import * as d3 from 'd3';
  * The single scale factory for every channel — positional (x/y) and beyond
  * (color, size, opacity). `range` is the channel's visual output range: pixels
  * for x/y, a radius interval for size, a palette or two-stop ramp for color.
- *   linear     -> continuous field -> continuous output (pixel | radius | …)
- *   band       -> categorical field -> position (drives band center)
- *   ordinal    -> discrete field    -> discrete output (category -> colour)
- *   sequential -> continuous field  -> continuous colour along a ramp
+ *   linear     -> continuous field   -> continuous output (pixel | radius | …)
+ *   band       -> categorical field   -> an interval per category (bars: the band
+ *                                        gives the bar its thickness)
+ *   point      -> categorical field   -> a point per category (dots: a circle sits
+ *                                        on the category's tick, no width)
+ *   ordinal    -> discrete field      -> discrete output (category -> colour)
+ *   sequential -> continuous field    -> continuous colour along a ramp
+ *
+ * band vs point is the categorical split that matters per MARK: a bar needs the
+ * interval (bandwidth), a circle wants the tick. The mark declares which it wants
+ * (`categoricalScale`) and the resolver picks accordingly; an explicit `type`
+ * still overrides.
  * @param {any} spec
  * @param {any[]} range
  * @returns {import('../types').Scale | null}
@@ -24,6 +32,8 @@ export function createScale(spec, range) {
 
     if (type === 'band') {
         scale = d3.scaleBand().domain(spec.domain).range(range).padding(0.1);
+    } else if (type === 'point') {
+        scale = d3.scalePoint().domain(spec.domain).range(range).padding(0.5);
     } else if (type === 'ordinal') {
         scale = d3.scaleOrdinal().domain(spec.domain).range(range);
     } else if (type === 'sequential') {
@@ -52,7 +62,7 @@ export function createScale(spec, range) {
     // `invertible` tells interactors which channels a gesture can drive.
     // These are the x/y special case of the general channel model in
     // core/encoding.js; positionOnScale/invertOnScale are the shared impl.
-    scale.invertible = (type === 'linear' || type === 'band');
+    scale.invertible = (type === 'linear' || type === 'band' || type === 'point');
     scale.encode = (/** @type {any} */ value, /** @type {any} */ fallback) => positionOnScale(scale, value, fallback);
     scale.invertValue = scale.invertible ? (/** @type {any} */ pixel) => invertOnScale(scale, pixel) : () => undefined;
 
@@ -97,6 +107,11 @@ export function positionOnScale(scale, value, fallback) {
         const p = scale(value);
         return p == null ? fallback : p + scale.bandwidth() / 2;
     }
+    if (scale.type === 'point') {
+        // scalePoint already returns the tick position (no bandwidth to offset).
+        const p = scale(value);
+        return p == null ? fallback : p;
+    }
     return scale(value);
 }
 
@@ -126,16 +141,17 @@ export function bandwidthOf(scale, fallback) {
 export function invertOnScale(scale, pixel) {
     if (!scale) return undefined;
     // Colour scales (ordinal/sequential) don't map a pixel back to data.
-    if (scale.type !== 'band' && scale.type !== 'linear') return undefined;
+    if (scale.type !== 'band' && scale.type !== 'point' && scale.type !== 'linear') return undefined;
 
-    if (scale.type === 'band') {
+    if (scale.type === 'band' || scale.type === 'point') {
         const domain = scale.domain();
         if (!domain.length) return undefined;
-        // Band scales aren't invertible, so find the category whose center is
-        // closest to the pixel. This mirrors positionOnScale's band branch.
+        // Categorical scales aren't invertible, so find the category whose center
+        // is closest to the pixel. This mirrors positionOnScale: a band's center
+        // is offset by half its bandwidth, a point's center is the tick itself.
+        const half = scale.type === 'band' ? scale.bandwidth() / 2 : 0;
         let nearest = domain[0];
         let bestDist = Infinity;
-        const half = scale.bandwidth() / 2;
         for (const category of domain) {
             const center = scale(category) + half;
             const dist = Math.abs(center - pixel);

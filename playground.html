@@ -364,6 +364,11 @@
             ><input type="checkbox" id="single" /> Single mark (count max 1 —
             Likert)</label
           >
+          <label class="check"
+            ><input type="checkbox" id="del" /> Delete
+            (<code>edit: remove()</code> — click a mark; Alt-click when color
+            edit shares the click)</label
+          >
         </div>
 
         <div class="group">
@@ -375,6 +380,7 @@
               <option value="clamp">clamp 0–80</option>
               <option value="sum">maintainSum 200</option>
               <option value="snap">snap to 5 (custom)</option>
+              <option value="unique">unique (one per category)</option>
             </select>
           </div>
         </div>
@@ -413,7 +419,7 @@
 
     <script type="module">
       import * as vibe from "./src/index.js";
-      const { drag, resize, cycle, create } = vibe.edit;
+      const { drag, resize, cycle, create, remove } = vibe.edit;
 
       const rand = (a, b) => Math.round(a + Math.random() * (b - a));
       // Sample a value inside a linear domain, kept a little off the edges so
@@ -501,10 +507,12 @@
       const FEATURE_ID = "responses";
 
       // One positional channel spec from its axis controls (no edit attached yet).
-      function axisChannel(field, type, domain, cats) {
+      // A categorical ("band") selection resolves to the concrete scale the mark
+      // wants: `band` for a bar (needs the interval), `point` for a dot (a tick).
+      function axisChannel(field, type, domain, cats, catType) {
         if (type === "none") return undefined;
         return type === "band"
-          ? { field, type: "band", domain: cats }
+          ? { field, type: catType, domain: cats }
           : { field, type: "linear", domain };
       }
 
@@ -555,20 +563,22 @@
       }
 
       // ---- Constraint pairs: { real, code } so one selection materializes both
-      // the live constraint and its printed source. ----------------------------
-      function valueConstraints(opts) {
+      // the live invariant and its printed source. Constraints are DATA-LAYER
+      // invariants declared at feature level, named by data field: value-axis
+      // rules use `valueField`, the per-category rule uses `categoryField`. -----
+      function constraintPairs(opts, valueField, categoryField) {
         if (opts.constraint === "clamp")
           return [
             {
-              real: vibe.constraints.clamp({ min: 0, max: 80 }),
-              code: `vibe.constraints.clamp({ min: 0, max: 80 })`,
+              real: vibe.constraints.clamp({ field: valueField, min: 0, max: 80 }),
+              code: `vibe.constraints.clamp({ field: "${valueField}", min: 0, max: 80 })`,
             },
           ];
         if (opts.constraint === "sum")
           return [
             {
-              real: vibe.constraints.maintainSum({ targetSum: 200 }),
-              code: `vibe.constraints.maintainSum({ targetSum: 200 })`,
+              real: vibe.constraints.maintainSum({ field: valueField, targetSum: 200 }),
+              code: `vibe.constraints.maintainSum({ field: "${valueField}", targetSum: 200 })`,
             },
           ];
         if (opts.constraint === "snap")
@@ -576,8 +586,16 @@
             {
               real: vibe.constraints.define(
                 ({ value }) => Math.round(value / 5) * 5,
+                { field: valueField },
               ),
-              code: `vibe.constraints.define(({ value }) => Math.round(value / 5) * 5)`,
+              code: `vibe.constraints.define(({ value }) => Math.round(value / 5) * 5, { field: "${valueField}" })`,
+            },
+          ];
+        if (opts.constraint === "unique" && categoryField)
+          return [
+            {
+              real: vibe.constraints.unique({ field: categoryField }),
+              code: `vibe.constraints.unique({ field: ${JSON.stringify(categoryField)} })`,
             },
           ];
         return [];
@@ -588,9 +606,10 @@
       };
 
       // ---- Edit pairs --------------------------------------------------------
-      // A positional drag edit. pick / when / constrain / guide are optional and
-      // printed only when set, so a plain channel reads as bare `drag()`.
-      function dragEdit({ pick, threshold, when, constrain, guide }) {
+      // A positional drag edit. pick / when / guide are optional and printed only
+      // when set, so a plain channel reads as bare `drag()`. Constraints are no
+      // longer attached here — they're data invariants on the feature.
+      function dragEdit({ pick, threshold, when, guide }) {
         const o = {};
         const parts = [];
         if (pick === "nearest") {
@@ -601,10 +620,6 @@
         if (when) {
           o.when = when.fn;
           parts.push(`when: ${when.code}`);
-        }
-        if (constrain && constrain.length) {
-          o.constrain = constrain.map((c) => c.real);
-          parts.push(`constrain: [${constrain.map((c) => c.code).join(", ")}]`);
         }
         if (guide) {
           o.guide = true;
@@ -619,8 +634,13 @@
 
       // ---- Compose a spec from the chosen options ----------------------------
       function compose(opts, data, onChange) {
-        const x = axisChannel("x", opts.xType, opts.xDomain, opts.xCats);
-        const y = axisChannel("y", opts.yType, opts.yDomain, opts.yCats);
+        const isBar = opts.mark === "bar";
+        // Concrete categorical scale for this mark: bars need band intervals,
+        // dots want a point per category.
+        const catType = isBar ? "band" : "point";
+        const isCat = (s) => s.type === "band" || s.type === "point";
+        const x = axisChannel("x", opts.xType, opts.xDomain, opts.xCats, catType);
+        const y = axisChannel("y", opts.yType, opts.yDomain, opts.yCats, catType);
         const pos = [
           ["x", x],
           ["y", y],
@@ -628,7 +648,6 @@
         if (pos.length === 0)
           return { error: "Pick at least one positional axis (x or y)." };
 
-        const isBar = opts.mark === "bar";
         if (isBar) {
           const bands = pos.filter(([, s]) => s.type === "band").length;
           if (pos.length !== 2 || bands !== 1)
@@ -637,8 +656,8 @@
             };
         }
 
-        // The value axis carries the constraints + self-drawn guide: for a bar
-        // it's the linear axis; for a point it's y if present, else x.
+        // The value axis carries the self-drawn guide (and value-axis invariants):
+        // for a bar it's the linear axis; for a point it's y if present, else x.
         const valueAxis = isBar
           ? x && x.type !== "band"
             ? "x"
@@ -646,6 +665,18 @@
           : y
             ? "y"
             : "x";
+        // The category axis/axes (band) — what `unique` groups by. With two band
+        // axes (a categorical grid) the key is composite, so uniqueness is
+        // per-CELL, not per-column. Field name equals the channel name here.
+        const categoryNames = pos
+          .filter(([, s]) => isCat(s))
+          .map(([n]) => n);
+        const categoryField =
+          categoryNames.length === 0
+            ? null
+            : categoryNames.length === 1
+              ? categoryNames[0]
+              : categoryNames;
 
         // Non-positional edits (color cycle, size resize) act on the touched mark
         // and so need direct picking — the proximity plane on top would swallow
@@ -657,7 +688,17 @@
           opts.interaction === "proximity" && !wantColorEdit && !wantResize;
         const pickMode = useNearest ? "nearest" : "direct";
         const moveWhen = wantResize ? WHEN_NOSHIFT : null; // plain drag moves, Shift resizes
-        const cons = valueConstraints(opts);
+
+        // Feature-level data invariants (the whole point): the selected rule, plus
+        // count(1) for a single-mark device. They hold for every edit, not just one.
+        const selectedCons = constraintPairs(opts, valueAxis, categoryField);
+        const featureCons = [
+          ...selectedCons,
+          ...(opts.single ? [COUNT1] : []),
+        ];
+        // When delete shares the click gesture with a color cycle, arbitrate them:
+        // plain click recolours (noAlt), Alt-click deletes (alt).
+        const delSharesClick = opts.del && wantColorEdit;
 
         // Build the encoding in parallel: enc (live) + encCode (Raw source).
         const enc = {},
@@ -684,7 +725,6 @@
               pick: pickMode,
               threshold: opts.threshold,
               when: moveWhen,
-              constrain: isValue ? cons : [],
               guide: isValue && opts.gGuide,
             }),
           );
@@ -696,7 +736,14 @@
             setCh(
               "color",
               { field: "group", domain: GROUPS },
-              wantColorEdit ? { real: cycle(), code: `cycle()` } : null,
+              wantColorEdit
+                ? delSharesClick
+                  ? {
+                      real: cycle({ when: vibe.when.noAlt }),
+                      code: `cycle({ when: vibe.when.noAlt })`,
+                    }
+                  : { real: cycle(), code: `cycle()` }
+                : null,
             );
           else if (opts.color === "mag") setCh("color", { field: "mag" });
           if (opts.size === "mag")
@@ -718,7 +765,6 @@
           markEditCodes = [];
         if (opts.create) {
           const trigger = useNearest ? "dblclick" : "click";
-          const cp = opts.single ? [...cons, COUNT1] : cons;
           const defaults = {};
           if (opts.mark === "point" && opts.color === "group")
             defaults.group = GROUPS[0];
@@ -733,13 +779,30 @@
             o.defaults = defaults;
             parts.push(`defaults: ${js(defaults)}`);
           }
-          if (cp.length) {
-            o.constrain = cp.map((c) => c.real);
-            parts.push(`constrain: [${cp.map((c) => c.code).join(", ")}]`);
-          }
           markEdits.push(create(o));
           markEditCodes.push(
             parts.length ? `create({ ${parts.join(", ")} })` : `create()`,
+          );
+        }
+
+        // remove is just another edit: it shares the dispatch + arbitration. It
+        // picks like the drags (nearest/direct); when a color cycle already owns
+        // the plain click, delete defers to Alt-click.
+        if (opts.del) {
+          const o = {},
+            parts = [];
+          if (pickMode === "nearest") {
+            o.pick = "nearest";
+            o.threshold = opts.threshold;
+            parts.push(`pick: "nearest"`, `threshold: ${opts.threshold}`);
+          }
+          if (delSharesClick) {
+            o.when = vibe.when.alt;
+            parts.push(`when: vibe.when.alt`);
+          }
+          markEdits.push(remove(o));
+          markEditCodes.push(
+            parts.length ? `remove({ ${parts.join(", ")} })` : `remove()`,
           );
         }
 
@@ -748,10 +811,10 @@
         const guides = [],
           guideCodes = [];
         if (opts.gRule) {
-          if (y && y.type !== "band") {
+          if (y && !isCat(y)) {
             guides.push(vibe.guides.rule({ y: 50, label: "target 50" }));
             guideCodes.push(`vibe.guides.rule({ y: 50, label: "target 50" })`);
-          } else if (x && x.type === "band") {
+          } else if (x && isCat(x)) {
             const mid = opts.xCats[Math.floor(opts.xCats.length / 2)];
             guides.push(vibe.guides.rule({ x: mid, label: "midpoint" }));
             guideCodes.push(
@@ -765,6 +828,7 @@
           data,
           encoding: enc,
           edits: markEdits,
+          constraints: featureCons.map((c) => c.real),
           onChange,
           ...(isBar ? { fill: "#4f46e5" } : {}),
         });
@@ -777,7 +841,14 @@
             features: [feature],
             guides,
           },
-          code: generateCode(opts, encCode, markEditCodes, guideCodes, oneD),
+          code: generateCode(
+            opts,
+            encCode,
+            markEditCodes,
+            featureCons.map((c) => c.code),
+            guideCodes,
+            oneD,
+          ),
           meta: {
             mark: opts.mark,
             channels: Object.keys(enc).join(", "),
@@ -797,11 +868,11 @@
       }
 
       // ---- Codegen: print the exact spec for the current selection -----------
-      function generateCode(opts, encCode, markEditCodes, guideCodes, oneD) {
+      function generateCode(opts, encCode, markEditCodes, constraintCodes, guideCodes, oneD) {
         const markFn =
           opts.mark === "bar" ? "vibe.plot.bar" : "vibe.plot.point";
         const out = [];
-        out.push(`const { drag, resize, cycle, create } = vibe.edit;`);
+        out.push(`const { drag, resize, cycle, create, remove } = vibe.edit;`);
         out.push(``);
         out.push(`vibe.Elicit({`);
         out.push(`  width: 600,`);
@@ -814,6 +885,11 @@
         if (markEditCodes.length) {
           out.push(`      edits: [`);
           markEditCodes.forEach((c) => out.push(`        ${c},`));
+          out.push(`      ],`);
+        }
+        if (constraintCodes.length) {
+          out.push(`      constraints: [ // data invariants — hold for every edit`);
+          constraintCodes.forEach((c) => out.push(`        ${c},`));
           out.push(`      ],`);
         }
         out.push(`      onChange: (data) => { /* your belief state */ },`);
@@ -865,6 +941,7 @@
         "threshold",
         "create",
         "single",
+        "del",
         "constraint",
         "gGuide",
         "gRule",
@@ -904,6 +981,7 @@
           threshold: +el("threshold").value,
           create: el("create").checked,
           single: el("single").checked,
+          del: el("del").checked,
           constraint: el("constraint").value,
           gGuide: el("gGuide").checked,
           gRule: el("gRule").checked,
@@ -944,6 +1022,18 @@
           notes.push("drag to move, Shift-drag to resize (edit.resize)");
         else if (opts.resize && opts.size !== "mag")
           notes.push("resize needs Size = by mag");
+        if (opts.del)
+          notes.push(
+            opts.colorEdit && opts.color === "group"
+              ? "Alt-click a mark to delete (plain click recolours)"
+              : `${meta.pick === "nearest" ? "click near" : "click"} a mark to delete (edit.remove)`,
+          );
+        if (
+          opts.constraint === "unique" &&
+          opts.xType !== "band" &&
+          opts.yType !== "band"
+        )
+          notes.push("unique needs a band (category) axis to group by");
         el("meta").innerHTML = `
           <dt>mark</dt><dd><code>${meta.mark}</code></dd>
           <dt>channels</dt><dd>${meta.channels}</dd>
@@ -996,6 +1086,7 @@
           interaction: "direct",
           create: true,
           single: true,
+          del: false,
           constraint: "none",
         },
         scatter: {
@@ -1011,6 +1102,7 @@
           interaction: "proximity",
           create: true,
           single: false,
+          del: false,
           constraint: "none",
         },
         categorical: {
@@ -1024,6 +1116,7 @@
           interaction: "proximity",
           create: true,
           single: false,
+          del: false,
           constraint: "none",
         },
         bars: {
@@ -1038,6 +1131,7 @@
           interaction: "proximity",
           create: false,
           single: false,
+          del: false,
           constraint: "sum",
         },
       };

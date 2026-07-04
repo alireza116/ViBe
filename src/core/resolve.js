@@ -52,15 +52,20 @@ export function resolveScales(features, state, spec, dims) {
         }
     }
 
-    // 2 + 3. Per-mark encodings: carry explicit sub-specs, gather values.
+    // 2 + 3. Per-mark encodings: carry explicit sub-specs, gather values, and note
+    // each mark's preferred categorical scale ('band' for bars, 'point' for dots).
+    // When marks disagree on a shared categorical axis, 'band' wins — a bar needs
+    // the interval, and a dot renders fine on a band (it just uses the centre).
     for (const feature of features) {
         const enc = normalizeEncoding(feature);
         const data = state[feature.id] || feature.data || [];
+        const pref = feature.categoricalScale || 'band';
         for (const [ch, chSpec] of Object.entries(enc)) {
             const a = ensure(ch);
             if (a.type == null && chSpec.type != null) a.type = chSpec.type;
             if (a.domain == null && chSpec.domain != null) a.domain = chSpec.domain;
             if (a.range == null && chSpec.range != null) a.range = chSpec.range;
+            if (a.catPref !== 'band') a.catPref = pref;
             if (chSpec.field != null) {
                 for (const d of data) a.values.push(d[chSpec.field]);
             }
@@ -75,7 +80,7 @@ export function resolveScales(features, state, spec, dims) {
         const hasData = a.values.some((v) => v != null);
         if (!hasSpec && !hasData) continue; // channel unused (e.g. 1D dropped axis)
 
-        const type = a.type || inferScaleType(ch, a.values);
+        const type = a.type || inferScaleType(ch, a.values, a.catPref || 'band');
         const domain = a.domain || inferDomainFromValues(type, a.values);
         const range = a.range || channelRange(ch, type, dims);
         const scale = createScale({ type, domain }, range);

@@ -32,9 +32,13 @@ export function buildEditGuide(feature, edit, ctx) {
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
 
-    // Constraint boundaries owned by this edit, on the edit's own value channel.
+    // Constraint boundaries on the edit's own value channel. Constraints now live
+    // at the feature level (data invariants); we draw the ones whose field matches
+    // this edit's primary channel, plus any edit-scoped guard sugar.
     if (primary && primary.scale) {
-        for (const constraint of edit.constrain) {
+        const invariants = [...(feature.constraints || []), ...edit.constrain];
+        for (const constraint of invariants) {
+            if (constraint.field && primary.field && constraint.field !== primary.field) continue;
             nodes.push(...constraintGuide(constraint, {
                 feature, data, scales, width, height, primary, color
             }));

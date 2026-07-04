@@ -12,7 +12,11 @@
 //                 direct  : the mark the gesture landed on
 //                 nearest : the closest mark within `threshold` (proximity)
 //                 plane   : no target — the edit produces a new datum (create)
-//     constrain constraint(s) scoped to this edit (they carry their own field)
+//     constrain constraint(s) to also apply on this edit's commit. Constraints
+//               are DATA-LAYER INVARIANTS — pure rules over the dataset, named by
+//               data field — so the canonical home is the feature's `constraints`
+//               (they then hold for every edit, not just this one). This per-edit
+//               list is sugar for a guard you only want on one edit.
 //     guide     true to self-draw this edit's guide (constraint bounds / snap
 //               ring), retiring the old `target` indirection
 //     apply     (ctx) => datum | dataset | undefined — performs the edit
@@ -173,6 +177,35 @@ export function create(options = {}) {
             }
             if (!placed) return undefined; // no positionable channel: nothing to place
             return [...ctx.data, datum];
+        }
+    });
+}
+
+/**
+ * remove — deletes the targeted datum. Like every other edit it is just a
+ * { gesture, when, pick } descriptor, so it shares the dispatch and arbitration:
+ * `when` decides whether it (vs. a sibling edit on the same gesture) claims the
+ * event, and `pick` selects the target — 'direct' (the mark clicked) or 'nearest'
+ * (the closest mark within threshold, deletable from empty space).
+ *
+ * Trigger defaults to a plain click. When another click edit already lives on the
+ * mark (e.g. `cycle` recolour), pair them with a modifier so they don't both
+ * fire: `cycle({ when: when.noAlt })` + `remove({ when: when.alt })` — Alt-click
+ * to delete, plain click to recolour. (The opinionated preset layer will wire
+ * this pairing for you; at the primitive level you compose it explicitly.)
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function remove(options = {}) {
+    const { channel, channels, ...rest } = options;
+    return makeEdit({
+        type: 'remove',
+        gesture: options.gesture || 'click',
+        channels: channels || (channel ? [channel] : null),
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            if (ctx.index == null) return undefined; // no target resolved
+            return ctx.data.filter((_, i) => i !== ctx.index);
         }
     });
 }

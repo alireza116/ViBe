@@ -2,7 +2,7 @@ import { ScaleLinear, ScaleBand, ScaleOrdinal } from 'd3';
 
 export type Datum = Record<string, any>;
 
-export type ScaleType = 'linear' | 'band' | 'ordinal' | 'sequential';
+export type ScaleType = 'linear' | 'band' | 'point' | 'ordinal' | 'sequential';
 
 export interface CustomScaleProperties {
   type: ScaleType;
@@ -44,21 +44,23 @@ export interface ResolvedChannel {
   scale?: Scale | null;
 }
 
-export interface ConstraintContext extends EditContext {
-  valueKey?: string;
-  valueScale?: Scale;
-  nodeIndex?: number | null;
-  nodeData?: Datum;
-  activeIndex?: number | null;
+// The pure-data context a constraint reducer receives (defineConstraint). By the
+// time it runs, gestures are already inverted to data space, so it sees only data.
+export interface ConstraintContext {
+  data: Datum[];
+  oldData: Datum[];
+  activeIndex: number | null;
   active?: Datum;
-  activeX?: any;
+  field: string;
   value?: any;
+  domain?: number[];
 }
 
 export interface Constraint {
-  (newData: Datum[], oldData: Datum[], context: ConstraintContext): Datum[] | boolean | undefined;
+  (newData: Datum[], oldData: Datum[], context: any): Datum[] | boolean | undefined;
   constraintType?: string;
   options?: any;
+  field?: string;
   guide?: (ctx: any) => any[];
 }
 

@@ -3,4 +3,5 @@ export { defineConstraint, defineConstraint as define, defineConstraint as custo
 export { clamp } from './clamp.js';
 export { maintainSum } from './maintainSum.js';
 export { count } from './count.js';
+export { unique } from './unique.js';
 
