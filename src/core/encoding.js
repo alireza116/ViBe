@@ -30,6 +30,12 @@ export const DEFAULT_PALETTE = ['#4f46e5', '#0d9488', '#e4572e', '#f2b705', '#7b
 // Default two-stop ramp for a continuous colour channel.
 export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
 
+// Channel families that share scale semantics, so a field-driven fill/stroke is
+// colour-scaled and a field-driven fillOpacity/strokeOpacity is opacity-scaled —
+// symmetric with the base `color` / `opacity` channels.
+const COLOR_CHANNELS = new Set(['color', 'fill', 'stroke']);
+const OPACITY_CHANNELS = new Set(['opacity', 'fillOpacity', 'strokeOpacity']);
+
 // ---------------------------------------------------------------------------
 // Inference (value-based, so both the per-mark resolver here and the engine's
 // cross-mark resolver can share it). `values` is the flat list of a field's
@@ -37,9 +43,34 @@ export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
 // ---------------------------------------------------------------------------
 
 /**
- * Choose a scale type from a channel name + its data values. `categorical` is the
- * concrete categorical scale to use for non-numeric positional data — the MARK
- * decides it ('band' for bars, 'point' for dots), defaulting to 'band'.
+ * Route a channel + a data KIND to a concrete scale type. This is the one place
+ * the "what a channel does with continuous vs discrete vs temporal data" decision
+ * lives, shared by both the data-inference path (inferScaleType) and the
+ * schema-declared path (measureToScaleType) so they can never disagree.
+ *   kind: 'numeric' (continuous), 'categorical' (discrete), 'temporal' (dates).
+ * `categorical` is the concrete categorical scale for non-numeric positional data
+ * — the MARK decides it ('band' for bars, 'point' for dots), defaulting to 'band'.
+ * @param {string} channelName
+ * @param {'numeric' | 'categorical' | 'temporal'} kind
+ * @param {import('../types').ScaleType} [categorical]
+ * @returns {import('../types').ScaleType}
+ */
+export function scaleTypeFor(channelName, kind, categorical = 'band') {
+    // Colour family (fill/stroke are colour-scaled just like `color`): continuous
+    // data (numeric or temporal) -> a ramp, discrete -> a palette.
+    if (COLOR_CHANNELS.has(channelName)) return kind === 'categorical' ? 'ordinal' : 'sequential';
+    // positional / size / opacity: dates -> time, numbers -> linear, strings ->
+    // the mark's categorical scale (band|point).
+    if (kind === 'temporal') return 'time';
+    if (kind === 'numeric') return 'linear';
+    return categorical;
+}
+
+/**
+ * Choose a scale type from a channel name + its data values. Derives the data
+ * KIND from a sample (Date -> temporal, number -> numeric, else categorical) and
+ * routes it through the shared `scaleTypeFor`. A channel with no non-null values
+ * defaults to a continuous (linear) scale.
  * @param {string} channelName
  * @param {any[]} values
  * @param {import('../types').ScaleType} [categorical]
@@ -47,10 +78,28 @@ export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
  */
 export function inferScaleType(channelName, values, categorical = 'band') {
     const sample = values.find((v) => v != null);
-    const isNumeric = typeof sample === 'number';
-    if (channelName === 'color') return isNumeric ? 'sequential' : 'ordinal';
-    // positional / size / opacity: strings are categorical (band|point), else linear.
-    return isNumeric ? 'linear' : (sample !== undefined ? categorical : 'linear');
+    if (sample === undefined) return COLOR_CHANNELS.has(channelName) ? 'sequential' : 'linear';
+    const kind = sample instanceof Date ? 'temporal'
+        : typeof sample === 'number' ? 'numeric'
+            : 'categorical';
+    return scaleTypeFor(channelName, kind, categorical);
+}
+
+/**
+ * Map a SCHEMA measurement type (what the data means) to a concrete scale type
+ * for a channel (how it's drawn), via the same routing as data inference. Lets an
+ * author declare `belief: quantitative` once and have it become linear on x/y,
+ * sequential on colour, etc.
+ * @param {string} channelName
+ * @param {import('../types').MeasureType} measure
+ * @param {import('../types').ScaleType} [categorical]
+ * @returns {import('../types').ScaleType}
+ */
+export function measureToScaleType(channelName, measure, categorical = 'band') {
+    const kind = measure === 'quantitative' ? 'numeric'
+        : measure === 'temporal' ? 'temporal'
+            : 'categorical'; // categorical | ordinal
+    return scaleTypeFor(channelName, kind, categorical);
 }
 
 /**
@@ -81,10 +130,13 @@ export function channelRange(channelName, type, dims) {
         case 'x': return [0, dims.width];
         case 'y': return [dims.height, 0];   // pixel y is inverted
         case 'size': return [3, 18];         // radius, px
-        case 'opacity': return [0.15, 1];
-        case 'color': return type === 'sequential' ? DEFAULT_RAMP : DEFAULT_PALETTE;
-        default: return [0, 1];
     }
+    // Family-based ranges: any opacity/colour channel gets the same output range
+    // as its base channel, so fillOpacity/strokeOpacity and fill/stroke behave
+    // like opacity/color when driven by a field.
+    if (OPACITY_CHANNELS.has(channelName)) return [0.15, 1];
+    if (COLOR_CHANNELS.has(channelName)) return type === 'sequential' ? DEFAULT_RAMP : DEFAULT_PALETTE;
+    return [0, 1];
 }
 
 /**

@@ -4,6 +4,16 @@
 import * as d3 from 'd3';
 
 /**
+ * Coerce a domain value to a Date for the `time` scale. Accepts Dates, epoch
+ * numbers, and ISO/parseable date strings; leaves an already-Date untouched.
+ * @param {any} v
+ * @returns {Date}
+ */
+function toDate(v) {
+    return v instanceof Date ? v : new Date(v);
+}
+
+/**
  * The single scale factory for every channel — positional (x/y) and beyond
  * (color, size, opacity). `range` is the channel's visual output range: pixels
  * for x/y, a radius interval for size, a palette or two-stop ramp for color.
@@ -30,7 +40,11 @@ export function createScale(spec, range) {
     /** @type {any} */
     let scale;
 
-    if (type === 'band') {
+    if (type === 'time') {
+        // Temporal axis — continuous like linear, but over Dates. Domain values
+        // may be Dates, epoch numbers, or date strings; coerce them.
+        scale = d3.scaleTime().domain(spec.domain.map(toDate)).range(range);
+    } else if (type === 'band') {
         scale = d3.scaleBand().domain(spec.domain).range(range).padding(0.1);
     } else if (type === 'point') {
         scale = d3.scalePoint().domain(spec.domain).range(range).padding(0.5);
@@ -62,7 +76,7 @@ export function createScale(spec, range) {
     // `invertible` tells interactors which channels a gesture can drive.
     // These are the x/y special case of the general channel model in
     // core/encoding.js; positionOnScale/invertOnScale are the shared impl.
-    scale.invertible = (type === 'linear' || type === 'band' || type === 'point');
+    scale.invertible = (type === 'linear' || type === 'time' || type === 'band' || type === 'point');
     scale.encode = (/** @type {any} */ value, /** @type {any} */ fallback) => positionOnScale(scale, value, fallback);
     scale.invertValue = scale.invertible ? (/** @type {any} */ pixel) => invertOnScale(scale, pixel) : () => undefined;
 
@@ -112,6 +126,8 @@ export function positionOnScale(scale, value, fallback) {
         const p = scale(value);
         return p == null ? fallback : p;
     }
+    // Temporal: coerce the value to a Date so string/epoch data still positions.
+    if (scale.type === 'time') return scale(toDate(value));
     return scale(value);
 }
 
@@ -141,7 +157,7 @@ export function bandwidthOf(scale, fallback) {
 export function invertOnScale(scale, pixel) {
     if (!scale) return undefined;
     // Colour scales (ordinal/sequential) don't map a pixel back to data.
-    if (scale.type !== 'band' && scale.type !== 'point' && scale.type !== 'linear') return undefined;
+    if (scale.type !== 'band' && scale.type !== 'point' && scale.type !== 'linear' && scale.type !== 'time') return undefined;
 
     if (scale.type === 'band' || scale.type === 'point') {
         const domain = scale.domain();
@@ -163,10 +179,16 @@ export function invertOnScale(scale, pixel) {
         return nearest;
     }
 
-    // Continuous (linear) scale: invert then clamp into the (possibly reversed)
-    // domain so created values never escape the axis.
+    // Continuous (linear | time) scale: invert then clamp into the (possibly
+    // reversed) domain so created values never escape the axis. Time inverts to a
+    // Date; clamp numerically on epoch ms and hand back a Date.
     const value = scale.invert(pixel);
     const domain = scale.domain();
+    if (scale.type === 'time') {
+        const lo = Math.min(...domain.map(Number));
+        const hi = Math.max(...domain.map(Number));
+        return new Date(Math.max(lo, Math.min(hi, Number(value))));
+    }
     const lo = Math.min(...domain);
     const hi = Math.max(...domain);
     return Math.max(lo, Math.min(hi, value));

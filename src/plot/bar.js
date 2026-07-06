@@ -1,5 +1,6 @@
 // @ts-check
 import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
+import { resolveStyle, normalizeMarkOptions } from './mark.js';
 
 // bar: a rectangular mark that composes across orientations. The band axis is
 // the categorical/position axis (sets the bar's position + thickness) and the
@@ -19,23 +20,26 @@ import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
  * @returns {any}
  */
 function buildBar(options, forcedOrientation) {
+    // Desugar top-level style shorthands (e.g. the legacy `fill: 'steelblue'`)
+    // into the encoding as constant channels, so bar reads style the same way
+    // every mark does. Explicit `encoding.fill` still wins.
+    const opts = normalizeMarkOptions(options);
     const {
         data = [],
-        encoding,
-        fill = 'steelblue',
+        encoding = {},
         id,
         interactors,
         edits,
         constraints,
         onChange,
         orientation: orientationOption
-    } = options;
+    } = opts;
 
     // Channel-native: read the x/y field from the encoding, falling back to the
     // legacy x/y accessor options. Either way the scale for each channel is the
     // global one the engine resolves and passes in as scales.x / scales.y.
-    const xKey = (encoding && encoding.x && encoding.x.field) || options.x || 'x';
-    const yKey = (encoding && encoding.y && encoding.y.field) || options.y || 'y';
+    const xKey = (encoding.x && encoding.x.field) || options.x || 'x';
+    const yKey = (encoding.y && encoding.y.field) || options.y || 'y';
 
     return {
         id,
@@ -65,6 +69,11 @@ function buildBar(options, forcedOrientation) {
             }
 
             return currentData.map((d, i) => {
+                // Standard style surface (fill/stroke/opacity/…), resolved per
+                // datum through the same channels every mark uses. Defaults to the
+                // classic steelblue fill when no fill channel/shorthand is set.
+                const style = resolveStyle(scales, encoding, d, { fill: 'steelblue' });
+
                 if (orientation === 'horizontal') {
                     // Category on y (band), value/length on x (linear).
                     const bandStart = yScale ? yScale(d[yKey]) : 0;
@@ -77,7 +86,7 @@ function buildBar(options, forcedOrientation) {
                         y: bandStart,
                         width: Math.abs(valuePos - baseline),
                         height: thickness,
-                        fill,
+                        ...style,
                         data: d,
                         index: i,
                         orientation,
@@ -96,7 +105,7 @@ function buildBar(options, forcedOrientation) {
                     y: Math.min(valuePos, baseline),
                     width: thickness,
                     height: Math.abs(baseline - valuePos),
-                    fill,
+                    ...style,
                     data: d,
                     index: i,
                     orientation,

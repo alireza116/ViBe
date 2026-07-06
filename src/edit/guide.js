@@ -12,9 +12,9 @@
 //
 // Rebuilt every render (via the engine), so bounds track live data.
 import { resolveChannels } from './route.js';
+import { DEFAULT_EFFECTS } from '../core/effects.js';
 
 const DEFAULT_CONSTRAINT_COLOR = '#e4572e';
-const DEFAULT_RING_COLOR = '#ff9800';
 
 /**
  * @param {any} feature
@@ -45,9 +45,9 @@ export function buildEditGuide(feature, edit, ctx) {
         }
     }
 
-    // Proximity ring + highlight for nearest-pick edits.
+    // Proximity ring + highlight for nearest-pick edits (the `select` effect).
     if (edit.pick === 'nearest') {
-        nodes.push(...proximityGuide(feature, ctx, DEFAULT_RING_COLOR));
+        nodes.push(...proximityGuide(feature, ctx));
     }
 
     return nodes;
@@ -182,41 +182,63 @@ function maintainSumGuide({ targetSum }, gctx) {
 }
 
 /**
- * The snap ring at the pointer + a highlight around the selected mark, read from
- * the transient nearest-selection state the dispatch writes into ui.proximity.
+ * The `select` interaction effect: a snap ring at the pointer + a highlight
+ * outline around the selected mark, read from the transient nearest-selection
+ * state the dispatch writes into ui.proximity. Appearance comes from the
+ * customizable effects layer (ctx.effects.select).
  * @param {any} feature
  * @param {any} ctx
- * @param {string} color
  * @returns {import('../types').FeatureNode[]}
  */
-function proximityGuide(feature, ctx, color) {
+function proximityGuide(feature, ctx) {
     const info = ctx.ui && ctx.ui.proximity && ctx.ui.proximity[feature.id];
     if (!info) return [];
+    return selectEffectNodes(info, (ctx.featureNodes && ctx.featureNodes[feature.id]) || [],
+        (ctx.effects && ctx.effects.select) || DEFAULT_EFFECTS.select);
+}
+
+/**
+ * Build the `select` effect's scene nodes (ring + mark outline) from a proximity
+ * selection and the resolved `select` effect config. Shared by the edit-owned
+ * guide and the legacy standalone proximity guide so both look identical and
+ * honour the same customization.
+ * @param {any} info the ui.proximity[featureId] selection
+ * @param {any[]} marks the feature's current scene nodes
+ * @param {any} select the resolved effects.select config
+ * @returns {import('../types').FeatureNode[]}
+ */
+export function selectEffectNodes(info, marks, select) {
+    if (!info || (select && select.enabled === false)) return [];
+    const { color, ring, highlight } = select;
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
 
+    // Snap zone at the pointer.
     if (info.px != null && info.py != null && info.threshold != null) {
         nodes.push({
             type: 'circle', cx: info.px, cy: info.py, r: info.threshold,
-            fill: 'none', stroke: color, strokeDasharray: '2 4',
-            strokeWidth: 1, opacity: 0.45, guide: true
+            fill: 'none', stroke: color, strokeDasharray: ring.dash,
+            strokeWidth: ring.width, opacity: ring.opacity, guide: true
         });
     }
 
+    // Outline around the selected mark (active drag selection wins over hover).
     const index = info.activeIndex != null ? info.activeIndex : info.hoverIndex;
     if (index != null) {
-        const marks = (ctx.featureNodes && ctx.featureNodes[feature.id]) || [];
         const mark = marks[index];
+        const pad = highlight.pad;
         if (mark && mark.type === 'circle') {
             nodes.push({
-                type: 'circle', cx: mark.cx, cy: mark.cy, r: (mark.r || 5) + 5,
-                fill: 'none', stroke: color, strokeWidth: 2.5, opacity: 0.95, guide: true
+                type: 'circle', cx: mark.cx, cy: mark.cy, r: (mark.r || 5) + pad,
+                fill: 'none', stroke: color, strokeWidth: highlight.width,
+                opacity: highlight.opacity, guide: true
             });
         } else if (mark && mark.type === 'rect') {
             nodes.push({
-                type: 'rect', x: mark.x - 2, y: mark.y - 2,
-                width: mark.width + 4, height: mark.height + 4,
-                fill: 'none', stroke: color, strokeWidth: 2.5, opacity: 0.95, guide: true
+                type: 'rect', x: mark.x - pad, y: mark.y - pad,
+                width: mark.width + pad * 2, height: mark.height + pad * 2,
+                fill: 'none', stroke: color, strokeWidth: highlight.width,
+                opacity: highlight.opacity, guide: true
             });
         }
     }

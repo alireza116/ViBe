@@ -37,6 +37,23 @@
 const asList = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
 
 /**
+ * The starting values a minted datum gets from the dataset schema: every declared
+ * field, set to its explicit `default` when given, else `null` (present but unset,
+ * to be set later by an edit). Returns {} when no schema is declared.
+ * @param {Record<string, import('../types').FieldSchema> | undefined} schema
+ * @returns {Record<string, any>}
+ */
+function schemaDefaults(schema) {
+    /** @type {Record<string, any>} */
+    const out = {};
+    if (!schema) return out;
+    for (const [field, spec] of Object.entries(schema)) {
+        out[field] = spec && spec.default !== undefined ? spec.default : null;
+    }
+    return out;
+}
+
+/**
  * @param {any} spec
  * @returns {import('../types').Edit}
  */
@@ -166,7 +183,11 @@ export function create(options = {}) {
         pick: 'plane',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const datum = { ...defaults };
+            // Seed every declared schema field first (its `default`, else null —
+            // present-but-unset, editable later), so a minted datum matches the
+            // elicited shape. Explicit create `defaults` then win, and the inverted
+            // pointer wins last for the positional channels below.
+            const datum = { ...schemaDefaults(ctx.schema), ...defaults };
             let placed = false;
             for (const ch of ctx.channels) {
                 const visual = ch.name === 'x' ? ctx.pointer.x

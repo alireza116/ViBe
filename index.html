@@ -3,278 +3,64 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VibeJS · new edit API</title>
+    <title>VibeJS</title>
     <style>
-      body { font-family: system-ui, sans-serif; padding: 1.5rem 2rem; max-width: 720px; color: #1f2733; }
-      h1 { font-size: 1.3rem; }
-      h2 { font-size: 1rem; margin: 2rem 0 0.25rem; }
-      p  { color: #55606c; font-size: 0.88rem; margin: 0.25rem 0 0.6rem; }
-      code { background: #eef0f3; padding: 0.05rem 0.3rem; border-radius: 4px; }
-      .chart { border: 1px solid #e3e6ea; border-radius: 8px; display: inline-block; }
-      .note { background: #fff4e5; border: 1px solid #ffd8a8; color: #8a5a00;
-              padding: 0.5rem 0.7rem; border-radius: 8px; font-size: 0.82rem; }
+      body {
+        font-family: system-ui, sans-serif;
+        padding: 3rem 2rem;
+        max-width: 640px;
+        margin: 0 auto;
+        color: #1f2733;
+        line-height: 1.55;
+      }
+      h1 { font-size: 1.6rem; margin: 0 0 0.2rem; }
+      .tag { color: #55606c; font-size: 0.95rem; margin: 0 0 1.6rem; }
+      p { color: #55606c; font-size: 0.92rem; }
+      code {
+        background: #eef0f3;
+        padding: 0.05rem 0.3rem;
+        border-radius: 4px;
+        font-size: 0.85em;
+      }
+      .links { display: grid; gap: 0.8rem; margin: 1.8rem 0 0; }
+      a.card {
+        display: block;
+        border: 1px solid #e3e6ea;
+        border-radius: 10px;
+        padding: 0.9rem 1.1rem;
+        text-decoration: none;
+        color: inherit;
+      }
+      a.card:hover { border-color: #4f46e5; }
+      a.card b { color: #4f46e5; font-size: 1rem; }
+      a.card span { display: block; color: #55606c; font-size: 0.85rem; margin-top: 0.15rem; }
     </style>
   </head>
   <body>
-    <h1>VibeJS — the new <code>edit</code> API</h1>
+    <h1>VibeJS</h1>
+    <p class="tag">Declarative, editable visualization for belief elicitation.</p>
     <p>
-      A channel owns both <code>encode</code> (data→visual) and <code>edit</code>
-      (gesture→data). Interactions are declared where the channel is defined; a
-      constraint on an edit governs that edit's channel by construction.
+      A chart is a declarative <code>Elicit(spec)</code>: a list of marks, each
+      with an <b>encoding</b> that maps data to visuals. A channel owns both
+      <code>encode</code> (data → visual) and <code>edit</code> (gesture → data),
+      so interactions are declared where the channel is defined. Constraints are
+      data-layer invariants; a <code>schema</code> declares the elicited dataset
+      so a chart works with zero starter data.
     </p>
-    <p class="note">
-      One bidirectional model: change-edits (drag / resize / cycle / custom),
-      <code>create</code> and <code>remove</code> as their own edits,
-      <code>pick: "nearest"</code> proximity targeting, per-edit <code>when</code>
-      arbitration, and edits that self-draw their guide via <code>guide: true</code>.
-      Constraints are <b>data-layer invariants</b> declared at feature level
-      (<code>constraints: []</code>) — pure rules over the dataset, named by data
-      field, that hold no matter which edit fired.
-    </p>
-
-    <h2>1 · Vertical bars — drag to set the value</h2>
-    <p><code>y</code> is a linear channel carrying <code>edit: drag()</code>. Dragging a bar sets its <code>y</code>.</p>
-    <div id="c1" class="chart"></div>
-
-    <h2>2 · Bars — maintainSum(100) as a data invariant</h2>
-    <p>The sum rule is declared at <b>feature level</b> (<code>constraints: [maintainSum(...)]</code>), so it holds for <i>every</i> edit, not just the drag. Bars grow until the total hits 100. The dashed line is a declarative guide.</p>
-    <div id="c2" class="chart"></div>
-
-    <h2>3 · Scatter — 2D move</h2>
-    <p>Both <code>x</code> and <code>y</code> carry <code>edit: drag()</code>, so a drag moves the point in both.</p>
-    <div id="c3" class="chart"></div>
-
-    <h2>4 · One mark, three edits (the payoff)</h2>
-    <p><b>Drag</b> to move (x+y), <b>Shift-drag</b> to resize (size→mag), <b>click</b> to recolor (cycle the group). Three channel-scoped edits on one mark, arbitrated by <code>when</code>.</p>
-    <div id="c4" class="chart"></div>
-
-    <h2>5 · Likert — drag a point, or click an empty slot to place one</h2>
-    <p>1D categorical <code>x</code> on a dot resolves to a <b>point scale</b> (scalePoint — the dot sits on the category tick): <code>edit: drag()</code> snaps to the nearest category, and a mark-level <code>edit.create()</code> lets a click on an empty slot mint a response.</p>
-    <div id="c5" class="chart"></div>
-
-    <h2>6 · Custom edit — the escape hatch</h2>
-    <p><code>edit.custom((datum, event) => …)</code> gets the whole datum + event and returns a new datum. Here a vertical drag sets <code>y</code> and stamps <code>touched</code>.</p>
-    <div id="c6" class="chart"></div>
-
-    <h2>7 · Create — click empty space to add a point</h2>
-    <p><code>edit.create({ defaults })</code> is its own declaration: a plane click inverts the pointer through the positional channels (the same inverse <code>drag</code> uses) and appends a datum. Created points are then draggable through the channel edits. <code>count(max)</code> caps how many.</p>
-    <div id="c7" class="chart"></div>
-
-    <h2>8 · Nearest pick + self-drawn guide</h2>
-    <p>Thin bars are hard to hit, so the <code>y</code> edit uses <code>pick: "nearest"</code> — grab a bar from anywhere in its column. <code>guide: true</code> makes the edit draw its own snap ring plus the <code>clamp</code> bounds for its channel (read from the feature's data invariants).</p>
-    <div id="c8" class="chart"></div>
-
-    <h2>9 · unique — one bar per category</h2>
-    <p><code>create</code> mints a bar wherever you click, but the <code>unique({ field: "x" })</code> data invariant forbids two bars in the same band slot: a click on an occupied category is rejected, an empty one is filled.</p>
-    <div id="c9" class="chart"></div>
-
-    <h2>10 · remove — Alt-click to delete</h2>
-    <p><code>remove()</code> is just another edit. Here <b>click</b> recolours (<code>cycle</code>) and <b>Alt-click</b> deletes — the two share the click gesture, arbitrated by <code>when</code> (<code>noAlt</code> vs <code>alt</code>). <b>drag</b> still moves.</p>
-    <div id="c10" class="chart"></div>
-
-    <script type="module">
-      import * as vibe from "./src/index.js";
-      const { drag, resize, cycle, custom, create, remove } = vibe.edit;
-      const { clamp, maintainSum, count, unique } = vibe.constraints;
-      const mount = (id, el) => document.getElementById(id).appendChild(el);
-      const log = (label) => (data) => console.log(label, data);
-
-      // 1 · Vertical bars — the value channel (y) is editable by dragging.
-      mount("c1", vibe.Elicit({
-        width: 560, height: 320,
-        features: [
-          vibe.plot.bar({
-            id: "bars1", fill: "#4f46e5", onChange: log("bars1"),
-            data: [{ x: "A", y: 20 }, { x: "B", y: 45 }, { x: "C", y: 30 }, { x: "D", y: 60 }],
-            encoding: {
-              x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-              y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
-            },
-          }),
-        ],
-      }));
-
-      // 2 · maintainSum lives on the y edit — no field named, defaults to y.
-      mount("c2", vibe.Elicit({
-        width: 560, height: 320,
-        guides: [ vibe.guides.rule({ y: 25, label: "even split (25)" }) ],
-        features: [
-          vibe.plot.bar({
-            id: "bars2", fill: "#7b2d8b", onChange: (d) => console.log("sum", d.reduce((a, b) => a + b.y, 0)),
-            data: [{ x: "A", y: 25 }, { x: "B", y: 25 }, { x: "C", y: 25 }, { x: "D", y: 25 }],
-            encoding: {
-              x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-              y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ guide: true }) },
-            },
-            // Data invariants: the dataset must always satisfy these, whatever edit ran.
-            constraints: [
-              clamp({ field: "y", min: 0 }),
-              maintainSum({ field: "y", targetSum: 100 }),
-            ],
-          }),
-        ],
-      }));
-
-      // 3 · Scatter 2D move — drag on both positional channels.
-      mount("c3", vibe.Elicit({
-        width: 560, height: 320,
-        features: [
-          vibe.plot.point({
-            id: "sc3", onChange: log("sc3"),
-            data: [{ x: 20, y: 30 }, { x: 55, y: 65 }, { x: 80, y: 40 }],
-            encoding: {
-              x: { field: "x", type: "linear", domain: [0, 100], edit: drag() },
-              y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
-              size: { value: 8 },   // constant size (no field, no edit)
-              color: { value: "#0d9488" },
-            },
-          }),
-        ],
-      }));
-
-      // 4 · Three edits on one mark, arbitrated by `when`.
-      mount("c4", vibe.Elicit({
-        width: 560, height: 340,
-        features: [
-          vibe.plot.point({
-            id: "sc4", onChange: log("sc4"),
-            data: [
-              { x: 25, y: 40, mag: 30, group: "alpha" },
-              { x: 65, y: 60, mag: 70, group: "beta" },
-            ],
-            encoding: {
-              // plain drag moves; Shift-drag is claimed by resize instead.
-              x: { field: "x", type: "linear", domain: [0, 100], edit: drag({ when: vibe.when.noShift }) },
-              y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ when: vibe.when.noShift }) },
-              size:  { field: "mag", type: "linear", domain: [0, 100], range: [5, 40],
-                       edit: resize({ when: vibe.when.shift }) },
-              color: { field: "group", type: "ordinal", domain: ["alpha", "beta", "gamma"], edit: cycle() },
-            },
-          }),
-        ],
-      }));
-
-      // 5 · Likert — 1D band x, drag snaps to the nearest category.
-      const likert = ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"];
-      mount("c5", vibe.Elicit({
-        width: 560, height: 150,
-        features: [
-          vibe.plot.point({
-            id: "lk5", onChange: log("likert"),
-            data: [{ response: "Neutral" }],
-            encoding: {
-              x: { field: "response", domain: likert, edit: drag() }, // -> point scale
-              size: { value: 10 }, color: { value: "#e4572e" },
-            },
-            // Click an empty slot to place a new response (create = plane edit).
-            edits: [ create() ],
-          }),
-        ],
-      }));
-
-      // 6 · Custom edit — arbitrary datum transform on drag.
-      mount("c6", vibe.Elicit({
-        width: 560, height: 320,
-        features: [
-          vibe.plot.point({
-            id: "cu6", onChange: log("custom"),
-            data: [{ x: 30, y: 30 }, { x: 70, y: 70 }],
-            encoding: {
-              x: { field: "x", type: "linear", domain: [0, 100] },
-              y: { field: "y", type: "linear", domain: [0, 100] },
-              size: { value: 8 }, color: { value: "#2563eb" },
-            },
-            // Mark-level edit: sees the whole datum + event, returns a new datum.
-            edits: [
-              custom((datum, event, ctx) => {
-                const yScale = ctx.scales.y;
-                return { ...datum, y: yScale.invertValue(ctx.pointer.y), touched: true };
-              }),
-            ],
-          }),
-        ],
-      }));
-
-      // 7 · Create — click empty space to append a point; drag to move it after.
-      mount("c7", vibe.Elicit({
-        width: 560, height: 320,
-        features: [
-          vibe.plot.point({
-            id: "mk7", onChange: log("create"),
-            data: [{ x: 30, y: 30, group: "a" }],
-            encoding: {
-              x: { field: "x", type: "linear", domain: [0, 100], edit: drag() },
-              y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
-              size: { value: 8 }, color: { value: "#0d9488" },
-            },
-            // create is its own edit: plane click -> new datum (with defaults).
-            // Editing it afterwards uses the channel drags above.
-            edits: [ create({ defaults: { group: "a" } }) ],
-            // count is a dataset invariant — caps total at 8 regardless of edit.
-            constraints: [ count({ max: 8 }) ],
-          }),
-        ],
-      }));
-
-      // 8 · Nearest pick + self-drawn guide — grab a thin bar from its column.
-      mount("c8", vibe.Elicit({
-        width: 560, height: 320,
-        features: [
-          vibe.plot.bar({
-            id: "bars8", fill: "#2563eb", onChange: log("nearest"),
-            data: [{ x: "A", y: 20 }, { x: "B", y: 45 }, { x: "C", y: 30 }, { x: "D", y: 60 }],
-            encoding: {
-              x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-              y: { field: "y", type: "linear", domain: [0, 100],
-                   edit: drag({ pick: "nearest", threshold: 40, guide: true }) },
-            },
-            constraints: [ clamp({ field: "y", min: 0, max: 90 }) ],
-          }),
-        ],
-      }));
-
-      // 9 · unique — create is blocked on an occupied category, allowed on empty.
-      mount("c9", vibe.Elicit({
-        width: 560, height: 320,
-        features: [
-          vibe.plot.bar({
-            id: "bars9", fill: "#0d9488", onChange: log("unique"),
-            data: [{ x: "A", y: 40 }, { x: "C", y: 60 }],
-            encoding: {
-              x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-              y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
-            },
-            edits: [ create({ defaults: { y: 20 } }) ],
-            // one datum per band slot; a create on a filled slot is rejected.
-            constraints: [ unique({ field: "x", max: 1 }) ],
-          }),
-        ],
-      }));
-
-      // 10 · remove — click recolours, Alt-click deletes, drag moves.
-      mount("c10", vibe.Elicit({
-        width: 560, height: 320,
-        features: [
-          vibe.plot.point({
-            id: "rm10", onChange: log("remove"),
-            data: [
-              { x: 25, y: 40, group: "alpha" },
-              { x: 55, y: 65, group: "beta" },
-              { x: 80, y: 30, group: "gamma" },
-            ],
-            encoding: {
-              x: { field: "x", type: "linear", domain: [0, 100], edit: drag() },
-              y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
-              size: { value: 10 },
-              // click recolours — but only a plain (non-Alt) click.
-              color: { field: "group", type: "ordinal",
-                       domain: ["alpha", "beta", "gamma"], edit: cycle({ when: vibe.when.noAlt }) },
-            },
-            // Alt-click deletes; shares the click gesture with cycle, arbitrated by `when`.
-            edits: [ remove({ when: vibe.when.alt }) ],
-          }),
-        ],
-      }));
-    </script>
+    <div class="links">
+      <a class="card" href="./docs.html">
+        <b>Documentation →</b>
+        <span
+          >A guided, feature-by-feature tour — marks, scales &amp; axes, editing,
+          create/remove, constraints, interaction effects, and the data schema.
+          Every example shows the exact code beside its live, interactive
+          result.</span
+        >
+      </a>
+      <a class="card" href="./playground.html">
+        <b>Composition playground →</b>
+        <span>An interactive sandbox for composing specs live.</span>
+      </a>
+    </div>
   </body>
 </html>

@@ -5,7 +5,39 @@ import { collectEdits, resolveChannels } from '../edit/route.js';
 import { nearestMark, pickThreshold } from '../edit/pick.js';
 import { buildEditGuide } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
+import { resolveEffects } from './effects.js';
+import { axisX, axisY, gridX, gridY } from '../plot/axis.js';
 import * as guideBuilders from '../guides/index.js';
+
+/**
+ * Resolve the global `axes` convenience into composable axis/grid marks — the
+ * IMPLICIT layer of the Observable-Plot axis model. Only channels the user did
+ * not already compose an explicit axis mark for are auto-injected, so an explicit
+ * `axisX(...)` in `features` always wins. `spec.axes`:
+ *   undefined -> default axis on both positional channels (today's behaviour)
+ *   false     -> no axes at all
+ *   { x, y }  -> per-channel config object, or `false` to suppress that channel.
+ * @param {any[]} features
+ * @param {any} axesOpt
+ * @returns {any[]} the axis/grid marks to prepend (drawn behind marks)
+ */
+function autoAxes(features, axesOpt) {
+    if (axesOpt === false) return [];
+    /** @type {any[]} */
+    const injected = [];
+    /** @param {string} ch */
+    const hasExplicit = (ch) => features.some(f => (f.isAxis || f.isGrid) && f.channel === ch);
+    const builders = { x: { axis: axisX, grid: gridX }, y: { axis: axisY, grid: gridY } };
+    for (const ch of /** @type {const} */ (['x', 'y'])) {
+        const cfg = axesOpt ? axesOpt[ch] : {};
+        if (cfg === false) continue;           // channel suppressed
+        if (hasExplicit(ch)) continue;         // user composed their own
+        const opts = cfg || {};
+        injected.push(builders[ch].axis(opts));
+        if (opts.grid) injected.push(builders[ch].grid(opts));
+    }
+    return injected;
+}
 
 /**
  * @param {import('../types').ElicitSpec} spec
@@ -18,10 +50,22 @@ export function Elicit(spec) {
         margins = { top: 20, right: 20, bottom: 30, left: 40 },
         // Top-level x / y are read as global positional scale specs by
         // resolveScales (spec.x / spec.y); channels beyond x/y come from marks.
-        features = [],
+        features: userFeatures = [],
+        // Global axis convenience: desugars into composable axis/grid marks (see
+        // autoAxes). Explicit axis marks in `features` take precedence per channel.
+        axes,
         guides = [],
+        // Interaction-effects layer (grab / proximity-select), customizable and
+        // kept separate from mark style channels. See core/effects.js.
+        effects: effectsSpec,
         renderer = new D3Renderer()
     } = spec;
+
+    const effects = resolveEffects(effectsSpec);
+
+    // Prepend auto-injected axis/grid marks (drawn behind marks via the background
+    // layer). Explicit axis marks the user composed into `features` are preserved.
+    const features = [...autoAxes(userFeatures, axes), ...userFeatures];
 
     const innerWidth = width - margins.left - margins.right;
     const innerHeight = height - margins.top - margins.bottom;
@@ -170,6 +214,7 @@ export function Elicit(spec) {
             features,
             featureNodes,
             ui,
+            effects,
             width: innerWidth,
             height: innerHeight
         };
@@ -190,6 +235,7 @@ export function Elicit(spec) {
             scales,
             spec,
             planeOnTop,
+            effects,
             onEvent: handleEvent
         });
     };
@@ -296,6 +342,9 @@ export function Elicit(spec) {
             channels: resolved,
             scales,
             encoding,
+            // The dataset schema, so a mint (create) can populate every declared
+            // field with its default (or null) — not just the positional ones.
+            schema: spec.schema,
             xKey: feature.xKey || 'x',
             yKey: feature.yKey || 'y'
         };

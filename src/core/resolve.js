@@ -20,6 +20,7 @@ import {
     normalizeEncoding,
     inferScaleType,
     inferDomainFromValues,
+    measureToScaleType,
     channelRange
 } from './encoding.js';
 
@@ -32,11 +33,18 @@ import {
  * @returns {import('../types').ScaleMap}
  */
 export function resolveScales(features, state, spec, dims) {
-    // Accumulate, per channel: an explicit spec (type/domain/range) and the flat
+    // The dataset schema (field -> measurement type/domain/default). It is the
+    // declared source of truth for a field's scale, ranked above data inference —
+    // so a chart resolves its scales with ZERO data (see the skip guard below).
+    /** @type {Record<string, import('../types').FieldSchema>} */
+    const schema = (/** @type {any} */ (spec).schema) || {};
+
+    // Accumulate, per channel: an explicit spec (type/domain/range), the field's
+    // schema entry (if any), the mark's preferred categorical scale, and the flat
     // list of its values across all marks (for domain inference).
-    /** @type {Record<string, { type?: import('../types').ScaleType, domain?: any[], range?: any[], values: any[] }>} */
+    /** @type {Record<string, { type?: import('../types').ScaleType, domain?: any[], range?: any[], catPref?: import('../types').ScaleType, schema?: import('../types').FieldSchema, values: any[] }>} */
     const acc = {};
-    
+
     /** @param {string} ch */
     const ensure = (ch) => (acc[ch] || (acc[ch] = { values: [] }));
 
@@ -66,6 +74,11 @@ export function resolveScales(features, state, spec, dims) {
             if (a.domain == null && chSpec.domain != null) a.domain = chSpec.domain;
             if (a.range == null && chSpec.range != null) a.range = chSpec.range;
             if (a.catPref !== 'band') a.catPref = pref;
+            // The field's schema entry — the declared type/domain, ranked below an
+            // explicit channel spec but above data inference (first field wins).
+            if (a.schema == null && chSpec.field != null && schema[chSpec.field]) {
+                a.schema = schema[chSpec.field];
+            }
             if (chSpec.field != null) {
                 for (const d of data) a.values.push(d[chSpec.field]);
             }
@@ -77,11 +90,18 @@ export function resolveScales(features, state, spec, dims) {
     const scales = {};
     for (const [ch, a] of Object.entries(acc)) {
         const hasSpec = a.type != null || a.domain != null;
+        const hasSchema = a.schema != null;
         const hasData = a.values.some((v) => v != null);
-        if (!hasSpec && !hasData) continue; // channel unused (e.g. 1D dropped axis)
+        // A schema-backed channel counts as used even with no data — this is what
+        // lets an EMPTY chart resolve its scales (place marks, invert for create).
+        if (!hasSpec && !hasSchema && !hasData) continue; // channel unused (e.g. 1D dropped axis)
 
-        const type = a.type || inferScaleType(ch, a.values, a.catPref || 'band');
-        const domain = a.domain || inferDomainFromValues(type, a.values);
+        const catPref = a.catPref || 'band';
+        // Precedence: explicit channel spec > schema declaration > data inference.
+        const type = a.type
+            || (a.schema ? measureToScaleType(ch, a.schema.type, catPref) : inferScaleType(ch, a.values, catPref));
+        const domain = a.domain
+            || (a.schema && a.schema.domain) || inferDomainFromValues(type, a.values);
         const range = a.range || channelRange(ch, type, dims);
         const scale = createScale({ type, domain }, range);
         if (scale) {

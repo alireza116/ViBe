@@ -8,15 +8,20 @@
 //
 // Added automatically when a proximityDrag has `highlight: true`, or declared
 // explicitly: vibe.guides.proximity({ target: "my-feature" }).
-
-const DEFAULT_COLOR = '#ff9800';
+//
+// This is the legacy standalone form of the `select` interaction effect; it now
+// delegates to the shared builder so it looks identical to the edit-owned guide
+// and honours the same customizable effects layer (ctx.effects.select). An
+// explicit `color` option still overrides, for backward compatibility.
+import { selectEffectNodes } from '../edit/guide.js';
+import { DEFAULT_EFFECTS } from '../core/effects.js';
 
 /**
  * @param {{ target: string, color?: string }} options
  * @returns {any}
  */
 export function proximity(options) {
-    const { target, color = DEFAULT_COLOR } = options;
+    const { target, color } = options;
 
     return {
         isGuide: true,
@@ -27,44 +32,11 @@ export function proximity(options) {
         build: (ctx) => {
             const info = ctx.ui && ctx.ui.proximity && ctx.ui.proximity[target];
             if (!info) return [];
-
-            /** @type {import('../types').FeatureNode[]} */
-            const nodes = [];
-
-            // Threshold ring at the pointer (the snap zone).
-            if (info.px != null && info.py != null && info.threshold != null) {
-                nodes.push({
-                    type: 'circle',
-                    cx: info.px, cy: info.py, r: info.threshold,
-                    fill: 'none', stroke: color, strokeDasharray: '2 4',
-                    strokeWidth: 1, opacity: 0.45, guide: true
-                });
-            }
-
-            // Highlight the snapped mark (active drag selection wins over hover).
-            const index = info.activeIndex != null ? info.activeIndex : info.hoverIndex;
-            if (index != null) {
-                const marks = (ctx.featureNodes && ctx.featureNodes[target]) || [];
-                const mark = marks[index];
-                if (mark && mark.type === 'circle') {
-                    nodes.push({
-                        type: 'circle',
-                        cx: mark.cx, cy: mark.cy, r: (mark.r || 5) + 5,
-                        fill: 'none', stroke: color, strokeWidth: 2.5,
-                        opacity: 0.95, guide: true
-                    });
-                } else if (mark && mark.type === 'rect') {
-                    nodes.push({
-                        type: 'rect',
-                        x: mark.x - 2, y: mark.y - 2,
-                        width: mark.width + 4, height: mark.height + 4,
-                        fill: 'none', stroke: color, strokeWidth: 2.5,
-                        opacity: 0.95, guide: true
-                    });
-                }
-            }
-
-            return nodes;
+            const base = (ctx.effects && ctx.effects.select) || DEFAULT_EFFECTS.select;
+            // An explicit guide `color` option wins over the effect's colour.
+            const select = color != null ? { ...base, color } : base;
+            const marks = (ctx.featureNodes && ctx.featureNodes[target]) || [];
+            return selectEffectNodes(info, marks, select);
         }
     };
 }
