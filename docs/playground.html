@@ -264,6 +264,15 @@
             <select id="mark">
               <option value="point">point (circle)</option>
               <option value="bar">bar (rect)</option>
+              <option value="tick">tick (line)</option>
+              <option value="line">line (path)</option>
+            </select>
+          </div>
+          <div class="field" id="orderField" hidden>
+            <label for="order">Order (line)</label>
+            <select id="order">
+              <option value="domain">domain — you-draw-it sweep</option>
+              <option value="sequence">sequence — connected scatter (2D)</option>
             </select>
           </div>
         </div>
@@ -418,7 +427,7 @@
     </div>
 
     <script type="module">
-      import * as vibe from "./src/index.js";
+      import * as vibe from "../src/index.js";
       const { drag, resize, cycle, create, remove } = vibe.edit;
 
       const rand = (a, b) => Math.round(a + Math.random() * (b - a));
@@ -455,13 +464,28 @@
         const xBand = xType === "band";
         const yBand = yType === "band";
 
-        if (mark === "bar") {
-          // Bars: one category axis, one value axis (one row per category).
+        if (mark === "bar" || mark === "tick") {
+          // Bars/ticks: one category axis, one value axis (one row per category).
           return (
             xBand
               ? xCats.map((c) => ({ x: c, y: inDomain(yDomain) }))
               : yCats.map((c) => ({ x: inDomain(xDomain), y: c }))
           ).map(decorate);
+        }
+
+        if (mark === "line") {
+          // Line: an ordered array of points evenly spaced along the DOMAIN axis
+          // (the linear axis without the value edit), value random on the other.
+          const N = 8;
+          const domainIsX = xType !== "none"; // default lineY: x domain, y value
+          const [dDom, vDom] = domainIsX ? [xDomain, yDomain] : [yDomain, xDomain];
+          const [dLo, dHi] = [Math.min(...dDom), Math.max(...dDom)];
+          return Array.from({ length: N }, (_, i) => {
+            const dv = dLo + ((dHi - dLo) * i) / (N - 1);
+            const vv = inDomain(vDom);
+            const row = domainIsX ? { x: dv, y: vv } : { x: vv, y: dv };
+            return decorate(row);
+          });
         }
 
         // point: build rows from each axis independently, so any combination
@@ -499,7 +523,7 @@
       // Every mark is channel-native: the whole spec is one encoding — a map of
       // channel -> { field, type?, domain?, edit? }. Each channel owns its edit
       // (gesture->data). The controls assemble encoding + edits + guides below.
-      const MARKS = { point: vibe.plot.point, bar: vibe.plot.bar };
+      const MARKS = { point: vibe.plot.point, bar: vibe.plot.bar, tick: vibe.plot.tick, line: vibe.plot.line };
 
       // The mark feature's id. In the new model declarative guides position by
       // value (not by target), and introspective guides are owned by their edit,
@@ -609,13 +633,20 @@
       // A positional drag edit. pick / when / guide are optional and printed only
       // when set, so a plain channel reads as bare `drag()`. Constraints are no
       // longer attached here — they're data invariants on the feature.
-      function dragEdit({ pick, threshold, when, guide }) {
+      function dragEdit({ pick, threshold, when, guide, channels }) {
         const o = {};
         const parts = [];
-        if (pick === "nearest") {
-          o.pick = "nearest";
-          o.threshold = threshold;
-          parts.push(`pick: "nearest"`, `threshold: ${threshold}`);
+        if (pick === "nearest" || pick === "sweep") {
+          o.pick = pick;
+          parts.push(`pick: "${pick}"`);
+          if (pick === "nearest") {
+            o.threshold = threshold;
+            parts.push(`threshold: ${threshold}`);
+          }
+        }
+        if (channels) {
+          o.channels = channels;
+          parts.push(`channels: ${JSON.stringify(channels)}`);
         }
         if (when) {
           o.when = when.fn;
@@ -635,9 +666,13 @@
       // ---- Compose a spec from the chosen options ----------------------------
       function compose(opts, data, onChange) {
         const isBar = opts.mark === "bar";
-        // Concrete categorical scale for this mark: bars need band intervals,
-        // dots want a point per category.
-        const catType = isBar ? "band" : "point";
+        const isTick = opts.mark === "tick";
+        const isLine = opts.mark === "line";
+        const lineSequence = isLine && opts.order === "sequence";
+        // Bars and ticks both live in a band (bar fills it, tick spans it as a
+        // line), so both want the band interval; dots want a point per category.
+        const bandMark = isBar || isTick;
+        const catType = bandMark ? "band" : "point";
         const isCat = (s) => s.type === "band" || s.type === "point";
         const x = axisChannel("x", opts.xType, opts.xDomain, opts.xCats, catType);
         const y = axisChannel("y", opts.yType, opts.yDomain, opts.yCats, catType);
@@ -657,8 +692,9 @@
         }
 
         // The value axis carries the self-drawn guide (and value-axis invariants):
-        // for a bar it's the linear axis; for a point it's y if present, else x.
-        const valueAxis = isBar
+        // for a band mark (bar/tick) it's the linear axis; for a point it's y if
+        // present, else x.
+        const valueAxis = bandMark
           ? x && x.type !== "band"
             ? "x"
             : "y"
@@ -711,18 +747,39 @@
         };
 
         for (const [name, base] of pos) {
-          // A bar's band (category) axis isn't draggable; every other positional
+          // A band mark's category axis isn't draggable; every other positional
           // channel gets a drag edit. Only the value axis carries constraints/guide.
-          if (isBar && base.type === "band") {
+          if (bandMark && base.type === "band") {
             setCh(name, base);
             continue;
           }
           const isValue = name === valueAxis;
+          // A connected-scatter line (order: sequence) moves points in 2D: one
+          // nearest drag over both axes, attached to the value channel.
+          if (isLine && lineSequence) {
+            if (isValue) {
+              setCh(name, base, dragEdit({
+                pick: "nearest",
+                threshold: opts.threshold,
+                channels: ["x", "y"],
+                guide: opts.gGuide,
+              }));
+            } else {
+              setCh(name, base);
+            }
+            continue;
+          }
+          // A you-draw-it line (order: domain) fixes its domain axis: only the
+          // value axis is editable, via a `sweep` drag (paint as the pointer crosses).
+          if (isLine && !isValue) {
+            setCh(name, base);
+            continue;
+          }
           setCh(
             name,
             base,
             dragEdit({
-              pick: pickMode,
+              pick: isLine ? "sweep" : pickMode,
               threshold: opts.threshold,
               when: moveWhen,
               guide: isValue && opts.gGuide,
@@ -730,8 +787,10 @@
           );
         }
 
-        // Non-positional channels (point): color (+ optional cycle), size (+ resize).
-        if (!isBar) {
+        // Non-positional channels (color/size) apply only to the point mark — the
+        // one whose channel controls are shown. Bars, ticks and lines omit them
+        // (for a line, a color FIELD would silently split it into series).
+        if (opts.mark === "point") {
           if (opts.color === "group")
             setCh(
               "color",
@@ -831,6 +890,8 @@
           constraints: featureCons.map((c) => c.real),
           onChange,
           ...(isBar ? { fill: "#4f46e5" } : {}),
+          ...(isTick ? { stroke: "#4f46e5", strokeWidth: 3 } : {}),
+          ...(isLine ? { stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", order: opts.order } : {}),
         });
 
         const oneD = pos.length < 2;
@@ -870,7 +931,10 @@
       // ---- Codegen: print the exact spec for the current selection -----------
       function generateCode(opts, encCode, markEditCodes, constraintCodes, guideCodes, oneD) {
         const markFn =
-          opts.mark === "bar" ? "vibe.plot.bar" : "vibe.plot.point";
+          opts.mark === "bar" ? "vibe.plot.bar"
+          : opts.mark === "tick" ? "vibe.plot.tick"
+          : opts.mark === "line" ? "vibe.plot.line"
+          : "vibe.plot.point";
         const out = [];
         out.push(`const { drag, resize, cycle, create, remove } = vibe.edit;`);
         out.push(``);
@@ -882,6 +946,16 @@
         out.push(`      data, // generated sample data (see Data panel)`);
         out.push(`      encoding: ${js(encCode, "      ")},`);
         if (opts.mark === "bar") out.push(`      fill: "#4f46e5",`);
+        if (opts.mark === "tick") {
+          out.push(`      stroke: "#4f46e5",`);
+          out.push(`      strokeWidth: 3,`);
+        }
+        if (opts.mark === "line") {
+          out.push(`      stroke: "#4f46e5",`);
+          out.push(`      strokeWidth: 3,`);
+          out.push(`      curve: "catmullRom",`);
+          out.push(`      order: ${JSON.stringify(opts.order)},`);
+        }
         if (markEditCodes.length) {
           out.push(`      edits: [`);
           markEditCodes.forEach((c) => out.push(`        ${c},`));
@@ -925,6 +999,7 @@
       // ---- Wiring ------------------------------------------------------------
       const ids = [
         "mark",
+        "order",
         "xType",
         "yType",
         "xMin",
@@ -978,6 +1053,7 @@
           colorEdit: el("colorEdit").checked,
           resize: el("resize").checked,
           interaction: el("interaction").value,
+          order: el("order").value,
           threshold: +el("threshold").value,
           create: el("create").checked,
           single: el("single").checked,
@@ -998,6 +1074,8 @@
         el("yBandDomain").hidden = yType !== "band";
         // Channels (color/size) only apply to the channel-driven point mark.
         el("channelsGroup").hidden = el("mark").value !== "point";
+        // The order toggle (domain sweep vs sequence 2D) only applies to line.
+        el("orderField").hidden = el("mark").value !== "line";
       }
 
       function showState(data) {

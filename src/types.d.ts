@@ -60,6 +60,10 @@ export interface EditContext {
   schema?: Schema;
   xKey: string;
   yKey: string;
+  // The feature's series (grouping) field and current scene nodes, for
+  // proximity-aware edits (anchor / newSeries) and when.near|far.
+  seriesKey?: string | null;
+  marks?: FeatureNode[];
 }
 
 export interface ResolvedChannel {
@@ -93,8 +97,11 @@ export interface Edit {
   gesture: string;
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
-  pick: 'direct' | 'nearest' | 'plane';
+  pick: 'direct' | 'nearest' | 'plane' | 'sweep';
   threshold: number;
+  // anchor(): which line a new point joins, and how it's ordered in.
+  into?: 'nearest' | 'new';
+  at?: 'append' | 'domain';
   constrain: Constraint[];
   guide: boolean | null;
   guideColor: string | null;
@@ -157,7 +164,11 @@ export interface MarkOptions {
 }
 
 export interface FeatureNode {
-  type: 'circle' | 'rect' | 'line' | 'text';
+  type: 'circle' | 'rect' | 'line' | 'path' | 'text';
+  // Connecting-path geometry (line mark): the ordered pixel points and the curve
+  // interpolation name (see the renderer's resolveCurve).
+  points?: [number, number][];
+  curve?: string;
   cx?: number;
   cy?: number;
   r?: number;

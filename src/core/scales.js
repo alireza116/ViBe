@@ -142,6 +142,40 @@ export function bandwidthOf(scale, fallback) {
 }
 
 /**
+ * The pixel span a mark occupies ALONG a (possibly categorical) axis — the
+ * inverse concern of `bandwidthOf`: not "how thick" but "from where to where".
+ * Mark-agnostic so any mark that spans a band (a tick across its category, and
+ * later a bar) shares one rule:
+ *   band scale   -> the category's interval [start, start+bandwidth]
+ *   no band      -> the full axis extent [0, fullLength]  (rug / strip plot)
+ * `inset` (px) shrinks each end; an explicit `length` (px) overrides the span
+ * with a fixed-length segment centred on the band (or the axis) instead.
+ * @param {any} scale the axis scale for the span dimension (may be null/linear)
+ * @param {any} value the datum's category on that axis (band case)
+ * @param {number} fullLength the inner pixel length of that axis (no-band case)
+ * @param {{ inset?: number, length?: number }} [opts]
+ * @returns {[number, number]} [start, end] in pixels
+ */
+export function bandSpan(scale, value, fullLength, { inset = 0, length } = {}) {
+    let lo, hi;
+    if (isBand(scale)) {
+        const start = scale(value);
+        const size = scale.bandwidth();
+        lo = start;
+        hi = start + size;
+    } else {
+        // No band on this axis: span the whole extent (a per-datum rule).
+        lo = 0;
+        hi = fullLength;
+    }
+    if (length != null) {
+        const center = (lo + hi) / 2;
+        return [center - length / 2, center + length / 2];
+    }
+    return [lo + inset, hi - inset];
+}
+
+/**
  * Inverse of positionOnScale: map a pixel position back to a data value.
  * The mirror image of how marks are placed, so any scale a mark can be drawn
  * on is also a scale a mark can be created on.

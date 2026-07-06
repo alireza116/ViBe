@@ -45,8 +45,9 @@ export function buildEditGuide(feature, edit, ctx) {
         }
     }
 
-    // Proximity ring + highlight for nearest-pick edits (the `select` effect).
-    if (edit.pick === 'nearest') {
+    // Proximity ring + highlight for nearest/sweep-pick edits (the `select`
+    // effect) — both resolve a target from an arbitrary pointer position.
+    if (edit.pick === 'nearest' || edit.pick === 'sweep') {
         nodes.push(...proximityGuide(feature, ctx));
     }
 
@@ -223,9 +224,12 @@ export function selectEffectNodes(info, marks, select) {
     }
 
     // Outline around the selected mark (active drag selection wins over hover).
+    // `index` is a DATUM index; find the node carrying it rather than indexing by
+    // position, since a feature may emit extra nodes (e.g. a line's path) that
+    // offset the handles from their datum index.
     const index = info.activeIndex != null ? info.activeIndex : info.hoverIndex;
     if (index != null) {
-        const mark = marks[index];
+        const mark = marks.find(m => m && m.index === index) || marks[index];
         const pad = highlight.pad;
         if (mark && mark.type === 'circle') {
             nodes.push({
@@ -237,6 +241,18 @@ export function selectEffectNodes(info, marks, select) {
             nodes.push({
                 type: 'rect', x: mark.x - pad, y: mark.y - pad,
                 width: mark.width + pad * 2, height: mark.height + pad * 2,
+                fill: 'none', stroke: color, strokeWidth: highlight.width,
+                opacity: highlight.opacity, guide: true
+            });
+        } else if (mark && mark.type === 'line') {
+            // A tick is a line: outline its span (a thin padded box around the
+            // segment), so the selected tick reads the same as a highlighted bar.
+            const lx = Math.min(mark.x1, mark.x2);
+            const ly = Math.min(mark.y1, mark.y2);
+            nodes.push({
+                type: 'rect', x: lx - pad, y: ly - pad,
+                width: Math.abs(mark.x2 - mark.x1) + pad * 2,
+                height: Math.abs(mark.y2 - mark.y1) + pad * 2,
                 fill: 'none', stroke: color, strokeWidth: highlight.width,
                 opacity: highlight.opacity, guide: true
             });

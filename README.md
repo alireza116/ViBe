@@ -108,7 +108,14 @@ vibe-js/
 │   │   ├── constraints.js # Draws where constraints limit interaction
 │   │   └── proximity.js   # Highlights the nearest-mark proximity selection
 │   └── index.js           # Public API aggregator
-├── index.html             # Live demonstration playground
+├── index.html             # Landing page → links into docs/
+├── docs/                  # Multi-page documentation site
+│   ├── _nav.js            # Sidebar sitemap (groups → pages)
+│   ├── _harness.js        # Shared render engine (highlight + renderPage)
+│   ├── styles.css         # Shared docs stylesheet
+│   ├── pages/             # One example module per page
+│   ├── marks/ · editing/  # Feature pages (bar, tick, point, line, …)
+│   └── playground.html    # Composition playground
 ├── vite.config.js         # Dev server hot-reloading configurations
 └── package.json
 ```
@@ -184,8 +191,9 @@ npm install
 npx vite
 ```
 
-- `index.html` — a gallery of fixed example charts.
-- `playground.html` — a **composition playground**: pick a mark, scale types, interaction mode, constraint, and guides from dropdowns and the spec is built and rendered live. The place to test composing new elicitation devices.
+- `index.html` — the landing page, linking into the docs.
+- `docs/` — a multi-page documentation site: a page per mark (bar, tick, point, line) and per feature (editing, scales, constraints, effects, guides, schema), each showing the exact code beside its live result.
+- `docs/playground.html` — a **composition playground**: pick a mark, scale types, interaction mode, constraint, and guides from dropdowns and the spec is built and rendered live. The place to test composing new elicitation devices.
 
 ---
 

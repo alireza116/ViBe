@@ -2,6 +2,30 @@
 import * as d3 from 'd3';
 import { DEFAULT_EFFECTS } from '../core/effects.js';
 
+// Curve name -> d3 curve factory for line-mark paths. Mirrors Observable Plot's
+// `curve` option; unknown names fall back to a straight polyline.
+/** @type {Record<string, any>} */
+const CURVES = {
+    linear: d3.curveLinear,
+    catmullRom: d3.curveCatmullRom,
+    natural: d3.curveNatural,
+    step: d3.curveStep,
+    stepAfter: d3.curveStepAfter,
+    stepBefore: d3.curveStepBefore,
+    basis: d3.curveBasis,
+    cardinal: d3.curveCardinal,
+    monotoneX: d3.curveMonotoneX,
+    monotoneY: d3.curveMonotoneY
+};
+
+/**
+ * @param {string} [name]
+ * @returns {any}
+ */
+function resolveCurve(name) {
+    return (name && CURVES[name]) || d3.curveLinear;
+}
+
 export class D3Renderer {
     constructor() {
         // The standard paint surface: node field -> [SVG attribute, base default].
@@ -55,6 +79,7 @@ export class D3Renderer {
         const allRects = byType('rect');
         const allCircles = byType('circle');
         const allLines = byType('line');
+        const allPaths = byType('path');
         const allTexts = byType('text');
 
         // Draw order == z-order: background, then guide regions (behind marks),
@@ -65,13 +90,17 @@ export class D3Renderer {
 
         this._drawGuideRegions(g, allRects.filter((/** @type {any} */ n) => n.guide));
 
+        // Connecting paths (line marks) sit above guide regions but BELOW the
+        // handle dots, so the dots stay grabbable on top of the line.
+        this._drawPaths(g, allPaths);
+
         this._drawMarks(g,
             allRects.filter((/** @type {any} */ n) => !n.guide),
             allCircles.filter((/** @type {any} */ n) => !n.guide),
             { drag, markClick });
 
         this._drawGuideCircles(g, allCircles.filter((/** @type {any} */ n) => n.guide));
-        this._drawLines(g, allLines.filter((/** @type {any} */ n) => !n.background));
+        this._drawLines(g, allLines.filter((/** @type {any} */ n) => !n.background), { drag, markClick });
         this._drawLabels(g, allTexts.filter((/** @type {any} */ n) => !n.background));
 
         // In plane-on-top (proximity) mode the plane must sit above the marks and
@@ -347,16 +376,42 @@ export class D3Renderer {
     }
 
     /**
-     * Foreground lines (reference rules, guide boundaries).
+     * Foreground lines. Two roles share one draw:
+     *   - reference rules / guide boundaries: non-interactive (no interactors,
+     *     often pointerEvents:'none') — drawn as before.
+     *   - interactive line marks (ticks): carry `interactors`, so they get the
+     *     same click + drag wiring as rect/circle marks. Only nodes with
+     *     interactors actually change state; d3.drag is inert on the rest.
      * @param {any} g
      * @param {any[]} lines
+     * @param {{ drag: any, markClick: (e: any, d: any) => void }} io
      */
-    _drawLines(g, lines) {
+    _drawLines(g, lines, { drag, markClick }) {
         const sel = g.selectAll('line.mark').data(lines).join('line')
             .attr('class', 'mark')
-            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto');
+            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
+            .style('cursor', (/** @type {any} */ d) => (d.interactors && d.interactors.length > 0) ? (d.cursor || 'move') : 'default')
+            .on('click', markClick)
+            .call(drag);
         this._geomLine(sel);
         this._applyStyle(sel, { stroke: 'black', strokeWidth: 1, opacity: 1 });
+    }
+
+    /**
+     * Connecting paths for line marks: one `<path>` per node, its `d` built from
+     * the node's `points` with the requested `curve` interpolation. Non-interactive
+     * (pointer-events off) — the line is edited through its handle dots, not the
+     * path itself — and `fill:'none'` by default so a stroked path reads as a line.
+     * @param {any} g
+     * @param {any[]} paths
+     */
+    _drawPaths(g, paths) {
+        const sel = g.selectAll('path.mark-line').data(paths).join('path')
+            .attr('class', 'mark-line')
+            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'none')
+            .attr('d', (/** @type {any} */ d) =>
+                d3.line().curve(resolveCurve(d.curve))(d.points || []));
+        this._applyStyle(sel, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 });
     }
 
     /**

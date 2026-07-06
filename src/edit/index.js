@@ -30,11 +30,30 @@
 // Or at mark level for joint / arbitrary edits:
 //   edits: [ vibe.edit.drag({ channels: ["x", "y"] }), vibe.edit.custom(fn) ]
 
+import { nearestSeries, DEFAULT_PICK_THRESHOLD } from './pick.js';
+import { resolveSamples } from '../core/samples.js';
+
 /**
  * @param {any} v
  * @returns {any[]}
  */
 const asList = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
+
+/**
+ * A fresh series key not already present in the data — the identity of a new line.
+ * Uses the smallest non-negative integer free among the existing keys, so colors
+ * (an ordinal scale over the keys) stay stable as lines come and go.
+ * @param {any[]} data
+ * @param {string | null} seriesField
+ * @returns {number}
+ */
+function nextSeriesKey(data, seriesField) {
+    if (!seriesField) return 0;
+    const existing = new Set((data || []).map((d) => d[seriesField]));
+    let n = 0;
+    while (existing.has(n)) n++;
+    return n;
+}
 
 /**
  * The starting values a minted datum gets from the dataset schema: every declared
@@ -247,6 +266,129 @@ export function custom(fn, options = {}) {
     });
 }
 
+/**
+ * anchor — add ONE point to a connected path (a line's bezier-style anchor). The
+ * inverse of `remove` for paths, and proximity-aware where `create` is not: it
+ * resolves WHICH line the gesture means.
+ *   into 'nearest' -> attach to the closest line within `threshold`; if none is
+ *                     near (empty space) it falls back to starting a fresh series,
+ *                     so repeated clicks draw a new line point-by-point, then extend
+ *                     it (each later click is now near the line it just started).
+ *   into 'new'     -> always start a fresh series.
+ * The new point's series is written to the feature's series field; its position is
+ * the inverted pointer on each positional channel (2D by default). Order is handled
+ * by the mark's `order` (domain sort or as-drawn), so anchor just appends.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function anchor(options = {}) {
+    const { into = 'nearest', at = 'append', channels, trigger = 'click', series: seriesField, ...rest } = options;
+    const threshold = options.threshold != null && options.threshold > 0 ? options.threshold : DEFAULT_PICK_THRESHOLD;
+    return makeEdit({
+        type: 'anchor',
+        gesture: trigger,
+        channels: channels || ['x', 'y'],
+        pick: 'plane',
+        into,
+        at,
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const sField = seriesField || ctx.seriesKey || null;
+            // Resolve the target line: the nearest one, or a fresh series when
+            // 'new' (or 'nearest' found none within threshold — empty space).
+            let seriesVal = null;
+            if (into === 'nearest') {
+                seriesVal = nearestSeries(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, threshold);
+            }
+            if (seriesVal == null) seriesVal = nextSeriesKey(ctx.data, sField);
+
+            const datum = { ...schemaDefaults(ctx.schema) };
+            if (sField) datum[sField] = seriesVal;
+            let placed = false;
+            for (const ch of ctx.channels) {
+                const visual = ch.name === 'x' ? ctx.pointer.x
+                    : ch.name === 'y' ? ctx.pointer.y : undefined;
+                if (visual === undefined || !ch.scale || !ch.scale.invertible) continue;
+                datum[ch.field] = ch.scale.invertValue(visual);
+                placed = true;
+            }
+            if (!placed) return undefined;
+            return [...ctx.data, datum];
+        }
+    });
+}
+
+/**
+ * newSeries — seed a WHOLE new line at once: one anchor per sampled domain
+ * position (see resolveSamples: the scale's ticks by default, or a count / explicit
+ * positions / time interval), each starting at the pointer's value on the value
+ * axis (a flat line you then sweep into shape). This is the draw-from-scratch
+ * primitive; `youDrawIt` composes it with a series-scoped sweep.
+ *   domain / value : the positional axes ('x'/'y'); default domain 'x', value 'y'.
+ *   samples        : passed to resolveSamples for the anchor domain positions.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function newSeries(options = {}) {
+    const { domain = 'x', value = 'y', samples, trigger = 'dblclick', series: seriesField, ...rest } = options;
+    return makeEdit({
+        type: 'newSeries',
+        gesture: trigger,
+        channels: [domain, value],
+        pick: 'plane',
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const sField = seriesField || ctx.seriesKey || null;
+            const domainField = (ctx.encoding[domain] && ctx.encoding[domain].field)
+                || (domain === 'x' ? ctx.xKey : ctx.yKey);
+            const valueField = (ctx.encoding[value] && ctx.encoding[value].field)
+                || (value === 'x' ? ctx.xKey : ctx.yKey);
+            const domainScale = ctx.scales[domain];
+            const valueScale = ctx.scales[value];
+            if (!domainScale || !domainField) return undefined;
+
+            const positions = resolveSamples(domainScale, samples);
+            if (!positions.length) return undefined;
+
+            // Flat line at the clicked value (or the value-domain start if the
+            // value axis can't invert here).
+            const seedVisual = value === 'x' ? ctx.pointer.x : ctx.pointer.y;
+            const seedValue = valueScale && valueScale.invertible
+                ? valueScale.invertValue(seedVisual)
+                : (valueScale && valueScale.domain ? valueScale.domain()[0] : null);
+            const seriesVal = nextSeriesKey(ctx.data, sField);
+
+            const seeded = positions.map((pos) => {
+                const datum = { ...schemaDefaults(ctx.schema) };
+                if (sField) datum[sField] = seriesVal;
+                datum[domainField] = pos;
+                if (valueField) datum[valueField] = seedValue;
+                return datum;
+            });
+            return [...ctx.data, ...seeded];
+        }
+    });
+}
+
+/**
+ * sweep — you-draw-it painting: a drag that repaints the value of each point the
+ * pointer crosses (series-scoped in the engine). Convenience over `drag`.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function sweep(options = {}) {
+    return drag({ pick: 'sweep', guide: true, ...options });
+}
+
+/**
+ * youDrawIt — alias of `sweep`, named for the interaction it implements.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function youDrawIt(options = {}) {
+    return sweep(options);
+}
+
 // Arbitration predicates for `when` — kept separate from the edits so the same
 // edit works under any strategy (see the gate() rationale).
 export const when = {
@@ -261,5 +403,14 @@ export const when = {
     /** @param {string} key */
     modifier: (key) => (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.event && ctx.event[key]),
     /** @param {string} key */
-    noModifier: (key) => (/** @type {import('../types').EditContext} */ ctx) => !(ctx.event && ctx.event[key])
+    noModifier: (key) => (/** @type {import('../types').EditContext} */ ctx) => !(ctx.event && ctx.event[key]),
+    // Proximity arbitration for path authoring: is the pointer near an existing
+    // line, or out in empty space? Pair anchor({ when: when.near }) with
+    // newSeries({ when: when.far }) to add-to-nearest vs start-a-new-line.
+    /** @param {import('../types').EditContext} ctx */
+    near: (ctx) => nearestSeries(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, DEFAULT_PICK_THRESHOLD) != null,
+    /** @param {import('../types').EditContext} ctx */
+    far: (ctx) => nearestSeries(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, DEFAULT_PICK_THRESHOLD) == null,
+    /** @param {number} t @returns {(ctx: import('../types').EditContext) => boolean} */
+    nearWithin: (t) => (/** @type {import('../types').EditContext} */ ctx) => nearestSeries(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, t) != null
 };

@@ -2,7 +2,7 @@
 import { SceneGraph } from './scene.js';
 import { resolveScales } from './resolve.js';
 import { collectEdits, resolveChannels } from '../edit/route.js';
-import { nearestMark, pickThreshold } from '../edit/pick.js';
+import { nearestMark, nearestMarkOnAxis, nearestSeries, pickThreshold } from '../edit/pick.js';
 import { buildEditGuide } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
 import { resolveEffects } from './effects.js';
@@ -144,7 +144,7 @@ export function Elicit(spec) {
             )
         ) ||
         features.some(feature =>
-            collectEdits(feature).some(e => e.pick === 'nearest')
+            collectEdits(feature).some(e => e.pick === 'nearest' || e.pick === 'sweep')
         );
 
     // Transient interaction (UI) state, separate from the belief data `state`.
@@ -346,7 +346,12 @@ export function Elicit(spec) {
             // field with its default (or null) — not just the positional ones.
             schema: spec.schema,
             xKey: feature.xKey || 'x',
-            yKey: feature.yKey || 'y'
+            yKey: feature.yKey || 'y',
+            // The feature's series (grouping) field and its current scene nodes, so
+            // proximity-aware edits (anchor / newSeries) and `when.near|far` can
+            // resolve WHICH line a plane gesture means. Harmless to other edits.
+            seriesKey: feature.seriesKey || null,
+            marks: featureNodes[feature.id] || []
         };
         if (edit.when && !edit.when(ctx)) return false; // arbitration
 
@@ -426,7 +431,7 @@ export function Elicit(spec) {
      * @returns {boolean}
      */
     const dispatchPlaneEdits = (feature, event) => {
-        const planeEdits = collectEdits(feature).filter(e => e.pick === 'plane' || e.pick === 'nearest');
+        const planeEdits = collectEdits(feature).filter(e => e.pick === 'plane' || e.pick === 'nearest' || e.pick === 'sweep');
         if (planeEdits.length === 0) return false;
         const fid = feature.id;
         let changed = false;
@@ -474,6 +479,66 @@ export function Elicit(spec) {
                 } else if (info) {
                     changed = true; // nothing to run; still redraw the ring
                 }
+            }
+        }
+
+        // sweep (you-draw-it) — like nearest, but distance is measured along the
+        // domain axis only and the target is RE-RESOLVED every drag event (no
+        // dragstart lock), so one horizontal sweep paints each point's value as
+        // the pointer crosses its column.
+        const sweepEdits = planeEdits.filter(e => e.pick === 'sweep');
+        if (sweepEdits.length > 0) {
+            const marks = featureNodes[fid] || [];
+            const threshold = pickThreshold(sweepEdits[0]);
+            // The channels the sweep governs: one positional axis -> paint that
+            // value along the OTHER (a function line); both x AND y -> a 2D sweep
+            // (connected scatter), retargeting by euclidean distance.
+            const chans = sweepEdits[0].channels || ['y'];
+            const twoD = chans.includes('x') && chans.includes('y');
+            const valueName = chans[0] || 'y';
+            /** @type {'x' | 'y'} */
+            const axis = valueName === 'x' ? 'y' : 'x'; // sweep (domain) axis, 1D case
+
+            // Resolve the point under the pointer, scoped to the LOCKED series so
+            // overlapping lines don't fight over a column. 1D sweeps by domain axis,
+            // 2D sweeps by euclidean nearest.
+            /** @param {any} lockSeries */
+            const resolve = (lockSeries) => twoD
+                ? nearestMark(marks, event.x, event.y, threshold, lockSeries)
+                : nearestMarkOnAxis(marks, event.x, event.y, threshold, axis, lockSeries);
+
+            if (event.type === 'hover') {
+                const s = nearestSeries(marks, event.x, event.y, threshold);
+                const hit = resolve(s == null ? undefined : s);
+                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: hit, series: s });
+                changed = true;
+            } else if (event.type === 'hoverout') {
+                if (ui.proximity) delete ui.proximity[fid];
+                changed = true;
+            } else if (event.type === 'dragstart') {
+                // Lock onto the nearest line for the whole drag.
+                const s = nearestSeries(marks, event.x, event.y, threshold);
+                const index = resolve(s == null ? undefined : s);
+                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: index, activeIndex: index, series: s });
+                if (index != null) {
+                    sweepEdits.forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
+                }
+                changed = true;
+            } else if (event.type === 'dragend') {
+                const info = readSel(fid);
+                if (info) { info.activeIndex = null; info.series = null; }
+                changed = true;
+            } else if (event.type === 'drag') {
+                // Paint: retarget within the locked series each event (no per-point
+                // lock), so one stroke fills the whole line.
+                const info = readSel(fid);
+                const lock = info && info.series != null ? info.series : undefined;
+                const index = resolve(lock);
+                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: index, activeIndex: index });
+                if (index != null) {
+                    sweepEdits.forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
+                }
+                changed = true;
             }
         }
         return changed;
