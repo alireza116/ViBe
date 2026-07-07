@@ -6,8 +6,10 @@ export default {
         'Creating and deleting data are edits like any other. ' +
         '<code class="inline">create</code> is a plane gesture that inverts the pointer through ' +
         'the positional channels to mint a datum; <code class="inline">remove</code> deletes the ' +
-        'target. For connected paths, <code class="inline">anchor</code> adds one point to the ' +
-        'nearest line and <code class="inline">newSeries</code> seeds a whole line. Multiple ' +
+        'target. For connected paths, <code class="inline">edit.line.anchor</code> adds one point to the ' +
+        'nearest line, <code class="inline">edit.line.newSeries</code> seeds a whole line, ' +
+        '<code class="inline">edit.line.draw</code> lays a line down as you drag, and ' +
+        '<code class="inline">edit.line.removeSeries</code> deletes a whole line. Multiple ' +
         'edits on one gesture are arbitrated by <code class="inline">when</code>.',
     sections: [
         {
@@ -108,14 +110,14 @@ export default {
             id: 'anchors',
             title: 'Anchors — building a connected path',
             intro:
-                'On a line, anchor() adds a point to the nearest series (or starts a new one from ' +
-                'empty space), and newSeries() seeds a whole line from sampled positions. Order is ' +
+                'On a line, edit.line.anchor() adds a point to the nearest series (or starts a new one from ' +
+                'empty space), and edit.line.newSeries() seeds a whole line from sampled positions. Order is ' +
                 'tracked so the path stays reproducible.',
             examples: [
                 {
                     title: 'Click to add an anchor',
-                    blurb: 'anchor({ into: "nearest" }) attaches to the nearby line; far clicks start a new one.',
-                    try: '<b>Drag</b> a point, or <b>click</b> empty space to add an anchor.',
+                    blurb: 'edit.line.anchor({ into: "nearest" }) extends the connected path in click order — near or far, it stays one line (into: "new" starts a fresh one).',
+                    try: '<b>Drag</b> a point, or <b>click</b> empty space to add the next anchor.',
                     code:
 `mount(Elicit({
   width: 420, height: 300,
@@ -134,7 +136,7 @@ export default {
       },
       edits: [
         drag({ channels: ["x", "y"], pick: "nearest", threshold: 40 }),
-        anchor({ into: "nearest", channels: ["x", "y"], series: "s", threshold: 80 }),
+        edit.line.anchor({ into: "nearest", channels: ["x", "y"], series: "s", threshold: 80 }),
       ],
     }),
   ],
@@ -158,7 +160,57 @@ export default {
         y: { field: "y", type: "linear", domain: [0, 100],
              edit: drag({ pick: "sweep", guide: true }) },
       },
-      edits: [ newSeries({ domain: "x", value: "y", series: "s", samples: 6 }) ],
+      edits: [ edit.line.newSeries({ domain: "x", value: "y", series: "s", samples: 6 }) ],
+    }),
+  ],
+}))`,
+                },
+                {
+                    title: 'Freehand — draw a path as you drag',
+                    blurb: 'On an order:"sequence" line, draw samples the pointer by distance and appends points in creation order. It stays one path: a later drag over the line reshapes it, a drag in empty space extends the same line (in draw order) rather than starting a new one. (Pass into:"new" to start fresh lines.)',
+                    try: '<b>Press and drag</b> to draw a path · <b>drag over it</b> to reshape · <b>drag elsewhere</b> to keep extending the same line.',
+                    code:
+`mount(Elicit({
+  width: 420, height: 300,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  schema: { s: {}, x: {}, y: {} },
+  features: [
+    connectedScatter({
+      stroke: "#0d9488", strokeWidth: 3, series: "s",
+      data: [],
+      encoding: {
+        x: { field: "x", type: "linear", domain: [0, 100] },
+        y: { field: "y", type: "linear", domain: [0, 100] },
+      },
+      edits: [ edit.line.draw({ series: "s", minDist: 10 }) ],
+    }),
+  ],
+}))`,
+                },
+                {
+                    title: 'Remove a whole line',
+                    blurb: 'remove deletes one anchor; edit.line.removeSeries() deletes the whole line — click any point on a line to remove it. The delete counterpart to anchor / newSeries / draw.',
+                    try: '<b>Alt-click</b> a point to delete just that anchor · <b>click</b> a point to remove its entire line.',
+                    code:
+`mount(Elicit({
+  width: 420, height: 300,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  schema: { s: {}, x: {}, y: {} },
+  features: [
+    connectedScatter({
+      stroke: "#0d9488", strokeWidth: 3, series: "s",
+      data: [
+        { s: 0, x: 20, y: 30 }, { s: 0, x: 45, y: 70 }, { s: 0, x: 75, y: 40 },
+        { s: 1, x: 30, y: 80 }, { s: 1, x: 60, y: 20 }, { s: 1, x: 85, y: 60 },
+      ],
+      encoding: {
+        x: { field: "x", type: "linear", domain: [0, 100] },
+        y: { field: "y", type: "linear", domain: [0, 100] },
+      },
+      edits: [
+        remove({ when: when.alt }),                        // Alt-click: one anchor
+        edit.line.removeSeries({ series: "s", when: when.noAlt }), // click: whole line
+      ],
     }),
   ],
 }))`,

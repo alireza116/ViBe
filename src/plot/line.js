@@ -43,7 +43,6 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
         data = [],
         encoding = {},
         id,
-        interactors,
         edits,
         constraints,
         onChange,
@@ -67,7 +66,6 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
     return {
         id,
         data,
-        interactors,
         encoding,
         edits,
         constraints,
@@ -79,6 +77,9 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
         seriesKey: seriesField,
         order,
         samples,
+        // Groups points into series, so the line-scoped edits (edit.line.*) apply.
+        // The engine dev-warns if a line-scoped edit lands on a mark without this.
+        supportsSeries: true,
         /**
          * @param {any[]} currentData
          * @param {import('../types').ScaleMap} scales

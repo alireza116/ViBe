@@ -62,18 +62,18 @@ export function createScale(spec, range) {
         scale = d3.scaleLinear().domain(spec.domain).range(range);
     }
 
-    // Attach type metadata for interactors to validate
+    // Attach type metadata for edits to validate
     scale.type = type;
 
     // Attach domain configuration for constraints to access easily
     scale.domainConfig = spec.domain;
 
     // Unified channel API. Every scale exposes the same pair, so marks and
-    // interactors never branch on scale type:
+    // edits never branch on scale type:
     //   encode(value)      -> visual output (band center | linear pixel | colour | radius)
     //   invertValue(pixel) -> data value    (nearest category | clamped invert)
     // Only continuous/band scales are invertible; colour scales are not, so
-    // `invertible` tells interactors which channels a gesture can drive.
+    // `invertible` tells edits which channels a gesture can drive.
     // These are the x/y special case of the general channel model in
     // core/encoding.js; positionOnScale/invertOnScale are the shared impl.
     scale.invertible = (type === 'linear' || type === 'time' || type === 'band' || type === 'point');

@@ -63,9 +63,9 @@ export class D3Renderer {
         this._bindPlaneGestures(plane, pointer, onEvent, planeOnTop);
 
         const drag = this._makeDrag(onEvent, effects.grab);
-        // A mark-scoped click (routed to the mark's click interactors, e.g.
-        // cycleChannel). d3.drag suppresses the click after a real drag, so this
-        // only fires on a click without movement — drag moves, click edits.
+        // A mark-scoped click (routed to the mark's click edits, e.g. cycle /
+        // remove). d3.drag suppresses the click after a real drag, so this only
+        // fires on a click without movement — drag moves, click edits.
         /** @param {any} event @param {any} d */
         const markClick = (event, d) => {
             const [px, py] = pointer(event);
@@ -136,7 +136,7 @@ export class D3Renderer {
                 .attr('transform', `translate(${margins.left},${margins.top})`);
 
             // Transparent background plane, behind everything, that captures
-            // interactions on empty space (used by plane-target "create" interactors).
+            // interactions on empty space (used by plane-pick edits, e.g. create).
             g.append('rect')
                 .attr('class', 'plane')
                 .attr('x', 0)
@@ -170,6 +170,11 @@ export class D3Renderer {
     _bindPlaneGestures(plane, pointer, onEvent, planeOnTop) {
         plane
             .on('click', (/** @type {any} */ event) => {
+                // A plane drag (below) ends with a native `click` on the same element.
+                // Swallow that one so a drag-to-edit doesn't also fire a click-gesture
+                // edit (e.g. create/anchor minting a point where the drag released).
+                // A click without a preceding drag passes through untouched.
+                if (this._suppressClick) { this._suppressClick = false; return; }
                 const [px, py] = pointer(event);
                 onEvent({ type: 'click', x: px, y: py, rawEvent: event });
             })
@@ -208,6 +213,8 @@ export class D3Renderer {
                 const gesture = this._planeGesture;
                 if (gesture && gesture.dragging) {
                     onEvent({ type: 'dragend', x: px, y: py, rawEvent: event });
+                    // Suppress the native click the browser fires next (see 'click').
+                    this._suppressClick = true;
                 }
                 this._planeGesture = null;
             })
@@ -351,7 +358,8 @@ export class D3Renderer {
 
     /**
      * Interactive marks: rects (bars) then circles (dots). Both get the click +
-     * drag wiring; only nodes carrying interactors actually change state.
+     * drag wiring; only nodes flagged `editable` (their feature has a direct-pick
+     * edit) show an interactive cursor — d3.drag/click is inert on the rest.
      * @param {any} g
      * @param {any[]} markRects
      * @param {any[]} markCircles
@@ -360,7 +368,7 @@ export class D3Renderer {
     _drawMarks(g, markRects, markCircles, { drag, markClick }) {
         const rectSel = g.selectAll('rect.mark').data(markRects).join('rect')
             .attr('class', 'mark')
-            .style('cursor', (/** @type {any} */ d) => (d.interactors && d.interactors.length > 0) ? 'ns-resize' : 'default')
+            .style('cursor', (/** @type {any} */ d) => d.editable ? 'ns-resize' : 'default')
             .on('click', markClick)
             .call(drag);
         this._geomRect(rectSel);
@@ -368,7 +376,7 @@ export class D3Renderer {
 
         const circleSel = g.selectAll('circle.mark').data(markCircles).join('circle')
             .attr('class', 'mark')
-            .style('cursor', (/** @type {any} */ d) => (d.interactors && d.interactors.length > 0) ? 'move' : 'default')
+            .style('cursor', (/** @type {any} */ d) => d.editable ? 'move' : 'default')
             .on('click', markClick)
             .call(drag);
         this._geomCircle(circleSel);
@@ -377,11 +385,11 @@ export class D3Renderer {
 
     /**
      * Foreground lines. Two roles share one draw:
-     *   - reference rules / guide boundaries: non-interactive (no interactors,
-     *     often pointerEvents:'none') — drawn as before.
-     *   - interactive line marks (ticks): carry `interactors`, so they get the
-     *     same click + drag wiring as rect/circle marks. Only nodes with
-     *     interactors actually change state; d3.drag is inert on the rest.
+     *   - reference rules / guide boundaries: non-interactive (often
+     *     pointerEvents:'none') — drawn as before.
+     *   - interactive line marks (ticks): flagged `editable`, so they get the same
+     *     click + drag wiring as rect/circle marks. Only editable nodes show an
+     *     interactive cursor; d3.drag is inert on the rest.
      * @param {any} g
      * @param {any[]} lines
      * @param {{ drag: any, markClick: (e: any, d: any) => void }} io
@@ -390,7 +398,7 @@ export class D3Renderer {
         const sel = g.selectAll('line.mark').data(lines).join('line')
             .attr('class', 'mark')
             .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
-            .style('cursor', (/** @type {any} */ d) => (d.interactors && d.interactors.length > 0) ? (d.cursor || 'move') : 'default')
+            .style('cursor', (/** @type {any} */ d) => d.editable ? (d.cursor || 'move') : 'default')
             .on('click', markClick)
             .call(drag);
         this._geomLine(sel);

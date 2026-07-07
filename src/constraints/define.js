@@ -43,16 +43,16 @@
  * @returns {number[] | undefined}
  */
 function domainOfField(field, scales, encoding) {
-    if (!field || !scales || !encoding) return undefined;
-    for (const key of Object.keys(encoding)) {
-        const spec = encoding[key];
-        if (spec && spec.field === field && scales[key]) {
-            const s = scales[key];
-            if (s.domainConfig) return s.domainConfig;
-            if (typeof s.domain === 'function') return s.domain();
-        }
+  if (!field || !scales || !encoding) return undefined;
+  for (const key of Object.keys(encoding)) {
+    const spec = encoding[key];
+    if (spec && spec.field === field && scales[key]) {
+      const s = scales[key];
+      if (s.domainConfig) return s.domainConfig;
+      if (typeof s.domain === "function") return s.domain();
     }
-    return undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -62,67 +62,66 @@ function domainOfField(field, scales, encoding) {
  * @returns {import('../types').Constraint}
  */
 export function defineConstraint(reducer, meta = {}) {
-    /** @type {import('../types').Constraint} */
-    const constraint = (newData, oldData, context) => {
-        context = context || {};
-        // The field this invariant governs, named in DATA terms. Precedence:
-        //   1. the constraint's own `meta.field` (explicit — the model)
-        //   2. legacy fallbacks (valueKey / yKey) so the old interactor path,
-        //      which doesn't name a field, keeps working.
-        const field = meta.field || context.valueKey || context.yKey || 'y';
+  /** @type {import('../types').Constraint} */
+  const constraint = (newData, oldData, context) => {
+    context = context || {};
+    // The field this invariant governs, named in DATA terms: the constraint's
+    // own `meta.field`, defaulting to 'y' for a value constraint that didn't
+    // name one. Cross-dataset rules (count) ignore `field` entirely.
+    const field = meta.field || "y";
 
-        // The datum the gesture touched or created. The edit dispatch passes it as
-        // `activeIndex`; the legacy path passes `nodeIndex`; failing both, locate
-        // it by matching the touched datum's category key.
-        let activeIndex = context.activeIndex != null ? context.activeIndex
-            : (context.nodeIndex != null ? context.nodeIndex : null);
-        if (activeIndex == null && context.nodeData !== undefined) {
-            const xKey = context.xKey || 'x';
-            const found = newData.findIndex(d => d[xKey] === context.nodeData[xKey]);
-            activeIndex = found >= 0 ? found : null;
-        }
-        const hasActive = activeIndex != null && activeIndex >= 0 && activeIndex < newData.length;
-        const active = hasActive ? newData[activeIndex] : undefined;
+    // The datum the gesture touched or created, passed by the edit dispatch as
+    // `activeIndex` (create -> the appended datum; remove -> null; else the
+    // edited index).
+    const activeIndex =
+      context.activeIndex != null ? context.activeIndex : null;
+    const hasActive =
+      activeIndex != null && activeIndex >= 0 && activeIndex < newData.length;
+    const active = hasActive ? newData[activeIndex] : undefined;
 
-        const domain = domainOfField(field, context.scales, context.encoding)
-            || (context.valueScale && context.valueScale.domainConfig);
+    const domain = domainOfField(field, context.scales, context.encoding);
 
-        const ctx = {
-            data: newData,
-            oldData,
-            activeIndex,
-            active,
-            field,
-            value: active ? active[field] : undefined,
-            domain
-        };
-
-        const result = reducer(ctx);
-
-        // Pass-through control values.
-        if (result === false || result === true || result === undefined) return result;
-        // A full replacement dataset (cross-datum rules).
-        if (Array.isArray(result)) return result;
-
-        // A constrained scalar for the active datum's field.
-        if (typeof result === 'number') {
-            if (!hasActive) return newData;
-            return newData.map((d, i) => (i === activeIndex ? { ...d, [field]: result } : d));
-        }
-        // A partial datum merged into the active datum.
-        if (result && typeof result === 'object') {
-            if (!hasActive) return newData;
-            return newData.map((d, i) => (i === activeIndex ? { ...d, ...result } : d));
-        }
-
-        return newData;
+    const ctx = {
+      data: newData,
+      oldData,
+      activeIndex,
+      active,
+      field,
+      value: active ? active[field] : undefined,
+      domain,
     };
 
-    // Metadata for guides (an edit with `guide: true` draws its channel's bounds).
-    constraint.constraintType = meta.type;
-    constraint.options = meta.options;
-    constraint.field = meta.field;
-    if (typeof meta.guide === 'function') constraint.guide = meta.guide;
+    const result = reducer(ctx);
 
-    return constraint;
+    // Pass-through control values.
+    if (result === false || result === true || result === undefined)
+      return result;
+    // A full replacement dataset (cross-datum rules).
+    if (Array.isArray(result)) return result;
+
+    // A constrained scalar for the active datum's field.
+    if (typeof result === "number") {
+      if (!hasActive) return newData;
+      return newData.map((d, i) =>
+        i === activeIndex ? { ...d, [field]: result } : d,
+      );
+    }
+    // A partial datum merged into the active datum.
+    if (result && typeof result === "object") {
+      if (!hasActive) return newData;
+      return newData.map((d, i) =>
+        i === activeIndex ? { ...d, ...result } : d,
+      );
+    }
+
+    return newData;
+  };
+
+  // Metadata for guides (an edit with `guide: true` draws its channel's bounds).
+  constraint.constraintType = meta.type;
+  constraint.options = meta.options;
+  constraint.field = meta.field;
+  if (typeof meta.guide === "function") constraint.guide = meta.guide;
+
+  return constraint;
 }

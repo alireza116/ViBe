@@ -8,7 +8,8 @@ export default {
         'connected scatter are the same mark along four orthogonal knobs: <b>grouping</b> ' +
         '(<code class="inline">series</code>), <b>ordering</b> (<code class="inline">order</code>), ' +
         '<b>editing</b> (the edit on the handles), and <b>creation</b> ' +
-        '(<code class="inline">anchor</code> / <code class="inline">newSeries</code>). ' +
+        '(<code class="inline">anchor</code> / <code class="inline">newSeries</code> / ' +
+        '<code class="inline">draw</code>). ' +
         '<code class="inline">lineY</code>/<code class="inline">lineX</code> fix the value axis; ' +
         '<code class="inline">connectedScatter</code>/<code class="inline">path</code> default ' +
         'to order: "sequence".',
@@ -79,6 +80,41 @@ export default {
             ],
         },
         {
+            id: 'handles',
+            title: 'Hiding the handles',
+            intro:
+                'The per-point handles are optional. handles: false renders them invisible but ' +
+                'keeps them for hit-testing, so the line stays fully editable — you just don’t ' +
+                'see the dots. handleRadius sizes them when shown.',
+            examples: [
+                {
+                    title: 'A clean line, still sweepable',
+                    blurb: 'handles: false hides the dots; the sweep edit still works.',
+                    try: '<b>Sweep</b> across — no handles, but the line still responds.',
+                    code:
+`mount(Elicit({
+  width: 400, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  features: [
+    lineY({
+      stroke: "#7c3aed", strokeWidth: 3, curve: "catmullRom",
+      handles: false,   // hide the anchor dots (still editable)
+      data: [
+        { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
+        { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
+      ],
+      encoding: {
+        x: { field: "x", type: "linear", domain: [0, 7] },
+        y: { field: "y", type: "linear", domain: [0, 100],
+             edit: drag({ pick: "sweep", guide: true }) },
+      },
+    }),
+  ],
+}))`,
+                },
+            ],
+        },
+        {
             id: 'series',
             title: 'Multiple lines (series)',
             intro:
@@ -119,13 +155,14 @@ export default {
             intro:
                 'With order: "sequence" the points connect in creation order, not by domain — a ' +
                 'connected scatter / free 2D path. Both axes carry a drag, so each point moves in ' +
-                '2D and the links follow. anchor() adds a point to the nearest line, or starts a ' +
-                'new one from empty space.',
+                '2D and the links follow. edit.line.anchor() adds a point to the path — near the line or ' +
+                'far, it extends the same single line in click order (so the path stays one ' +
+                'sequence).',
             examples: [
                 {
                     title: 'A 2D path you can reshape',
-                    blurb: 'connectedScatter defaults to order: "sequence"; a 2D drag moves points, anchor adds them.',
-                    try: '<b>Drag</b> a point anywhere, or <b>click</b> empty space to add an anchor.',
+                    blurb: 'connectedScatter defaults to order: "sequence"; a 2D drag moves points, anchor extends the one path in click order.',
+                    try: '<b>Drag</b> a point anywhere, or <b>click</b> empty space to add the next anchor.',
                     code:
 `mount(Elicit({
   width: 420, height: 300,
@@ -144,7 +181,7 @@ export default {
       },
       edits: [
         drag({ channels: ["x", "y"], pick: "nearest", threshold: 40 }),
-        anchor({ into: "nearest", channels: ["x", "y"], series: "s", threshold: 80 }),
+        edit.line.anchor({ into: "nearest", channels: ["x", "y"], series: "s", threshold: 80 }),
       ],
     }),
   ],
@@ -162,7 +199,7 @@ export default {
             examples: [
                 {
                     title: 'Double-click to seed, then sweep',
-                    blurb: 'newSeries({ samples: 6 }) drops six evenly-spaced anchors at the click’s value.',
+                    blurb: 'edit.line.newSeries({ samples: 6 }) drops six evenly-spaced anchors at the click’s value.',
                     try: '<b>Double-click</b> to drop a line, then <b>sweep</b> to shape it.',
                     code:
 `mount(Elicit({
@@ -178,7 +215,42 @@ export default {
         y: { field: "y", type: "linear", domain: [0, 100],
              edit: drag({ pick: "sweep", guide: true }) },
       },
-      edits: [ newSeries({ domain: "x", value: "y", series: "s", samples: 6 }) ],
+      edits: [ edit.line.newSeries({ domain: "x", value: "y", series: "s", samples: 6 }) ],
+    }),
+  ],
+}))`,
+                },
+            ],
+        },
+        {
+            id: 'draw',
+            title: 'Draw it in one drag (draw)',
+            intro:
+                'draw authors lines by dragging, and it is edit-aware. On a domain-ordered line ' +
+                'a drag in empty space is you-draw-it from scratch — the pointer crossing each ' +
+                'samples column lays that point down at the pointer value, so one stroke draws ' +
+                'the curve. Start a later drag near the drawn line (within threshold) and it ' +
+                'reshapes that line with a sweep instead of making a new one; start far away and ' +
+                'it draws another. Pass into: "new" to always draw a fresh line.',
+            examples: [
+                {
+                    title: 'Draw, then reshape',
+                    blurb: 'edit.line.draw({ samples: 8 }) on an empty line. First drag draws all eight points; a drag over the line reshapes it, a drag in empty space starts a new one.',
+                    try: '<b>Press and drag</b> to draw · <b>drag over the line</b> to reshape · <b>drag elsewhere</b> for a new line.',
+                    code:
+`mount(Elicit({
+  width: 420, height: 300,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  schema: { s: {}, x: {}, y: {} },
+  features: [
+    lineY({
+      stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", series: "s",
+      data: [],
+      encoding: {
+        x: { field: "x", type: "linear", domain: [0, 10] },
+        y: { field: "y", type: "linear", domain: [0, 100] },
+      },
+      edits: [ edit.line.draw({ domain: "x", value: "y", series: "s", samples: 8 }) ],
     }),
   ],
 }))`,

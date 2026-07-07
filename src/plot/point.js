@@ -32,13 +32,12 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
  */
 export function point(options = {}) {
     const opts = normalizeMarkOptions(options);
-    const { data = [], encoding = {}, id, interactors, edits, constraints, onChange } = opts;
+    const { data = [], encoding = {}, id, edits, constraints, onChange } = opts;
 
     return {
         id,
         data,
         encoding,
-        interactors,
         // Mark-level edits (joint / arbitrary); channel-level edits live in
         // encoding[ch].edit. Both are gathered by the engine via collectEdits.
         edits,

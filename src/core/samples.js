@@ -1,6 +1,6 @@
 // @ts-check
 // samples.js — resolve a set of anchor positions on a domain axis. Mark-agnostic,
-// used when authoring a line's points (newSeries seeding, youDrawIt): "where along
+// used when authoring a line's points (newSeries seeding, sweep): "where along
 // the domain do the anchors sit?" The default reads the scale's own ticks, so a
 // drawn line lands on the same nice values an axis would show — even when no axis
 // is rendered. Overridable with a count, explicit positions, or a time interval.

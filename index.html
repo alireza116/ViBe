@@ -13,16 +13,30 @@
         color: #1f2733;
         line-height: 1.55;
       }
-      h1 { font-size: 1.6rem; margin: 0 0 0.2rem; }
-      .tag { color: #55606c; font-size: 0.95rem; margin: 0 0 1.6rem; }
-      p { color: #55606c; font-size: 0.92rem; }
+      h1 {
+        font-size: 1.6rem;
+        margin: 0 0 0.2rem;
+      }
+      .tag {
+        color: #55606c;
+        font-size: 0.95rem;
+        margin: 0 0 1.6rem;
+      }
+      p {
+        color: #55606c;
+        font-size: 0.92rem;
+      }
       code {
         background: #eef0f3;
         padding: 0.05rem 0.3rem;
         border-radius: 4px;
         font-size: 0.85em;
       }
-      .links { display: grid; gap: 0.8rem; margin: 1.8rem 0 0; }
+      .links {
+        display: grid;
+        gap: 0.8rem;
+        margin: 1.8rem 0 0;
+      }
       a.card {
         display: block;
         border: 1px solid #e3e6ea;
@@ -31,21 +45,33 @@
         text-decoration: none;
         color: inherit;
       }
-      a.card:hover { border-color: #4f46e5; }
-      a.card b { color: #4f46e5; font-size: 1rem; }
-      a.card span { display: block; color: #55606c; font-size: 0.85rem; margin-top: 0.15rem; }
+      a.card:hover {
+        border-color: #4f46e5;
+      }
+      a.card b {
+        color: #4f46e5;
+        font-size: 1rem;
+      }
+      a.card span {
+        display: block;
+        color: #55606c;
+        font-size: 0.85rem;
+        margin-top: 0.15rem;
+      }
     </style>
   </head>
   <body>
     <h1>VibeJS</h1>
-    <p class="tag">Declarative, editable visualization for belief elicitation.</p>
+    <p class="tag">
+      Declarative, editable visualization for belief elicitation.
+    </p>
     <p>
       A chart is a declarative <code>Elicit(spec)</code>: a list of marks, each
       with an <b>encoding</b> that maps data to visuals. A channel owns both
-      <code>encode</code> (data → visual) and <code>edit</code> (gesture → data),
-      so interactions are declared where the channel is defined. Constraints are
-      data-layer invariants; a <code>schema</code> declares the elicited dataset
-      so a chart works with zero starter data.
+      <code>encode</code> (data → visual) and <code>edit</code> (gesture →
+      data), so interactions are declared where the channel is defined.
+      Constraints are data-layer invariants; a <code>schema</code> declares the
+      elicited dataset so a chart works with zero starter data.
     </p>
     <div class="links">
       <a class="card" href="./docs/index.html">

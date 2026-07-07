@@ -13,6 +13,21 @@
 // Declarative only: a channel is `{ field }` (scaled), `{ value }` (a constant),
 // or `{ field, scale: null }` (a raw field, unscaled). No accessor functions —
 // specs stay serializable and introspectable by the edit/elicitation layer.
+//
+// ── The mark contract ───────────────────────────────────────────────────────
+// A mark factory returns a plain feature object the engine consumes. Required:
+//   build(currentData, scales, width, height) -> FeatureNode[]
+//     the one method — emit scene nodes ({ type: 'circle'|'rect'|'line'|'path'|
+//     'text', … }); resolve every position/style through encodeChannel/resolveStyle.
+// Common optional fields the engine reads:
+//   encoding                 the channel map (also the source scales resolve from)
+//   categoricalScale         'band' (bar/tick: interval) | 'point' (dot/line: tick)
+//   xKey / yKey              value field names the edit/constraint layer reads back
+//   edits / constraints / onChange / id
+//   seriesKey / order / supportsSeries   line-family grouping (see plot/line.js)
+// Every data mark should resolve a datum -> pixel through encodeChannel (band+value
+// marks use it for the value axis and band-geometry helpers for the category axis),
+// so positions are computed exactly one way across marks.
 
 /**
  * The standard style channels every mark understands, with their default

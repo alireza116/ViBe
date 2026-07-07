@@ -3,7 +3,7 @@ export default {
     path: 'editing/sweep.html',
     title: 'Sweep (you-draw-it)',
     lead:
-        '<code class="inline">sweep()</code> (aka <code class="inline">youDrawIt()</code>) is a ' +
+        '<code class="inline">edit.line.sweep()</code> is a ' +
         'drag that repaints each point’s value as the pointer crosses its column — the NYT ' +
         '“you draw it” interaction. It is sugar over ' +
         '<code class="inline">drag({ pick: "sweep", guide: true })</code>, and it is ' +

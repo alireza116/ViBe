@@ -30,7 +30,7 @@ export function proximity(options) {
          * @returns {import('../types').FeatureNode[]}
          */
         build: (ctx) => {
-            const info = ctx.ui && ctx.ui.proximity && ctx.ui.proximity[target];
+            const info = ctx.ui && ctx.ui.session && ctx.ui.session[target];
             if (!info) return [];
             const base = (ctx.effects && ctx.effects.select) || DEFAULT_EFFECTS.select;
             // An explicit guide `color` option wins over the effect's colour.

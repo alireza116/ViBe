@@ -34,7 +34,6 @@ function buildTick(options, forcedValueAxis) {
         data = [],
         encoding = {},
         id,
-        interactors,
         edits,
         constraints,
         onChange,
@@ -48,7 +47,6 @@ function buildTick(options, forcedValueAxis) {
     return {
         id,
         data,
-        interactors,
         encoding,
         edits,
         constraints,

@@ -15,12 +15,18 @@ import * as vibe from '../src/index.js';
 import { SITE } from './_nav.js';
 
 // ---- dependency surface (namespace spread → self-maintaining) ---------------
+// Universal edits (drag, create, remove, resize, cycle, custom) are spread bare so
+// examples read `edit: drag()`. The line-scoped edits stay under `edit.line.*` so
+// their scope shows in the example; `line` (the edit namespace) and the internal
+// `nextSeriesKey` are excluded from the spread so they don't shadow the line MARK.
+const { line: _editLine, nextSeriesKey: _nsk, when: _editWhen, ...universalEdits } = vibe.edit;
 const depObj = {
     ...vibe.plot,
-    ...vibe.edit,
+    ...universalEdits,
     ...vibe.constraints,
     Elicit: vibe.Elicit,
     when: vibe.when,
+    edit: vibe.edit,
     guides: vibe.guides,
 };
 const depNames = Object.keys(depObj);

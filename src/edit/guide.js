@@ -11,10 +11,40 @@
 //      highlight, read from the transient `ui` selection the dispatch writes.
 //
 // Rebuilt every render (via the engine), so bounds track live data.
-import { resolveChannels } from './route.js';
+import { resolveChannels, collectEdits } from './route.js';
 import { DEFAULT_EFFECTS } from '../core/effects.js';
+import { isBand } from '../core/scales.js';
 
 const DEFAULT_CONSTRAINT_COLOR = '#e4572e';
+
+/**
+ * Collect the auto-guides for every feature: an edit declared `guide: true`
+ * self-draws (constraint bounds + nearest snap ring) via buildEditGuide, without
+ * the caller repeating the feature id in a top-level guides list. Deduped per
+ * (feature, edit).
+ * @param {any[]} features
+ * @returns {any[]} guide objects ({ isGuide, build })
+ */
+export function autoEditGuides(features) {
+    /** @type {any[]} */
+    const out = [];
+    /** @type {Set<string>} */
+    const seen = new Set();
+    for (const feature of features) {
+        collectEdits(feature).forEach((edit, i) => {
+            if (!edit.guide) return;
+            const key = `${feature.id}:edit-${edit.type}-${i}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            out.push({
+                isGuide: true,
+                /** @param {any} ctx */
+                build: (ctx) => buildEditGuide(feature, edit, ctx)
+            });
+        });
+    }
+    return out;
+}
 
 /**
  * @param {any} feature
@@ -68,6 +98,9 @@ function constraintGuide(constraint, gctx) {
     switch (constraint.constraintType) {
         case 'clamp': return clampGuide(constraint.options, gctx);
         case 'maintainSum': return maintainSumGuide(constraint.options, gctx);
+        // count / unique are CARDINALITY rules (how many data / per category), not
+        // value bounds — there is no line on a value axis to draw, so they render
+        // no guide by design. A custom constraint can still supply meta.guide above.
         default: return [];
     }
 }
@@ -143,6 +176,11 @@ function clampGuide({ min, max }, gctx) {
  * maintainSum -> a cap tick over each mark at the highest value it can reach given
  * the current total of the others. The category axis is the non-value positional
  * channel; the tick sits at that mark's slot, on the value axis.
+ *
+ * The per-mark cap tick only makes sense when the category axis is a BAND (bars /
+ * ticks — discrete slots to sit a cap over). On two continuous axes (a line /
+ * scatter) there is no slot geometry, so the guide draws nothing (the maintainSum
+ * data invariant still holds; only its visualization is band-specific).
  * @param {{ targetSum: number }} options
  * @param {any} gctx
  * @returns {import('../types').FeatureNode[]}
@@ -155,10 +193,11 @@ function maintainSumGuide({ targetSum }, gctx) {
     const catKey = catName === 'y' ? (feature.yKey || 'y') : (feature.xKey || 'x');
     const valueScale = primary.scale;
     const catScale = scales[catName];
-    if (!catScale) return [];
+    // Band category axis only — otherwise there is no slot to draw a cap over.
+    if (!catScale || !isBand(catScale)) return [];
 
     const [dMin, dMax] = [Math.min(...valueScale.domain()), Math.max(...valueScale.domain())];
-    const band = catScale.bandwidth ? catScale.bandwidth() : 20;
+    const band = catScale.bandwidth();
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
 
@@ -185,14 +224,14 @@ function maintainSumGuide({ targetSum }, gctx) {
 /**
  * The `select` interaction effect: a snap ring at the pointer + a highlight
  * outline around the selected mark, read from the transient nearest-selection
- * state the dispatch writes into ui.proximity. Appearance comes from the
- * customizable effects layer (ctx.effects.select).
+ * state the drivers write into ui.session. Appearance comes from the customizable
+ * effects layer (ctx.effects.select).
  * @param {any} feature
  * @param {any} ctx
  * @returns {import('../types').FeatureNode[]}
  */
 function proximityGuide(feature, ctx) {
-    const info = ctx.ui && ctx.ui.proximity && ctx.ui.proximity[feature.id];
+    const info = ctx.ui && ctx.ui.session && ctx.ui.session[feature.id];
     if (!info) return [];
     return selectEffectNodes(info, (ctx.featureNodes && ctx.featureNodes[feature.id]) || [],
         (ctx.effects && ctx.effects.select) || DEFAULT_EFFECTS.select);
@@ -203,7 +242,7 @@ function proximityGuide(feature, ctx) {
  * selection and the resolved `select` effect config. Shared by the edit-owned
  * guide and the legacy standalone proximity guide so both look identical and
  * honour the same customization.
- * @param {any} info the ui.proximity[featureId] selection
+ * @param {any} info the ui.session[featureId] selection
  * @param {any[]} marks the feature's current scene nodes
  * @param {any} select the resolved effects.select config
  * @returns {import('../types').FeatureNode[]}

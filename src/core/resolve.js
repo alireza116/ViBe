@@ -5,7 +5,7 @@
 // a channel producer (it declares field-per-channel via its encoding); the
 // engine unions each channel's values across all marks to infer its domain, then
 // builds one scale. Marks then read scales by channel name (scales.x, scales.color)
-// and interactors invert through the same objects.
+// and edits invert through the same objects.
 //
 // Precedence for a channel's scale spec:
 //   1. Legacy top-level spec.x / spec.y            (explicit global positional scales)

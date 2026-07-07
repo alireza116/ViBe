@@ -1,12 +1,11 @@
-// Point & Dot marks.
+// Point mark.
 export default {
     path: 'marks/point.html',
-    title: 'Point & Dot',
+    title: 'Point',
     lead:
         '<code class="inline">point</code> is the channel-driven circle: every channel — x, y, ' +
         'size, fill/color, stroke — resolves through the global scales, so one mark is a full ' +
-        'scatter. <code class="inline">dot</code> is the simpler accessor-based sibling (x/y/r ' +
-        'fields), handy for quick plots.',
+        'scatter.',
     sections: [
         {
             id: 'channels',
@@ -88,34 +87,6 @@ export default {
         size: { value: 9 },
       },
       edits: [ drag({ channels: ["x", "y"] }) ],
-    }),
-  ],
-}))`,
-                },
-            ],
-        },
-        {
-            id: 'dot',
-            title: 'dot — the quick sibling',
-            intro:
-                'dot takes plain field names (x, y) plus a constant radius r and fill — no ' +
-                'encoding block. Domains are inferred from the data. The shortest path to a ' +
-                'scatter when you don’t need per-channel scales or edits.',
-            examples: [
-                {
-                    title: 'A plain dot plot',
-                    blurb: 'x / y name data fields; r and fill are constants. Scales are inferred from the data.',
-                    code:
-`mount(Elicit({
-  width: 340, height: 240,
-  margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  features: [
-    dot({
-      data: [
-        { x: 15, y: 22 }, { x: 40, y: 55 },
-        { x: 62, y: 33 }, { x: 84, y: 68 },
-      ],
-      x: "x", y: "y", r: 8, fill: "#7c3aed",
     }),
   ],
 }))`,

@@ -46,18 +46,3 @@ export function resolveChannels(names, encoding, scales) {
     }));
 }
 
-/**
- * The field/scale a constraint defaults to for this edit: its primary (first)
- * channel. The engine puts these on the context as valueKey/valueScale so a
- * constraint with no explicit field governs the edit's own channel — correct by
- * construction, never inherited from whatever gesture ran.
- * @param {import('../types').ResolvedChannel[]} resolvedChannels
- * @returns {{ valueKey?: string, valueScale?: import('../types').Scale }}
- */
-export function primaryValue(resolvedChannels) {
-    const primary = resolvedChannels[0];
-    return primary
-        ? { valueKey: primary.field, valueScale: primary.scale || undefined }
-        : {};
-}
-

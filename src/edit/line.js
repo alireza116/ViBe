@@ -1,0 +1,310 @@
+// @ts-check
+// line.js — the line-scoped edits: authoring and reshaping a connected path. They
+// only make sense on a mark that groups points into series (the `line` family),
+// so they are exposed under `edit.line.*` and tagged `scope: 'line'` (the engine
+// dev-warns if one lands on a mark without series support).
+//
+//   anchor    — add ONE point to a line (click)
+//   newSeries — seed a WHOLE flat line from sampled positions (dblclick)
+//   draw      — author a line by dragging (drag), edit-aware
+//   sweep     — you-draw-it: repaint each point the pointer crosses (drag)
+
+import { makeEdit, schemaDefaults, nextSeriesKey, numOf } from './shared.js';
+import { nearestSeries, nearestMark, nearestMarkOnAxis, DEFAULT_PICK_THRESHOLD } from './pick.js';
+import { resolveSamples } from '../core/samples.js';
+import { drag } from './basic.js';
+
+/**
+ * anchor — add ONE point to a connected path (a line's bezier-style anchor). The
+ * inverse of `remove` for paths, and proximity-aware where `create` is not: it
+ * resolves WHICH line the gesture means.
+ *   into 'nearest' -> attach to the closest line within `threshold`; if none is
+ *                     near (empty space) it falls back to starting a fresh series,
+ *                     so repeated clicks draw a new line point-by-point, then extend
+ *                     it (each later click is now near the line it just started).
+ *   into 'new'     -> always start a fresh series.
+ * The new point's series is written to the feature's series field; its position is
+ * the inverted pointer on each positional channel (2D by default). Order is handled
+ * by the mark's `order` (domain sort or as-drawn), so anchor just appends.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function anchor(options = {}) {
+    const { into = 'nearest', channels, trigger = 'click', series: seriesField, ...rest } = options;
+    const threshold = options.threshold != null && options.threshold > 0 ? options.threshold : DEFAULT_PICK_THRESHOLD;
+    return makeEdit({
+        type: 'anchor',
+        gesture: trigger,
+        channels: channels || ['x', 'y'],
+        pick: 'plane',
+        scope: 'line',
+        into,
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const sField = seriesField || ctx.seriesKey || null;
+            // Resolve the target line: the nearest one, or a fresh series when
+            // 'new' (or 'nearest' found none within threshold — empty space).
+            let seriesVal = null;
+            if (into === 'nearest') {
+                seriesVal = nearestSeries(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, threshold);
+                // Freehand line (order: 'sequence'): no nearby line, but one already
+                // exists — extend THAT line (append in draw order) rather than spawning
+                // a new series, so a far click keeps a single path. Domain lines, and
+                // into:'new', still start a fresh series.
+                if (seriesVal == null && ctx.order === 'sequence' && sField && (ctx.data || []).length) {
+                    seriesVal = ctx.data[ctx.data.length - 1][sField];
+                }
+            }
+            if (seriesVal == null) seriesVal = nextSeriesKey(ctx.data, sField);
+
+            const datum = { ...schemaDefaults(ctx.schema) };
+            if (sField) datum[sField] = seriesVal;
+            let placed = false;
+            for (const ch of ctx.channels) {
+                const visual = ch.name === 'x' ? ctx.pointer.x
+                    : ch.name === 'y' ? ctx.pointer.y : undefined;
+                if (visual === undefined || !ch.scale || !ch.scale.invertible) continue;
+                datum[ch.field] = ch.scale.invertValue(visual);
+                placed = true;
+            }
+            if (!placed) return undefined;
+            return [...ctx.data, datum];
+        }
+    });
+}
+
+/**
+ * newSeries — seed a WHOLE new line at once: one anchor per sampled domain
+ * position (see resolveSamples: the scale's ticks by default, or a count / explicit
+ * positions / time interval), each starting at the pointer's value on the value
+ * axis (a flat line you then sweep into shape). This is the draw-from-scratch
+ * primitive; pair it with `sweep` to then shape the seeded line.
+ *   domain / value : the positional axes ('x'/'y'); default domain 'x', value 'y'.
+ *   samples        : passed to resolveSamples for the anchor domain positions.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function newSeries(options = {}) {
+    const { domain = 'x', value = 'y', samples, trigger = 'dblclick', series: seriesField, ...rest } = options;
+    return makeEdit({
+        type: 'newSeries',
+        gesture: trigger,
+        channels: [domain, value],
+        pick: 'plane',
+        scope: 'line',
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const sField = seriesField || ctx.seriesKey || null;
+            const domainField = (ctx.encoding[domain] && ctx.encoding[domain].field)
+                || (domain === 'x' ? ctx.xKey : ctx.yKey);
+            const valueField = (ctx.encoding[value] && ctx.encoding[value].field)
+                || (value === 'x' ? ctx.xKey : ctx.yKey);
+            const domainScale = ctx.scales[domain];
+            const valueScale = ctx.scales[value];
+            if (!domainScale || !domainField) return undefined;
+
+            const positions = resolveSamples(domainScale, samples);
+            if (!positions.length) return undefined;
+
+            // Flat line at the clicked value (or the value-domain start if the
+            // value axis can't invert here).
+            const seedVisual = value === 'x' ? ctx.pointer.x : ctx.pointer.y;
+            const seedValue = valueScale && valueScale.invertible
+                ? valueScale.invertValue(seedVisual)
+                : (valueScale && valueScale.domain ? valueScale.domain()[0] : null);
+            const seriesVal = nextSeriesKey(ctx.data, sField);
+
+            const seeded = positions.map((pos) => {
+                const datum = { ...schemaDefaults(ctx.schema) };
+                if (sField) datum[sField] = seriesVal;
+                datum[domainField] = pos;
+                if (valueField) datum[valueField] = seedValue;
+                return datum;
+            });
+            return [...ctx.data, ...seeded];
+        }
+    });
+}
+
+/**
+ * draw — author lines by dragging, edit-aware: the missing corner of the creation
+ * matrix (anchor = click one point, newSeries = dblclick a seeded line, draw = drag
+ * a line). On dragstart it resolves proximity to existing lines and picks a mode for
+ * the whole drag:
+ *   near an existing line (within `threshold`) -> EDIT it (sweep): each drag event
+ *       repaints the line the drag started nearest to — a domain line's value along
+ *       its column, a freehand line's nearest point in 2D.
+ *   in empty space (or `into: 'new'`)          -> DRAW a new line, laying points down
+ *       as the pointer moves. It specializes by the line's `order`:
+ *         order 'domain'   (lineY/lineX)          -> YOU-DRAW-IT FROM SCRATCH: the
+ *             pointer crossing each `samples` column upserts that point at the
+ *             pointer value, so one sweep draws the curve (re-cross to repaint).
+ *         order 'sequence' (connectedScatter/path) -> FREEHAND: sample the pointer by
+ *             pixel distance (`minDist`) and append points in creation order (a 2D
+ *             path, e.g. a route over a map).
+ * So one gesture both draws new lines and reshapes drawn ones — near edits, far draws.
+ * The engine (draw driver) owns the per-drag lock; this apply reads it from
+ * ctx.drawState (mode + locked series) and ctx.order.
+ *   domain / value : the positional axes ('x'/'y'); default domain 'x', value 'y'.
+ *   channels       : governed channels (default [domain, value]); freehand needs both.
+ *   samples        : domain grid for you-draw-it (resolveSamples; default = ticks).
+ *   minDist        : freehand pointer-sampling distance in px (default 8).
+ *   threshold      : proximity radius for the edit-vs-draw decision (default 40).
+ *   into           : 'nearest' (default, near edits / far draws) | 'new' (always draw).
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function draw(options = {}) {
+    const {
+        domain = 'x', value = 'y', channels, samples, minDist = 8,
+        into = 'nearest', series: seriesField, ...rest
+    } = options;
+    return makeEdit({
+        type: 'draw',
+        gesture: 'drag',
+        channels: channels || [domain, value],
+        pick: 'draw',
+        scope: 'line',
+        into,
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const st = ctx.drawState;
+            if (!st) return undefined; // engine sets the per-drag lock on dragstart
+            const sField = seriesField || ctx.seriesKey || null;
+            const seriesVal = st.drawSeries;
+            const freehandLine = ctx.order === 'sequence';
+
+            /** @type {Record<string, import('../types').ResolvedChannel>} */
+            const byName = {};
+            for (const c of ctx.channels) byName[c.name] = c;
+
+            // EDIT MODE (drag started near an existing line): sweep that line. Grab
+            // its nearest point — by column (domain axis) for a domain line, in 2D
+            // for a freehand one — and rewrite it from the pointer. Locked to the
+            // series so overlapping lines don't fight over the drag.
+            if (st.mode === 'edit') {
+                const idx = freehandLine
+                    ? nearestMark(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, Infinity, seriesVal)
+                    : nearestMarkOnAxis(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, Infinity, domain, seriesVal);
+                if (idx == null || ctx.data[idx] == null) return undefined;
+                const datum = { ...ctx.data[idx] };
+                for (const ch of ctx.channels) {
+                    const visual = ch.name === 'x' ? ctx.pointer.x : ch.name === 'y' ? ctx.pointer.y : undefined;
+                    if (visual === undefined || !ch.scale || !ch.scale.invertible) continue;
+                    // A domain line keeps its column fixed — paint only the value axis;
+                    // a freehand line moves the whole point (both axes).
+                    if (!freehandLine && ch.name !== value) continue;
+                    datum[ch.field] = ch.scale.invertValue(visual);
+                }
+                return ctx.data.map((d, i) => (i === idx ? datum : d));
+            }
+
+            // FREEHAND: append a pointer sample when it has moved far enough.
+            if (freehandLine) {
+                const px = ctx.pointer.x, py = ctx.pointer.y;
+                if (st.lastX != null && st.lastY != null) {
+                    const moved = Math.hypot(px - st.lastX, py - st.lastY);
+                    if (moved < minDist) return undefined; // too close — skip
+                }
+                const datum = { ...schemaDefaults(ctx.schema) };
+                if (sField) datum[sField] = seriesVal;
+                let placed = false;
+                for (const ch of ctx.channels) {
+                    const visual = ch.name === 'x' ? px : ch.name === 'y' ? py : undefined;
+                    if (visual === undefined || !ch.scale || !ch.scale.invertible) continue;
+                    datum[ch.field] = ch.scale.invertValue(visual);
+                    placed = true;
+                }
+                if (!placed) return undefined;
+                st.lastX = px; st.lastY = py;
+                return [...ctx.data, datum];
+            }
+
+            // YOU-DRAW-IT: upsert the sample column(s) the pointer has crossed.
+            const dCh = byName[domain], vCh = byName[value];
+            if (!dCh || !vCh || !dCh.scale || !vCh.scale
+                || !dCh.scale.invertible || !vCh.scale.invertible) return undefined;
+            const positions = resolveSamples(ctx.scales[domain], samples);
+            if (!positions.length) return undefined;
+
+            const dCur = dCh.scale.invertValue(domain === 'x' ? ctx.pointer.x : ctx.pointer.y);
+            const v = vCh.scale.invertValue(value === 'x' ? ctx.pointer.x : ctx.pointer.y);
+
+            // Which grid columns to fill: those between the previous pointer domain
+            // and the current one (so a fast drag doesn't skip columns); on the first
+            // event just the nearest column.
+            const nearest = () => {
+                let best = null, bd = Infinity;
+                for (const p of positions) {
+                    const d = Math.abs(numOf(p) - numOf(dCur));
+                    if (d < bd) { bd = d; best = p; }
+                }
+                return best == null ? [] : [best];
+            };
+            let targets;
+            if (st.lastDomain == null) {
+                targets = nearest();
+            } else {
+                const lo = Math.min(numOf(st.lastDomain), numOf(dCur));
+                const hi = Math.max(numOf(st.lastDomain), numOf(dCur));
+                targets = positions.filter((p) => numOf(p) >= lo && numOf(p) <= hi);
+                if (!targets.length) targets = nearest();
+            }
+            st.lastDomain = dCur;
+
+            const data = ctx.data.slice();
+            for (const pos of targets) {
+                const idx = data.findIndex((row) =>
+                    (!sField || row[sField] === seriesVal) && numOf(row[dCh.field]) === numOf(pos));
+                const datum = { ...schemaDefaults(ctx.schema), ...(idx >= 0 ? data[idx] : {}) };
+                if (sField) datum[sField] = seriesVal;
+                datum[dCh.field] = pos;
+                datum[vCh.field] = v;
+                if (idx >= 0) data[idx] = datum; else data.push(datum);
+            }
+            return data;
+        }
+    });
+}
+
+/**
+ * sweep — you-draw-it painting: a drag that repaints the value of each point the
+ * pointer crosses (series-scoped in the engine). Convenience over `drag`.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function sweep(options = {}) {
+    return drag({ pick: 'sweep', guide: true, scope: 'line', ...options });
+}
+
+/**
+ * removeSeries — delete a WHOLE line at once: the series-scoped counterpart to
+ * `remove` (which deletes one datum / anchor). The gesture resolves a target datum
+ * the usual way (direct pick = the clicked handle, or pick:'nearest'), reads its
+ * series key, and filters out every datum in that series — so clicking any point
+ * on a line removes the entire line. Restores create/remove symmetry: anchor +
+ * newSeries + draw build lines, remove + removeSeries take them apart.
+ *   trigger : the gesture (default 'click'); pair with `when` if another click
+ *             edit shares the mark (e.g. remove one point vs the whole series).
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function removeSeries(options = {}) {
+    const { series: seriesField, trigger, channels, ...rest } = options;
+    return makeEdit({
+        type: 'removeSeries',
+        gesture: trigger || options.gesture || 'click',
+        channels: channels || null,
+        scope: 'line',
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            if (ctx.datum == null) return undefined; // no target resolved
+            const sField = seriesField || ctx.seriesKey || null;
+            // No series field (a single-series line): fall back to deleting the
+            // one targeted datum, so removeSeries never silently no-ops.
+            if (!sField) return ctx.data.filter((_, i) => i !== ctx.index);
+            const key = ctx.datum[sField];
+            return ctx.data.filter((d) => d[sField] !== key);
+        }
+    });
+}

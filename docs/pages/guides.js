@@ -6,8 +6,9 @@ export default {
         'Guides are non-interactive annotations, rebuilt every render so they track the live ' +
         'data. <code class="inline">guides.rule</code> draws a reference line at a data value, ' +
         '<code class="inline">guides.region</code> shades a band between two values, and ' +
-        '<code class="inline">guides.constraints</code> / <code class="inline">guides.proximity</code> ' +
-        'visualize where an edit is bounded or what it has selected.',
+        '<code class="inline">guides.proximity</code> visualizes what a nearest-pick edit has ' +
+        'selected. (An edit’s own constraint bounds draw automatically via ' +
+        '<code class="inline">guide: true</code>.)',
     sections: [
         {
             id: 'annotations',

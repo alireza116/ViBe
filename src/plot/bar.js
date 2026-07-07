@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
-import { resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 
 // bar: a rectangular mark that composes across orientations. The band axis is
 // the categorical/position axis (sets the bar's position + thickness) and the
@@ -28,7 +28,6 @@ function buildBar(options, forcedOrientation) {
         data = [],
         encoding = {},
         id,
-        interactors,
         edits,
         constraints,
         onChange,
@@ -44,7 +43,6 @@ function buildBar(options, forcedOrientation) {
     return {
         id,
         data,
-        interactors,
         encoding,
         edits,
         constraints,
@@ -75,11 +73,13 @@ function buildBar(options, forcedOrientation) {
                 const style = resolveStyle(scales, encoding, d, { fill: 'steelblue' });
 
                 if (orientation === 'horizontal') {
-                    // Category on y (band), value/length on x (linear).
+                    // Category on y (band geometry), value/length on x. The value
+                    // axis resolves through encodeChannel like every other mark; the
+                    // band axis keeps its interval geometry (start + thickness).
                     const bandStart = yScale ? yScale(d[yKey]) : 0;
                     const thickness = bandwidthOf(yScale, 20);
                     const baseline = baselineOf(xScale);
-                    const valuePos = xScale ? xScale(d[xKey]) : 0;
+                    const valuePos = encodeChannel(scales, encoding, 'x', d, baseline);
                     return {
                         type: 'rect',
                         x: Math.min(valuePos, baseline),
@@ -94,11 +94,12 @@ function buildBar(options, forcedOrientation) {
                     };
                 }
 
-                // Vertical: category on x (band), value/length on y (linear).
+                // Vertical: category on x (band geometry), value/length on y. Value
+                // via encodeChannel (as every mark); band axis keeps its interval.
                 const bandStart = xScale ? xScale(d[xKey]) : 0;
                 const thickness = bandwidthOf(xScale, 20);
                 const baseline = baselineOf(yScale);
-                const valuePos = yScale ? yScale(d[yKey]) : 0;
+                const valuePos = encodeChannel(scales, encoding, 'y', d, baseline);
                 return {
                     type: 'rect',
                     x: bandStart,

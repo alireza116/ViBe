@@ -64,6 +64,13 @@ export interface EditContext {
   // proximity-aware edits (anchor / newSeries) and when.near|far.
   seriesKey?: string | null;
   marks?: FeatureNode[];
+  // The line's ordering knob, so a create-as-you-drag (draw) edit can pick its
+  // mode: 'sequence' -> freehand append; otherwise -> you-draw-it column upsert.
+  order?: string | null;
+  // The feature's transient session (per-drag lock for a draw edit: drawSeries +
+  // last pointer/domain), read and mutated across a single press-drag. Set by the
+  // draw driver.
+  drawState?: Session | null;
 }
 
 export interface ResolvedChannel {
@@ -89,6 +96,8 @@ export interface Constraint {
   constraintType?: string;
   options?: any;
   field?: string;
+  // A constraint's own boundary DRAWER (distinct from an Edit's boolean `guide`):
+  // returns the scene nodes visualizing where it limits interaction.
   guide?: (ctx: any) => any[];
 }
 
@@ -97,12 +106,19 @@ export interface Edit {
   gesture: string;
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
-  pick: 'direct' | 'nearest' | 'plane' | 'sweep';
+  pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw';
+  // null = universal (any mark); 'line' = needs a series-grouping mark. The engine
+  // dev-warns when a 'line' edit is attached to a mark without series support.
+  scope: 'line' | null;
   threshold: number;
-  // anchor(): which line a new point joins, and how it's ordered in.
+  // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
-  at?: 'append' | 'domain';
+  // Edit-scoped constraint SUGAR (runs only on this edit's commit). The canonical
+  // home for invariants is the feature's `constraints` (plural), which hold for
+  // every edit; `constrain` (singular) is a guard you want on just this one.
   constrain: Constraint[];
+  // true = this edit self-draws its guide (constraint bounds + snap ring). Not to
+  // be confused with a Constraint's `guide`, which is a drawer function.
   guide: boolean | null;
   guideColor: string | null;
   apply: (ctx: EditContext) => any;
@@ -158,7 +174,6 @@ export interface MarkOptions {
   id?: string;
   edits?: any[];
   constraints?: Constraint[];
-  interactors?: any[];
   onChange?: (data: Datum[]) => void;
   [key: string]: any;
 }
@@ -196,8 +211,35 @@ export interface FeatureNode {
   data?: Datum;
   index?: number;
   featureId?: string;
-  interactors?: { type: string; featureId: string }[];
+  // Set by the engine when the node's feature has a direct-pick edit, so the
+  // renderer shows an interactive cursor on it.
+  editable?: boolean;
+  // Runtime tags set by marks for the pick/driver layer: `series` groups a line's
+  // nodes; `sweepAxis`/`bandAxis` name the axis proximity measures along; `cursor`
+  // overrides the interactive cursor (e.g. a tick's ew-resize).
+  series?: any;
+  sweepAxis?: 'x' | 'y';
+  bandAxis?: 'x' | 'y';
+  cursor?: string;
   [key: string]: any;
+}
+
+// Per-feature transient interaction state a driver keeps in ui.session[featureId]
+// (proximity selection, sweep/draw locks). Read by guides to draw the snap ring +
+// highlight and by a draw edit via ctx.drawState. All fields optional/driver-set.
+export interface Session {
+  px?: number;
+  py?: number;
+  threshold?: number;
+  hoverIndex?: number | null;
+  activeIndex?: number | null;
+  series?: any;
+  // draw driver: the locked mode + series and the pointer/domain trail.
+  mode?: 'edit' | 'draw';
+  drawSeries?: any;
+  lastDomain?: any;
+  lastX?: number | null;
+  lastY?: number | null;
 }
 
 // Config for a single positional axis (the `axes` convenience, or an explicit

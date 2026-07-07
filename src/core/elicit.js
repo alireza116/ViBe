@@ -2,41 +2,33 @@
 import { SceneGraph } from './scene.js';
 import { resolveScales } from './resolve.js';
 import { collectEdits, resolveChannels } from '../edit/route.js';
-import { nearestMark, nearestMarkOnAxis, nearestSeries, pickThreshold } from '../edit/pick.js';
-import { buildEditGuide } from '../edit/guide.js';
+import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
+import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
 import { resolveEffects } from './effects.js';
-import { axisX, axisY, gridX, gridY } from '../plot/axis.js';
-import * as guideBuilders from '../guides/index.js';
+import { autoAxes } from './axes.js';
 
+// Dev-only builds (Vite sets import.meta.env.DEV; undefined under a bare Node
+// import) get a capability guard: a line-scoped edit (edit.line.*) attached to a
+// mark that doesn't group points into series is almost certainly a mistake.
+const DEV = !!(/** @type {any} */ (import.meta).env && /** @type {any} */ (import.meta).env.DEV);
+/** @type {Set<string>} */
+const warnedScope = new Set();
 /**
- * Resolve the global `axes` convenience into composable axis/grid marks — the
- * IMPLICIT layer of the Observable-Plot axis model. Only channels the user did
- * not already compose an explicit axis mark for are auto-injected, so an explicit
- * `axisX(...)` in `features` always wins. `spec.axes`:
- *   undefined -> default axis on both positional channels (today's behaviour)
- *   false     -> no axes at all
- *   { x, y }  -> per-channel config object, or `false` to suppress that channel.
- * @param {any[]} features
- * @param {any} axesOpt
- * @returns {any[]} the axis/grid marks to prepend (drawn behind marks)
+ * @param {any} feature
+ * @param {import('../types').Edit[]} edits
  */
-function autoAxes(features, axesOpt) {
-    if (axesOpt === false) return [];
-    /** @type {any[]} */
-    const injected = [];
-    /** @param {string} ch */
-    const hasExplicit = (ch) => features.some(f => (f.isAxis || f.isGrid) && f.channel === ch);
-    const builders = { x: { axis: axisX, grid: gridX }, y: { axis: axisY, grid: gridY } };
-    for (const ch of /** @type {const} */ (['x', 'y'])) {
-        const cfg = axesOpt ? axesOpt[ch] : {};
-        if (cfg === false) continue;           // channel suppressed
-        if (hasExplicit(ch)) continue;         // user composed their own
-        const opts = cfg || {};
-        injected.push(builders[ch].axis(opts));
-        if (opts.grid) injected.push(builders[ch].grid(opts));
+function warnLineScopeMismatch(feature, edits) {
+    for (const e of edits) {
+        if (e.scope !== 'line' || feature.supportsSeries) continue;
+        const key = `${feature.id}:${e.type}`;
+        if (warnedScope.has(key)) continue;
+        warnedScope.add(key);
+        console.warn(
+            `[vibe] edit.line.${e.type}() is attached to a mark without series support ` +
+            `(feature "${feature.id}"). Line-scoped edits expect a line mark; it may not behave.`
+        );
     }
-    return injected;
 }
 
 /**
@@ -84,75 +76,23 @@ export function Elicit(spec) {
         }
     });
 
-    // Auto-guides: interactors can request guides for their feature without the
-    // caller repeating the feature id in a top-level guides list:
-    //   - `showGuides` -> a constraints guide (where constraints limit dragging).
-    //   - `highlight`  -> a proximity guide (highlights the nearest-mark selection).
-    // Deduped per (feature, guide type).
-    /** @type {any[]} */
-    const autoGuides = [];
-    /** @type {Set<string>} */
-    const seenAutoGuides = new Set();
-    
-    /**
-     * @param {string} kind
-     * @param {string} featureId
-     * @param {any} guide
-     */
-    const addAutoGuide = (kind, featureId, guide) => {
-        const key = `${featureId}:${kind}`;
-        if (!seenAutoGuides.has(key)) {
-            seenAutoGuides.add(key);
-            autoGuides.push(guide);
-        }
-    };
-    features.forEach(feature => {
-        (feature.interactors || []).forEach((/** @type {any} */ interactor) => {
-            if (interactor.showGuides) {
-                const opts = typeof interactor.showGuides === 'object' ? interactor.showGuides : {};
-                addAutoGuide('constraints', feature.id, guideBuilders.constraints({ target: feature.id, ...opts }));
-            }
-            if (interactor.highlight) {
-                const opts = typeof interactor.highlight === 'object' ? interactor.highlight : {};
-                addAutoGuide('proximity', feature.id, guideBuilders.proximity({ target: feature.id, ...opts }));
-            }
-        });
+    // Auto-guides: an edit declared `guide: true` self-draws its guide (constraint
+    // bounds + nearest snap ring) without the caller repeating the feature id in a
+    // top-level guides list (see edit/guide.js).
+    const allGuides = [...autoEditGuides(features), ...guides];
 
-        // New model: an edit declared `guide: true` self-draws (constraint bounds
-        // + nearest snap ring) via buildEditGuide. No `target` — the edit already
-        // owns its channel and constraints. Deduped per (feature, edit type).
-        collectEdits(feature).forEach((edit, i) => {
-            if (!edit.guide) return;
-            addAutoGuide(`edit-${edit.type}-${i}`, feature.id, {
-                isGuide: true,
-                /** @param {any} ctx */
-                build: (ctx) => buildEditGuide(feature, edit, ctx)
-            });
-        });
-    });
-    const allGuides = [...autoGuides, ...guides];
+    // Plane-on-top mode: when a feature has an edit whose driver resolves its
+    // target from an arbitrary pointer position (nearest/sweep/draw), the plane
+    // must sit above the marks and own the gesture. The renderer reads this flag.
+    const planeOnTop = features.some(feature => needsPlaneOnTop(collectEdits(feature)));
 
-    // Plane-on-top mode: when a feature needs the plane to capture pointer moves
-    // or drags anywhere (not just on a mark), the plane must sit above the marks.
-    // Two cases: a legacy proximity interactor, or a new `pick: 'nearest'` edit —
-    // both resolve their target from an arbitrary pointer position, so they need
-    // the plane to own the gesture. The renderer reads this flag.
-    const planeOnTop =
-        features.some(feature =>
-            (feature.interactors || []).some((/** @type {any} */ i) =>
-                (i.target || 'mark') === 'plane' && (i.hover || i.dragstart || i.drag)
-            )
-        ) ||
-        features.some(feature =>
-            collectEdits(feature).some(e => e.pick === 'nearest' || e.pick === 'sweep')
-        );
+    // Transient interaction (UI) state, separate from the belief data `state`. The
+    // interaction drivers keep a per-feature session here (proximity selection,
+    // sweep/draw locks); guides read it to draw the snap ring + highlight.
+    /** @type {{ session: Record<string, any> }} */
+    const ui = { session: {} };
 
-    // Transient interaction (UI) state, separate from the belief data `state`.
-    // Guides and plane interactors read/write it (e.g. proximity selection).
-    /** @type {any} */
-    const ui = { proximity: {} };
-
-    // The most recently built scene nodes per feature, so plane interactors can
+    // The most recently built scene nodes per feature, so plane-pick edits can
     // hit-test against exact mark geometry and guides can look marks up by index.
     /** @type {Record<string, any[]>} */
     const featureNodes = {};
@@ -185,25 +125,22 @@ export function Elicit(spec) {
             const nodes = feature.build(currentData, scales, innerWidth, innerHeight);
             featureNodes[feature.id] = nodes;
 
-            // Attach metadata for mark-scoped interactors (those that operate on
-            // existing marks). Plane-scoped interactors are routed via the plane,
-            // not the marks, so they are not attached here.
-            const markInteractors = (feature.interactors || [])
-                .filter((/** @type {any} */ i) => (i.target || 'mark') === 'mark');
-            if (markInteractors.length > 0) {
-                nodes.forEach((/** @type {any} */ node) => {
-                    node.interactors = markInteractors.map((/** @type {any} */ interactorDef) => ({
-                        type: interactorDef.type,
-                        featureId: feature.id
-                    }));
-                });
-            }
+            const edits = collectEdits(feature);
+            if (DEV) warnLineScopeMismatch(feature, edits);
 
-            // Tag every mark node with its feature so gesture events can find the
-            // feature's edits (the new `edit` dispatch path).
-            nodes.forEach((/** @type {any} */ node) => { node.featureId = feature.id; });
+            // A feature with a direct-pick edit is interactive on its marks, so the
+            // renderer should show an editable cursor on them. Plane-pick edits
+            // (nearest/sweep/draw) put the cursor on the plane instead, so they
+            // don't mark nodes editable.
+            const editable = edits.some(e => e.pick === 'direct');
 
-            nodes.forEach((/** @type {any} */ node) => scene.add(node));
+            // Tag every node with its feature so gesture events can find the
+            // feature's edits, and flag interactive marks for the cursor.
+            nodes.forEach((/** @type {any} */ node) => {
+                node.featureId = feature.id;
+                if (editable) node.editable = true;
+                scene.add(node);
+            });
         });
 
         // Build guides last so they can read the freshly-updated state of every
@@ -238,81 +175,6 @@ export function Elicit(spec) {
             effects,
             onEvent: handleEvent
         });
-    };
-
-    // Apply a single interactor to an event: build context, run the handler and
-    // its constraints, then commit to state. Returns whether a re-render is
-    // needed (data committed, or a handler requested a redraw for UI state).
-    /**
-     * @param {any} feature
-     * @param {any} interactorDef
-     * @param {any} event
-     * @returns {boolean}
-     */
-    const applyInteraction = (feature, interactorDef, event) => {
-        const handler = interactorDef[event.type];
-        if (!handler) return false;
-
-        const featureId = feature.id;
-        const currentData = state[featureId] || [];
-
-        const context = {
-            event: event.rawEvent,
-            x: event.x,
-            y: event.y,
-            data: currentData,
-            scales,
-            // For mark (change) interactions these identify the touched datum;
-            // for plane (create/proximity) interactions they are undefined.
-            nodeData: event.node ? event.node.data : undefined,
-            nodeIndex: event.node ? event.node.index : undefined,
-            // The touched scene node itself, so geometry-based editors (e.g.
-            // resize, which measures a radius from the mark centre) can read it.
-            node: event.node,
-            xKey: feature.xKey || 'x',
-            yKey: feature.yKey || 'y',
-            // The feature's channel encoding, so channel-scoped interactors can
-            // resolve channel -> field generically (e.g. edit the colour field).
-            encoding: feature.encoding,
-            // Extras for plane interactors: the feature id, its current marks (for
-            // proximity hit-testing) and the shared transient UI state.
-            featureId,
-            marks: featureNodes[featureId] || [],
-            ui
-        };
-
-        // Gesture arbitration, kept SEPARATE from the interactions: a `when`
-        // predicate (added by gate()) decides whether this interactor acts on
-        // this gesture — e.g. plain-drag vs Shift-drag selects move vs resize.
-        // The interaction itself stays unaware of how it was selected.
-        if (interactorDef.when && !interactorDef.when(context)) return false;
-
-        // The interactor returns:
-        //   undefined -> no-op (no re-render)
-        //   true      -> redraw only (it mutated UI state, e.g. proximity hover)
-        //   array     -> a proposed dataset to commit (after constraints)
-        let newData = handler(context);
-        if (newData === undefined) return false;
-        if (newData === true) return true;
-
-        // Run constraints. A constraint may return `false` to reject the whole
-        // interaction, or a modified dataset to bound/limit it. Each constraint
-        // is fed the result of the previous one so they compose.
-        const constraints = interactorDef.constraints || [];
-        for (const constraint of constraints) {
-            const result = constraint(newData, currentData, context);
-            if (result === false) {
-                return false; // rejected
-            } else if (result !== true && result !== undefined) {
-                newData = result;
-            }
-        }
-
-        state[featureId] = newData;
-        if (interactorDef.onChange) {
-            interactorDef.onChange(newData);
-        }
-        return true;
     };
 
     // Run one edit against a resolved target and commit. `index` addresses the
@@ -351,7 +213,11 @@ export function Elicit(spec) {
             // proximity-aware edits (anchor / newSeries) and `when.near|far` can
             // resolve WHICH line a plane gesture means. Harmless to other edits.
             seriesKey: feature.seriesKey || null,
-            marks: featureNodes[feature.id] || []
+            marks: featureNodes[feature.id] || [],
+            // The line's ordering knob and the engine's per-drag lock, for a `draw`
+            // (create-as-you-drag) edit. Harmless to every other edit.
+            order: feature.order || null,
+            drawState: (ui.session && ui.session[feature.id]) || null
         };
         if (edit.when && !edit.when(ctx)) return false; // arbitration
 
@@ -365,9 +231,9 @@ export function Elicit(spec) {
             : currentData.map((d, i) => (i === index ? result : d));
 
         // Which datum the gesture touched, for invariants that resolve a violation
-        // relative to it (create -> the appended one; remove -> none; else `index`).
+        // relative to it (create -> the appended one; a delete -> none; else `index`).
         const activeIndex = edit.type === 'create' ? newData.length - 1
-            : edit.type === 'remove' ? null
+            : (edit.type === 'remove' || edit.type === 'removeSeries') ? null
                 : index;
 
         // Data-layer invariants: feature-wide first (hold for every edit), then any
@@ -405,150 +271,55 @@ export function Elicit(spec) {
         return changed;
     };
 
-    // Plane-pick edits: the gesture is on the plane (no node). Two kinds:
-    //   - create (pick 'plane'): mint a new datum on the matching gesture.
-    //   - nearest (pick 'nearest'): resolve the closest mark within threshold and
-    //     edit it, holding a lock across the drag (like the old proximityDrag).
-    // Nearest also maintains the transient ui.proximity selection its guide draws.
-    /**
-     * @param {string} fid
-     * @returns {any}
-     */
-    const readSel = (fid) => (ui.proximity && ui.proximity[fid]) || null;
-    
-    /**
-     * @param {string} fid
-     * @param {any} patch
-     */
-    const writeSel = (fid, patch) => {
-        ui.proximity = ui.proximity || {};
-        ui.proximity[fid] = { ...(ui.proximity[fid] || {}), ...patch };
-    };
-
+    // Plane-pick edits: the gesture is on the plane (no node). Each interaction
+    // driver (edit/drivers) owns one pick-mode lifecycle; we hand every driver the
+    // edits it `wants` plus a per-feature session, and it runs them. The engine no
+    // longer knows any specific mode — adding one means adding a driver file.
     /**
      * @param {any} feature
      * @param {any} event
      * @returns {boolean}
      */
     const dispatchPlaneEdits = (feature, event) => {
-        const planeEdits = collectEdits(feature).filter(e => e.pick === 'plane' || e.pick === 'nearest' || e.pick === 'sweep');
-        if (planeEdits.length === 0) return false;
+        const edits = collectEdits(feature).filter(e => e.pick !== 'direct');
+        if (edits.length === 0) return false;
         const fid = feature.id;
+
+        // Per-feature transient session the drivers read/write (proximity selection,
+        // sweep/draw locks); guides render from it.
+        const session = {
+            get: () => (ui.session && ui.session[fid]) || null,
+            /** @param {any} patch */
+            set: (patch) => {
+                ui.session = ui.session || {};
+                ui.session[fid] = { ...(ui.session[fid] || {}), ...patch };
+            },
+            clear: () => { if (ui.session) delete ui.session[fid]; }
+        };
+        /** @param {import('../types').Edit} edit @param {number | null} index */
+        const runFeatureEdit = (edit, index) => runEdit(feature, edit, event, index);
+
         let changed = false;
-
-        // create — matches its own trigger gesture ('click' / 'dblclick').
-        planeEdits
-            .filter(e => e.pick === 'plane' && e.gesture === event.type)
-            .forEach(edit => { if (runEdit(feature, edit, event, null)) changed = true; });
-
-        // nearest — manage the proximity lock + selection, then edit on drag.
-        const nearestEdits = planeEdits.filter(e => e.pick === 'nearest');
-        if (nearestEdits.length > 0) {
-            const marks = featureNodes[fid] || [];
-            const threshold = pickThreshold(nearestEdits[0]);
-
-            if (event.type === 'hover') {
-                const hit = nearestMark(marks, event.x, event.y, threshold);
-                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: hit });
-                changed = true; // redraw ring only
-            } else if (event.type === 'hoverout') {
-                if (ui.proximity) delete ui.proximity[fid];
-                changed = true;
-            } else if (event.type === 'dragstart') {
-                const hit = nearestMark(marks, event.x, event.y, threshold);
-                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: hit, activeIndex: hit });
-                changed = true;
-            } else if (event.type === 'dragend') {
-                const info = readSel(fid);
-                if (info) info.activeIndex = null;
-                changed = true;
-            } else {
-                // Any other gesture a nearest edit declares — a drag (uses the
-                // lock set on dragstart) or a discrete gesture like a click/dblclick
-                // delete (resolve a fresh nearest target). Keep the ring at the
-                // pointer either way.
-                const info = readSel(fid);
-                if (info) { info.px = event.x; info.py = event.y; }
-                const matching = nearestEdits.filter(e => e.gesture === event.type);
-                if (matching.length > 0) {
-                    let index = info ? info.activeIndex : null;
-                    if (index == null) index = nearestMark(marks, event.x, event.y, threshold);
-                    if (index != null) {
-                        matching.forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
-                    }
-                } else if (info) {
-                    changed = true; // nothing to run; still redraw the ring
-                }
-            }
-        }
-
-        // sweep (you-draw-it) — like nearest, but distance is measured along the
-        // domain axis only and the target is RE-RESOLVED every drag event (no
-        // dragstart lock), so one horizontal sweep paints each point's value as
-        // the pointer crosses its column.
-        const sweepEdits = planeEdits.filter(e => e.pick === 'sweep');
-        if (sweepEdits.length > 0) {
-            const marks = featureNodes[fid] || [];
-            const threshold = pickThreshold(sweepEdits[0]);
-            // The channels the sweep governs: one positional axis -> paint that
-            // value along the OTHER (a function line); both x AND y -> a 2D sweep
-            // (connected scatter), retargeting by euclidean distance.
-            const chans = sweepEdits[0].channels || ['y'];
-            const twoD = chans.includes('x') && chans.includes('y');
-            const valueName = chans[0] || 'y';
-            /** @type {'x' | 'y'} */
-            const axis = valueName === 'x' ? 'y' : 'x'; // sweep (domain) axis, 1D case
-
-            // Resolve the point under the pointer, scoped to the LOCKED series so
-            // overlapping lines don't fight over a column. 1D sweeps by domain axis,
-            // 2D sweeps by euclidean nearest.
-            /** @param {any} lockSeries */
-            const resolve = (lockSeries) => twoD
-                ? nearestMark(marks, event.x, event.y, threshold, lockSeries)
-                : nearestMarkOnAxis(marks, event.x, event.y, threshold, axis, lockSeries);
-
-            if (event.type === 'hover') {
-                const s = nearestSeries(marks, event.x, event.y, threshold);
-                const hit = resolve(s == null ? undefined : s);
-                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: hit, series: s });
-                changed = true;
-            } else if (event.type === 'hoverout') {
-                if (ui.proximity) delete ui.proximity[fid];
-                changed = true;
-            } else if (event.type === 'dragstart') {
-                // Lock onto the nearest line for the whole drag.
-                const s = nearestSeries(marks, event.x, event.y, threshold);
-                const index = resolve(s == null ? undefined : s);
-                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: index, activeIndex: index, series: s });
-                if (index != null) {
-                    sweepEdits.forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
-                }
-                changed = true;
-            } else if (event.type === 'dragend') {
-                const info = readSel(fid);
-                if (info) { info.activeIndex = null; info.series = null; }
-                changed = true;
-            } else if (event.type === 'drag') {
-                // Paint: retarget within the locked series each event (no per-point
-                // lock), so one stroke fills the whole line.
-                const info = readSel(fid);
-                const lock = info && info.series != null ? info.series : undefined;
-                const index = resolve(lock);
-                writeSel(fid, { px: event.x, py: event.y, threshold, hoverIndex: index, activeIndex: index });
-                if (index != null) {
-                    sweepEdits.forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
-                }
-                changed = true;
-            }
+        for (const driver of drivers) {
+            const matching = edits.filter(e => driver.wants(e));
+            if (matching.length === 0) continue;
+            const dctx = {
+                feature, event, edits: matching,
+                marks: featureNodes[fid] || [],
+                data: state[fid] || [],
+                session,
+                runEdit: runFeatureEdit
+            };
+            if (driver.onEvent(dctx)) changed = true;
         }
         return changed;
     };
 
     // 4. Event routing.
-    //    - Events carrying a `node` are mark-scoped (change existing elements)
-    //      and route to that mark's edits (new) or interactors (legacy).
-    //    - Events without a `node` are plane-scoped (create new elements) and
-    //      route to every feature's plane-target interactors.
+    //    - Events carrying a `node` are mark-scoped (change existing elements) and
+    //      route to that mark's direct-pick edits.
+    //    - Events without a `node` are plane-scoped and route to every feature's
+    //      plane/nearest/sweep/draw edits.
     /**
      * @param {any} event
      */
@@ -556,33 +327,13 @@ export function Elicit(spec) {
         let shouldRender = false;
 
         if (event.node) {
-            // New edit path: dispatch to the touched mark's feature (direct pick).
+            // Dispatch to the touched mark's feature (direct pick).
             const feature = features.find(f => f.id === event.node.featureId);
             if (feature && dispatchDirectEdits(feature, event)) shouldRender = true;
         } else {
-            // New edit path: plane gestures -> every feature's plane/nearest edits.
+            // Plane gestures -> every feature's plane/nearest/sweep/draw edits.
             features.forEach(feature => {
                 if (dispatchPlaneEdits(feature, event)) shouldRender = true;
-            });
-        }
-
-        if (event.node && event.node.interactors) {
-            event.node.interactors.forEach((/** @type {any} */ nodeInteractor) => {
-                const feature = features.find(f => f.id === nodeInteractor.featureId);
-                const interactorDef = feature.interactors.find((/** @type {any} */ i) => i.type === nodeInteractor.type);
-                if (interactorDef && applyInteraction(feature, interactorDef, event)) {
-                    shouldRender = true;
-                }
-            });
-        } else if (!event.node) {
-            features.forEach(feature => {
-                (feature.interactors || []).forEach((/** @type {any} */ interactorDef) => {
-                    if ((interactorDef.target || 'mark') === 'plane' && interactorDef[event.type]) {
-                        if (applyInteraction(feature, interactorDef, event)) {
-                            shouldRender = true;
-                        }
-                    }
-                });
             });
         }
 
