@@ -1,20 +1,39 @@
 // @ts-check
 // waffle.js — a waffle mark: like bar, it shows a quantity for a category, but
-// subdivides the block into a grid of unit CELLS so a reader can count exact
-// amounts and a gesture can pick a proportion cell-by-cell. It mirrors bar's
-// structure exactly (band = category axis + thickness, linear = value axis +
-// length from a baseline; orientation autodetected or forced by waffleX/waffleY),
-// then quantizes the value length into a grid.
+// subdivides the block into a grid of CELLS so a reader can COUNT exact amounts
+// and a gesture can pick a proportion cell-by-cell. It mirrors bar's structure
+// (band = category axis + thickness, linear = value axis + length from a
+// baseline; orientation autodetected or forced by waffleX/waffleY).
 //
 //   waffleY([{ cat: 'apples', value: 212 }, ...], { x: 'cat', y: 'value' })
 //
-// The value's fill LEVEL is resolved through encodeChannel exactly like a bar's
-// length — the single field->pixel path — and the grid simply quantizes around
-// it: the block from the baseline to the value-domain max is cut into cols x rows
-// cells, and the first `round(fraction * total)` cells (row-major from the
-// baseline) are filled. Every cell (filled and empty) carries `data`/`index`, so
-// the whole block is one direct-pick target: a plain `drag()` on the value
-// channel fills to the pointer, and a `snap` constraint lands it on whole cells.
+// The invariant that makes a waffle a waffle (Observable Plot's model): ONE CELL
+// IS A FIXED QUANTITY. `unit` (default 1) is the value each cell represents, so
+// `value / unit` cells are filled and the reader can literally count them. Cells
+// are laid out `multiple` across the band and are UNIFORM SQUARES that touch:
+// their pitch is the smaller of the per-column band width and the per-row block
+// height, so the grid always fits inside `thickness x blockLen` and its width
+// never exceeds the bandwidth (it is centred across the band, and may be
+// narrower). `multiple` defaults to the largest column count whose square cells
+// still fill the block height — floor(sqrt(totalCells * thickness / blockLen)) —
+// so a full waffle reaches the value's height on the axis and rows stay countable.
+//
+// The value's fill LEVEL is still resolved through encodeChannel (the single
+// field->pixel path) so a plain `drag()` on the value channel fills to the
+// pointer; the grid quantizes that level into whole cells. Empty cells (up to the
+// domain top) are drawn too so the whole block is one direct-pick drag target —
+// dragging *up* into them raises the count. `showEmpty: false` keeps them as
+// targets but paints them transparent; `emptyFill` sets their colour. `shape`
+// picks 'rect' (default) or 'circle' cells. Pair with a `snap` constraint whose
+// step equals `unit` to land on whole cells.
+//
+// Interactions: use `waffleFill()` on the value channel — it maps the pointer to
+// the exact cell under it (row + column) and fills up to and INCLUDING that cell,
+// consistently for both drag and a single click. (A plain `drag()` inverts the 1D
+// value scale, which can't target a cell in a packed grid, so the fill lands on
+// the wrong row.) Every cell carries the shared grid descriptor `node.grid` that
+// `waffleFill` reads. Add a second `waffleFill({ gesture: 'click' })` at mark
+// level for tap-to-set alongside drag-to-fill.
 
 import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
 import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
@@ -43,8 +62,11 @@ function buildWaffle(options, forcedOrientation) {
         edits,
         constraints,
         orientation: orientationOption,
-        cols = 10,
+        unit = 1,
+        multiple: multipleOption,
         gap = 1,
+        shape = 'rect',
+        showEmpty = true,
         emptyFill = '#eee'
     } = opts;
 
@@ -83,7 +105,7 @@ function buildWaffle(options, forcedOrientation) {
 
                 // Band (category) geometry vs value (length) geometry — the same
                 // split bar makes. `bandStart`/`thickness` place the block across
-                // its category; `baseline`/`level` set the filled length.
+                // its category; the value scale sets where each cell row lands.
                 const bandScale = vertical ? xScale : yScale;
                 const valueChannel = vertical ? 'y' : 'x';
                 const valueScale = vertical ? yScale : xScale;
@@ -92,54 +114,109 @@ function buildWaffle(options, forcedOrientation) {
                 const bandStart = bandScale ? bandScale(d[bandKey]) : 0;
                 const thickness = bandwidthOf(bandScale, 20);
                 const baseline = baselineOf(valueScale);
+
+                // Value DOMAIN in data units, and the pixels that span it. The
+                // grid tiles this whole span in `unit`-sized cells, so it's the
+                // same block a bar would draw — just cut into countable cells.
+                const [dlo, dhi] = domainExtent(valueScale);
+                const domainSpan = Math.abs(dhi - dlo) || 1;
+                const domainTopPx = valueScale ? valueScale(dhi) : baseline;
+                const blockLen = Math.abs(baseline - domainTopPx) || 1;
+
+                // One cell = `unit` of value, so `totalCells` tile the whole value
+                // block. `multiple` cells sit across the band. Auto-pick the LARGEST
+                // `multiple` whose square cells still fit the band width while
+                // filling the block height — i.e. multiple = floor(sqrt(totalCells *
+                // thickness / blockLen)). A user override is honoured (clamped so it
+                // never overflows the band).
+                const totalCells = Math.max(1, Math.round(domainSpan / unit));
+                let multiple = multipleOption;
+                if (!(multiple >= 1)) {
+                    const fit = Math.sqrt((totalCells * thickness) / blockLen);
+                    multiple = Number.isFinite(fit) && fit >= 1 ? Math.floor(fit) : 1;
+                }
+                multiple = Math.max(1, Math.min(totalCells, Math.round(multiple)));
+
+                // Uniform SQUARE cells that touch: the pitch is the smaller of the
+                // per-column band width and the per-row block height, so the whole
+                // grid fits inside `thickness x blockLen`. The grid is then centred
+                // across the band (its width may be < thickness — never more, as
+                // requested for the categorical case).
+                const rows = Math.ceil(totalCells / multiple);
+                const cellSize = Math.min(thickness / multiple, blockLen / rows);
+                const bandInset = (thickness - multiple * cellSize) / 2;
+                const drawSize = Math.max(0.5, cellSize - gap);
+
+                // Grid descriptor shared by every cell of this datum, so the
+                // waffle-native `waffleFill` edit can map a pointer to the exact
+                // cell (row + column) it is over — the value scale alone can't,
+                // since the packed grid isn't a 1:1 vertical split of the block.
+                const grid = {
+                    axis: vertical ? 'y' : 'x',
+                    sign: vertical ? -1 : 1, // pixels grow this way INTO the block
+                    baseline, cellSize, rows, multiple, bandStart, bandInset,
+                    unit, dlo, dhi, totalCells
+                };
+
+                // Fill LEVEL through encodeChannel (the one field->pixel path),
+                // quantized into whole cells so the count is exact and the top of
+                // the filled cells lines up with `value` on the axis.
                 const level = encodeChannel(scales, channels, valueChannel, d, baseline);
+                const fillFraction = Math.abs(baseline - level) / blockLen;
+                const filled = Math.max(0, Math.min(totalCells, Math.round(fillFraction * totalCells)));
 
-                // Grid: cols across the band, rows spanning the value DOMAIN (so the
-                // grid is stable as the value changes — only how many cells are
-                // filled changes). Cell edge = band thickness / cols (square-ish).
-                const cell = thickness / cols;
-                const [, dhi] = domainExtent(valueScale);
-                const domainTop = valueScale ? valueScale(dhi) : baseline;
-                const blockLen = Math.abs(baseline - domainTop) || 1;
-                const rows = Math.max(1, Math.round(blockLen / cell));
-                const total = rows * cols;
+                // Signed step away from the baseline along the value axis (up for a
+                // vertical waffle, right for a horizontal one).
+                const valueDir = vertical ? -1 : 1;
 
-                // Fill fraction from the value's PIXEL (encodeChannel — the single
-                // field->pixel path), quantized into cells. The grid visualizes the
-                // same length a bar would draw; it never reads the raw field.
-                const fillLen = Math.abs(baseline - level);
-                const filled = Math.max(0, Math.min(total, Math.round((fillLen / blockLen) * total)));
-
-                for (let idx = 0; idx < total; idx++) {
-                    const rowFromBase = Math.floor(idx / cols); // 0 at the baseline
-                    const col = idx % cols;
+                for (let idx = 0; idx < totalCells; idx++) {
+                    const row = Math.floor(idx / multiple); // 0 at the baseline
+                    const col = idx % multiple;
                     const isFilled = idx < filled;
+
+                    // Empty cells double as the drag TRACK: they're the target a
+                    // drag grabs to raise the count, so they always exist. Hiding
+                    // them (`showEmpty: false`) makes them transparent — invisible
+                    // but still grabbable — rather than removing the target.
                     const cellStyle = isFilled
                         ? style
-                        : { ...style, fill: emptyFill };
-                    if (vertical) {
+                        : { ...style, fill: showEmpty ? emptyFill : 'transparent' };
+
+                    // Cell origin: band offset (centred) + value offset from the
+                    // baseline. Uniform `cellSize` pitch makes neighbours touch.
+                    const bandPos = bandStart + bandInset + col * cellSize;
+                    const valueNear = baseline + valueDir * row * cellSize;       // edge closer to baseline
+                    const valueFar = baseline + valueDir * (row + 1) * cellSize;  // edge further out
+                    const valueTop = Math.min(valueNear, valueFar);              // smaller pixel
+
+                    if (shape === 'circle') {
+                        const r = drawSize / 2;
+                        const bandCenter = bandPos + cellSize / 2;
+                        const valCenter = (valueNear + valueFar) / 2;
                         nodes.push({
-                            type: 'rect',
-                            x: bandStart + col * cell + gap / 2,
-                            y: baseline - (rowFromBase + 1) * cell + gap / 2,
-                            width: cell - gap,
-                            height: cell - gap,
+                            type: 'circle',
+                            cx: vertical ? bandCenter : valCenter,
+                            cy: vertical ? valCenter : bandCenter,
+                            r,
                             ...cellStyle,
                             data: d,
-                            index: i
+                            index: i,
+                            grid
                         });
-                    } else {
-                        nodes.push({
-                            type: 'rect',
-                            x: baseline + rowFromBase * cell + gap / 2,
-                            y: bandStart + col * cell + gap / 2,
-                            width: cell - gap,
-                            height: cell - gap,
-                            ...cellStyle,
-                            data: d,
-                            index: i
-                        });
+                        continue;
                     }
+
+                    nodes.push({
+                        type: 'rect',
+                        x: (vertical ? bandPos : valueTop) + gap / 2,
+                        y: (vertical ? valueTop : bandPos) + gap / 2,
+                        width: drawSize,
+                        height: drawSize,
+                        ...cellStyle,
+                        data: d,
+                        index: i,
+                        grid
+                    });
                 }
             });
 

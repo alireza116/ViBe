@@ -13,6 +13,7 @@ export const SITE = [
         pages: [
             { path: 'index.html', title: 'Overview' },
             { path: 'concepts.html', title: 'Core concepts' },
+            { path: 'sizing.html', title: 'Responsive sizing' },
         ],
     },
     {

@@ -72,8 +72,19 @@ export function Elicit(spec) {
         // Interaction-effects layer (grab / proximity-select), customizable and
         // kept separate from mark style channels. See core/effects.js.
         effects: effectsSpec,
+        // Sizing mode. 'fixed' (default) renders at the given pixel width/height.
+        // 'scale' renders once at those dims but wraps the SVG in a viewBox so the
+        // browser scales it to fill the parent (aspect ratio preserved, one draw).
+        // 'reflow' measures the parent and re-renders at native pixels on resize
+        // (crisp text, width tracks the container, height stays the given value).
+        // `responsive: true` is an alias for 'reflow'.
+        responsive,
         renderer = new D3Renderer()
     } = spec;
+
+    const mode = responsive === true ? 'reflow'
+        : (responsive === 'scale' || responsive === 'reflow') ? responsive
+            : 'fixed';
 
     const effects = resolveEffects(effectsSpec);
 
@@ -82,8 +93,16 @@ export function Elicit(spec) {
     // Flattened because a group mark (composite) desugars to an ARRAY of features.
     const features = [...autoAxes(userFeatures, axes), ...userFeatures].flat(Infinity);
 
-    const innerWidth = width - margins.left - margins.right;
-    const innerHeight = height - margins.top - margins.bottom;
+    // Working dims. In 'reflow' mode `curW` tracks the container's measured width
+    // (height stays the given value); 'fixed'/'scale' keep the design dims. Marks
+    // and scales read the inner (margin-subtracted) dims, so recomputing them on a
+    // resize is all it takes for the whole scene to reflow.
+    const designW = typeof width === 'number' ? width : 600;
+    const designH = typeof height === 'number' ? height : 400;
+    let curW = designW;
+    let curH = designH;
+    let innerWidth = curW - margins.left - margins.right;
+    let innerHeight = curH - margins.top - margins.bottom;
 
     features.forEach((feature, index) => {
         if (!feature.id) feature.id = `feature-${index}`;
@@ -168,16 +187,47 @@ export function Elicit(spec) {
     const dims = { width: innerWidth, height: innerHeight };
     let scales = resolveScales(features, dataset, spec, dims);
 
-    // Set up container.
+    // Set up container. 'fixed' pins pixel dims; the responsive modes fill the
+    // parent's width (the SVG scales via viewBox in 'scale', or is redrawn at the
+    // measured size in 'reflow').
     const container = document.createElement('div');
-    container.style.width = `${width}px`;
-    container.style.height = `${height}px`;
     container.style.position = 'relative';
+    if (mode === 'scale') {
+        container.style.width = '100%';
+        container.style.height = 'auto';
+    } else if (mode === 'reflow') {
+        container.style.width = '100%';
+        container.style.height = `${curH}px`;
+    } else {
+        container.style.width = `${curW}px`;
+        container.style.height = `${curH}px`;
+    }
+
+    // Recompute the margin-subtracted dims from the current outer dims, and (reflow
+    // only) re-measure the container's width from the parent. Returns whether the
+    // width actually changed, so a resize can skip a redundant re-render.
+    const recomputeInner = () => {
+        innerWidth = curW - margins.left - margins.right;
+        innerHeight = curH - margins.top - margins.bottom;
+        dims.width = innerWidth;
+        dims.height = innerHeight;
+    };
+    const measure = () => {
+        if (mode !== 'reflow') return false;
+        const w = container.clientWidth || designW;
+        if (w > 0 && w !== curW) {
+            curW = w;
+            recomputeInner();
+            return true;
+        }
+        return false;
+    };
 
     const scene = new SceneGraph();
 
     // 3. Coordinator - rebuild the scene graph from current state and render.
     const update = () => {
+        measure(); // reflow: pick up the container's current width before drawing
         scene.clear();
 
         // Re-resolve global scales so inferred domains follow the live data.
@@ -250,12 +300,13 @@ export function Elicit(spec) {
         renderer.render({
             container,
             scene,
-            width,
-            height,
+            width: curW,
+            height: curH,
             margins,
             scales,
             spec,
             planeOnTop,
+            responsive: mode,
             effects,
             onEvent: handleEvent
         });
@@ -529,6 +580,29 @@ export function Elicit(spec) {
         update();
     };
     el.nextStage = () => el.setStage(currentStage + 1);
+
+    // 'reflow' mode: watch the container and re-render when the parent resizes.
+    // rAF-coalesced (a resize can fire many times per frame) and guarded so a
+    // render that doesn't change the width can't feed back into a loop.
+    /** @type {ResizeObserver | null} */
+    let ro = null;
+    if (mode === 'reflow' && typeof ResizeObserver !== 'undefined') {
+        let scheduled = false;
+        ro = new ResizeObserver(() => {
+            if (scheduled) return;
+            scheduled = true;
+            requestAnimationFrame(() => {
+                scheduled = false;
+                if (measure()) update();
+            });
+        });
+        ro.observe(container);
+    }
+    // Detach the observer (and its hold on the container). Call when unmounting a
+    // reflow chart; no-op otherwise.
+    el.destroy = () => {
+        if (ro) { ro.disconnect(); ro = null; }
+    };
 
     // Initial render. Deferred so the container can be attached to the DOM first
     // if the renderer needs measured dimensions.

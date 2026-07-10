@@ -40,7 +40,7 @@ VibeJS is layered for extensibility:
    - `rule` / `ruleX` / `ruleY` → a straight reference line at a data value (`y: { datum: 50 }`), or a **span** segment (a stem / whisker) between `y1`/`y2` (or `x1`/`x2`) at a category. An ordinary editable mark: put an `edit` on an endpoint and the cap becomes a handle.
    - `composite` → a **glyph**: a named group of ordinary marks as `parts` (a stem, a whisker, a dot, two caps). Each part encodes some columns of the same rows; a part whose channel carries an `edit` is a handle. It desugars into its parts as plain features — `Elicit` flattens them — so nothing about a glyph reaches the engine. Drag one handle and the rest re-derive from the changed row (lollipop, error bar). Because each handle is its own mark, dragging one cannot move another: dispatch already routes a gesture to the feature owning the node you touched.
    - `dotStack` / `dotStackY` / `dotStackX` → a stacked dot plot (token counter): one datum per token, tokens sharing a slot stack into a countable column (drop with `create`, take back with `remove`).
-   - `waffle` / `waffleY` / `waffleX` → a bar subdivided into a grid of unit cells for exact counting and proportion picking; every cell is a drag target, `snap` lands drags on whole cells.
+   - `waffle` / `waffleY` / `waffleX` → a bar subdivided into a grid of uniform, touching cells (`rect` or `circle`) where one cell is a fixed quantity (`unit`); `value / unit` cells fill, laid out `multiple` across the band (auto-sized square, width ≤ bandwidth) — exact counting and proportion picking. Drive it with `edit.waffleFill()`, which maps the pointer to the exact cell (row + column) and fills up to and including it, consistently for click and drag.
    - `cone` → a line + cone correlation glyph: a single `{ r, spread }` belief drawn as a rotating mean line plus a `Normal(r, spread)` fan (paired with the `rotate` edit and stages).
    - `trend` → an intercept-then-slope line: `{ intercept, slope }` with an intercept handle (translate) and a slope handle (rotate about the anchor), stageable.
    - `axis` / `axisX` / `axisY` / `grid` / `gridX` / `gridY` → composable axis & gridline marks (or use the global `axes` convenience).
@@ -62,6 +62,8 @@ VibeJS is layered for extensibility:
 8. **Renderer (`vibe.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
 
 **Reading data out.** `Elicit(spec)` returns the chart element augmented with a small observation API: `getData()` (a deep copy of the committed belief dataset), `setData(data)` (seed/reset + re-render), and `on("change" | "stage", cb)` (subscribe; returns an unsubscribe). This is in addition to the spec's `onChange`.
+
+**Sizing.** `width`/`height` are pixels by default (`responsive: "fixed"`). Set `responsive: "scale"` to wrap the SVG in a `viewBox` so the browser scales it to fill the parent (one draw, aspect ratio preserved), or `responsive: "reflow"` (alias `true`) to measure the parent and redraw at native pixels on resize (crisp text; width tracks the container, height stays the given value). A reflow chart wires a `ResizeObserver` — call `el.destroy()` when unmounting it. See `docs/sizing.html`.
 
 ---
 

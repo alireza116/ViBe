@@ -131,10 +131,14 @@ a { color: var(--accent); }
    instead of restarting in column 0. */
 .code .ln { display: block; padding-left: 2.2ch; text-indent: -2.2ch; }
 .code .ln:empty::before { content: "\200b"; }
-/* The chart column. Its width is pinned to the chart's own pixel width by the
-   harness, so the data readout below can't widen the card. */
+/* The chart column. A fixed chart's width is pinned to its own pixels by the
+   harness, so the data readout below can't widen the card. A RESPONSIVE chart
+   (`.fluid`) instead shares the row with the code as a bounded, flexible column
+   the chart scales into — so it fills its parent without squishing the code. */
 .result { flex: 0 0 auto; min-width: 0; max-width: 100%; }
+.result.fluid { flex: 1 1 46%; }
 .chart { display: block; max-width: 100%; overflow-x: auto; }
+.result.fluid .chart { width: 100%; }
 .try {
   display: block;
   margin-top: 0.4rem;
@@ -187,6 +191,9 @@ a { color: var(--accent); }
 @media (max-width: 940px) {
   .body { flex-direction: column; }
   .code { flex-basis: auto; width: 100%; }
+  /* Stacked: a responsive chart needs a DEFINITE width to measure/scale into,
+     otherwise a reflow chart shrink-wraps its own svg and never grows. */
+  .result.fluid { flex-basis: auto; width: 100%; }
 }
 @media (max-width: 720px) {
   nav { display: none; }

@@ -49,13 +49,13 @@ export class D3Renderer {
      * @param {any} context
      */
     render(context) {
-        const { container, scene, width, height, margins, onEvent, planeOnTop = false } = context;
+        const { container, scene, width, height, margins, onEvent, planeOnTop = false, responsive = 'fixed' } = context;
         const effects = context.effects || DEFAULT_EFFECTS;
 
         const innerWidth = width - margins.left - margins.right;
         const innerHeight = height - margins.top - margins.bottom;
 
-        const { g, plane } = this._ensureScene(container, { width, height, margins, innerWidth, innerHeight });
+        const { g, plane } = this._ensureScene(container, { width, height, margins, innerWidth, innerHeight, responsive });
 
         /** @param {any} event */
         const pointer = (event) => d3.pointer(event, g.node());
@@ -119,21 +119,18 @@ export class D3Renderer {
      * interaction plane, and the background layer (behind every mark). Idempotent
      * — on re-render it just returns the existing nodes.
      * @param {any} container
-     * @param {{ width: number, height: number, margins: any, innerWidth: number, innerHeight: number }} dims
+     * @param {{ width: number, height: number, margins: any, innerWidth: number, innerHeight: number, responsive?: string }} dims
      * @returns {{ svg: any, g: any, plane: any }}
      */
-    _ensureScene(container, { width, height, margins, innerWidth, innerHeight }) {
+    _ensureScene(container, { width, height, margins, innerWidth, innerHeight, responsive = 'fixed' }) {
         /** @type {any} */
         let svg = d3.select(container).select('svg');
         if (svg.empty()) {
             svg = d3.select(container).append('svg')
-                .attr('width', width)
-                .attr('height', height)
-                .style('user-select', 'none'); // prevent text selection during drag
+                .style('user-select', 'none') // prevent text selection during drag
+                .style('display', 'block');   // no inline-baseline gap under the svg
 
-            const g = svg.append('g')
-                .attr('class', 'scene-container')
-                .attr('transform', `translate(${margins.left},${margins.top})`);
+            const g = svg.append('g').attr('class', 'scene-container');
 
             // Transparent background plane, behind everything, that captures
             // interactions on empty space (used by plane-pick edits, e.g. create).
@@ -141,8 +138,6 @@ export class D3Renderer {
                 .attr('class', 'plane')
                 .attr('x', 0)
                 .attr('y', 0)
-                .attr('width', innerWidth)
-                .attr('height', innerHeight)
                 .style('fill', 'transparent')
                 .style('pointer-events', 'all');
 
@@ -152,7 +147,28 @@ export class D3Renderer {
             g.append('g').attr('class', 'bg-layer');
         }
 
-        const g = svg.select('.scene-container');
+        // Sizing runs every render (not just on create) so 'reflow' picks up new
+        // pixel dims and 'scale' keeps its viewBox. In 'scale' the SVG carries a
+        // viewBox and stretches to 100% of the parent (aspect ratio preserved); the
+        // other modes size the SVG in real pixels. `d3.pointer(_, g)` reads through
+        // getScreenCTM, so gestures map correctly under a viewBox too.
+        if (responsive === 'scale') {
+            svg.attr('viewBox', `0 0 ${width} ${height}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .attr('width', null)
+                .attr('height', null)
+                .style('width', '100%')
+                .style('height', 'auto');
+        } else {
+            svg.attr('viewBox', null)
+                .attr('width', width)
+                .attr('height', height)
+                .style('width', null)
+                .style('height', null);
+        }
+
+        const g = svg.select('.scene-container').attr('transform', `translate(${margins.left},${margins.top})`);
+        g.select('rect.plane').attr('width', innerWidth).attr('height', innerHeight);
         return { svg, g, plane: g.select('rect.plane') };
     }
 

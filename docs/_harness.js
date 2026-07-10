@@ -274,10 +274,17 @@ export function renderPage(page) {
                 }));
             }
             if (elicited) {
-                // Pin the column to the chart's own pixel width (Elicit sets it inline)
-                // so a long data row scrolls inside the readout instead of widening
-                // the card. Capped by `.result { max-width: 100% }` when stacked.
-                if (elicited.style.width) result.style.width = elicited.style.width;
+                // A fixed chart carries its own pixel width (Elicit sets it inline);
+                // pin the column to it so a long data row scrolls inside the readout
+                // instead of widening the card. A RESPONSIVE chart is `width: 100%`
+                // and must instead SHARE the row with the code (else it eats the whole
+                // flex line and squishes the code box): give it the `fluid` modifier so
+                // it takes a bounded column the chart scales to.
+                if (elicited.style.width && elicited.style.width.endsWith('px')) {
+                    result.style.width = elicited.style.width;
+                } else {
+                    result.classList.add('fluid');
+                }
                 result.append(dataPanel(elicited));
             }
         }

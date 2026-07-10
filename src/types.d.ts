@@ -411,6 +411,12 @@ export interface ElicitSpec {
   // Customizable interaction-effects layer (grab / proximity-select).
   effects?: EffectsSpec;
   guides?: any[];
+  // Sizing mode. 'fixed' (default) draws at the pixel width/height. 'scale' wraps
+  // the SVG in a viewBox so the browser scales it to fill the parent (one draw,
+  // aspect ratio preserved). 'reflow' (or `true`) measures the parent and redraws
+  // at native pixels on resize — crisp text, width tracks the container, height
+  // stays the given value. Reflow charts expose `destroy()` to detach the observer.
+  responsive?: 'fixed' | 'scale' | 'reflow' | boolean;
   renderer?: any;
   // Chart-level scale overrides, keyed by channel ('x', 'y', 'fill', 'size', …).
   // Scales are GLOBAL per channel, so this is their honest home; a channel's own
@@ -439,4 +445,7 @@ export interface ElicitElement extends HTMLDivElement {
   getStage(): number;
   setStage(stage: number): void;
   nextStage(): void;
+  // Detach the ResizeObserver used by `responsive: 'reflow'`. No-op otherwise;
+  // call it when unmounting a reflow chart. Present on every element.
+  destroy(): void;
 }

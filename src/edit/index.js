@@ -31,6 +31,8 @@
 //   edits: [ vibe.edit.drag({ channels: ["x", "y"] }), vibe.edit.line.anchor() ]
 
 export { drag, dragSpan, brushSpan, resize, rotate, cycle, create, toggle, remove, custom } from './basic.js';
+// waffleFill: the cell-native fill edit for the waffle mark (scope is in the name).
+export { waffleFill } from './waffle.js';
 export { when } from './when.js';
 export { nextSeriesKey } from './shared.js';
 
