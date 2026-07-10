@@ -58,9 +58,9 @@ export default {
     cone({
       id: "belief",
       channels: {
-        angle: { field: "r", range: [-45, 45],
-                  edit: rotate({ pick: "probe", stage: 0 }) },
-        spread: { field: "spread",  range: [0, 45],
+        angle: { field: "r", scale: { range: [-45, 45] },
+                 edit: rotate({ pick: "probe", stage: 0 }) },
+        spread: { field: "spread", scale: { range: [0, 45] },
                   edit: rotate({ pick: "probe", stage: 1, relativeTo: "angle" }) },
       },
       samples: 60, wedge: true,

@@ -94,15 +94,19 @@ kbd {
 a { color: var(--accent); }
 
 /* --- cards --- */
-.grid { display: grid; grid-template-columns: 1fr; gap: 1.3rem; margin-top: 0.9rem; }
+/* `minmax(0, 1fr)`, not `1fr`: a 1fr track's automatic minimum is min-content, so
+   the card would refuse to shrink below the longest code line plus the chart's
+   fixed pixel width — and push the whole page into a horizontal scroll. */
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.3rem; margin-top: 0.9rem; }
 .card {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 0.9rem 1.1rem 1.1rem;
+  min-width: 0;
 }
 .card h3 { font-size: 0.98rem; margin: 0 0 0.2rem; }
 .card > p { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.7rem; }
-.body { display: flex; gap: 1.1rem; align-items: flex-start; }
+.body { display: flex; gap: 1.1rem; align-items: flex-start; min-width: 0; }
 .code {
   flex: 1 1 52%;
   min-width: 0;
@@ -113,20 +117,73 @@ a { color: var(--accent); }
   padding: 0.75rem 0.85rem;
   border-radius: 8px;
   margin: 0;
-  overflow: auto;
+  /* Long lines wrap rather than scroll sideways; tall blocks still scroll down. */
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: 460px;
 }
-.code code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
-.result { flex: 0 0 auto; }
-.chart { display: inline-block; }
+.code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+/* One block per source line, so a wrapped line hangs under its own indent
+   instead of restarting in column 0. */
+.code .ln { display: block; padding-left: 2.2ch; text-indent: -2.2ch; }
+.code .ln:empty::before { content: "\200b"; }
+/* The chart column. Its width is pinned to the chart's own pixel width by the
+   harness, so the data readout below can't widen the card. */
+.result { flex: 0 0 auto; min-width: 0; max-width: 100%; }
+.chart { display: block; max-width: 100%; overflow-x: auto; }
 .try {
   display: block;
   margin-top: 0.4rem;
   font-size: 0.78rem;
   color: #0d7a5f;
-  max-width: 40ch;
 }
 .try b { color: #075e48; }
+
+/* --- live data readout (every example shows what getData() returns) --- */
+.data {
+  margin-top: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.data-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  background: #f7f8fa;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #97a1ad;
+  font-weight: 700;
+}
+.data-count { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--muted); }
+/* A FIXED height, not max-height: rows appended by a create edit then scroll
+   inside the panel instead of growing the card and shifting the page. */
+.data-body {
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  height: 7.4em;
+  overflow: auto;
+  background: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--ink);
+  white-space: pre;
+}
+.data-body .empty { color: #97a1ad; font-style: italic; }
+.data-body .idx { color: #b9c2cd; user-select: none; }
+.data-body .key { color: var(--muted); }
+.data-body .num { color: #b45309; }
+.data-body .str { color: #0d7a5f; }
 @media (max-width: 940px) {
   .body { flex-direction: column; }
   .code { flex-basis: auto; width: 100%; }
@@ -151,7 +208,7 @@ section.api { scroll-margin-top: 1rem; }
   flex: none;
   width: 100%;
   margin: 0 0 0.9rem;
-  white-space: pre;
+  white-space: pre-wrap;
 }
 .api-label {
   font-size: 0.68rem;

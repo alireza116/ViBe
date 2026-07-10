@@ -8,15 +8,22 @@
 // FOLLOWS the pointer, a click sets it; then the cone opens with the pointer, and
 // a click sets that too.
 //
-//   // Elicit({ data: [{ r: 0, spread: 0 }], features: [ cone({ … }) ] })
+//   // Elicit({ schema: { r:      { type: 'quantitative', domain: [-1, 1] },
+//   //                    spread: { type: 'quantitative', domain: [0, 1] } },
+//   //          data: [{ r: 0, spread: 0 }], features: [ cone({ … }) ] })
 //   cone({
 //     channels: {
-//       angle:  { field: 'r',      type: 'linear', domain: [-1, 1], range: [-45, 45],
+//       angle:  { field: 'r',      scale: { range: [-45, 45] },
 //                 edit: rotate({ pick: 'probe', stage: 0 }) },
-//       spread: { field: 'spread', type: 'linear', domain: [0, 1],  range: [0, 45],
+//       spread: { field: 'spread', scale: { range: [0, 45] },
 //                 edit: rotate({ pick: 'probe', stage: 1, relativeTo: 'angle' }) },
 //     },
 //   })
+//
+// Both channels are DEGREE channels: the schema owns the domain (r units) and the
+// channel's scale owns the range (degrees). A channel carries no `range` of its
+// own — putting one there is silently ignored, and the cone collapses to a flat
+// line, so resolveScales dev-warns on it.
 //
 // The mean line's slope is the `angle` channel resolved through encodeChannel —
 // the one field->pixel path — and every sample line's slope is likewise its

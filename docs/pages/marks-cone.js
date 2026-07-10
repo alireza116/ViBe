@@ -25,8 +25,8 @@ export default {
                 { name: 'sigma', type: 'number', default: '1.96', desc: 'Samples are drawn from <code class="inline">Normal(r, spread / sigma)</code>, so ~95% land inside the envelope the reader pointed at.' },
             ],
             channels: [
-                { name: 'angle', type: 'linear (deg range)', desc: 'The correlation r; <code class="inline">domain: [-1, 1], range: [-45, 45]</code>.' },
-                { name: 'spread', type: 'linear (deg range)', desc: 'The <b>half-width</b> of the plausible envelope in r units — the quantity the pointer names, so the line under the cursor is the edge of the fan.' },
+                { name: 'angle', type: 'linear (deg range)', desc: 'The correlation r, mapped to degrees by its scale — <code class="inline">scale: { range: [-45, 45] }</code>. The domain <code class="inline">[-1, 1]</code> comes from the schema.' },
+                { name: 'spread', type: 'linear (deg range)', desc: 'The <b>half-width</b> of the plausible envelope in r units — the quantity the pointer names, so the line under the cursor is the edge of the fan. <code class="inline">scale: { range: [0, 45] }</code>.' },
             ],
             returns: 'A <b>feature</b> emitting a mean <code class="inline">line</code>, sample lines, and an optional wedge <code class="inline">path</code>.',
         },
@@ -57,10 +57,12 @@ export default {
   features: [
     cone({
       channels: {
-        angle: { field: "r", range: [-45, 45],
-                  edit: rotate({ pick: "probe", stage: 0 }) },
-        spread: { field: "spread",  range: [0, 45],
-                  edit: rotate({ pick: "probe", stage: 1, relativeTo: "angle" }) },
+        // Schema owns the domain (r units); the scale owns the range (degrees).
+        angle: { field: "r", scale: { range: [-45, 45] },
+                 edit: rotate({ pick: "probe", stage: 0 }) },
+        spread: { field: "spread", scale: { range: [0, 45] },
+                  edit: rotate({ pick: "probe", stage: 1,
+                                 relativeTo: "angle" }) },
       },
       samples: 60, wedge: true,
     }),
@@ -83,8 +85,8 @@ export default {
   features: [
     cone({
       channels: {
-        angle: { field: "r", range: [-45, 45] },
-        spread: { field: "spread",  range: [0, 45] },
+        angle: { field: "r", scale: { range: [-45, 45] } },
+        spread: { field: "spread", scale: { range: [0, 45] } },
       },
       samples: 80, wedge: true, stroke: "#d33",
     }),

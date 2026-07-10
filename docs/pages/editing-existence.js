@@ -53,9 +53,9 @@ export default {
         {
             name: 'edit.line.newSeries(options)',
             summary: 'Seeds a whole flat line at once — one anchor per sampled domain position, at the clicked value.',
-            signature: 'edit.line.newSeries({ domain, value, samples, trigger }) → Edit',
+            signature: 'edit.line.newSeries({ along, value, samples, trigger }) → Edit',
             options: [
-                { name: 'domain / value', type: "'x' | 'y'", default: "'x' / 'y'", desc: 'The positional axes.' },
+                { name: 'along / value', type: "'x' | 'y'", default: "'x' / 'y'", desc: 'The positional axes — the independent axis to sample along, and the value axis.' },
                 { name: 'samples', type: 'number | any[]', default: 'ticks', desc: 'Domain positions to seed (see resolveSamples).' },
                 { name: 'trigger', type: 'string', default: "'dblclick'", desc: 'The gesture that seeds a line.' },
             ],
@@ -243,7 +243,7 @@ export default {
         y: { field: "y",
              edit: drag({ pick: "sweep", guide: true }) },
       },
-      edits: [ edit.line.newSeries({ domain: "x", value: "y", series: "s", samples: 6 }) ],
+      edits: [ edit.line.newSeries({ along: "x", value: "y", series: "s", samples: 6 }) ],
     }),
   ],
 }))`,

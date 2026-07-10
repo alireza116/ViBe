@@ -59,6 +59,13 @@ export function highlight(code) {
     return out + esc(code.slice(last));
 }
 
+// Code wraps rather than scrolling sideways, so a wrapped line needs a hanging
+// indent or its continuation lands in column 0 and reads as a new statement. That
+// needs one block per source line (text-indent applies to a block's first line
+// only). Safe to split on '\n': no token the highlighter emits spans a newline.
+const highlightBlock = (code) =>
+    highlight(code).split('\n').map((l) => '<span class="ln">' + l + '</span>').join('');
+
 // The path prefix that takes a page back to the docs root, derived from the page's
 // own docs-relative path (e.g. 'marks/bar.html' -> '../'). No URL parsing needed.
 const prefixFor = (path) => '../'.repeat(path.split('/').length - 1);
@@ -68,6 +75,44 @@ const el = (tag, props = {}, ...kids) => {
     for (const k of kids) n.append(k);
     return n;
 };
+
+// ---- live data readout ------------------------------------------------------
+// Every example elicits a dataset, so every example shows the dataset it elicited.
+// The panel subscribes to `change`, which fires only on COMMITTED data — a probe's
+// hover preview never reaches it, and that absence is exactly the lesson.
+function fmtValue(v) {
+    if (v == null) return `<span class="key">${v}</span>`;
+    // Dragged values are long floats; the readout is a display, so round it.
+    if (typeof v === 'number') return `<span class="num">${Number.isInteger(v) ? v : v.toFixed(2)}</span>`;
+    if (v instanceof Date) return `<span class="str">${v.toISOString().slice(0, 10)}</span>`;
+    if (typeof v === 'string') return `<span class="str">"${esc(v)}"</span>`;
+    return `<span class="num">${esc(JSON.stringify(v))}</span>`;
+}
+
+const fmtRow = (d, i, pad) =>
+    `<span class="idx">${String(i).padStart(pad, ' ')}</span>  { ` +
+    Object.entries(d).map(([k, v]) => `<span class="key">${esc(k)}:</span> ${fmtValue(v)}`).join(', ') +
+    ' }';
+
+/** @param {any} chartEl an ElicitElement (has getData + on) */
+function dataPanel(chartEl) {
+    const body = el('pre', { className: 'data-body' });
+    const count = el('span', { className: 'data-count' });
+    const panel = el('div', { className: 'data' },
+        el('div', { className: 'data-head' }, el('span', { textContent: 'getData()' }), count),
+        body);
+    const render = () => {
+        const rows = chartEl.getData();
+        count.textContent = rows.length === 1 ? '1 row' : `${rows.length} rows`;
+        const pad = String(Math.max(rows.length - 1, 0)).length;
+        body.innerHTML = rows.length
+            ? rows.map((d, i) => fmtRow(d, i, pad)).join('\n')
+            : '<span class="empty">no rows</span>';
+    };
+    chartEl.on('change', render);
+    render();
+    return panel;
+}
 
 // ---- API reference block (signature + option/channel tables + returns) ------
 // A page's optional `api` is an array of ENTRIES, one per factory documented on
@@ -108,7 +153,7 @@ function renderApi(entries) {
         const sigs = entry.signatures || (entry.signature ? [entry.signature] : []);
         if (sigs.length) {
             const codeEl = el('code');
-            codeEl.innerHTML = sigs.map(highlight).join('\n');
+            codeEl.innerHTML = sigs.map(highlightBlock).join('');
             block.append(el('pre', { className: 'code sig' }, codeEl));
         }
         if (entry.options && entry.options.length) {
@@ -199,7 +244,7 @@ export function renderPage(page) {
             if (ex.try) result.append(el('span', { className: 'try', innerHTML: 'Try: ' + ex.try }));
 
             const codeEl = el('code');
-            codeEl.innerHTML = highlight(ex.code);
+            codeEl.innerHTML = highlightBlock(ex.code);
             const card = el('div', { className: 'card' },
                 el('h3', { textContent: ex.title }),
                 el('p', { textContent: ex.blurb || '' }),
@@ -209,7 +254,16 @@ export function renderPage(page) {
             grid.append(card);
 
             // run the SAME string that is displayed; `mount` drops the chart in.
-            const mount = (node) => { chart.appendChild(node); return node; };
+            // An example may mount several nodes (a chart, then a button); the first
+            // one carrying the Elicit data API is the one whose data we show.
+            let elicited = null;
+            const mount = (node) => {
+                chart.appendChild(node);
+                if (!elicited && node && typeof node.getData === 'function' && typeof node.on === 'function') {
+                    elicited = node;
+                }
+                return node;
+            };
             try {
                 new Function(...depNames, 'mount', ex.code)(...depVals, mount);
             } catch (err) {
@@ -218,6 +272,13 @@ export function renderPage(page) {
                     style: 'color:#b91c1c;font-size:0.75rem;white-space:pre-wrap',
                     textContent: '⚠ ' + err.message,
                 }));
+            }
+            if (elicited) {
+                // Pin the column to the chart's own pixel width (Elicit sets it inline)
+                // so a long data row scrolls inside the readout instead of widening
+                // the card. Capped by `.result { max-width: 100% }` when stacked.
+                if (elicited.style.width) result.style.width = elicited.style.width;
+                result.append(dataPanel(elicited));
             }
         }
         main.append(section);

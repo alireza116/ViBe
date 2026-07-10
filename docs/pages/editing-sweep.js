@@ -26,9 +26,9 @@ export default {
             summary:
                 'The authoring counterpart: near an existing line it edits (sweeps) it; in empty ' +
                 'space it draws a new one — you-draw-it for domain lines, freehand for <code class="inline">order:"sequence"</code>.',
-            signature: 'edit.line.draw({ domain, value, samples, minDist, threshold, into }) → Edit',
+            signature: 'edit.line.draw({ along, value, samples, minDist, threshold, into }) → Edit',
             options: [
-                { name: 'domain / value', type: "'x' | 'y'", default: "'x' / 'y'", desc: 'The positional axes.' },
+                { name: 'along / value', type: "'x' | 'y'", default: "'x' / 'y'", desc: 'The positional axes — the independent axis to draw along, and the value axis.' },
                 { name: 'samples', type: 'number | any[]', default: 'ticks', desc: 'Domain grid the you-draw-it upsert snaps to.' },
                 { name: 'minDist', type: 'number', default: '8', desc: 'Freehand pointer-sampling distance in pixels.' },
                 { name: 'threshold', type: 'number', default: '40', desc: 'Proximity radius for the edit-vs-draw decision.' },

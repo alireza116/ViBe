@@ -113,6 +113,19 @@ export function resolveScales(features, dataset, spec, dims) {
             // schema entry.
             if (chSpec.scale === null) continue;
 
+            // `domain` and `range` are not channel options: the schema owns the
+            // domain, the scale owns the range. Both used to live here, and a
+            // leftover is invisible — the channel silently takes its default range
+            // (a cone's degrees collapse to [0, 1]) and the chart draws, wrong.
+            if (DEV) {
+                for (const [key, where] of [['domain', 'the spec\'s schema'], ['range', 'this channel\'s `scale`']]) {
+                    if (chSpec[key] === undefined) continue;
+                    warnOnce(`stray:${key}:${ch}`,
+                        `[vibe] channel "${ch}" declares "${key}", which is ignored. Move it to ` +
+                        `${where}: ${key === 'range' ? `scale: { range: [...] }` : `schema: { <field>: { domain: [...] } }`}.`);
+                }
+            }
+
             const a = ensure(bucketOf(ch));
             if (a.measure == null && chSpec.type != null) a.measure = chSpec.type;
             if (a.scaleOpt == null && chSpec.scale != null) a.scaleOpt = chSpec.scale;
