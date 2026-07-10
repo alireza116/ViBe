@@ -13,6 +13,13 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 // `orientation`); `barY` / `barX` force one. In all cases the mark reads the
 // x-channel via the `x` accessor and the y-channel via `y`, so which channel is
 // the "value" and which is the "category" follows the scales — matching the spec.
+//
+// The value axis also accepts an explicit SPAN instead of a single value: two
+// endpoint channels (x1/x2 for barX, y1/y2 for barY) place the bar between them
+// rather than from the baseline — e.g. a Gantt-style "years active" span per
+// category (Observable Plot's bar model, minus stacking). x1/x2 share the same
+// resolved scale as x (and y1/y2 as y — see core/resolve.js's axis aliasing), so
+// they're read through encodeChannel exactly like the single-value form.
 
 /**
  * @param {any} options
@@ -25,12 +32,10 @@ function buildBar(options, forcedOrientation) {
     // every mark does. Explicit `encoding.fill` still wins.
     const opts = normalizeMarkOptions(options);
     const {
-        data = [],
         encoding = {},
         id,
         edits,
         constraints,
-        onChange,
         orientation: orientationOption
     } = opts;
 
@@ -39,14 +44,16 @@ function buildBar(options, forcedOrientation) {
     // global one the engine resolves and passes in as scales.x / scales.y.
     const xKey = (encoding.x && encoding.x.field) || options.x || 'x';
     const yKey = (encoding.y && encoding.y.field) || options.y || 'y';
+    // Span mode: both endpoint channels declared on that axis. Decided once per
+    // mark (not per datum) — the missing form (baseline+value) stays the default.
+    const hasXSpan = !!(encoding.x1 && encoding.x2);
+    const hasYSpan = !!(encoding.y1 && encoding.y2);
 
     return {
         id,
-        data,
         encoding,
         edits,
         constraints,
-        onChange,
         // A bar's categorical axis wants the band interval (its thickness).
         categoricalScale: 'band',
         xKey,
@@ -79,12 +86,22 @@ function buildBar(options, forcedOrientation) {
                     const bandStart = yScale ? yScale(d[yKey]) : 0;
                     const thickness = bandwidthOf(yScale, 20);
                     const baseline = baselineOf(xScale);
-                    const valuePos = encodeChannel(scales, encoding, 'x', d, baseline);
+                    let lo, hi;
+                    if (hasXSpan) {
+                        const v1 = encodeChannel(scales, encoding, 'x1', d, baseline);
+                        const v2 = encodeChannel(scales, encoding, 'x2', d, baseline);
+                        lo = Math.min(v1, v2);
+                        hi = Math.max(v1, v2);
+                    } else {
+                        const valuePos = encodeChannel(scales, encoding, 'x', d, baseline);
+                        lo = Math.min(valuePos, baseline);
+                        hi = Math.max(valuePos, baseline);
+                    }
                     return {
                         type: 'rect',
-                        x: Math.min(valuePos, baseline),
+                        x: lo,
                         y: bandStart,
-                        width: Math.abs(valuePos - baseline),
+                        width: hi - lo,
                         height: thickness,
                         ...style,
                         data: d,
@@ -99,13 +116,23 @@ function buildBar(options, forcedOrientation) {
                 const bandStart = xScale ? xScale(d[xKey]) : 0;
                 const thickness = bandwidthOf(xScale, 20);
                 const baseline = baselineOf(yScale);
-                const valuePos = encodeChannel(scales, encoding, 'y', d, baseline);
+                let lo, hi;
+                if (hasYSpan) {
+                    const v1 = encodeChannel(scales, encoding, 'y1', d, baseline);
+                    const v2 = encodeChannel(scales, encoding, 'y2', d, baseline);
+                    lo = Math.min(v1, v2);
+                    hi = Math.max(v1, v2);
+                } else {
+                    const valuePos = encodeChannel(scales, encoding, 'y', d, baseline);
+                    lo = Math.min(valuePos, baseline);
+                    hi = Math.max(valuePos, baseline);
+                }
                 return {
                     type: 'rect',
                     x: bandStart,
-                    y: Math.min(valuePos, baseline),
+                    y: lo,
                     width: thickness,
-                    height: Math.abs(baseline - valuePos),
+                    height: hi - lo,
                     ...style,
                     data: d,
                     index: i,

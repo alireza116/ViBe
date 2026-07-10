@@ -1,0 +1,64 @@
+// @ts-check
+// slider.js — a continuous (or stepped) slider as a survey instrument. The knob
+// FOLLOWS the pointer along the track and a click sets it (`drag` under the
+// `probe` driver — the same hover/click flow as the line+cone, applied to a
+// single positional channel). `clamp` keeps it in range and an optional `snap`
+// lands it on `step` ticks.
+//
+// Returns an ElicitSpec: Elicit(slider({ question, domain, step })).
+
+import { point } from '../plot/index.js';
+import { drag } from '../edit/index.js';
+import { clamp, snap } from '../constraints/index.js';
+import { sliderTrack, prompt, THEME } from './theme.js';
+
+/**
+ * @param {{ question?: string, domain?: [number, number], step?: number,
+ *   value?: number, format?: (v: any) => string,
+ *   onChange?: (data: any[]) => void, width?: number, height?: number,
+ *   stage?: number }} [opts]
+ * @returns {import('../types').ElicitSpec}
+ */
+export function slider(opts = {}) {
+    const {
+        question,
+        domain = [0, 1],
+        step,
+        value,
+        format,
+        onChange,
+        width = 560,
+        height = 120,
+        stage
+    } = opts;
+
+    /** @type {any[]} */
+    const constraints = [clamp({ min: domain[0], max: domain[1], field: 'value' })];
+    if (step) constraints.push(snap({ field: 'value', step, origin: domain[0] }));
+
+    return {
+        width,
+        height,
+        margins: { top: 34, right: 40, bottom: 40, left: 40 },
+        x: { type: 'linear', domain },
+        // The elicited dataset: the single value the knob carries.
+        data: [{ value: value != null ? value : domain[0] }],
+        constraints,
+        onChange,
+        axes: false,
+        guides: [prompt(question || ''), sliderTrack(format ? { format } : {})],
+        features: [
+            point({
+                id: 'slider',
+                encoding: {
+                    x: { field: 'value', type: 'linear', domain },
+                    size: { value: THEME.radius - 2 },
+                    fill: { value: THEME.accent }
+                },
+                // The knob tracks the pointer; a click settles it. No `create` — the
+                // value always exists, so there is exactly one knob to move.
+                edits: [drag({ pick: 'probe', channels: ['x'], advance: false, stage })]
+            })
+        ]
+    };
+}

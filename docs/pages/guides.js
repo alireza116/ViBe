@@ -9,6 +9,31 @@ export default {
         '<code class="inline">guides.proximity</code> visualizes what a nearest-pick edit has ' +
         'selected. (An edit’s own constraint bounds draw automatically via ' +
         '<code class="inline">guide: true</code>.)',
+    api: [
+        {
+            name: 'guides.rule · guides.region · guides.proximity',
+            summary:
+                'Import from <code class="inline">vibe.guides</code> and pass in the chart’s ' +
+                '<code class="inline">guides: [...]</code>. All position in <b>data space</b> through the same ' +
+                '<code class="inline">scale.encode()</code> a mark uses, so they compose across scale types. Non-interactive.',
+            signatures: [
+                'guides.rule({ x?, y?, stroke, strokeDasharray, label }) → Guide',
+                'guides.region({ x?, y?, fill, opacity }) → Guide',
+                'guides.proximity({ target, color }) → Guide',
+            ],
+            options: [
+                { name: 'rule.x / y', type: 'any', default: '—', desc: 'The value to draw the reference line at (a number or a category).' },
+                { name: 'rule.label', type: 'string', default: '—', desc: 'Optional text label near the line.' },
+                { name: 'rule.stroke / strokeDasharray', type: 'style', default: "#64748b / '5 4'", desc: 'Line colour and dash pattern.' },
+                { name: 'region.x / y', type: '[a, b]', default: '—', desc: 'The two values to shade between on that axis.' },
+                { name: 'region.fill / opacity', type: 'style', default: '#64748b / 0.1', desc: 'Band fill and opacity.' },
+                { name: 'proximity.target', type: 'string', default: '—', desc: 'The feature id whose nearest-pick selection to visualize (ring + highlight).' },
+                { name: 'proximity.color', type: 'string', default: 'effect', desc: 'Override the highlight colour (else the effects layer’s).' },
+            ],
+            returns:
+                'Each returns a <b>Guide</b> (<code class="inline">{ isGuide: true, build(ctx) }</code>), rebuilt every render so it tracks live data.',
+        },
+    ],
     sections: [
         {
             id: 'annotations',
@@ -29,10 +54,10 @@ export default {
     guides.region({ y: [40, 60], fill: "#0d9488", opacity: 0.14 }),
     guides.rule({ y: 50, label: "target 50" }),
   ],
+  data: [{ x: 20, y: 30 }, { x: 50, y: 55 }, { x: 80, y: 70 }],
   features: [
     point({
       fill: "#0d9488",
-      data: [{ x: 20, y: 30 }, { x: 50, y: 55 }, { x: 80, y: 70 }],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },
         y: { field: "y", type: "linear", domain: [0, 100] },
@@ -61,10 +86,10 @@ export default {
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   guides: [ guides.rule({ y: 25, label: "even split (25)" }) ],
+  data: ["A", "B", "C", "D"].map((c) => ({ x: c, y: 25 })),
   features: [
     bar({
       fill: "#6366f1",
-      data: ["A", "B", "C", "D"].map((c) => ({ x: c, y: 25 })),
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ guide: true }) },

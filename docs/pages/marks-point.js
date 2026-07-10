@@ -6,6 +6,29 @@ export default {
         '<code class="inline">point</code> is the channel-driven circle: every channel — x, y, ' +
         'size, fill/color, stroke — resolves through the global scales, so one mark is a full ' +
         'scatter.',
+    api: [
+        {
+            name: 'point(options)',
+            summary:
+                'Import from <code class="inline">vibe.plot</code>. A circle per datum; every channel — ' +
+                'positional or not — resolves through the global scales.',
+            signature: 'point({ encoding, edits, constraints, id }) → Feature',
+            options: [
+                { name: 'encoding', type: 'object', default: '{}', desc: 'Channel map — see <b>Channels</b>.' },
+                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in the encoding.' },
+                { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark.' },
+                { name: 'fill, stroke, …', type: 'style', default: "fill: 'steelblue'", desc: 'Style shorthands / channels.' },
+            ],
+            channels: [
+                { name: 'x', type: 'linear | band', desc: 'Horizontal position; omitted parks the dot at the centre of x.' },
+                { name: 'y', type: 'linear | band', desc: 'Vertical position; omitted parks the dot at the centre of y.' },
+                { name: 'size', type: 'linear', desc: 'The dot radius (default 5). Pair with <code class="inline">edit: resize()</code> to drag the radius.' },
+                { name: 'fill / color', type: 'const | field', desc: 'Fill; a field tints through the ordinal palette (<code class="inline">color</code> is the legacy fallback).' },
+                { name: 'stroke, strokeWidth, opacity', type: 'const | field', desc: 'Standard style surface.' },
+            ],
+            returns: 'A <b>feature</b> emitting one <code class="inline">circle</code> per datum.',
+        },
+    ],
     sections: [
         {
             id: 'channels',
@@ -22,12 +45,12 @@ export default {
 `mount(Elicit({
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 34 },
+  data: [
+    { h: 150, weight: 48 }, { h: 160, weight: 57 }, { h: 170, weight: 66 },
+    { h: 180, weight: 78 }, { h: 190, weight: 92 }, { h: 165, weight: 61 },
+  ],
   features: [
     point({
-      data: [
-        { h: 150, weight: 48 }, { h: 160, weight: 57 }, { h: 170, weight: 66 },
-        { h: 180, weight: 78 }, { h: 190, weight: 92 }, { h: 165, weight: 61 },
-      ],
       stroke: "#334155", strokeWidth: 1,
       encoding: {
         x: { field: "h", type: "linear", domain: [140, 200] },
@@ -46,12 +69,12 @@ export default {
 `mount(Elicit({
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 12, y: 40 }, { x: 30, y: 22 }, { x: 48, y: 55 },
+    { x: 66, y: 33 }, { x: 80, y: 68 }, { x: 22, y: 60 },
+  ],
   features: [
     point({
-      data: [
-        { x: 12, y: 40 }, { x: 30, y: 22 }, { x: 48, y: 55 },
-        { x: 66, y: 33 }, { x: 80, y: 68 }, { x: 22, y: 60 },
-      ],
       fill: "#fde68a", stroke: "#b45309", strokeWidth: 2, opacity: 0.85,
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },
@@ -77,10 +100,10 @@ export default {
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 20, y: 30 }, { x: 50, y: 62 }, { x: 78, y: 40 }],
   features: [
     point({
       fill: "#2563eb", stroke: "#1f2733", strokeWidth: 1, opacity: 0.85,
-      data: [{ x: 20, y: 30 }, { x: 50, y: 62 }, { x: 78, y: 40 }],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },
         y: { field: "y", type: "linear", domain: [0, 100] },

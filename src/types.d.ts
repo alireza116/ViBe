@@ -55,6 +55,10 @@ export interface EditContext {
   channels: ResolvedChannel[];
   scales: ScaleMap;
   encoding: Record<string, any>;
+  // Plot pixel dimensions, for a gesture measured against the whole plane (e.g.
+  // rotate about the centre), the angular sibling of resize's mark-centre radius.
+  width?: number;
+  height?: number;
   // The dataset schema, so a `create` edit can mint a datum carrying every
   // declared field (its default or null), not only the positional ones.
   schema?: Schema;
@@ -106,7 +110,7 @@ export interface Edit {
   gesture: string;
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
-  pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw';
+  pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' | 'probe';
   // null = universal (any mark); 'line' = needs a series-grouping mark. The engine
   // dev-warns when a 'line' edit is attached to a mark without series support.
   scope: 'line' | null;
@@ -114,13 +118,20 @@ export interface Edit {
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
   // Edit-scoped constraint SUGAR (runs only on this edit's commit). The canonical
-  // home for invariants is the feature's `constraints` (plural), which hold for
+  // home for invariants is the dataset's `constraints` (plural), which hold for
   // every edit; `constrain` (singular) is a guard you want on just this one.
   constrain: Constraint[];
   // true = this edit self-draws its guide (constraint bounds + snap ring). Not to
   // be confused with a Constraint's `guide`, which is a drawer function.
   guide: boolean | null;
   guideColor: string | null;
+  // Multi-stage gate: active only when it equals the engine's current stage;
+  // null = always active. A uniform filter applied to every edit, like `gesture`
+  // matching — not a mode branch. Set via a factory option: drag({ stage: 1 }).
+  stage: number | null;
+  // probe-pick only: does a click that settles this edit advance the stage?
+  // Default true; `advance: false` commits repeatedly within one stage.
+  advance: boolean;
   apply: (ctx: EditContext) => any;
 }
 
@@ -153,6 +164,13 @@ export interface StyleChannels {
 export interface Encoding extends StyleChannels {
   x?: ChannelSpec;
   y?: ChannelSpec;
+  // Explicit span endpoints (bar's x1/x2 or y1/y2): alternative to x/y for a
+  // value that doesn't start at the baseline. Share x/y's resolved scale (see
+  // core/encoding.js's axisOf / core/resolve.js's axis-bucketed aliasing).
+  x1?: ChannelSpec;
+  x2?: ChannelSpec;
+  y1?: ChannelSpec;
+  y2?: ChannelSpec;
   size?: ChannelSpec;
   color?: ChannelSpec;
   [channel: string]: ChannelSpec | undefined;
@@ -161,8 +179,11 @@ export interface Encoding extends StyleChannels {
 // The shared option surface for every mark factory (bar, point, and new marks).
 // `encoding` carries the channels; the style shorthands are sugar that desugar
 // into constant channels via normalizeMarkOptions (explicit `encoding` wins).
+//
+// A mark NEVER owns data: `Elicit` owns the one dataset, and a mark is a view
+// over it that encodes some columns and may edit them. There is no `data` or
+// `onChange` here — both live on ElicitSpec.
 export interface MarkOptions {
-  data?: Datum[];
   encoding?: Encoding;
   // Style shorthands (constants) — e.g. `fill: 'steelblue'`, `strokeWidth: 2`.
   fill?: any;
@@ -173,9 +194,27 @@ export interface MarkOptions {
   strokeOpacity?: number;
   id?: string;
   edits?: any[];
+  // Sugar. Constraints are DATASET invariants; declaring them on a mark is a
+  // convenience, and the engine promotes them into the chart-wide set (so they
+  // gate every edit, from every mark, over the same rows). ElicitSpec.constraints
+  // is the canonical home.
   constraints?: Constraint[];
-  onChange?: (data: Datum[]) => void;
   [key: string]: any;
+}
+
+// Options for a COMPOSITE mark (a glyph): a named GROUP of ordinary marks over
+// the shared dataset. Each part encodes some columns; a part carrying an `edit`
+// on a channel is a handle. `composite` returns the parts as an array of features
+// (Elicit flattens it) — it is a desugaring, not a new kind of feature.
+export interface CompositeOptions {
+  // The sub-marks, in z-order: visual parts first, handles last.
+  parts?: any[];
+  id?: string;
+  // Stamped onto any part that doesn't declare its own (a glyph usually sits in a
+  // band slot). See plot/composite.js.
+  categoricalScale?: 'band' | 'point';
+  // Group-level data invariants; promoted to the dataset like any mark's.
+  constraints?: Constraint[];
 }
 
 export interface FeatureNode {
@@ -216,10 +255,15 @@ export interface FeatureNode {
   editable?: boolean;
   // Runtime tags set by marks for the pick/driver layer: `series` groups a line's
   // nodes; `sweepAxis`/`bandAxis` name the axis proximity measures along; `cursor`
-  // overrides the interactive cursor (e.g. a tick's ew-resize).
+  // overrides the interactive cursor (e.g. a tick's ew-resize); `channel` tags one
+  // of a mark's several handles, so that handle's edit `when` claims only this node.
+  // Needed only when one FEATURE emits multiple handles over one datum — see
+  // plot/trend.js (intercept vs slope). Marks split across features don't need it:
+  // direct-pick dispatch already routes a gesture to the touched node's feature.
   series?: any;
   sweepAxis?: 'x' | 'y';
   bandAxis?: 'x' | 'y';
+  channel?: string;
   cursor?: string;
   [key: string]: any;
 }
@@ -240,6 +284,10 @@ export interface Session {
   lastDomain?: any;
   lastX?: number | null;
   lastY?: number | null;
+  // brush driver: the dragstart-locked grab zone (+ which field an edge zone
+  // targets), forced to 'canonicalize' for the one-time dragend cleanup tick.
+  zone?: 'edgeA' | 'edgeB' | 'body' | 'canonicalize' | null;
+  field?: string | null;
 }
 
 // Config for a single positional axis (the `axes` convenience, or an explicit
@@ -288,19 +336,53 @@ export interface ElicitSpec {
   height?: number;
   margins?: { top: number; right: number; bottom: number; left: number };
   features?: any[];
-  // Global axis convenience: `false` = no axes; `{ x, y }` = per-channel config or
-  // `false` to suppress that channel; omitted = default axes on both positional
-  // channels. Desugars into composable axis/grid marks.
-  axes?: false | { x?: AxisSpec | false; y?: AxisSpec | false };
+  // THE dataset. A chart elicits exactly one — even a slider elicits a one-row
+  // dataset. Seed rows are a starting point; every mark is a view over these rows,
+  // encoding some columns and (where it carries an edit) writing them back. Marks
+  // never own data. May be omitted: with a `schema`, scales resolve and `create`
+  // mints rows from nothing.
+  data?: Datum[];
   // The elicited-dataset schema (field -> measurement type/domain/default). Lets a
   // chart resolve scales and mint data with zero starter data; ranked above data
   // inference but below an explicit per-channel type/domain or top-level x/y.
   schema?: Schema;
+  // The dataset's invariants. They gate and REPAIR every edit, whichever mark fired
+  // it: a rejected proposal is dropped; a returned array replaces it, and the marks
+  // re-derive from the repaired rows on the next render. A mark's own `constraints`
+  // are promoted into this set (see MarkOptions.constraints).
+  constraints?: Constraint[];
+  // Called with the committed dataset after each edit. Hover previews never fire it.
+  onChange?: (data: Datum[]) => void;
+  // Global axis convenience: `false` = no axes; `{ x, y }` = per-channel config or
+  // `false` to suppress that channel; omitted = default axes on both positional
+  // channels. Desugars into composable axis/grid marks.
+  axes?: false | { x?: AxisSpec | false; y?: AxisSpec | false };
   // Customizable interaction-effects layer (grab / proximity-select).
   effects?: EffectsSpec;
   guides?: any[];
   renderer?: any;
   x?: { type?: ScaleType; domain?: any[]; range?: any[] };
   y?: { type?: ScaleType; domain?: any[]; range?: any[] };
+  // Initial stage index for multi-stage elicitation. Edits carrying a `stage`
+  // are active only when it equals the current stage (see Edit.stage).
+  stage?: number;
   [key: string]: any;
+}
+
+// The DOM element Elicit returns: the chart container plus a small observation
+// API over the belief-data store. `getData`/`setData` read/replace the committed
+// dataset; `on` subscribes to commits and stage changes. These add no interaction
+// path — edits + constraints remain the only way a gesture mutates data.
+export interface ElicitElement extends HTMLDivElement {
+  // A deep copy of the committed dataset.
+  getData(): Datum[];
+  // Replace the dataset and re-render. Bypasses constraints (trusted seed/reset).
+  setData(data: Datum[]): void;
+  // Subscribe to committed changes ('change': (data)) or stage advances
+  // ('stage': (stageIndex)). Returns an unsubscribe function.
+  on(type: 'change' | 'stage', cb: (...args: any[]) => void): () => void;
+  // Multi-stage controls (see ElicitSpec.stage). getStage reads the current index.
+  getStage(): number;
+  setStage(stage: number): void;
+  nextStage(): void;
 }

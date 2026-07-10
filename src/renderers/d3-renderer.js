@@ -366,8 +366,13 @@ export class D3Renderer {
      * @param {{ drag: any, markClick: (e: any, d: any) => void }} io
      */
     _drawMarks(g, markRects, markCircles, { drag, markClick }) {
+        // A mark may opt OUT of the pointer (pointerEvents: 'none') — a ghost/affordance
+        // node, or a glyph part that must not swallow the plane's hover/click. Without
+        // this a decorative circle would eat the gesture the plane driver needs, the
+        // same way line marks and paths already honour the flag.
         const rectSel = g.selectAll('rect.mark').data(markRects).join('rect')
             .attr('class', 'mark')
+            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
             .style('cursor', (/** @type {any} */ d) => d.editable ? 'ns-resize' : 'default')
             .on('click', markClick)
             .call(drag);
@@ -376,6 +381,7 @@ export class D3Renderer {
 
         const circleSel = g.selectAll('circle.mark').data(markCircles).join('circle')
             .attr('class', 'mark')
+            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
             .style('cursor', (/** @type {any} */ d) => d.editable ? 'move' : 'default')
             .on('click', markClick)
             .call(drag);

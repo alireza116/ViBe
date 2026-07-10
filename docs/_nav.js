@@ -22,6 +22,11 @@ export const SITE = [
             { path: 'marks/tick.html', title: 'Tick' },
             { path: 'marks/point.html', title: 'Point & Dot' },
             { path: 'marks/line.html', title: 'Line' },
+            { path: 'marks/composite.html', title: 'Composite' },
+            { path: 'marks/dotstack.html', title: 'Stacked dots' },
+            { path: 'marks/waffle.html', title: 'Waffle' },
+            { path: 'marks/cone.html', title: 'Line + Cone' },
+            { path: 'marks/trend.html', title: 'Trend line' },
             { path: 'marks/axes.html', title: 'Axis, Grid & Rule' },
         ],
     },
@@ -32,6 +37,14 @@ export const SITE = [
             { path: 'editing/gestures.html', title: 'Drag · Resize · Cycle · Custom' },
             { path: 'editing/sweep.html', title: 'Sweep (you-draw-it)' },
             { path: 'editing/existence.html', title: 'Create · Remove · Anchors' },
+            { path: 'editing/probe.html', title: 'Probe (hover · click)' },
+            { path: 'editing/stages.html', title: 'Stages (multi-step)' },
+        ],
+    },
+    {
+        group: 'Widgets',
+        pages: [
+            { path: 'widgets.html', title: 'Likert · Choice · Slider · Matrix' },
         ],
     },
     {

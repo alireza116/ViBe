@@ -3,11 +3,35 @@ export default {
     path: 'concepts.html',
     title: 'Core concepts',
     lead:
+        '<b>One dataset.</b> A chart elicits exactly one dataset — even a slider elicits a ' +
+        'one-row dataset — so <code class="inline">data</code> lives on the ' +
+        '<code class="inline">Elicit</code> spec, never on a mark. Each mark is a <i>view</i> ' +
+        'over those rows: it encodes some columns and, where a channel carries an ' +
+        '<code class="inline">edit</code>, writes them back. Several marks over the same rows ' +
+        'is the point, not a special case — they all re-derive from the committed data on the ' +
+        'next render. ' +
         'Every mark reads the same <b>channel</b> surface. A channel is either a constant ' +
         '(<code class="inline">fill: "red"</code>) or a data field through a scale ' +
         '(<code class="inline">fill: { field: "kind" }</code>). No accessor functions — ' +
         'specs stay serializable. Encoding maps data → visual; an edit on a channel maps a ' +
         'gesture → data, back through the same scale.',
+    api: [
+        {
+            name: 'The channel forms',
+            summary:
+                'The three shapes a channel can take on any mark’s <code class="inline">encoding</code>, plus the ' +
+                'co-located <code class="inline">edit</code> that makes it writable. Full scale options live on the ' +
+                '<b>Scales &amp; encoding</b> page.',
+            options: [
+                { name: '{ value }', type: 'constant', default: '—', desc: 'A fixed visual — <code class="inline">fill: { value: "red" }</code> (or the shorthand <code class="inline">fill: "red"</code>).' },
+                { name: '{ field }', type: 'scaled', default: '—', desc: 'A data field mapped through the channel’s scale — <code class="inline">y: { field: "n" }</code>.' },
+                { name: '{ field, scale: null }', type: 'raw', default: '—', desc: 'A field passed through unscaled (the datum already holds a literal colour / pixel).' },
+                { name: '{ …, edit }', type: 'writable', default: '—', desc: 'Attach an edit so a gesture inverts back to <code class="inline">field</code> through the same scale.' },
+            ],
+            returns:
+                'Encoding maps <b>data → visual</b>; an edit maps <b>gesture → data</b> through the same scale — the whole model.',
+        },
+    ],
     sections: [
         {
             id: 'channels',
@@ -25,12 +49,12 @@ export default {
 `mount(Elicit({
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { cat: "A", n: 34, kind: "low" },  { cat: "B", n: 58, kind: "high" },
+    { cat: "C", n: 22, kind: "low" },  { cat: "D", n: 47, kind: "high" },
+  ],
   features: [
     bar({
-      data: [
-        { cat: "A", n: 34, kind: "low" },  { cat: "B", n: 58, kind: "high" },
-        { cat: "C", n: 22, kind: "low" },  { cat: "D", n: 47, kind: "high" },
-      ],
       encoding: {
         x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "n", type: "linear", domain: [0, 60] },
@@ -47,12 +71,12 @@ export default {
 `mount(Elicit({
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 12, y: 40 }, { x: 30, y: 22 }, { x: 48, y: 55 },
+    { x: 66, y: 33 }, { x: 80, y: 68 }, { x: 22, y: 60 },
+  ],
   features: [
     point({
-      data: [
-        { x: 12, y: 40 }, { x: 30, y: 22 }, { x: 48, y: 55 },
-        { x: 66, y: 33 }, { x: 80, y: 68 }, { x: 22, y: 60 },
-      ],
       fill: "#fde68a", stroke: "#b45309", strokeWidth: 2, opacity: 0.85,
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },

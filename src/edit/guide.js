@@ -14,6 +14,7 @@
 import { resolveChannels, collectEdits } from './route.js';
 import { DEFAULT_EFFECTS } from '../core/effects.js';
 import { isBand } from '../core/scales.js';
+import { axisOf } from '../core/encoding.js';
 
 const DEFAULT_CONSTRAINT_COLOR = '#e4572e';
 
@@ -53,20 +54,20 @@ export function autoEditGuides(features) {
  * @returns {import('../types').FeatureNode[]}
  */
 export function buildEditGuide(feature, edit, ctx) {
-    const { scales, state, ui, width, height, featureNodes } = ctx;
+    const { scales, data, constraints, ui, width, height, featureNodes } = ctx;
     const encoding = feature.encoding || {};
     const resolved = resolveChannels(edit.channels, encoding, scales);
     const primary = resolved[0];
-    const data = state[feature.id] || [];
     const color = edit.guideColor || DEFAULT_CONSTRAINT_COLOR;
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
 
-    // Constraint boundaries on the edit's own value channel. Constraints now live
-    // at the feature level (data invariants); we draw the ones whose field matches
-    // this edit's primary channel, plus any edit-scoped guard sugar.
+    // Constraint boundaries on the edit's own value channel. Constraints are DATASET
+    // invariants, so an edit draws every one whose field matches its primary channel
+    // — including constraints declared on a sibling mark, since they gate this edit
+    // too. Plus any edit-scoped guard sugar.
     if (primary && primary.scale) {
-        const invariants = [...(feature.constraints || []), ...edit.constrain];
+        const invariants = [...(constraints || []), ...edit.constrain];
         for (const constraint of invariants) {
             if (constraint.field && primary.field && constraint.field !== primary.field) continue;
             nodes.push(...constraintGuide(constraint, {
@@ -75,9 +76,9 @@ export function buildEditGuide(feature, edit, ctx) {
         }
     }
 
-    // Proximity ring + highlight for nearest/sweep-pick edits (the `select`
-    // effect) — both resolve a target from an arbitrary pointer position.
-    if (edit.pick === 'nearest' || edit.pick === 'sweep') {
+    // Proximity ring + highlight for nearest/sweep/brush-pick edits (the `select`
+    // effect) — all three resolve a target from an arbitrary pointer position.
+    if (edit.pick === 'nearest' || edit.pick === 'sweep' || edit.pick === 'brush') {
         nodes.push(...proximityGuide(feature, ctx));
     }
 
@@ -119,7 +120,7 @@ function boundaryLine(value, label, gctx) {
     const at = primary.scale(value);
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
-    if (primary.name === 'x') {
+    if (axisOf(primary.name) === 'x') {
         nodes.push({
             type: 'line', x1: at, x2: at, y1: 0, y2: height,
             stroke: color, strokeDasharray: '4 4', strokeWidth: 1,

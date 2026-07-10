@@ -6,7 +6,6 @@
 // size encoding is data, not new mark code:
 //
 //   vibe.plot.point({
-//     data,
 //     encoding: {
 //       x:    { field: "gdp",    type: "linear" },
 //       y:    { field: "region" },              // band, inferred
@@ -32,18 +31,17 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
  */
 export function point(options = {}) {
     const opts = normalizeMarkOptions(options);
-    const { data = [], encoding = {}, id, edits, constraints, onChange } = opts;
+    const { encoding = {}, id, edits, constraints } = opts;
 
     return {
         id,
-        data,
         encoding,
         // Mark-level edits (joint / arbitrary); channel-level edits live in
         // encoding[ch].edit. Both are gathered by the engine via collectEdits.
         edits,
-        // Feature-level data invariants, run on every edit commit (see elicit.js).
+        // Data invariants, promoted by the engine into the dataset's constraint set
+        // and run on every edit commit, from any mark (see elicit.js).
         constraints,
-        onChange,
         // A dot's categorical axis wants a point per category (a tick, no width).
         categoricalScale: 'point',
         // Field keys the interaction/constraint layer reads, derived from encoding.

@@ -8,6 +8,29 @@ export default {
         'example on these pages shows the <b>exact code that drew the chart beside it</b> — ' +
         'the snippet is run verbatim. This page is the 30-second tour; the sidebar goes deep ' +
         'on each mark and feature.',
+    api: [
+        {
+            name: 'Elicit(spec)',
+            summary:
+                'The entry point (<code class="inline">vibe.Elicit</code>). Returns a DOM element you append. ' +
+                'The spec is a chart: a list of <code class="inline">features</code> (marks) plus size, margins ' +
+                'and global axes/guides.',
+            signature: 'Elicit({ width, height, margins, features, axes, guides, effects, renderer }) → HTMLElement',
+            options: [
+                { name: 'width / height', type: 'number', default: '600 / 400', desc: 'Outer pixel size of the chart element.' },
+                { name: 'margins', type: '{top,right,bottom,left}', default: '{20,20,30,40}', desc: 'Inset around the inner plot (leaves room for axes).' },
+                { name: 'features', type: 'Feature[]', default: '[]', desc: 'The marks — <code class="inline">bar(...)</code>, <code class="inline">point(...)</code>, <code class="inline">composite(...)</code>, … drawn in order.' },
+                { name: 'x / y', type: 'ScaleSpec', default: 'from marks', desc: 'Optional top-level positional scale specs (a shared domain across marks).' },
+                { name: 'axes', type: 'object | false', default: 'auto', desc: 'Global axis convenience — desugars into axis/grid marks; <code class="inline">false</code> drops them.' },
+                { name: 'guides', type: 'Guide[]', default: '[]', desc: 'Non-interactive annotations rebuilt every render.' },
+                { name: 'effects', type: 'object', default: 'defaults', desc: 'Interaction-feedback layer (grab / select), kept off mark paint channels.' },
+                { name: 'renderer', type: 'Renderer', default: 'D3Renderer', desc: 'The scene-graph renderer; swappable for Canvas/WebGL.' },
+            ],
+            returns:
+                'An <b>HTMLElement</b> (a positioned container). The engine deep-copies each feature’s ' +
+                '<code class="inline">data</code>, resolves one global scale per channel, and re-renders on every edit commit.',
+        },
+    ],
     sections: [
         {
             id: 'anatomy',
@@ -26,12 +49,12 @@ export default {
 `mount(Elicit({
   width: 380, height: 240,
   margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { cat: "A", n: 30 }, { cat: "B", n: 55 },
+    { cat: "C", n: 22 }, { cat: "D", n: 44 },
+  ],
   features: [
     bar({
-      data: [
-        { cat: "A", n: 30 }, { cat: "B", n: 55 },
-        { cat: "C", n: 22 }, { cat: "D", n: 44 },
-      ],
       fill: "#4f46e5",
       encoding: {
         x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
@@ -60,13 +83,13 @@ export default {
 `mount(Elicit({
   width: 380, height: 240,
   margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { cat: "A", n: 30 }, { cat: "B", n: 55 },
+    { cat: "C", n: 22 }, { cat: "D", n: 44 },
+  ],
   features: [
     bar({
       fill: "#4f46e5",
-      data: [
-        { cat: "A", n: 30 }, { cat: "B", n: 55 },
-        { cat: "C", n: 22 }, { cat: "D", n: 44 },
-      ],
       encoding: {
         x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "n", type: "linear", domain: [0, 60], edit: drag() },

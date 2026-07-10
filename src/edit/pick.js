@@ -165,3 +165,16 @@ export function pickThreshold(edit) {
     return edit.threshold && edit.threshold > 0 ? edit.threshold : DEFAULT_PICK_THRESHOLD;
 }
 
+// A brush's edge zone needs a usable px radius; 0 would mean "the exact pixel
+// only", making the edge essentially ungrabbable.
+export const DEFAULT_EDGE_INSET = 8;
+
+/**
+ * @param {import('../types').Edit} edit
+ * @returns {number}
+ */
+export function edgeInsetOf(edit) {
+    const inset = /** @type {any} */ (edit).edgeInset;
+    return inset && inset > 0 ? inset : DEFAULT_EDGE_INSET;
+}
+

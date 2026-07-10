@@ -8,6 +8,25 @@ export default {
         'through <code class="inline">effects</code>: a <code class="inline">grab</code> filter ' +
         'while dragging, and a <code class="inline">select</code> overlay (ring + highlight) for ' +
         'the proximity target.',
+    api: [
+        {
+            name: 'effects (on Elicit)',
+            summary:
+                'The interaction-feedback layer, passed as <code class="inline">effects</code> on ' +
+                '<code class="inline">Elicit</code>. Partial sub-objects merge over the defaults, so you override ' +
+                'just the part you care about.',
+            signature: 'effects: { grab, select }',
+            options: [
+                { name: 'grab', type: "false | string | { filter }", default: "brightness(0.82)", desc: 'Element effect applied to a mark while it is dragged. A string is shorthand for <code class="inline">{ filter }</code>; <code class="inline">false</code> disables it.' },
+                { name: 'select', type: 'false | object', default: 'enabled', desc: 'Overlay for proximity/nearest selection; <code class="inline">false</code> turns it off.' },
+                { name: 'select.color', type: 'string', default: 'accent', desc: 'Colour of the ring + highlight.' },
+                { name: 'select.ring', type: 'object', default: '—', desc: 'The snap-zone ring at the pointer (radius / stroke config).' },
+                { name: 'select.highlight', type: 'object', default: '—', desc: 'The outline drawn around the currently-selected mark.' },
+            ],
+            returns:
+                'Feedback draws in its own layer — never on a mark’s <code class="inline">fill</code>/<code class="inline">stroke</code> — so it can’t clobber data-driven style.',
+        },
+    ],
     sections: [
         {
             id: 'default',
@@ -24,10 +43,10 @@ export default {
 `mount(Elicit({
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
   features: [
     point({
       fill: "#ffffff", stroke: "#334155", strokeWidth: 2,
-      data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },
         y: { field: "y", type: "linear", domain: [0, 100] },
@@ -63,10 +82,10 @@ export default {
       highlight: { width: 4, opacity: 1, pad: 8 },
     },
   },
+  data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
   features: [
     point({
       fill: "#ffffff", stroke: "#334155", strokeWidth: 2,
-      data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },
         y: { field: "y", type: "linear", domain: [0, 100] },

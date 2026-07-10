@@ -31,12 +31,10 @@ function buildTick(options, forcedValueAxis) {
     // encoding so tick reads style the same way every mark does.
     const opts = normalizeMarkOptions(options);
     const {
-        data = [],
         encoding = {},
         id,
         edits,
         constraints,
-        onChange,
         inset = 0,
         length
     } = opts;
@@ -46,11 +44,9 @@ function buildTick(options, forcedValueAxis) {
 
     return {
         id,
-        data,
         encoding,
         edits,
         constraints,
-        onChange,
         // A tick sits within a band (like a bar) — it wants the band interval to
         // span, so it asks for the band variant of the categorical scale.
         categoricalScale: 'band',

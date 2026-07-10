@@ -4,6 +4,8 @@
 // Kept separate so the universal edits (basic.js) and the line-scoped edits
 // (line.js) share one implementation of these primitives.
 
+import { visualForChannel, axisOf } from '../core/encoding.js';
+
 /**
  * @param {any} v
  * @returns {any[]}
@@ -32,6 +34,14 @@ export function makeEdit(spec) {
         constrain: asList(spec.constrain),
         guide: spec.guide || null,
         guideColor: spec.guideColor || null,
+        // Multi-stage gate: an edit with a numeric stage is active only when it
+        // equals the engine's current stage; null (the default) is always active.
+        // A uniform descriptor filter — not a mode branch (see elicit.js activeEdits).
+        stage: spec.stage != null ? spec.stage : null,
+        // probe-pick only: does a click that settles this edit advance the stage?
+        // Defaults to true for a staged edit (the "line, then cone" flow); set false
+        // to commit repeatedly within one stage (the dot plot's create).
+        advance: spec.advance !== false,
         apply: spec.apply
     };
 }
@@ -70,6 +80,22 @@ export function schemaDefaults(schema) {
 }
 
 /**
+ * The scene node an edit is currently acting on, regardless of pick strategy:
+ * `ctx.node` is set for a direct-pick gesture (the DOM element it landed on),
+ * but a plane-pick gesture (nearest/sweep) resolves its target by datum index
+ * with no node attached — so fall back to looking the current mark up in
+ * `ctx.marks` by `ctx.index`, the same by-datum-index lookup guide.js's
+ * `selectEffectNodes` already does for the proximity highlight.
+ * @param {import('../types').EditContext} ctx
+ * @returns {any | null}
+ */
+export function resolveMarkNode(ctx) {
+    if (ctx.node) return ctx.node;
+    if (ctx.index == null || !ctx.marks) return null;
+    return ctx.marks.find((m) => m && m.index === ctx.index) || null;
+}
+
+/**
  * Centre of a scene node: circles carry cx/cy; rects carry x/y/width/height.
  * @param {any} node
  * @returns {{ cx: number, cy: number } | null}
@@ -87,3 +113,45 @@ export function markCenter(node) {
 // linear or time domain grid can be matched/ordered the same way.
 /** @param {any} p @returns {number} */
 export const numOf = (p) => (p instanceof Date ? p.getTime() : p);
+
+/**
+ * Invert the pointer through ONE channel's scale — the single-field half of
+ * `drag()`'s move, factored out so `brushSpan`'s edge-zone tick can reuse the
+ * exact same computation instead of a second copy.
+ * @param {import('../types').ResolvedChannel} ch
+ * @param {{ x: number, y: number }} pointer
+ * @returns {any}
+ */
+export function invertChannel(ch, pointer) {
+    if (!ch || !ch.scale || !ch.scale.invertible) return undefined;
+    const visual = visualForChannel(ch.name, pointer);
+    if (visual === undefined) return undefined;
+    return ch.scale.invertValue(visual);
+}
+
+/**
+ * Recenter a mark's CURRENT pixel span (read off its rendered node) on the
+ * pointer, then invert both new endpoints back to data — the whole-span-move
+ * computation `dragSpan` and `brushSpan`'s body zone both use. Stateless: no
+ * dragstart/delta tracking, just "the gesture sets the absolute position",
+ * the same model `drag()`/`invertChannel` already use for a single field.
+ * @param {any} node the mark's current scene node (rect: x/y/width/height)
+ * @param {import('../types').ResolvedChannel} chA
+ * @param {import('../types').ResolvedChannel} chB
+ * @param {{ x: number, y: number }} pointer
+ * @returns {{ a: any, b: any } | undefined}
+ */
+export function recenterSpan(node, chA, chB, pointer) {
+    if (!node || !chA || !chB || !chA.scale || !chB.scale) return undefined;
+    if (!chA.scale.invertible || !chB.scale.invertible) return undefined;
+    const axis = axisOf(chA.name);
+    if (!axis || axis !== axisOf(chB.name)) return undefined; // must share an axis
+
+    const visual = axis === 'x' ? pointer.x : pointer.y;
+    const span = axis === 'x' ? node.width : node.height;
+    if (visual === undefined || span == null) return undefined;
+
+    const p1 = visual - span / 2;
+    const p2 = visual + span / 2;
+    return { a: chA.scale.invertValue(p1), b: chB.scale.invertValue(p2) };
+}

@@ -10,6 +10,45 @@ export default {
         'and <code class="inline">guide</code>. Place it on a channel ' +
         '(<code class="inline">encoding.y.edit</code>) or at mark level ' +
         '(<code class="inline">edits: [...]</code>).',
+    api: [
+        {
+            name: 'The Edit descriptor',
+            summary:
+                'Every edit factory (<code class="inline">vibe.edit.*</code>) returns this shape. ' +
+                '<code class="inline">apply(ctx)</code> is pure: given the context it returns a datum ' +
+                '(direct edit), a full array (whole-dataset edit), or <code class="inline">undefined</code> (no-op).',
+            options: [
+                { name: 'gesture', type: "'drag'|'click'|'dblclick'", default: "'drag'", desc: 'The raw gesture that triggers the edit.' },
+                { name: 'channels', type: 'string[] | null', default: 'null', desc: 'Channel names it governs; <code class="inline">null</code> injects the channel it was placed on.' },
+                { name: 'when', type: '(ctx) => boolean', default: 'null', desc: 'Arbitration — whether this edit claims the gesture (e.g. only on Shift). See <code class="inline">vibe.when</code>.' },
+                { name: 'pick', type: "'direct'|'nearest'|'plane'|driver", default: "'direct'", desc: 'How the gesture selects its target. <code class="inline">nearest</code>/<code class="inline">sweep</code>/<code class="inline">draw</code>/<code class="inline">brush</code> route through drivers.' },
+                { name: 'threshold', type: 'number', default: '0', desc: 'Proximity radius (px) for <code class="inline">nearest</code>-style picks.' },
+                { name: 'scope', type: "null | 'line'", default: 'null', desc: 'Universal, or line-scoped (needs a series-grouping mark).' },
+                { name: 'constrain', type: 'Constraint[]', default: '[]', desc: 'Per-edit constraint sugar; the canonical home is the spec’s <code class="inline">constraints</code> (the dataset’s invariants).' },
+                { name: 'guide', type: 'boolean', default: 'null', desc: 'Self-draw this edit’s guide (constraint bounds + snap ring).' },
+                { name: 'apply', type: '(ctx) => datum | data[] | undefined', default: '—', desc: 'The edit itself — maps the gesture to data through the same scale.' },
+            ],
+            returns:
+                'The <code class="inline">ctx</code> passed to <code class="inline">apply</code>/<code class="inline">when</code> carries ' +
+                '<code class="inline">{ datum, index, data, pointer, event, node, channels, scales, encoding }</code>.',
+        },
+        {
+            name: 'Edit catalogue',
+            summary:
+                'Universal edits import bare (<code class="inline">vibe.edit.drag</code>); line-scoped ones ' +
+                'live under <code class="inline">vibe.edit.line.*</code> so their scope shows in the name.',
+            options: [
+                { name: 'drag', type: 'drag', default: 'gestures', desc: 'Move — invert the pointer on each positional channel.' },
+                { name: 'resize', type: 'drag', default: 'gestures', desc: 'Magnitude — the radius from the mark centre inverts to a value (usually <code class="inline">size</code>).' },
+                { name: 'cycle', type: 'click', default: 'gestures', desc: 'Advance a discrete channel to its next domain value.' },
+                { name: 'custom', type: 'drag', default: 'gestures', desc: 'Escape hatch — an arbitrary <code class="inline">(datum, event, ctx) => …</code>.' },
+                { name: 'dragSpan / brushSpan', type: 'drag', default: 'bar', desc: 'Move / resize a two-endpoint span (x1·x2 or y1·y2).' },
+                { name: 'create / remove', type: 'click', default: 'existence', desc: 'Mint a datum from the pointer / delete the target.' },
+                { name: 'line.anchor / newSeries / draw / sweep / removeSeries', type: 'line', default: 'existence · sweep', desc: 'Author and reshape connected paths.' },
+            ],
+            returns: 'See the <b>Gestures</b>, <b>Sweep</b> and <b>Existence</b> pages for each factory’s own options.',
+        },
+    ],
     sections: [
         {
             id: 'drag',
@@ -26,13 +65,13 @@ export default {
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: "A", y: 20 }, { x: "B", y: 45 },
+    { x: "C", y: 30 }, { x: "D", y: 60 },
+  ],
   features: [
     bar({
       fill: "#4f46e5",
-      data: [
-        { x: "A", y: 20 }, { x: "B", y: 45 },
-        { x: "C", y: 30 }, { x: "D", y: 60 },
-      ],
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
@@ -59,10 +98,10 @@ export default {
 `mount(Elicit({
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
   features: [
     point({
       fill: "#ffffff", stroke: "#334155", strokeWidth: 2,
-      data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },
         y: { field: "y", type: "linear", domain: [0, 100] },

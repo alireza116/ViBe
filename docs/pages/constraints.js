@@ -3,18 +3,66 @@ export default {
     path: 'constraints.html',
     title: 'Constraints',
     lead:
-        'A constraint is a pure rule over the dataset, declared at feature level, so it holds no ' +
-        'matter which edit fired — for both create and drag. ' +
+        'A constraint is a pure rule over <b>the dataset</b>. It holds no matter which edit ' +
+        'fired it, or which <i>mark</i> that edit was declared on — so an invariant written ' +
+        'once gates a drag on a bar and a click on a dot alike. It can both <b>reject</b> a ' +
+        'proposal and <b>repair</b> it (return the corrected rows), and because every mark ' +
+        'reads those rows, a repair shows up everywhere on the next render. Declare it on the ' +
+        '<code class="inline">Elicit</code> spec (<code class="inline">constraints: [...]</code>); ' +
+        'declaring it on a mark is sugar — the engine promotes it to the dataset either way. ' +
         '<code class="inline">clamp</code> bounds a field, ' +
         '<code class="inline">maintainSum</code> fixes a total, ' +
         '<code class="inline">count</code> caps the size, and ' +
         '<code class="inline">unique</code> forbids duplicate keys.',
+    api: [
+        {
+            name: 'Built-in constraints',
+            summary:
+                'Import from <code class="inline">vibe.constraints</code> and pass on the ' +
+                '<code class="inline">Elicit</code> spec’s <code class="inline">constraints: [...]</code> ' +
+                '(a mark accepts them too, as sugar, and the engine promotes them). All are pure data ' +
+                'invariants — they run on every commit and never see pixels.',
+            signatures: [
+                'clamp({ min, max, field }) → Constraint',
+                'maintainSum({ targetSum, field }) → Constraint',
+                'count({ max, strategy }) → Constraint',
+                'unique({ field, max, strategy }) → Constraint',
+            ],
+            options: [
+                { name: 'clamp.min / max', type: 'number', default: 'field domain', desc: 'Bounds the active datum’s field to [min, max]; an omitted bound falls back to the field’s declared domain.' },
+                { name: 'clamp.field', type: 'string', default: "'y'", desc: 'The data field to bound.' },
+                { name: 'maintainSum.targetSum', type: 'number', default: '—', desc: 'Caps the field total — the touched datum can rise only to the remaining budget.' },
+                { name: 'count.max', type: 'number', default: '∞', desc: 'Maximum number of data rows.' },
+                { name: 'count.strategy', type: "'replace' | 'reject'", default: "'replace'", desc: 'Over the limit: drop the oldest (keep newest max) or refuse the interaction.' },
+                { name: 'unique.field', type: 'string | string[]', default: "'x'", desc: 'Category key(s); an array makes a composite (per-cell) key.' },
+                { name: 'unique.max / strategy', type: 'number / string', default: "1 / 'reject'", desc: 'How many may share a key, and whether to reject or replace the resident.' },
+            ],
+            returns: 'Each returns a <b>Constraint</b> — a reducer the engine runs on the proposed dataset after every edit.',
+        },
+        {
+            name: 'constraints.define(reducer, meta?)',
+            summary:
+                'Author your own (aliased <code class="inline">constraints.custom</code>). The reducer gets a ' +
+                'pure-data context and returns the shape that’s natural.',
+            signature: 'constraints.define(({ data, oldData, activeIndex, active, field, value, domain }) => result, meta?) → Constraint',
+            options: [
+                { name: 'return number', type: '—', default: '—', desc: 'The constrained value for the active datum’s <code class="inline">field</code>.' },
+                { name: 'return object', type: '—', default: '—', desc: 'Fields merged into the active datum.' },
+                { name: 'return array', type: '—', default: '—', desc: 'A full replacement dataset (cross-datum rules: sum, unique, count).' },
+                { name: 'return false', type: '—', default: '—', desc: 'Reject the whole interaction.' },
+                { name: 'return true / undefined', type: '—', default: '—', desc: 'Accept unchanged.' },
+                { name: 'meta.field', type: 'string', default: "'y'", desc: 'The field the invariant governs (for value rules + guides).' },
+                { name: 'meta.guide', type: 'function', default: '—', desc: 'Optional drawer so an edit with <code class="inline">guide:true</code> can show this constraint’s bounds.' },
+            ],
+            returns: 'A <b>Constraint</b>. The <code class="inline">ctx.active</code> is the datum the gesture touched; <code class="inline">domain</code> is that field’s declared data range.',
+        },
+    ],
     sections: [
         {
             id: 'sum',
             title: 'maintainSum — a total held at 100',
             intro:
-                'The sum rule is declared at feature level, so it holds for every edit. Bars give ' +
+                'The sum rule is a dataset invariant, so it holds for every edit from every mark. Bars give ' +
                 'way to keep the total at 100; guide: true draws the live bound.',
             examples: [
                 {
@@ -26,18 +74,19 @@ export default {
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   guides: [ guides.rule({ y: 25, label: "even split (25)" }) ],
+  data: ["A", "B", "C", "D"].map((c) => ({ x: c, y: 25 })),
+  // Invariants on the DATA — they gate every edit, from every mark.
+  constraints: [
+    clamp({ field: "y", min: 0 }),
+    maintainSum({ field: "y", targetSum: 100 }),
+  ],
   features: [
     bar({
       fill: "#6366f1",
-      data: ["A", "B", "C", "D"].map((c) => ({ x: c, y: 25 })),
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ guide: true }) },
       },
-      constraints: [
-        clamp({ field: "y", min: 0 }),
-        maintainSum({ field: "y", targetSum: 100 }),
-      ],
     }),
   ],
 }))`,
@@ -59,19 +108,19 @@ export default {
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: "A", y: 20 }, { x: "B", y: 45 },
+    { x: "C", y: 30 }, { x: "D", y: 60 },
+  ],
+  constraints: [ clamp({ field: "y", min: 0, max: 90 }) ],
   features: [
     bar({
       fill: "#2563eb",
-      data: [
-        { x: "A", y: 20 }, { x: "B", y: 45 },
-        { x: "C", y: 30 }, { x: "D", y: 60 },
-      ],
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100],
              edit: drag({ pick: "nearest", threshold: 40, guide: true }) },
       },
-      constraints: [ clamp({ field: "y", min: 0, max: 90 }) ],
     }),
   ],
 }))`,
@@ -93,16 +142,16 @@ export default {
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: "A", y: 40 }, { x: "C", y: 60 }],
+  constraints: [ unique({ field: "x", max: 1 }) ],
   features: [
     bar({
       fill: "#0d9488",
-      data: [{ x: "A", y: 40 }, { x: "C", y: 60 }],
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
       },
       edits: [ create({ defaults: { y: 20 } }) ],
-      constraints: [ unique({ field: "x", max: 1 }) ],
     }),
   ],
 }))`,
@@ -114,13 +163,14 @@ export default {
                     code:
 `mount(Elicit({
   width: 400, height: 320,
+  data: [
+    { x: "A", y: "Low", group: "alpha" },
+    { x: "B", y: "Mid", group: "beta" },
+    { x: "C", y: "High", group: "gamma" },
+  ],
+  constraints: [ unique({ field: ["x", "y"], max: 1 }) ],
   features: [
     point({
-      data: [
-        { x: "A", y: "Low", group: "alpha" },
-        { x: "B", y: "Mid", group: "beta" },
-        { x: "C", y: "High", group: "gamma" },
-      ],
       encoding: {
         x: { field: "x", domain: ["A", "B", "C"] },
         y: { field: "y", domain: ["Low", "Mid", "High"] },
@@ -133,7 +183,6 @@ export default {
         create({ defaults: { group: "alpha" } }),
         remove({ when: when.alt }),
       ],
-      constraints: [ unique({ field: ["x", "y"], max: 1 }) ],
     }),
   ],
 }))`,

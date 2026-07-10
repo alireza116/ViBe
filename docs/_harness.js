@@ -28,6 +28,7 @@ const depObj = {
     when: vibe.when,
     edit: vibe.edit,
     guides: vibe.guides,
+    widgets: vibe.widgets,
 };
 const depNames = Object.keys(depObj);
 const depVals = Object.values(depObj);
@@ -64,9 +65,76 @@ const el = (tag, props = {}, ...kids) => {
     return n;
 };
 
+// ---- API reference block (signature + option/channel tables + returns) ------
+// A page's optional `api` is an array of ENTRIES, one per factory documented on
+// the page (bar/barY/barX share one; the gestures page lists drag/resize/…). Each
+// entry renders a signature, an Options table, an optional Channels table, and a
+// Returns/Emits note — any field may be omitted. Descriptions accept inline HTML
+// (so `<code class="inline">…</code>` works), matching the lead/intro convention.
+const cell = (html) => { const td = el('td'); td.innerHTML = html == null ? '' : String(html); return td; };
+function apiTable(cols, rows) {
+    const table = el('table', { className: 'api-table' });
+    const thead = el('thead');
+    const htr = el('tr');
+    for (const c of cols) htr.append(el('th', { textContent: c }));
+    thead.append(htr);
+    const tbody = el('tbody');
+    for (const r of rows) {
+        const tr = el('tr');
+        for (const key of ['name', 'type', 'default', 'desc']) {
+            if (!cols.__keys.includes(key)) continue;
+            if (key === 'name') { const td = el('td'); td.append(el('code', { className: 'api-name', textContent: r.name })); tr.append(td); }
+            else if (key === 'type') { const td = el('td'); if (r.type != null) td.append(el('code', { className: 'api-type', textContent: r.type })); tr.append(td); }
+            else if (key === 'default') { const td = el('td'); if (r.default != null) td.append(el('code', { className: 'api-def', textContent: r.default })); tr.append(td); }
+            else tr.append(cell(r.desc));
+        }
+        tbody.append(tr);
+    }
+    table.append(thead, tbody);
+    return el('div', { className: 'api-table-wrap' }, table);
+}
+
+function renderApi(entries) {
+    const section = el('section', { id: 'api', className: 'api' });
+    section.append(el('h2', { className: 'section', textContent: 'API reference' }));
+    for (const entry of entries) {
+        const block = el('div', { className: 'api-entry' });
+        if (entry.name) block.append(el('h3', { className: 'api-heading', textContent: entry.name }));
+        if (entry.summary) block.append(el('p', { className: 'api-summary', innerHTML: entry.summary }));
+        const sigs = entry.signatures || (entry.signature ? [entry.signature] : []);
+        if (sigs.length) {
+            const codeEl = el('code');
+            codeEl.innerHTML = sigs.map(highlight).join('\n');
+            block.append(el('pre', { className: 'code sig' }, codeEl));
+        }
+        if (entry.options && entry.options.length) {
+            block.append(el('div', { className: 'api-label', textContent: 'Options' }));
+            const cols = ['Option', 'Type', 'Default', 'Description']; cols.__keys = ['name', 'type', 'default', 'desc'];
+            block.append(apiTable(cols, entry.options));
+        }
+        if (entry.channels && entry.channels.length) {
+            block.append(el('div', { className: 'api-label', textContent: 'Channels' }));
+            const cols = ['Channel', 'Type', 'Description']; cols.__keys = ['name', 'type', 'desc'];
+            block.append(apiTable(cols, entry.channels));
+        }
+        if (entry.returns) {
+            block.append(el('div', { className: 'api-label', textContent: 'Returns / emits' }));
+            block.append(el('p', { className: 'api-returns', innerHTML: entry.returns }));
+        }
+        section.append(block);
+    }
+    return section;
+}
+
 /**
  * Render one docs page.
- * @param {{ path: string, title: string, lead?: string, sections: Array<{
+ * @param {{ path: string, title: string, lead?: string,
+ *   api?: Array<{ name?: string, summary?: string, signature?: string,
+ *     signatures?: string[],
+ *     options?: Array<{ name: string, type?: string, default?: string, desc?: string }>,
+ *     channels?: Array<{ name: string, type?: string, desc?: string }>,
+ *     returns?: string }>,
+ *   sections: Array<{
  *   id: string, title: string, intro?: string, examples: Array<{
  *     title: string, blurb?: string, try?: string, code: string }> }> }} page
  */
@@ -93,8 +161,9 @@ export function renderPage(page) {
             if (active) a.className = 'active';
             g.append(a);
             // in-page section anchors, listed under the active page
-            if (active && page.sections.length > 1) {
+            if (active && (page.api || page.sections.length > 1)) {
                 const anchors = el('div', { className: 'anchors' });
+                if (page.api) anchors.append(el('a', { href: '#api', textContent: 'API reference' }));
                 for (const s of page.sections) {
                     anchors.append(el('a', { href: '#' + s.id, textContent: s.title }));
                 }
@@ -110,6 +179,8 @@ export function renderPage(page) {
     const main = el('main');
     main.append(el('h1', { textContent: page.title }));
     if (page.lead) main.append(el('p', { className: 'lead', innerHTML: page.lead }));
+
+    if (page.api && page.api.length) main.append(renderApi(page.api));
 
     for (const sec of page.sections) {
         const section = el('section', { id: sec.id });

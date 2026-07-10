@@ -4,9 +4,39 @@ export default {
     title: 'Bar',
     lead:
         'A rectangular mark: one axis is a categorical <b>band</b> (the position), the other ' +
-        'a linear <b>value</b> drawn as length from a baseline. <code class="inline">bar</code> ' +
-        'auto-detects orientation from which axis is a band; <code class="inline">barY</code> ' +
-        'forces vertical, <code class="inline">barX</code> horizontal.',
+        'a linear <b>value</b> drawn as length from a baseline (or an explicit start/end span ' +
+        'via x1/x2 or y1/y2). <code class="inline">bar</code> auto-detects orientation from ' +
+        'which axis is a band; <code class="inline">barY</code> forces vertical, ' +
+        '<code class="inline">barX</code> horizontal.',
+    api: [
+        {
+            name: 'bar(options) · barY(options) · barX(options)',
+            summary:
+                'Import from <code class="inline">vibe.plot</code>. <code class="inline">bar</code> ' +
+                'infers orientation from which axis is a band; <code class="inline">barY</code> forces ' +
+                'vertical, <code class="inline">barX</code> horizontal. All three share these options.',
+            signatures: [
+                'bar({ encoding, orientation, edits, constraints, id }) → Feature',
+                'barY(options) → Feature   // orientation: "vertical"',
+                'barX(options) → Feature   // orientation: "horizontal"',
+            ],
+            options: [
+                { name: 'encoding', type: 'object', default: '{}', desc: 'Channel map — one band axis (category) and one linear axis (value or a span). See <b>Channels</b>.' },
+                { name: 'orientation', type: "'vertical' | 'horizontal'", default: 'auto', desc: 'Override the inferred direction (bar only; barY/barX pin it).' },
+                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in <code class="inline">encoding[ch].edit</code>.' },
+                { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark (e.g. <code class="inline">maintainSum</code>).' },
+                { name: 'fill, stroke, …', type: 'style', default: "fill: 'steelblue'", desc: 'Style shorthands / channels (see the style surface on any mark).' },
+            ],
+            channels: [
+                { name: 'x', type: 'band | linear', desc: 'Category (band) or value (linear), depending on orientation.' },
+                { name: 'y', type: 'band | linear', desc: 'The other axis. The value axis carries <code class="inline">edit: drag()</code> to make bars draggable.' },
+                { name: 'y1 / y2', type: 'linear', desc: 'Explicit vertical span (barY) — draw between two values instead of from the baseline.' },
+                { name: 'x1 / x2', type: 'linear', desc: 'Explicit horizontal span (barX) — a Gantt-style range per category.' },
+                { name: 'fill, stroke, strokeWidth, opacity', type: 'const | field', desc: 'Standard style surface; a field tints through the ordinal palette.' },
+            ],
+            returns: 'A <b>feature</b> emitting one <code class="inline">rect</code> per datum, styled through the standard surface.',
+        },
+    ],
     sections: [
         {
             id: 'basics',
@@ -20,13 +50,13 @@ export default {
 `mount(Elicit({
   width: 380, height: 240,
   margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { cat: "A", n: 30 }, { cat: "B", n: 55 },
+    { cat: "C", n: 22 }, { cat: "D", n: 44 },
+  ],
   features: [
     bar({
       fill: "#4f46e5",
-      data: [
-        { cat: "A", n: 30 }, { cat: "B", n: 55 },
-        { cat: "C", n: 22 }, { cat: "D", n: 44 },
-      ],
       encoding: {
         x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "n",   type: "linear", domain: [0, 60] },
@@ -42,12 +72,12 @@ export default {
 `mount(Elicit({
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { cat: "A", n: 34, kind: "low" },  { cat: "B", n: 58, kind: "high" },
+    { cat: "C", n: 22, kind: "low" },  { cat: "D", n: 47, kind: "high" },
+  ],
   features: [
     bar({
-      data: [
-        { cat: "A", n: 34, kind: "low" },  { cat: "B", n: 58, kind: "high" },
-        { cat: "C", n: 22, kind: "low" },  { cat: "D", n: 47, kind: "high" },
-      ],
       encoding: {
         x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "n", type: "linear", domain: [0, 60] },
@@ -73,18 +103,88 @@ export default {
 `mount(Elicit({
   width: 380, height: 240,
   margins: { top: 14, right: 16, bottom: 26, left: 60 },
+  data: [
+    { region: "North", sales: 42 }, { region: "South", sales: 68 },
+    { region: "East", sales: 30 },  { region: "West", sales: 54 },
+  ],
   features: [
     barX({
       fill: "#0d9488",
-      data: [
-        { region: "North", sales: 42 }, { region: "South", sales: 68 },
-        { region: "East", sales: 30 },  { region: "West", sales: 54 },
-      ],
       encoding: {
         y: { field: "region", type: "band",
              domain: ["North", "South", "East", "West"] },
         x: { field: "sales", type: "linear", domain: [0, 80] },
       },
+    }),
+  ],
+}))`,
+                },
+            ],
+        },
+        {
+            id: 'span',
+            title: 'Explicit spans (x1/x2, y1/y2)',
+            intro:
+                'Instead of one value drawn from the baseline, give the value axis two explicit ' +
+                'endpoints — x1/x2 for barX, y1/y2 for barY — for a span that doesn’t start at ' +
+                'zero (a Gantt-style range per category). x1/x2 share the same resolved scale as x ' +
+                '(likewise y1/y2 with y), so only one needs an explicit type/domain.',
+            examples: [
+                {
+                    title: 'Years active per person',
+                    blurb: 'barX with x1/x2 spans; y is the category band.',
+                    code:
+`mount(Elicit({
+  width: 380, height: 220,
+  margins: { top: 14, right: 16, bottom: 26, left: 60 },
+  data: [
+    { person: "Ada",   start: 1830, end: 1852 },
+    { person: "Grace", start: 1930, end: 1992 },
+    { person: "Alan",  start: 1931, end: 1954 },
+  ],
+  features: [
+    barX({
+      fill: "#7b2d8b",
+      encoding: {
+        y: { field: "person", type: "band",
+             domain: ["Ada", "Grace", "Alan"] },
+        x1: { field: "start", type: "linear", domain: [1820, 2000] },
+        x2: { field: "end" },
+      },
+    }),
+  ],
+}))`,
+                },
+                {
+                    title: 'Brush: edges + body together',
+                    blurb:
+                        'brushSpan() combines both: grab near an edge to resize just that end, ' +
+                        'grab the body to move the whole span. Drag an edge past the other and ' +
+                        'release — the fields re-sort (start stays ≤ end) with no visual jump.',
+                    try: '<b>Drag</b> an edge to resize it, the body to move the whole bar, ' +
+                        'or drag one edge past the other to see it flip.',
+                    code:
+`mount(Elicit({
+  width: 380, height: 220,
+  margins: { top: 14, right: 16, bottom: 26, left: 60 },
+  data: [
+    { person: "Ada",   start: 1830, end: 1852 },
+    { person: "Grace", start: 1930, end: 1992 },
+    { person: "Alan",  start: 1931, end: 1954 },
+  ],
+  features: [
+    barX({
+      fill: "#2563eb",
+      encoding: {
+        y: { field: "person", type: "band",
+             domain: ["Ada", "Grace", "Alan"] },
+        x1: { field: "start", type: "linear", domain: [1820, 2000] },
+        x2: { field: "end" },
+      },
+      edits: [
+        brushSpan({ channels: ["x1", "x2"], threshold: 40,
+                    edgeInset: 10, guide: true }),
+      ],
     }),
   ],
 }))`,
@@ -106,13 +206,13 @@ export default {
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: "A", y: 20 }, { x: "B", y: 45 },
+    { x: "C", y: 30 }, { x: "D", y: 60 },
+  ],
   features: [
     bar({
       fill: "#4f46e5",
-      data: [
-        { x: "A", y: 20 }, { x: "B", y: 45 },
-        { x: "C", y: 30 }, { x: "D", y: 60 },
-      ],
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
@@ -129,13 +229,13 @@ export default {
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: "A", y: 20 }, { x: "B", y: 45 },
+    { x: "C", y: 30 }, { x: "D", y: 60 },
+  ],
   features: [
     bar({
       fill: "#2563eb",
-      data: [
-        { x: "A", y: 20 }, { x: "B", y: 45 },
-        { x: "C", y: 30 }, { x: "D", y: 60 },
-      ],
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100],

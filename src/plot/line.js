@@ -40,12 +40,10 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
     // encoding so line reads style the same way every mark does.
     const opts = normalizeMarkOptions(options);
     const {
-        data = [],
         encoding = {},
         id,
         edits,
         constraints,
-        onChange,
         curve = 'linear',
         handles = true,
         handleRadius = 4,
@@ -65,11 +63,9 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
 
     return {
         id,
-        data,
         encoding,
         edits,
         constraints,
-        onChange,
         // A line's domain axis is continuous (a point per datum, no band width).
         categoricalScale: 'point',
         xKey,

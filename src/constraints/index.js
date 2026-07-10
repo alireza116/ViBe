@@ -4,4 +4,5 @@ export { clamp } from './clamp.js';
 export { maintainSum } from './maintainSum.js';
 export { count } from './count.js';
 export { unique } from './unique.js';
+export { snap } from './snap.js';
 

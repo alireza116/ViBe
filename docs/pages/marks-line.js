@@ -13,6 +13,42 @@ export default {
         '<code class="inline">lineY</code>/<code class="inline">lineX</code> fix the value axis; ' +
         '<code class="inline">connectedScatter</code>/<code class="inline">path</code> default ' +
         'to order: "sequence".',
+    api: [
+        {
+            name: 'line · lineY · lineX · connectedScatter · path',
+            summary:
+                'Import from <code class="inline">vibe.plot</code>. One non-interactive connector path ' +
+                'per series, drawn under one draggable <code class="inline">circle</code> handle per datum. ' +
+                '<code class="inline">lineY</code>/<code class="inline">lineX</code> pin the value axis; ' +
+                '<code class="inline">connectedScatter</code> and <code class="inline">path</code> default to ' +
+                '<code class="inline">order:"sequence"</code>.',
+            signatures: [
+                'line({ encoding, series, order, curve, handles, handleRadius, samples, edits }) → Feature',
+                'lineY(options) → Feature   // value on y (time series)',
+                'connectedScatter(options) → Feature   // order: "sequence"',
+            ],
+            options: [
+                { name: 'encoding', type: 'object', default: '{}', desc: 'Channel map — see <b>Channels</b>.' },
+                { name: 'series', type: 'string', default: 'auto', desc: 'Field grouping points into lines (alias <code class="inline">z</code>). Defaults to the stroke/color field so a coloured chart auto-groups.' },
+                { name: 'order', type: "'domain' | 'sequence' | field", default: "'domain'", desc: 'How each series is connected: sorted by the domain axis, as-drawn, or by a named field.' },
+                { name: 'curve', type: 'string', default: "'linear'", desc: 'Interpolation between handles (e.g. <code class="inline">"catmullRom"</code>, <code class="inline">"step"</code>).' },
+                { name: 'handles', type: 'boolean', default: 'true', desc: 'Show the per-datum handles. When false they stay (for hit-testing) but render invisible.' },
+                { name: 'handleRadius', type: 'number', default: '4', desc: 'Pixel radius of each handle.' },
+                { name: 'samples', type: 'number | any[]', default: 'ticks', desc: 'Domain grid used by line authoring (<code class="inline">newSeries</code>/<code class="inline">draw</code>).' },
+                { name: 'edits, constraints, id', type: '—', default: '—', desc: 'As on every mark. Line authoring edits live under <code class="inline">edit.line.*</code>.' },
+            ],
+            channels: [
+                { name: 'x', type: 'linear | band | time', desc: 'Domain or value axis (per variant / inference).' },
+                { name: 'y', type: 'linear | band | time', desc: 'The other axis; the value axis carries the handle edit.' },
+                { name: 'stroke / color', type: 'const | field', desc: 'Line colour; a field here also becomes the default <code class="inline">series</code> grouping.' },
+                { name: 'strokeWidth, opacity', type: 'const | field', desc: 'Standard style surface for the connector + handles.' },
+            ],
+            returns:
+                'A <b>feature</b> with <code class="inline">supportsSeries: true</code>. Emits one ' +
+                '<code class="inline">path</code> per series (<code class="inline">pointerEvents:"none"</code>) plus one ' +
+                'indexed <code class="inline">circle</code> handle per datum, each tagged with its <code class="inline">series</code>.',
+        },
+    ],
     sections: [
         {
             id: 'basics',
@@ -28,13 +64,13 @@ export default {
 `mount(Elicit({
   width: 400, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 0, y: 40 }, { x: 1, y: 62 }, { x: 2, y: 48 },
+    { x: 3, y: 78 }, { x: 4, y: 60 }, { x: 5, y: 84 },
+  ],
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom",
-      data: [
-        { x: 0, y: 40 }, { x: 1, y: 62 }, { x: 2, y: 48 },
-        { x: 3, y: 78 }, { x: 4, y: 60 }, { x: 5, y: 84 },
-      ],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 5] },
         y: { field: "y", type: "linear", domain: [0, 100] },
@@ -61,13 +97,13 @@ export default {
 `mount(Elicit({
   width: 420, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
+    { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
+  ],
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom",
-      data: [
-        { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
-        { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
-      ],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 7] },
         y: { field: "y", type: "linear", domain: [0, 100],
@@ -95,14 +131,14 @@ export default {
 `mount(Elicit({
   width: 400, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
+    { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
+  ],
   features: [
     lineY({
       stroke: "#7c3aed", strokeWidth: 3, curve: "catmullRom",
       handles: false,   // hide the anchor dots (still editable)
-      data: [
-        { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
-        { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
-      ],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 7] },
         y: { field: "y", type: "linear", domain: [0, 100],
@@ -130,13 +166,13 @@ export default {
 `mount(Elicit({
   width: 420, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { g: "plan",   x: 0, y: 30 }, { g: "plan",   x: 1, y: 45 }, { g: "plan",   x: 2, y: 40 }, { g: "plan",   x: 3, y: 60 },
+    { g: "actual", x: 0, y: 70 }, { g: "actual", x: 1, y: 62 }, { g: "actual", x: 2, y: 75 }, { g: "actual", x: 3, y: 68 },
+  ],
   features: [
     lineY({
       strokeWidth: 3, curve: "catmullRom",
-      data: [
-        { g: "plan",   x: 0, y: 30 }, { g: "plan",   x: 1, y: 45 }, { g: "plan",   x: 2, y: 40 }, { g: "plan",   x: 3, y: 60 },
-        { g: "actual", x: 0, y: 70 }, { g: "actual", x: 1, y: 62 }, { g: "actual", x: 2, y: 75 }, { g: "actual", x: 3, y: 68 },
-      ],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 3] },
         y: { field: "y", type: "linear", domain: [0, 100],
@@ -168,13 +204,13 @@ export default {
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   schema: { s: {}, x: {}, y: {} },
+  data: [
+    { s: 0, x: 20, y: 30 }, { s: 0, x: 45, y: 70 },
+    { s: 0, x: 70, y: 40 }, { s: 0, x: 85, y: 80 },
+  ],
   features: [
     connectedScatter({
       stroke: "#0d9488", strokeWidth: 3, series: "s",
-      data: [
-        { s: 0, x: 20, y: 30 }, { s: 0, x: 45, y: 70 },
-        { s: 0, x: 70, y: 40 }, { s: 0, x: 85, y: 80 },
-      ],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 100] },
         y: { field: "y", type: "linear", domain: [0, 100] },
@@ -206,10 +242,10 @@ export default {
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   schema: { s: {}, x: {}, y: {} },
+  data: [],
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", series: "s",
-      data: [],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 10] },
         y: { field: "y", type: "linear", domain: [0, 100],
@@ -242,10 +278,10 @@ export default {
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   schema: { s: {}, x: {}, y: {} },
+  data: [],
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", series: "s",
-      data: [],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 10] },
         y: { field: "y", type: "linear", domain: [0, 100] },

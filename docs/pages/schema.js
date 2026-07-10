@@ -7,6 +7,24 @@ export default {
         'measurement type (quantitative / categorical / ordinal / temporal), range, and ' +
         'creation default. It is the source of truth for a field’s scale, so a chart resolves ' +
         'scales, draws axes, and mints data with <b>zero starter data</b>.',
+    api: [
+        {
+            name: 'schema — Record<field, FieldSchema>',
+            summary:
+                'Declared on a feature (or on <code class="inline">Elicit</code>). Each field maps to a spec ' +
+                'that fixes its measurement type, range and creation default — the source of truth a ' +
+                'scale and a minted datum both read.',
+            signature: 'schema: { [field]: { type, domain?, default? } }',
+            options: [
+                { name: 'type', type: "'quantitative'|'categorical'|'ordinal'|'temporal'", default: '—', desc: 'The field’s measurement type — picks the scale family (quantitative→linear, categorical→band/ordinal, temporal→time).' },
+                { name: 'domain', type: 'any[]', default: '—', desc: 'The field’s data range or category list; feeds the resolved scale and the axis.' },
+                { name: 'default', type: 'any', default: 'null', desc: 'The value a newly-created datum gets for this field (<code class="inline">null</code> = present but unset, editable later).' },
+            ],
+            returns:
+                'With a schema, a feature resolves scales and draws axes from <b>no starter data</b>; ' +
+                '<code class="inline">create</code> seeds every declared field before the pointer places the positional ones.',
+        },
+    ],
     sections: [
         {
             id: 'empty',
@@ -30,10 +48,10 @@ export default {
     class:  { type: "categorical",  domain: ["A", "B", "C"] },
   },
   axes: { x: { title: "age" }, y: { title: "belief" } },
+  data: [],   // start from nothing,
+  onChange: (d) => console.log("elicited", d),
   features: [
     point({
-      onChange: (d) => console.log("elicited", d),
-      data: [],   // start from nothing
       encoding: {
         x: { field: "age" }, y: { field: "belief" },
         fill: { field: "class" },
@@ -68,9 +86,9 @@ export default {
     belief: { type: "quantitative", domain: [0, 1], default: 0.5 },
   },
   axes: { x: { title: "when" }, y: { title: "belief" } },
+  data: [],
   features: [
     point({
-      data: [],
       encoding: {
         x: { field: "when" }, y: { field: "belief" },
         size: { value: 7 }, fill: { value: "#0d9488" },

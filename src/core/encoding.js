@@ -36,6 +36,23 @@ export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
 const COLOR_CHANNELS = new Set(['color', 'fill', 'stroke']);
 const OPACITY_CHANNELS = new Set(['opacity', 'fillOpacity', 'strokeOpacity']);
 
+// Position family: x1/x2 and y1/y2 are SPAN ENDPOINTS on the x/y axis, not their
+// own axes (Observable Plot's model — a bar's x1/x2 are both "x" units). The one
+// place a channel name resolves to the axis it shares a scale with, so x1/x2/y1/y2
+// union into the same domain/range/scale as x/y instead of getting their own.
+/** @type {Record<string, 'x' | 'y'>} */
+const AXIS_OF = { x: 'x', x1: 'x', x2: 'x', y: 'y', y1: 'y', y2: 'y' };
+
+/**
+ * The positional axis a channel shares its scale with ('x' or 'y'), or
+ * undefined for a non-positional channel (color, size, opacity, ...).
+ * @param {string} channelName
+ * @returns {'x' | 'y' | undefined}
+ */
+export function axisOf(channelName) {
+    return AXIS_OF[channelName];
+}
+
 // ---------------------------------------------------------------------------
 // Inference (value-based, so both the per-mark resolver here and the engine's
 // cross-mark resolver can share it). `values` is the flat list of a field's
@@ -251,13 +268,13 @@ export function datumFromPointer(enc, { x, y }) {
  * @returns {number | undefined}
  */
 export function visualForChannel(channelName, pointer, center) {
-    switch (channelName) {
-        case 'x': return pointer.x;
-        case 'y': return pointer.y;
-        case 'size': // radius = distance from centre -> a resize gesture
-            return center ? Math.hypot(pointer.x - center.cx, pointer.y - center.cy) : undefined;
-        default: return undefined; // channel isn't spatially adjustable this way
+    const axis = axisOf(channelName);
+    if (axis === 'x') return pointer.x;
+    if (axis === 'y') return pointer.y;
+    if (channelName === 'size') { // radius = distance from centre -> a resize gesture
+        return center ? Math.hypot(pointer.x - center.cx, pointer.y - center.cy) : undefined;
     }
+    return undefined; // channel isn't spatially adjustable this way
 }
 
 /**

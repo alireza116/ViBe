@@ -15,6 +15,11 @@
 // specs stay serializable and introspectable by the edit/elicitation layer.
 //
 // ── The mark contract ───────────────────────────────────────────────────────
+// A mark NEVER owns data. `Elicit` owns the chart's one dataset; a mark is a view
+// over it that encodes some columns and, where a channel carries an `edit`, writes
+// them back. The engine hands the current rows to build() — so there is no `data`
+// option and no `onChange` (both live on the Elicit spec).
+//
 // A mark factory returns a plain feature object the engine consumes. Required:
 //   build(currentData, scales, width, height) -> FeatureNode[]
 //     the one method — emit scene nodes ({ type: 'circle'|'rect'|'line'|'path'|
@@ -23,7 +28,7 @@
 //   encoding                 the channel map (also the source scales resolve from)
 //   categoricalScale         'band' (bar/tick: interval) | 'point' (dot/line: tick)
 //   xKey / yKey              value field names the edit/constraint layer reads back
-//   edits / constraints / onChange / id
+//   edits / constraints / id     (constraints are promoted to the dataset's set)
 //   seriesKey / order / supportsSeries   line-family grouping (see plot/line.js)
 // Every data mark should resolve a datum -> pixel through encodeChannel (band+value
 // marks use it for the value axis and band-geometry helpers for the category axis),

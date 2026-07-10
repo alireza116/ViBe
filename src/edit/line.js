@@ -9,7 +9,7 @@
 //   draw      — author a line by dragging (drag), edit-aware
 //   sweep     — you-draw-it: repaint each point the pointer crosses (drag)
 
-import { makeEdit, schemaDefaults, nextSeriesKey, numOf } from './shared.js';
+import { makeEdit, schemaDefaults, nextSeriesKey, numOf, invertChannel } from './shared.js';
 import { nearestSeries, nearestMark, nearestMarkOnAxis, DEFAULT_PICK_THRESHOLD } from './pick.js';
 import { resolveSamples } from '../core/samples.js';
 import { drag } from './basic.js';
@@ -61,10 +61,9 @@ export function anchor(options = {}) {
             if (sField) datum[sField] = seriesVal;
             let placed = false;
             for (const ch of ctx.channels) {
-                const visual = ch.name === 'x' ? ctx.pointer.x
-                    : ch.name === 'y' ? ctx.pointer.y : undefined;
-                if (visual === undefined || !ch.scale || !ch.scale.invertible) continue;
-                datum[ch.field] = ch.scale.invertValue(visual);
+                const v = invertChannel(ch, ctx.pointer);
+                if (v === undefined) continue;
+                datum[ch.field] = v;
                 placed = true;
             }
             if (!placed) return undefined;
@@ -189,12 +188,11 @@ export function draw(options = {}) {
                 if (idx == null || ctx.data[idx] == null) return undefined;
                 const datum = { ...ctx.data[idx] };
                 for (const ch of ctx.channels) {
-                    const visual = ch.name === 'x' ? ctx.pointer.x : ch.name === 'y' ? ctx.pointer.y : undefined;
-                    if (visual === undefined || !ch.scale || !ch.scale.invertible) continue;
                     // A domain line keeps its column fixed — paint only the value axis;
                     // a freehand line moves the whole point (both axes).
                     if (!freehandLine && ch.name !== value) continue;
-                    datum[ch.field] = ch.scale.invertValue(visual);
+                    const v = invertChannel(ch, ctx.pointer);
+                    if (v !== undefined) datum[ch.field] = v;
                 }
                 return ctx.data.map((d, i) => (i === idx ? datum : d));
             }
@@ -210,9 +208,9 @@ export function draw(options = {}) {
                 if (sField) datum[sField] = seriesVal;
                 let placed = false;
                 for (const ch of ctx.channels) {
-                    const visual = ch.name === 'x' ? px : ch.name === 'y' ? py : undefined;
-                    if (visual === undefined || !ch.scale || !ch.scale.invertible) continue;
-                    datum[ch.field] = ch.scale.invertValue(visual);
+                    const v = invertChannel(ch, ctx.pointer);
+                    if (v === undefined) continue;
+                    datum[ch.field] = v;
                     placed = true;
                 }
                 if (!placed) return undefined;

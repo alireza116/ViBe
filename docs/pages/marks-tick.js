@@ -8,6 +8,34 @@ export default {
         '(like a bar without the fill); over a full continuous extent it reads as a rug / strip. ' +
         '<code class="inline">inset</code> shrinks each end, <code class="inline">length</code> ' +
         'fixes a centered length.',
+    api: [
+        {
+            name: 'tick(options) · tickY(options) · tickX(options)',
+            summary:
+                'Import from <code class="inline">vibe.plot</code>. <code class="inline">tick</code> ' +
+                'infers the value axis from which axis is a band; <code class="inline">tickY</code> ' +
+                'marks a value on y (spans the x band), <code class="inline">tickX</code> on x.',
+            signatures: [
+                'tick({ encoding, inset, length, edits, constraints, id }) → Feature',
+                'tickY(options) → Feature   // value on y',
+                'tickX(options) → Feature   // value on x',
+            ],
+            options: [
+                { name: 'encoding', type: 'object', default: '{}', desc: 'One band axis (span) + one linear axis (the marked value). See <b>Channels</b>.' },
+                { name: 'inset', type: 'number', default: '0', desc: 'Pixels to shrink each end of the span.' },
+                { name: 'length', type: 'number', default: '—', desc: 'Explicit centered span length in pixels (overrides the full band span).' },
+                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in the encoding.' },
+                { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark.' },
+                { name: 'stroke, strokeWidth, …', type: 'style', default: "stroke:'steelblue'", desc: 'Style shorthands / channels.' },
+            ],
+            channels: [
+                { name: 'x', type: 'band | linear', desc: 'Category (band) or value (linear), per orientation.' },
+                { name: 'y', type: 'band | linear', desc: 'The other axis; the value axis carries <code class="inline">edit: drag()</code> to drag the tick.' },
+                { name: 'stroke, strokeWidth, opacity', type: 'const | field', desc: 'Standard style surface.' },
+            ],
+            returns: 'A <b>feature</b> emitting one <code class="inline">line</code> per datum (a bar with zero thickness).',
+        },
+    ],
     sections: [
         {
             id: 'value-marker',
@@ -23,13 +51,13 @@ export default {
 `mount(Elicit({
   width: 380, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: "A", y: 20 }, { x: "B", y: 45 },
+    { x: "C", y: 30 }, { x: "D", y: 60 },
+  ],
   features: [
     tickY({
       stroke: "#4f46e5", strokeWidth: 3,
-      data: [
-        { x: "A", y: 20 }, { x: "B", y: 45 },
-        { x: "C", y: 30 }, { x: "D", y: 60 },
-      ],
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100] },
@@ -46,13 +74,13 @@ export default {
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: "A", y: 20 }, { x: "B", y: 45 },
+    { x: "C", y: 30 }, { x: "D", y: 60 },
+  ],
   features: [
     tickY({
       stroke: "#4f46e5", strokeWidth: 3,
-      data: [
-        { x: "A", y: 20 }, { x: "B", y: 45 },
-        { x: "C", y: 30 }, { x: "D", y: 60 },
-      ],
       encoding: {
         x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
         y: { field: "y", type: "linear", domain: [0, 100],
@@ -78,13 +106,13 @@ export default {
 `mount(Elicit({
   width: 400, height: 200,
   margins: { top: 16, right: 16, bottom: 28, left: 16 },
+  data: [
+    { v: 12 }, { v: 18 }, { v: 21 }, { v: 34 }, { v: 39 },
+    { v: 41 }, { v: 55 }, { v: 58 }, { v: 63 }, { v: 71 }, { v: 84 },
+  ],
   features: [
     tickX({
       stroke: "#0d9488", strokeWidth: 2, inset: 10,
-      data: [
-        { v: 12 }, { v: 18 }, { v: 21 }, { v: 34 }, { v: 39 },
-        { v: 41 }, { v: 55 }, { v: 58 }, { v: 63 }, { v: 71 }, { v: 84 },
-      ],
       encoding: {
         x: { field: "v", type: "linear", domain: [0, 100] },
       },

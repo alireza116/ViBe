@@ -8,6 +8,35 @@ export default {
         '“you draw it” interaction. It is sugar over ' +
         '<code class="inline">drag({ pick: "sweep", guide: true })</code>, and it is ' +
         'series-scoped: it locks onto the nearest line at drag-start and paints only that one.',
+    api: [
+        {
+            name: 'edit.line.sweep(options)',
+            summary:
+                'Line-scoped (<code class="inline">scope: "line"</code>). Sugar over ' +
+                '<code class="inline">drag({ pick: "sweep", guide: true })</code>: a drag repaints the value ' +
+                'of each point the pointer crosses, locked to one series.',
+            signature: 'edit.line.sweep(options?) → Edit',
+            options: [
+                { name: 'options', type: 'object', default: '{}', desc: 'Any shared Edit fields — <code class="inline">channels</code>, <code class="inline">when</code>, <code class="inline">threshold</code>, <code class="inline">constrain</code>. <code class="inline">pick</code>/<code class="inline">guide</code>/<code class="inline">scope</code> are preset.' },
+            ],
+            returns: 'An <b>Edit</b> the engine routes through the <code class="inline">sweep</code> driver (locks the nearest line at drag-start).',
+        },
+        {
+            name: 'edit.line.draw(options)',
+            summary:
+                'The authoring counterpart: near an existing line it edits (sweeps) it; in empty ' +
+                'space it draws a new one — you-draw-it for domain lines, freehand for <code class="inline">order:"sequence"</code>.',
+            signature: 'edit.line.draw({ domain, value, samples, minDist, threshold, into }) → Edit',
+            options: [
+                { name: 'domain / value', type: "'x' | 'y'", default: "'x' / 'y'", desc: 'The positional axes.' },
+                { name: 'samples', type: 'number | any[]', default: 'ticks', desc: 'Domain grid the you-draw-it upsert snaps to.' },
+                { name: 'minDist', type: 'number', default: '8', desc: 'Freehand pointer-sampling distance in pixels.' },
+                { name: 'threshold', type: 'number', default: '40', desc: 'Proximity radius for the edit-vs-draw decision.' },
+                { name: 'into', type: "'nearest' | 'new'", default: "'nearest'", desc: 'Near edits / far draws, or always draw a fresh line.' },
+            ],
+            returns: 'An <b>Edit</b> routed through the <code class="inline">draw</code> driver (owns the per-drag mode lock).',
+        },
+    ],
     sections: [
         {
             id: 'sweep',
@@ -22,13 +51,13 @@ export default {
 `mount(Elicit({
   width: 420, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
+    { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
+  ],
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom",
-      data: [
-        { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
-        { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
-      ],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 7] },
         y: { field: "y", type: "linear", domain: [0, 100],
@@ -55,13 +84,13 @@ export default {
 `mount(Elicit({
   width: 420, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { g: "plan",   x: 0, y: 30 }, { g: "plan",   x: 1, y: 45 }, { g: "plan",   x: 2, y: 40 }, { g: "plan",   x: 3, y: 60 },
+    { g: "actual", x: 0, y: 70 }, { g: "actual", x: 1, y: 62 }, { g: "actual", x: 2, y: 75 }, { g: "actual", x: 3, y: 68 },
+  ],
   features: [
     lineY({
       strokeWidth: 3, curve: "catmullRom",
-      data: [
-        { g: "plan",   x: 0, y: 30 }, { g: "plan",   x: 1, y: 45 }, { g: "plan",   x: 2, y: 40 }, { g: "plan",   x: 3, y: 60 },
-        { g: "actual", x: 0, y: 70 }, { g: "actual", x: 1, y: 62 }, { g: "actual", x: 2, y: 75 }, { g: "actual", x: 3, y: 68 },
-      ],
       encoding: {
         x: { field: "x", type: "linear", domain: [0, 3] },
         y: { field: "y", type: "linear", domain: [0, 100],

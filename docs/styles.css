@@ -135,6 +135,64 @@ a { color: var(--accent); }
   nav { display: none; }
 }
 
+/* --- API reference block --- */
+section.api { scroll-margin-top: 1rem; }
+.api-entry { margin: 0.9rem 0 1.6rem; }
+.api-entry + .api-entry { padding-top: 1.2rem; border-top: 1px dashed var(--line); }
+.api-heading {
+  font-size: 0.95rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin: 0 0 0.35rem;
+  color: var(--ink);
+}
+.api-summary { color: var(--muted); font-size: 0.88rem; max-width: 78ch; margin: 0 0 0.6rem; }
+.code.sig {
+  max-height: none;
+  flex: none;
+  width: 100%;
+  margin: 0 0 0.9rem;
+  white-space: pre;
+}
+.api-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #97a1ad;
+  font-weight: 700;
+  margin: 0.9rem 0 0.35rem;
+}
+.api-table-wrap { overflow-x: auto; }
+table.api-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.82rem;
+  margin-bottom: 0.4rem;
+}
+table.api-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #97a1ad;
+  font-weight: 700;
+  padding: 0.3rem 0.7rem 0.3rem 0;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+table.api-table td {
+  padding: 0.4rem 0.7rem 0.4rem 0;
+  border-bottom: 1px solid #f0f2f4;
+  vertical-align: top;
+  color: var(--muted);
+}
+table.api-table td:first-child, table.api-table th:first-child { padding-left: 0; }
+code.api-name { font-weight: 600; color: var(--ink); white-space: nowrap; }
+code.api-type { color: var(--accent); white-space: nowrap; }
+code.api-def { color: #b45309; white-space: nowrap; }
+table.api-table code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+table.api-table td code.inline { background: #eef0f3; padding: 0.02rem 0.28rem; border-radius: 4px; }
+.api-returns { color: var(--muted); font-size: 0.88rem; max-width: 78ch; margin: 0.2rem 0 0; }
+
 /* --- syntax highlight --- */
 .code .c { color: #64748b; font-style: italic; }
 .code .s { color: #86efac; }
