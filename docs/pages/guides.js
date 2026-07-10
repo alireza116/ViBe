@@ -3,8 +3,12 @@ export default {
     path: 'guides.html',
     title: 'Guides',
     lead:
-        'Guides are non-interactive annotations, rebuilt every render so they track the live ' +
-        'data. <code class="inline">guides.rule</code> draws a reference line at a data value, ' +
+        'A guide is a graphical mark that isn’t bound to a row the way a plot mark is: it draws an ' +
+        'annotation. But it is still allowed to <b>depend on the data</b> — every guide option may ' +
+        'be a literal <i>or</i> a function of the guide context ' +
+        '(<code class="inline">{ data, scales, features, ui, width, height, stage }</code>), so a ' +
+        'mean line is one line of spec. Guides rebuild every render and never capture a gesture. ' +
+        '<code class="inline">guides.rule</code> draws a reference line at a data value, ' +
         '<code class="inline">guides.region</code> shades a band between two values, and ' +
         '<code class="inline">guides.proximity</code> visualizes what a nearest-pick edit has ' +
         'selected. (An edit’s own constraint bounds draw automatically via ' +
@@ -20,12 +24,16 @@ export default {
                 'guides.rule({ x?, y?, stroke, strokeDasharray, label }) → Guide',
                 'guides.region({ x?, y?, fill, opacity }) → Guide',
                 'guides.proximity({ target, color }) → Guide',
+                'guides.custom((ctx) => FeatureNode[]) → Guide',
+                '',
+                '// any option may be a function of the guide context:',
+                'guides.rule({ y: ({ data }) => d3.mean(data, (d) => d.y), label: "mean" })',
             ],
             options: [
-                { name: 'rule.x / y', type: 'any', default: '—', desc: 'The value to draw the reference line at (a number or a category).' },
-                { name: 'rule.label', type: 'string', default: '—', desc: 'Optional text label near the line.' },
+                { name: 'rule.x / y', type: 'any | (ctx) => any', default: '—', desc: 'The value to draw the reference line at (a number, a category, or a function of the data).' },
+                { name: 'rule.label', type: 'string | (ctx) => string', default: '—', desc: 'Optional text label near the line.' },
                 { name: 'rule.stroke / strokeDasharray', type: 'style', default: "#64748b / '5 4'", desc: 'Line colour and dash pattern.' },
-                { name: 'region.x / y', type: '[a, b]', default: '—', desc: 'The two values to shade between on that axis.' },
+                { name: 'region.x / y', type: '[a, b] | (ctx) => [a, b]', default: '—', desc: 'The two values to shade between on that axis.' },
                 { name: 'region.fill / opacity', type: 'style', default: '#64748b / 0.1', desc: 'Band fill and opacity.' },
                 { name: 'proximity.target', type: 'string', default: '—', desc: 'The feature id whose nearest-pick selection to visualize (ring + highlight).' },
                 { name: 'proximity.color', type: 'string', default: 'effect', desc: 'Override the highlight colour (else the effects layer’s).' },
@@ -55,13 +63,17 @@ export default {
     guides.rule({ y: 50, label: "target 50" }),
   ],
   data: [{ x: 20, y: 30 }, { x: 50, y: 55 }, { x: 80, y: 70 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#0d9488",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 9 },
+      size: 9,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [ drag({ channels: ["x", "y"] }) ],
     }),
@@ -72,32 +84,51 @@ export default {
         },
         {
             id: 'live',
-            title: 'Guides follow the data',
+            title: 'Guides derived from the data',
             intro:
-                'Because guides rebuild each render, a rule pinned to a data value stays correct as ' +
-                'edits change the dataset — here the even-split line under a maintainSum total.',
+                'A guide option can be a function of the guide context, so an annotation can be ' +
+                'computed from the rows it annotates. Here one rule is a fixed target and the other ' +
+                'is the running <b>mean</b> — recomputed on every commit, because guides rebuild each ' +
+                'render. The band tracks the spread the same way.',
             examples: [
                 {
-                    title: 'A rule under a live total',
-                    blurb: 'The bars keep a total of 100; the rule marks the even split as they move.',
-                    try: '<b>Drag</b> any bar — the others compensate, the rule holds.',
+                    title: 'A mean line that chases the bars',
+                    blurb: 'guides.rule({ y: ({ data }) => d3.mean(data, (d) => d.y) }) — the annotation reads the dataset.',
+                    try: '<b>Drag</b> a bar — the fixed target holds, the mean line and the band follow.',
                     code:
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  guides: [ guides.rule({ y: 25, label: "even split (25)" }) ],
-  data: ["A", "B", "C", "D"].map((c) => ({ x: c, y: 25 })),
+  guides: [
+    // A literal: a fixed reference.
+    guides.rule({ y: 50, label: "target 50" }),
+    // A function of the context: recomputed from the live rows every render.
+    guides.region({
+      y: ({ data }) => [d3.min(data, (d) => d.y), d3.max(data, (d) => d.y)],
+      fill: "#6366f1", opacity: 0.10,
+    }),
+    guides.rule({
+      y: ({ data }) => d3.mean(data, (d) => d.y),
+      label: "mean",
+      stroke: "#e4572e",
+    }),
+  ],
+  schema: {
+    x: { type: "categorical",  domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  data: [
+    { x: "A", y: 30 }, { x: "B", y: 55 },
+    { x: "C", y: 45 }, { x: "D", y: 70 },
+  ],
+  constraints: [ clamp({ field: "y", min: 0, max: 100 }) ],
   features: [
     bar({
       fill: "#6366f1",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ guide: true }) },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y", edit: drag() },
       },
-      constraints: [
-        clamp({ field: "y", min: 0 }),
-        maintainSum({ field: "y", targetSum: 100 }),
-      ],
     }),
   ],
 }))`,

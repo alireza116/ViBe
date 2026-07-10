@@ -70,13 +70,18 @@ export default {
   data: [
     { x: 25, y: 50, mag: 3 }, { x: 55, y: 50, mag: 7 }, { x: 82, y: 50, mag: 11 },
   ],
+  schema: {
+    x:   { type: "quantitative", domain: [0, 100] },
+    y:   { type: "quantitative", domain: [0, 100] },
+    mag: { domain: [0, 14] },
+  },
   features: [
     point({
       fill: "#ede9fe", stroke: "#7c3aed", strokeWidth: 2,
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { field: "mag", domain: [0, 14], edit: resize() },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        size: { field: "mag", edit: resize() },
       },
       constraints: [ clamp({ field: "mag", min: 1, max: 14 }) ],
     }),
@@ -105,13 +110,19 @@ export default {
     { x: 55, y: 34, mag: 9, team: "B" },
     { x: 80, y: 60, mag: 12, team: "C" },
   ],
+  schema: {
+    x:    { type: "quantitative", domain: [0, 100] },
+    y:    { type: "quantitative", domain: [0, 100] },
+    mag:  { domain: [0, 14] },
+    team: { domain: ["A", "B", "C"] },
+  },
   features: [
     point({
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { field: "mag", domain: [0, 14] },
-        fill: { field: "team", domain: ["A", "B", "C"], edit: cycle() },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        size: { field: "mag" },
+        fill: { field: "team", edit: cycle() },
       },
       edits: [
         drag({ channels: ["x", "y"], when: when.noShift }),  // plain drag = move
@@ -141,13 +152,17 @@ export default {
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: 30, y: 30 }, { x: 70, y: 70 }],
   onChange: (d) => console.log("custom", d),
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#2563eb",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 8 },
+      size: 8,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [
         custom((datum, event, ctx) => ({

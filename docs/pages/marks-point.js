@@ -12,10 +12,10 @@ export default {
             summary:
                 'Import from <code class="inline">vibe.plot</code>. A circle per datum; every channel — ' +
                 'positional or not — resolves through the global scales.',
-            signature: 'point({ encoding, edits, constraints, id }) → Feature',
+            signature: 'point({ channels, edits, constraints, id }) → Feature',
             options: [
-                { name: 'encoding', type: 'object', default: '{}', desc: 'Channel map — see <b>Channels</b>.' },
-                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in the encoding.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'Channel map — see <b>Channels</b>.' },
+                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in the channels map.' },
                 { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark.' },
                 { name: 'fill, stroke, …', type: 'style', default: "fill: 'steelblue'", desc: 'Style shorthands / channels.' },
             ],
@@ -49,12 +49,16 @@ export default {
     { h: 150, weight: 48 }, { h: 160, weight: 57 }, { h: 170, weight: 66 },
     { h: 180, weight: 78 }, { h: 190, weight: 92 }, { h: 165, weight: 61 },
   ],
+  schema: {
+    h:      { type: "quantitative", domain: [140, 200] },
+    weight: { type: "quantitative", domain: [40, 100] },
+  },
   features: [
     point({
       stroke: "#334155", strokeWidth: 1,
-      encoding: {
-        x: { field: "h", type: "linear", domain: [140, 200] },
-        y: { field: "weight", type: "linear", domain: [40, 100] },
+      channels: {
+        x: { field: "h" },
+        y: { field: "weight" },
         fill: { field: "weight" },   // number -> sequential ramp
         size: { field: "weight" },   // number -> radius
       },
@@ -73,13 +77,17 @@ export default {
     { x: 12, y: 40 }, { x: 30, y: 22 }, { x: 48, y: 55 },
     { x: 66, y: 33 }, { x: 80, y: 68 }, { x: 22, y: 60 },
   ],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 80] },
+  },
   features: [
     point({
       fill: "#fde68a", stroke: "#b45309", strokeWidth: 2, opacity: 0.85,
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 80] },
-        size: { value: 9 },
+      size: 9,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
     }),
   ],
@@ -101,13 +109,17 @@ export default {
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: 20, y: 30 }, { x: 50, y: 62 }, { x: 78, y: 40 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#2563eb", stroke: "#1f2733", strokeWidth: 1, opacity: 0.85,
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 9 },
+      size: 9,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [ drag({ channels: ["x", "y"] }) ],
     }),

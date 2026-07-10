@@ -1,10 +1,30 @@
 // @ts-check
-// pure math scale definitions to avoid tying the core directly to d3-scale if not needed,
-// though we can use d3-scale under the hood for now.
+// scales.js — the one scale factory, and the CAPABILITY MODEL every other module
+// branches on.
+//
+// ── Never branch on scale.type ──────────────────────────────────────────────
+// `type` is a label ('linear', 'log', 'band', …). It is NOT control flow, for two
+// reasons: a `log` scale behaves exactly like a `linear` one everywhere it
+// matters, and a scale a user hands us (`scale: d3.scaleBand().padding(0.3)`) has
+// no `type` at all. Branching on it means an unrecognized scale silently comes
+// back non-invertible — the chart draws fine and every edit on that channel goes
+// dead, with no error anywhere.
+//
+// So each scale carries what it can DO, sniffed once here from the object's own
+// shape and stamped on:
+//   kind: 'band'       occupies an interval per category (has a bandwidth)
+//         'point'      a tick per category (no width)
+//         'continuous' has invert(): linear, log, pow, sqrt, time, symlog
+//         'discrete'   value -> discrete output (ordinal, sequential ramp)
+//   temporal:   the domain holds Dates, so encode() coerces first
+//   invertible: a gesture on this channel can be inverted back to data
+//
+// Marks, edits, axes and the pick layer read `kind`. Adding a scale type means
+// adding a case HERE and nowhere else.
 import * as d3 from 'd3';
 
 /**
- * Coerce a domain value to a Date for the `time` scale. Accepts Dates, epoch
+ * Coerce a domain value to a Date for a temporal scale. Accepts Dates, epoch
  * numbers, and ISO/parseable date strings; leaves an already-Date untouched.
  * @param {any} v
  * @returns {Date}
@@ -14,22 +34,90 @@ function toDate(v) {
 }
 
 /**
+ * Sniff what a scale can do from its own shape. Works on the scales we build and
+ * on any d3 scale a user hands us — d3's own method surface is the tell:
+ *   scaleBand   -> bandwidth() + paddingInner()
+ *   scalePoint  -> bandwidth() but NO paddingInner (it's band with padding 1)
+ *   continuous  -> invert()
+ *   ordinal etc -> neither
+ * @param {any} scale
+ * @returns {import('../types').ScaleKind}
+ */
+function kindOf(scale) {
+    if (typeof scale.bandwidth === 'function') {
+        return typeof scale.paddingInner === 'function' ? 'band' : 'point';
+    }
+    if (typeof scale.invert === 'function') return 'continuous';
+    return 'discrete';
+}
+
+/**
+ * Stamp the capability flags + the unified channel API onto a scale. Every scale
+ * that reaches a mark or an edit has been through here, whether we built it
+ * (createScale) or a user supplied it (adoptScale).
+ * @param {any} scale
+ * @param {import('../types').ScaleType} [type] a label, when we know it
+ * @returns {import('../types').Scale}
+ */
+function stamp(scale, type) {
+    scale.type = type;
+    scale.kind = kindOf(scale);
+    const domain = typeof scale.domain === 'function' ? scale.domain() : [];
+    scale.temporal = domain.some((/** @type {any} */ v) => v instanceof Date);
+    scale.domainConfig = domain;
+
+    // Unified channel API. Marks and edits never branch on the scale:
+    //   encode(value)      -> visual output (band centre | pixel | colour | radius)
+    //   invertValue(pixel) -> data value    (nearest category | clamped invert)
+    // A colour scale is `discrete` with no invert(), so `invertible` is false and
+    // edits know a gesture can't drive that channel.
+    scale.invertible = scale.kind === 'band' || scale.kind === 'point'
+        || typeof scale.invert === 'function';
+    scale.encode = (/** @type {any} */ value, /** @type {any} */ fallback) => positionOnScale(scale, value, fallback);
+    scale.invertValue = scale.invertible
+        ? (/** @type {number} */ pixel) => invertOnScale(scale, pixel)
+        : () => undefined;
+
+    return scale;
+}
+
+/**
+ * Adopt a scale the user built themselves (`scale: d3.scaleBand().padding(0.3)`).
+ * It arrives fully configured; we only sniff its capabilities and, for a
+ * POSITIONAL channel that named no range of its own, hand it the plot's pixel
+ * range — pixels are ours to know, palettes and radii are the author's. A colour
+ * scale keeps whatever range/interpolator it was built with.
+ * @param {any} scale a d3 scale (or any callable with .domain/.range)
+ * @param {{ range?: any[], positional?: boolean, domain?: any[] }} [opts]
+ * @returns {import('../types').Scale}
+ */
+export function adoptScale(scale, { range, positional, domain } = {}) {
+    // The schema owns the domain; apply it unless the author's scale already
+    // declares one (an adopted scale with an explicit domain is deliberate).
+    if (domain && typeof scale.domain === 'function' && !scale.domain().length) {
+        scale.domain(domain);
+    }
+    if (range && positional && typeof scale.range === 'function') scale.range(range);
+    return stamp(scale);
+}
+
+/**
  * The single scale factory for every channel — positional (x/y) and beyond
- * (color, size, opacity). `range` is the channel's visual output range: pixels
- * for x/y, a radius interval for size, a palette or two-stop ramp for color.
- *   linear     -> continuous field   -> continuous output (pixel | radius | …)
- *   band       -> categorical field   -> an interval per category (bars: the band
- *                                        gives the bar its thickness)
- *   point      -> categorical field   -> a point per category (dots: a circle sits
- *                                        on the category's tick, no width)
- *   ordinal    -> discrete field      -> discrete output (category -> colour)
- *   sequential -> continuous field    -> continuous colour along a ramp
+ * (colour, size, opacity). `range` is the channel's visual output range: pixels
+ * for x/y, a radius interval for size, a palette or two-stop ramp for colour.
+ *   linear|log|pow|sqrt -> continuous field  -> continuous output (pixel | radius)
+ *   time                -> temporal field    -> continuous output over Dates
+ *   band                -> discrete field    -> an interval per category (a bar's
+ *                                               thickness comes from the bandwidth)
+ *   point               -> discrete field    -> a tick per category (a circle sits
+ *                                               on it; no width)
+ *   ordinal             -> discrete field    -> discrete output (category -> colour)
+ *   sequential          -> continuous field  -> continuous colour along a ramp
  *
- * band vs point is the categorical split that matters per MARK: a bar needs the
- * interval (bandwidth), a circle wants the tick. The mark declares which it wants
- * (`categoricalScale`) and the resolver picks accordingly; an explicit `type`
- * still overrides.
- * @param {any} spec
+ * band vs point is the discrete split that matters per MARK: a bar needs the
+ * interval, a circle wants the tick. The mark declares which it wants
+ * (`discreteScale`) and the resolver picks accordingly; an explicit `scale` wins.
+ * @param {any} spec { type, domain, padding, nice, clamp, base, exponent }
  * @param {any[]} range
  * @returns {import('../types').Scale | null}
  */
@@ -45,42 +133,38 @@ export function createScale(spec, range) {
         // may be Dates, epoch numbers, or date strings; coerce them.
         scale = d3.scaleTime().domain(spec.domain.map(toDate)).range(range);
     } else if (type === 'band') {
-        scale = d3.scaleBand().domain(spec.domain).range(range).padding(0.1);
+        scale = d3.scaleBand().domain(spec.domain).range(range)
+            .padding(spec.padding != null ? spec.padding : 0.1);
     } else if (type === 'point') {
-        scale = d3.scalePoint().domain(spec.domain).range(range).padding(0.5);
+        scale = d3.scalePoint().domain(spec.domain).range(range)
+            .padding(spec.padding != null ? spec.padding : 0.5);
     } else if (type === 'ordinal') {
         scale = d3.scaleOrdinal().domain(spec.domain).range(range);
     } else if (type === 'sequential') {
-        // Callable ramp with the d3-scale shape downstream code expects.
+        // Callable ramp with the d3-scale shape downstream code expects. It has
+        // neither bandwidth nor invert, so it sniffs as 'discrete' — correct: a
+        // colour is not something a gesture can invert.
         const [lo, hi] = [Math.min(...spec.domain), Math.max(...spec.domain)];
         const t = d3.scaleLinear().domain([lo, hi]).range([0, 1]).clamp(true);
         const ramp = d3.interpolateRgb(range[0], range[1]);
         scale = (/** @type {any} */ value) => ramp(t(value));
         scale.domain = () => spec.domain;
         scale.range = () => range;
+    } else if (type === 'log') {
+        scale = d3.scaleLog().domain(spec.domain).range(range);
+        if (spec.base != null) scale.base(spec.base);
+    } else if (type === 'pow' || type === 'sqrt') {
+        scale = d3.scalePow().domain(spec.domain).range(range)
+            .exponent(spec.exponent != null ? spec.exponent : (type === 'sqrt' ? 0.5 : 1));
     } else {
         scale = d3.scaleLinear().domain(spec.domain).range(range);
     }
 
-    // Attach type metadata for edits to validate
-    scale.type = type;
+    // Continuous-scale refinements, ignored by the discrete scales that lack them.
+    if (spec.nice && typeof scale.nice === 'function') scale.nice();
+    if (spec.clamp && typeof scale.clamp === 'function') scale.clamp(true);
 
-    // Attach domain configuration for constraints to access easily
-    scale.domainConfig = spec.domain;
-
-    // Unified channel API. Every scale exposes the same pair, so marks and
-    // edits never branch on scale type:
-    //   encode(value)      -> visual output (band center | linear pixel | colour | radius)
-    //   invertValue(pixel) -> data value    (nearest category | clamped invert)
-    // Only continuous/band scales are invertible; colour scales are not, so
-    // `invertible` tells edits which channels a gesture can drive.
-    // These are the x/y special case of the general channel model in
-    // core/encoding.js; positionOnScale/invertOnScale are the shared impl.
-    scale.invertible = (type === 'linear' || type === 'time' || type === 'band' || type === 'point');
-    scale.encode = (/** @type {any} */ value, /** @type {any} */ fallback) => positionOnScale(scale, value, fallback);
-    scale.invertValue = scale.invertible ? (/** @type {any} */ pixel) => invertOnScale(scale, pixel) : () => undefined;
-
-    return scale;
+    return stamp(scale, type);
 }
 
 // --- Scale helpers shared by marks -----------------------------------------
@@ -92,7 +176,17 @@ export function createScale(spec, range) {
  * @returns {boolean}
  */
 export function isBand(scale) {
-    return !!scale && scale.type === 'band';
+    return !!scale && scale.kind === 'band';
+}
+
+/**
+ * Discrete positional scale (band or point): a category per slot, not a number
+ * line. The two share every geometry rule except the half-bandwidth offset.
+ * @param {any} scale
+ * @returns {boolean}
+ */
+export function isDiscrete(scale) {
+    return !!scale && (scale.kind === 'band' || scale.kind === 'point');
 }
 
 /**
@@ -117,17 +211,17 @@ export function rangeExtent(scale) {
  */
 export function positionOnScale(scale, value, fallback) {
     if (!scale) return fallback;
-    if (scale.type === 'band') {
+    if (scale.kind === 'band') {
         const p = scale(value);
         return p == null ? fallback : p + scale.bandwidth() / 2;
     }
-    if (scale.type === 'point') {
+    if (scale.kind === 'point') {
         // scalePoint already returns the tick position (no bandwidth to offset).
         const p = scale(value);
         return p == null ? fallback : p;
     }
     // Temporal: coerce the value to a Date so string/epoch data still positions.
-    if (scale.type === 'time') return scale(toDate(value));
+    if (scale.temporal) return scale(toDate(value));
     return scale(value);
 }
 
@@ -189,17 +283,15 @@ export function bandSpan(scale, value, fullLength, { inset = 0, length } = {}) {
  * @returns {any}
  */
 export function invertOnScale(scale, pixel) {
-    if (!scale) return undefined;
-    // Colour scales (ordinal/sequential) don't map a pixel back to data.
-    if (scale.type !== 'band' && scale.type !== 'point' && scale.type !== 'linear' && scale.type !== 'time') return undefined;
+    if (!scale || !scale.invertible) return undefined; // colour scales, mainly
 
-    if (scale.type === 'band' || scale.type === 'point') {
+    if (isDiscrete(scale)) {
         const domain = scale.domain();
         if (!domain.length) return undefined;
-        // Categorical scales aren't invertible, so find the category whose center
-        // is closest to the pixel. This mirrors positionOnScale: a band's center
-        // is offset by half its bandwidth, a point's center is the tick itself.
-        const half = scale.type === 'band' ? scale.bandwidth() / 2 : 0;
+        // Discrete scales have no invert(), so find the category whose centre is
+        // closest to the pixel. This mirrors positionOnScale: a band's centre is
+        // offset by half its bandwidth, a point's centre is the tick itself.
+        const half = scale.kind === 'band' ? scale.bandwidth() / 2 : 0;
         let nearest = domain[0];
         let bestDist = Infinity;
         for (const category of domain) {
@@ -213,12 +305,13 @@ export function invertOnScale(scale, pixel) {
         return nearest;
     }
 
-    // Continuous (linear | time) scale: invert then clamp into the (possibly
-    // reversed) domain so created values never escape the axis. Time inverts to a
-    // Date; clamp numerically on epoch ms and hand back a Date.
+    // Continuous scale (linear | log | pow | sqrt | time | an adopted d3 scale):
+    // invert then clamp into the (possibly reversed) domain so created values
+    // never escape the axis. A temporal scale inverts to a Date; clamp numerically
+    // on epoch ms and hand back a Date.
     const value = scale.invert(pixel);
     const domain = scale.domain();
-    if (scale.type === 'time') {
+    if (scale.temporal) {
         const lo = Math.min(...domain.map(Number));
         const hi = Math.max(...domain.map(Number));
         return new Date(Math.max(lo, Math.min(hi, Number(value))));

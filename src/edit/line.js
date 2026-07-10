@@ -78,27 +78,28 @@ export function anchor(options = {}) {
  * positions / time interval), each starting at the pointer's value on the value
  * axis (a flat line you then sweep into shape). This is the draw-from-scratch
  * primitive; pair it with `sweep` to then shape the seeded line.
- *   domain / value : the positional axes ('x'/'y'); default domain 'x', value 'y'.
+ *   along / value  : the positional axes ("x"/"y"); the independent axis the line
+ *                    runs ALONG, and the axis it carries a value on. Defaults x/y.
  *   samples        : passed to resolveSamples for the anchor domain positions.
  * @param {any} [options]
  * @returns {import('../types').Edit}
  */
 export function newSeries(options = {}) {
-    const { domain = 'x', value = 'y', samples, trigger = 'dblclick', series: seriesField, ...rest } = options;
+    const { along = 'x', value = 'y', samples, trigger = 'dblclick', series: seriesField, ...rest } = options;
     return makeEdit({
         type: 'newSeries',
         gesture: trigger,
-        channels: [domain, value],
+        channels: [along, value],
         pick: 'plane',
         scope: 'line',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const sField = seriesField || ctx.seriesKey || null;
-            const domainField = (ctx.encoding[domain] && ctx.encoding[domain].field)
-                || (domain === 'x' ? ctx.xKey : ctx.yKey);
-            const valueField = (ctx.encoding[value] && ctx.encoding[value].field)
+            const domainField = (ctx.markChannels[along] && ctx.markChannels[along].field)
+                || (along === 'x' ? ctx.xKey : ctx.yKey);
+            const valueField = (ctx.markChannels[value] && ctx.markChannels[value].field)
                 || (value === 'x' ? ctx.xKey : ctx.yKey);
-            const domainScale = ctx.scales[domain];
+            const domainScale = ctx.scales[along];
             const valueScale = ctx.scales[value];
             if (!domainScale || !domainField) return undefined;
 
@@ -144,8 +145,9 @@ export function newSeries(options = {}) {
  * So one gesture both draws new lines and reshapes drawn ones — near edits, far draws.
  * The engine (draw driver) owns the per-drag lock; this apply reads it from
  * ctx.drawState (mode + locked series) and ctx.order.
- *   domain / value : the positional axes ('x'/'y'); default domain 'x', value 'y'.
- *   channels       : governed channels (default [domain, value]); freehand needs both.
+ *   along / value  : the positional axes ("x"/"y"); the independent axis the line
+ *                    runs ALONG, and the axis it carries a value on. Defaults x/y.
+ *   channels       : governed channels (default [along, value]); freehand needs both.
  *   samples        : domain grid for you-draw-it (resolveSamples; default = ticks).
  *   minDist        : freehand pointer-sampling distance in px (default 8).
  *   threshold      : proximity radius for the edit-vs-draw decision (default 40).
@@ -155,13 +157,13 @@ export function newSeries(options = {}) {
  */
 export function draw(options = {}) {
     const {
-        domain = 'x', value = 'y', channels, samples, minDist = 8,
+        along = 'x', value = 'y', channels, samples, minDist = 8,
         into = 'nearest', series: seriesField, ...rest
     } = options;
     return makeEdit({
         type: 'draw',
         gesture: 'drag',
-        channels: channels || [domain, value],
+        channels: channels || [along, value],
         pick: 'draw',
         scope: 'line',
         into,
@@ -184,7 +186,7 @@ export function draw(options = {}) {
             if (st.mode === 'edit') {
                 const idx = freehandLine
                     ? nearestMark(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, Infinity, seriesVal)
-                    : nearestMarkOnAxis(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, Infinity, domain, seriesVal);
+                    : nearestMarkOnAxis(ctx.marks || [], ctx.pointer.x, ctx.pointer.y, Infinity, along, seriesVal);
                 if (idx == null || ctx.data[idx] == null) return undefined;
                 const datum = { ...ctx.data[idx] };
                 for (const ch of ctx.channels) {
@@ -219,13 +221,13 @@ export function draw(options = {}) {
             }
 
             // YOU-DRAW-IT: upsert the sample column(s) the pointer has crossed.
-            const dCh = byName[domain], vCh = byName[value];
+            const dCh = byName[along], vCh = byName[value];
             if (!dCh || !vCh || !dCh.scale || !vCh.scale
                 || !dCh.scale.invertible || !vCh.scale.invertible) return undefined;
-            const positions = resolveSamples(ctx.scales[domain], samples);
+            const positions = resolveSamples(ctx.scales[along], samples);
             if (!positions.length) return undefined;
 
-            const dCur = dCh.scale.invertValue(domain === 'x' ? ctx.pointer.x : ctx.pointer.y);
+            const dCur = dCh.scale.invertValue(along === 'x' ? ctx.pointer.x : ctx.pointer.y);
             const v = vCh.scale.invertValue(value === 'x' ? ctx.pointer.x : ctx.pointer.y);
 
             // Which grid columns to fill: those between the previous pointer domain

@@ -88,13 +88,18 @@ export default {
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: 30, y: 30, group: "a" }],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#0d9488",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100], edit: drag() },
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
-        size: { value: 8 },
+      size: 8,
+      channels: {
+        x: { field: "x", edit: drag() },
+        y: { field: "y", edit: drag() },
       },
       edits: [ create({ defaults: { group: "a" } }) ],
       constraints: [ count({ max: 8 }) ],   // dataset invariant: at most 8
@@ -120,13 +125,18 @@ export default {
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: 30, y: 40 }, { x: 65, y: 65 }],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#0d9488",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 8 },
+      size: 8,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [
         drag({ channels: ["x", "y"] }),
@@ -150,14 +160,19 @@ export default {
     { x: 55, y: 65, group: "beta" },
     { x: 80, y: 30, group: "gamma" },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    group: { type: "ordinal", domain: ["alpha", "beta", "gamma"] },
+  },
   features: [
     point({
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100], edit: drag() },
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
-        size: { value: 10 },
-        color: { field: "group", type: "ordinal",
-                 domain: ["alpha", "beta", "gamma"], edit: cycle({ when: when.noAlt }) },
+      size: 10,
+      channels: {
+        x: { field: "x", edit: drag() },
+        y: { field: "y", edit: drag() },
+        fill: { field: "group", edit: cycle({ when: when.noAlt }) },
       },
       edits: [ remove({ when: when.alt }) ],
     }),
@@ -182,17 +197,21 @@ export default {
 `mount(Elicit({
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  schema: { s: {}, x: {}, y: {} },
   data: [
     { s: 0, x: 20, y: 30 }, { s: 0, x: 45, y: 70 },
     { s: 0, x: 70, y: 40 }, { s: 0, x: 85, y: 80 },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     connectedScatter({
       stroke: "#0d9488", strokeWidth: 3, series: "s",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [
         drag({ channels: ["x", "y"], pick: "nearest", threshold: 40 }),
@@ -210,14 +229,18 @@ export default {
 `mount(Elicit({
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  schema: { s: {}, x: {}, y: {} },
   data: [],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 10] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", series: "s",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 10] },
-        y: { field: "y", type: "linear", domain: [0, 100],
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
              edit: drag({ pick: "sweep", guide: true }) },
       },
       edits: [ edit.line.newSeries({ domain: "x", value: "y", series: "s", samples: 6 }) ],
@@ -233,14 +256,18 @@ export default {
 `mount(Elicit({
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  schema: { s: {}, x: {}, y: {} },
   data: [],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     connectedScatter({
       stroke: "#0d9488", strokeWidth: 3, series: "s",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [ edit.line.draw({ series: "s", minDist: 10 }) ],
     }),
@@ -255,17 +282,21 @@ export default {
 `mount(Elicit({
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  schema: { s: {}, x: {}, y: {} },
   data: [
     { s: 0, x: 20, y: 30 }, { s: 0, x: 45, y: 70 }, { s: 0, x: 75, y: 40 },
     { s: 1, x: 30, y: 80 }, { s: 1, x: 60, y: 20 }, { s: 1, x: 85, y: 60 },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     connectedScatter({
       stroke: "#0d9488", strokeWidth: 3, series: "s",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [
         remove({ when: when.alt }),                        // Alt-click: one anchor

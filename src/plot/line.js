@@ -7,7 +7,7 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 // plot, and a hand-drawn 2D path are the same mark along four orthogonal knobs:
 //
 //   grouping  `series` (alias `z`)  -> which points form one line (defaults to
-//                                       the stroke/color field, so lines auto-color)
+//                                       the stroke field, so lines auto-colour)
 //   ordering  `order`               -> 'domain'   : sort each series by the domain
 //                                                    axis (a function / time series)
 //                                       'sequence' : connect in creation/array order
@@ -37,37 +37,36 @@ const SINGLE = '__single__'; // group key when no series field is set
  */
 function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
     // Desugar top-level style shorthands (stroke: '…', strokeWidth: …) into the
-    // encoding so line reads style the same way every mark does.
+    // channels so line reads style the same way every mark does.
     const opts = normalizeMarkOptions(options);
     const {
-        encoding = {},
+        channels = {},
         id,
         edits,
         constraints,
         curve = 'linear',
         handles = true,
-        handleRadius = 4,
+        handleSize = 4,
         order = defaultOrder,
         samples
     } = opts;
 
-    const xKey = (encoding.x && encoding.x.field) || options.x || 'x';
-    const yKey = (encoding.y && encoding.y.field) || options.y || 'y';
+    const xKey = (channels.x && channels.x.field) || 'x';
+    const yKey = (channels.y && channels.y.field) || 'y';
 
-    // Grouping field: explicit `series`/`z`, else the field behind stroke/color
-    // (Plot's `z` default) so a colored line chart groups without extra config.
+    // Grouping field: explicit `series`/`z`, else the field behind `stroke`
+    // (Plot's `z` default) so a coloured line chart groups without extra config.
     const seriesField = opts.series || opts.z
-        || (encoding.stroke && encoding.stroke.field)
-        || (encoding.color && encoding.color.field)
+        || (channels.stroke && channels.stroke.field)
         || null;
 
     return {
         id,
-        encoding,
+        channels,
         edits,
         constraints,
         // A line's domain axis is continuous (a point per datum, no band width).
-        categoricalScale: 'point',
+        discreteScale: 'point',
         xKey,
         yKey,
         seriesKey: seriesField,
@@ -94,7 +93,7 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             if (!valueAxis) {
                 if (isBand(xScale)) valueAxis = 'y';
                 else if (isBand(yScale)) valueAxis = 'x';
-                else if (encoding.x && encoding.x.edit && !(encoding.y && encoding.y.edit)) valueAxis = 'x';
+                else if (channels.x && channels.x.edit && !(channels.y && channels.y.edit)) valueAxis = 'x';
                 else valueAxis = 'y';
             }
             // The domain (sweep) axis is the other one.
@@ -108,8 +107,8 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             const placed = currentData.map((d, i) => ({
                 d,
                 i,
-                cx: encodeChannel(scales, encoding, 'x', d, width / 2),
-                cy: encodeChannel(scales, encoding, 'y', d, height / 2),
+                cx: encodeChannel(scales, channels, 'x', d, width / 2),
+                cy: encodeChannel(scales, channels, 'y', d, height / 2),
                 series: seriesField ? d[seriesField] : SINGLE
             }));
 
@@ -126,7 +125,7 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             for (const group of groups.values()) {
                 if (group.length < 2) continue; // nothing to connect
                 const pts = orderPoints(group, order, domainAxis, seriesField);
-                const style = resolveStyle(scales, encoding, group[0].d, {
+                const style = resolveStyle(scales, channels, group[0].d, {
                     stroke: 'steelblue',
                     strokeWidth: 2
                 });
@@ -147,12 +146,12 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             // Handles: an ordinary circle per datum, so edits/pick reuse the mark
             // machinery. Tagged with `series` so a sweep can scope to one line.
             placed.forEach(({ d, i, cx, cy, series }) => {
-                const style = resolveStyle(scales, encoding, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
                 nodes.push({
                     type: 'circle',
                     cx,
                     cy,
-                    r: handles ? handleRadius : 0,
+                    r: handles ? handleSize : 0,
                     ...style,
                     ...(handles ? {} : { opacity: 0 }),
                     data: d,

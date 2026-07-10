@@ -1,29 +1,32 @@
 // @ts-check
-// encoding.js — the channel/encoding layer (Vega-Lite / Observable-Plot style).
+// encoding.js — the channel layer (Vega-Lite / Observable-Plot style).
 //
-// A CHANNEL is a named binding of a data field to a scale; an ENCODING is just a
-// map of them:
+// A CHANNEL is a named binding of a data field to a visual property; a mark's
+// `channels` is just a map of them:
 //
-//   encoding: {
-//     x:     { field: "height" },                       // scale/type inferred
-//     y:     { field: "weight",  type: "linear" },
-//     color: { field: "group" },                        // -> ordinal palette
-//     size:  { field: "pop",     range: [4, 20] },      // -> radius
-//     shape: { value: "circle" }                        // constant (no field)
+//   channels: {
+//     x:    { field: "height" },                  // scale inferred from the schema
+//     y:    { field: "weight", edit: drag() },    // ... and writable
+//     fill: { field: "group" },                   // -> ordinal palette
+//     size: { field: "pop", scale: { range: [4, 20] } },  // -> radius
+//     opacity: { value: 0.8 }                     // a visual constant (no scale)
 //   }
 //
 // The payoff: every channel — positional OR not — maps a datum the same way,
-// `channel.encode(datum)`. Position through a band/linear scale, colour through
-// an ordinal/sequential scale, size through a linear scale to a radius range.
+// through `scale.encode(value)`.
 //
-// Scales are built by the single factory in core/scales.js (`createScale`); this
-// module adds the *inference* (type/domain from data), the per-channel output
-// ranges, and the interaction primitives (invert a pointer/gesture back to data).
-// The engine (core/resolve.js) reuses the same inference helpers to resolve
-// GLOBAL per-channel scales across all marks (the Observable Plot model).
-
-import * as d3 from 'd3';
-import { createScale } from './scales.js';
+// ── type vs scale ───────────────────────────────────────────────────────────
+// A channel's `type` is the DATA type (quantitative | categorical | ordinal |
+// temporal) — what the field means. It is normally declared once on the schema
+// and never repeated here. The SCALE type (linear | band | point | ordinal | …)
+// is how a channel draws that data, and is derived: `scaleTypeFor` is the one
+// place that decision lives. So a bar's x channel is a band because the field is
+// categorical AND a bar needs an interval — nobody writes `type: "band"`.
+//
+// Scales are built by the single factory in core/scales.js (`createScale`), and
+// resolved GLOBALLY per channel across all marks by core/resolve.js (the
+// Observable Plot model). This module supplies the inference and the per-channel
+// output ranges that resolver needs.
 
 // Illustrative categorical palette (swap for a real design-system palette later).
 export const DEFAULT_PALETTE = ['#4f46e5', '#0d9488', '#e4572e', '#f2b705', '#7b2d8b', '#3aa5d1'];
@@ -32,8 +35,8 @@ export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
 
 // Channel families that share scale semantics, so a field-driven fill/stroke is
 // colour-scaled and a field-driven fillOpacity/strokeOpacity is opacity-scaled —
-// symmetric with the base `color` / `opacity` channels.
-const COLOR_CHANNELS = new Set(['color', 'fill', 'stroke']);
+// symmetric with the base `opacity` channel.
+const COLOR_CHANNELS = new Set(['fill', 'stroke']);
 const OPACITY_CHANNELS = new Set(['opacity', 'fillOpacity', 'strokeOpacity']);
 
 // Position family: x1/x2 and y1/y2 are SPAN ENDPOINTS on the x/y axis, not their
@@ -45,7 +48,7 @@ const AXIS_OF = { x: 'x', x1: 'x', x2: 'x', y: 'y', y1: 'y', y2: 'y' };
 
 /**
  * The positional axis a channel shares its scale with ('x' or 'y'), or
- * undefined for a non-positional channel (color, size, opacity, ...).
+ * undefined for a non-positional channel (fill, size, opacity, ...).
  * @param {string} channelName
  * @returns {'x' | 'y' | undefined}
  */
@@ -54,74 +57,55 @@ export function axisOf(channelName) {
 }
 
 // ---------------------------------------------------------------------------
-// Inference (value-based, so both the per-mark resolver here and the engine's
-// cross-mark resolver can share it). `values` is the flat list of a field's
-// values — from one mark here, or unioned across marks in the engine.
+// Inference. The engine's resolver (core/resolve.js) unions a field's values
+// across marks and asks these two questions in order: what IS this data, and
+// how should this channel draw it.
 // ---------------------------------------------------------------------------
 
 /**
- * Route a channel + a data KIND to a concrete scale type. This is the one place
- * the "what a channel does with continuous vs discrete vs temporal data" decision
- * lives, shared by both the data-inference path (inferScaleType) and the
- * schema-declared path (measureToScaleType) so they can never disagree.
- *   kind: 'numeric' (continuous), 'categorical' (discrete), 'temporal' (dates).
- * `categorical` is the concrete categorical scale for non-numeric positional data
- * — the MARK decides it ('band' for bars, 'point' for dots), defaulting to 'band'.
- * @param {string} channelName
- * @param {'numeric' | 'categorical' | 'temporal'} kind
- * @param {import('../types').ScaleType} [categorical]
- * @returns {import('../types').ScaleType}
- */
-export function scaleTypeFor(channelName, kind, categorical = 'band') {
-    // Colour family (fill/stroke are colour-scaled just like `color`): continuous
-    // data (numeric or temporal) -> a ramp, discrete -> a palette.
-    if (COLOR_CHANNELS.has(channelName)) return kind === 'categorical' ? 'ordinal' : 'sequential';
-    // positional / size / opacity: dates -> time, numbers -> linear, strings ->
-    // the mark's categorical scale (band|point).
-    if (kind === 'temporal') return 'time';
-    if (kind === 'numeric') return 'linear';
-    return categorical;
-}
-
-/**
- * Choose a scale type from a channel name + its data values. Derives the data
- * KIND from a sample (Date -> temporal, number -> numeric, else categorical) and
- * routes it through the shared `scaleTypeFor`. A channel with no non-null values
- * defaults to a continuous (linear) scale.
- * @param {string} channelName
+ * What a field's values ARE, from a sample: a Date is temporal, a number is
+ * quantitative, anything else is categorical. The fallback for a channel with no
+ * values at all is quantitative — but the resolver never gets here in that case,
+ * because a field with neither a schema type nor data is an error.
  * @param {any[]} values
- * @param {import('../types').ScaleType} [categorical]
- * @returns {import('../types').ScaleType}
+ * @returns {import('../types').MeasureType}
  */
-export function inferScaleType(channelName, values, categorical = 'band') {
+export function inferMeasureType(values) {
     const sample = values.find((v) => v != null);
-    if (sample === undefined) return COLOR_CHANNELS.has(channelName) ? 'sequential' : 'linear';
-    const kind = sample instanceof Date ? 'temporal'
-        : typeof sample === 'number' ? 'numeric'
-            : 'categorical';
-    return scaleTypeFor(channelName, kind, categorical);
+    if (sample instanceof Date) return 'temporal';
+    if (typeof sample === 'number') return 'quantitative';
+    if (sample === undefined) return 'quantitative';
+    return 'categorical';
 }
 
 /**
- * Map a SCHEMA measurement type (what the data means) to a concrete scale type
- * for a channel (how it's drawn), via the same routing as data inference. Lets an
- * author declare `belief: quantitative` once and have it become linear on x/y,
- * sequential on colour, etc.
+ * Route a channel + its data type to a concrete scale type. THE one place the
+ * "what does this channel do with continuous vs discrete vs temporal data"
+ * decision lives — so a schema-declared type and an inferred one can never
+ * disagree about the scale they produce.
+ *
+ * `discrete` is the concrete scale a mark wants for discrete data: a bar needs
+ * the interval ('band'), a dot wants the tick ('point'). The MARK declares it
+ * (`discreteScale`), defaulting to 'band'.
  * @param {string} channelName
  * @param {import('../types').MeasureType} measure
- * @param {import('../types').ScaleType} [categorical]
+ * @param {import('../types').ScaleType} [discrete]
  * @returns {import('../types').ScaleType}
  */
-export function measureToScaleType(channelName, measure, categorical = 'band') {
-    const kind = measure === 'quantitative' ? 'numeric'
-        : measure === 'temporal' ? 'temporal'
-            : 'categorical'; // categorical | ordinal
-    return scaleTypeFor(channelName, kind, categorical);
+export function scaleTypeFor(channelName, measure, discrete = 'band') {
+    const continuous = measure === 'quantitative' || measure === 'temporal';
+    // Colour family: continuous data -> a ramp, discrete -> a palette.
+    if (COLOR_CHANNELS.has(channelName)) return continuous ? 'sequential' : 'ordinal';
+    // positional / size / opacity: dates -> time, numbers -> linear, categories ->
+    // the mark's discrete scale (band|point).
+    if (measure === 'temporal') return 'time';
+    if (measure === 'quantitative') return 'linear';
+    return discrete;
 }
 
 /**
  * Infer a scale domain from data values: unique set for discrete scales, extent
- * for continuous ones.
+ * for continuous ones. Only reached when the schema declares no domain.
  * @param {import('../types').ScaleType} type
  * @param {any[]} values
  * @returns {any[]}
@@ -132,6 +116,27 @@ export function inferDomainFromValues(type, values) {
     }
     const nums = values.filter((v) => v != null);
     return nums.length ? [Math.min(...nums), Math.max(...nums)] : [0, 1];
+}
+
+/**
+ * Union the declared domains of every field feeding one axis. An error bar puts
+ * `mean`, `lo` and `hi` on y; the axis must span all three, not whichever field
+ * happened to be encoded first.
+ * @param {import('../types').MeasureType} measure
+ * @param {any[][]} domains one per field that declared one
+ * @returns {any[] | undefined}
+ */
+export function unionDomains(measure, domains) {
+    if (!domains.length) return undefined;
+    if (domains.length === 1) return domains[0];
+    if (measure === 'quantitative' || measure === 'temporal') {
+        const lows = domains.map((d) => Math.min(...d.map(Number)));
+        const highs = domains.map((d) => Math.max(...d.map(Number)));
+        const [lo, hi] = [Math.min(...lows), Math.max(...highs)];
+        return measure === 'temporal' ? [new Date(lo), new Date(hi)] : [lo, hi];
+    }
+    // Discrete: ordered union, first-seen order (ordinal's order is significant).
+    return [...new Set(domains.flat())];
 }
 
 /**
@@ -150,111 +155,25 @@ export function channelRange(channelName, type, dims) {
     }
     // Family-based ranges: any opacity/colour channel gets the same output range
     // as its base channel, so fillOpacity/strokeOpacity and fill/stroke behave
-    // like opacity/color when driven by a field.
+    // like opacity when driven by a field.
     if (OPACITY_CHANNELS.has(channelName)) return [0.15, 1];
     if (COLOR_CHANNELS.has(channelName)) return type === 'sequential' ? DEFAULT_RAMP : DEFAULT_PALETTE;
     return [0, 1];
 }
 
 /**
- * Normalize a feature to an encoding map. New marks carry `encoding` directly;
- * legacy marks (dot/bar) expose xKey/yKey accessors, which desugar to
- * { x: { field }, y: { field } } (their scale type/domain still comes from the
- * top-level spec.x / spec.y).
+ * A feature's channel map. Marks carry `channels` directly; this is the one
+ * accessor, so the engine never reaches into a feature's shape.
  * @param {any} feature
- * @returns {any}
+ * @returns {Record<string, any>}
  */
-export function normalizeEncoding(feature) {
-    if (feature.encoding) return feature.encoding;
-    const enc = {};
-    if (feature.xKey != null) enc.x = { field: feature.xKey };
-    if (feature.yKey != null) enc.y = { field: feature.yKey };
-    return enc;
+export function normalizeChannels(feature) {
+    return feature.channels || {};
 }
 
 // ---------------------------------------------------------------------------
-// Channel: binds a field (or a constant) to a resolved scale, and knows how to
-// encode a datum and (for invertible channels) invert a visual value to data.
-// Used for the standalone / per-mark path (tests, self-contained marks). The
-// engine's global path resolves scales via core/resolve.js and reads them by
-// channel name, but Channels share the same scale objects and semantics.
+// Interaction primitive — the inverse direction (gesture -> data).
 // ---------------------------------------------------------------------------
-
-/**
- * @param {string} name
- * @param {any} spec
- * @param {any[]} data
- * @param {{ width: number, height: number }} dims
- * @returns {any}
- */
-function resolveChannel(name, spec, data, dims) {
-    // Constant channel — no field, no scale. Subsumes today's static options
-    // like `fill: "steelblue"`:  color: { value: "steelblue" }.
-    if (spec.value !== undefined && spec.field === undefined) {
-        return {
-            name, field: undefined, constant: spec.value, invertible: false,
-            encode: () => spec.value, invert: () => undefined
-        };
-    }
-
-    const field = spec.field;
-    const values = data.map((d) => d[field]);
-    const type = spec.type || inferScaleType(name, values);
-    const domain = spec.domain || inferDomainFromValues(type, values);
-    const range = spec.range || channelRange(name, type, dims);
-    const scale = createScale({ type, domain }, range);
-
-    return {
-        name, field, type, scale,
-        invertible: scale ? scale.invertible : false,
-        encode: (/** @type {any} */ datum) => (scale && field) ? scale.encode(datum[field]) : undefined,
-        invert: (/** @type {any} */ visual) => scale ? scale.invertValue(visual) : undefined,
-        domain: () => domain
-    };
-}
-
-/**
- * Resolve a whole encoding map to { channelName: Channel } against one dataset.
- * @param {any} encoding
- * @param {any[]} data
- * @param {{ width: number, height: number }} dims
- * @returns {any}
- */
-export function resolveEncoding(encoding = {}, data = [], dims = { width: 0, height: 0 }) {
-    /** @type {Record<string, any>} */
-    const resolved = {};
-    for (const [name, spec] of Object.entries(encoding)) {
-        resolved[name] = resolveChannel(name, spec, data, dims);
-    }
-    return resolved;
-}
-
-// ---------------------------------------------------------------------------
-// Interaction primitives — the inverse direction (gesture/pointer -> data).
-// ---------------------------------------------------------------------------
-
-/**
- * Turn a pointer (x, y) into a partial datum via the positional channels. The
- * single primitive `create` shares — linear, band, and 1D (missing channel) all
- * work symmetrically, on either axis, with zero per-scale branching. `enc` is a
- * resolved-encoding or scale map exposing invertible + invert per channel.
- * @param {any} enc
- * @param {{ x?: number, y?: number }} pointer
- * @returns {any}
- */
-export function datumFromPointer(enc, { x, y }) {
-    /** @type {Record<string, any>} */
-    const datum = {};
-    for (const item of [['x', x], ['y', y]]) {
-        const name = /** @type {string} */ (item[0]);
-        const px = item[1];
-        const ch = enc[name];
-        if (ch && ch.invertible && ch.field && px !== undefined) {
-            datum[ch.field] = ch.invert(px);
-        }
-    }
-    return datum;
-}
 
 /**
  * The gesture->visual half of a channel-scoped interaction: given a pointer and
@@ -275,46 +194,4 @@ export function visualForChannel(channelName, pointer, center) {
         return center ? Math.hypot(pointer.x - center.cx, pointer.y - center.cy) : undefined;
     }
     return undefined; // channel isn't spatially adjustable this way
-}
-
-/**
- * The discrete-select analogue of adjustDatum: set one channel's field on the
- * datum at `index` to `value` (a member of the channel's domain). This is the
- * shared core of every "channel editor" interaction — a legend swatch pick, a
- * click-to-cycle, a menu — which differ only in HOW they choose `value` and
- * `index`, not in how the write happens. That shared core is what makes those
- * editing layers interchangeable.
- * @param {any[]} data
- * @param {number | null} index
- * @param {string} field
- * @param {any} value
- * @returns {any[] | undefined}
- */
-export function assignChannel(data, index, field, value) {
-    if (index == null || index < 0 || field == null) return undefined;
-    return data.map((d, i) => (i === index ? { ...d, [field]: value } : d));
-}
-
-/**
- * The generic "change" operation behind move / resize / 1D-placement: for each
- * target channel, turn the gesture into a visual value, invert it back to data,
- * and write it onto a copy of `datum`. `channels` is what makes one interactor
- * move (['x','y']), resize (['size']) or drag a bar (['y']).
- * @param {any} enc
- * @param {any} datum
- * @param {string[]} channels
- * @param {{ x: number, y: number }} pointer
- * @param {any} [center]
- * @returns {any}
- */
-export function adjustDatum(enc, datum, channels, pointer, center) {
-    const next = { ...datum };
-    for (const name of channels) {
-        const ch = enc[name];
-        if (!ch || !ch.invertible || ch.field === undefined) continue;
-        const visual = visualForChannel(name, pointer, center);
-        if (visual === undefined) continue;
-        next[ch.field] = ch.invert(visual);
-    }
-    return next;
 }

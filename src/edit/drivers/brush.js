@@ -36,15 +36,15 @@ import { axisOf } from '../../core/encoding.js';
  * @returns {{ zone: 'edgeA' | 'edgeB' | 'body', field?: string } | null}
  */
 function classifyZone(feature, scales, datum, channelNames, px, py, edgeInset) {
-    const encoding = feature.encoding || {};
+    const markChannels = feature.channels || {};
     const [nameA, nameB] = channelNames;
-    const specA = encoding[nameA], specB = encoding[nameB];
+    const specA = markChannels[nameA], specB = markChannels[nameB];
     if (!specA || !specB || !datum) return null;
     const axis = axisOf(nameA);
     if (!axis) return null;
 
-    const posA = encodeChannel(scales, encoding, nameA, datum);
-    const posB = encodeChannel(scales, encoding, nameB, datum);
+    const posA = encodeChannel(scales, markChannels, nameA, datum);
+    const posB = encodeChannel(scales, markChannels, nameB, datum);
     if (posA == null || posB == null) return null;
 
     const lo = Math.min(posA, posB), hi = Math.max(posA, posB);

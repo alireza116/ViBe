@@ -36,7 +36,13 @@ export function likert(opts = {}) {
         width,
         height,
         margins: { top: 34, right: 60, bottom: 44, left: 60 },
-        x: { type: 'band', domain: options },
+        // The contract of the elicited dataset. `ordinal`, not `categorical`: a
+        // Likert's options run from one pole to the other, so the domain's order is
+        // meaningful. The schema is what lets the scales resolve with zero rows.
+        schema: { choice: { type: 'ordinal', domain: options } },
+        // A `point` would give each option a tick; the rings want the interval a
+        // band provides, so the chart overrides the mark's preference.
+        scales: { x: { type: 'band' } },
         // The elicited dataset: the one answer, or no rows until the first click.
         data: value != null ? [{ choice: value }] : [],
         // Each click appends; count trims back to the single newest point.
@@ -48,10 +54,10 @@ export function likert(opts = {}) {
         features: [
             point({
                 id: 'likert',
-                encoding: {
-                    x: { field: 'choice', type: 'band', domain: options },
-                    size: { value: THEME.radius - 3 },
-                    fill: { value: THEME.accent }
+                size: THEME.radius - 3,
+                fill: THEME.accent,
+                channels: {
+                    x: { field: 'choice' }
                 },
                 edits: [
                     // Hover previews the answer in the ring under the cursor; the

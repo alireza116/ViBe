@@ -40,15 +40,18 @@ export default {
 `const chart = Elicit({
   width: 380, height: 240,
   margins: { top: 16, right: 16, bottom: 28, left: 16 },
-  x: { type: "linear", domain: [0, 10] },
   axes: { x: {}, y: false },
   stage: 0,
   data: [{ x: 5, mag: 12 }],
   onChange: (d) => console.log(d[0]),
+  schema: {
+    x:   { type: "quantitative", domain: [0, 10] },
+    mag: { type: "quantitative", domain: [0, 14] },
+  },
   features: [
     point({
-      encoding: {
-        x:    { field: "x",   type: "linear", domain: [0, 10], edit: drag({ stage: 0 }) },
+      channels: {
+        x: { field: "x", edit: drag({ stage: 0 }) },
         size: { field: "mag", edit: resize({ stage: 1 }) },
       },
     }),

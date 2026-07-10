@@ -22,11 +22,11 @@ export default {
                 'which <code class="inline">Elicit</code> flattens into its ' +
                 '<code class="inline">features</code> list.',
             signature:
-                'composite({ parts, constraints, categoricalScale, id }) → Feature[]',
+                'composite({ parts, constraints, discreteScale, id }) → Feature[]',
             options: [
                 { name: 'parts', type: 'Mark[]', default: '[]', desc: 'The sub-marks, in z-order (visual parts first, handles last). Ordinary mark instances — a <code class="inline">ruleX</code> whisker, a <code class="inline">point</code> dot, a <code class="inline">tick</code> cap. A part with an <code class="inline">edit</code> on a channel is a handle; a part without one is inert and the engine makes it <code class="inline">pointerEvents:"none"</code> so it can’t swallow a sibling’s drag.' },
                 { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Group-level data invariants. Promoted into the <b>dataset’s</b> constraint set, so they gate and repair every edit — including one made through a different part. See <b>Constraints</b>.' },
-                { name: 'categoricalScale', type: "'band' | 'point'", default: "'band'", desc: 'Stamped onto any part that doesn’t declare its own. A glyph usually sits in a band slot.' },
+                { name: 'discreteScale', type: "'band' | 'point'", default: "'band'", desc: 'Stamped onto any part that doesn’t declare its own. A glyph usually sits in a band slot.' },
                 { name: 'id', type: 'string', default: "'composite'", desc: 'Prefix for the parts’ generated ids (<code class="inline">id/0</code>, <code class="inline">id/1</code>, …), so each part keeps a stable identity across renders.' },
             ],
             returns:
@@ -58,19 +58,23 @@ export default {
     { g: "A", value: 40 }, { g: "B", value: 62 },
     { g: "C", value: 48 }, { g: "D", value: 75 },
   ],
+  schema: {
+    g:     { type: "categorical" },
+    value: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     composite({
       id: "lollipop",
       parts: [
         ruleX({
           stroke: "#94a3b8", strokeWidth: 2,
-          encoding: { x: { field: "g" }, y2: { field: "value" } },
+          channels: { x: { field: "g" }, y2: { field: "value" } },
         }),
         point({
-          fill: "steelblue", size: { value: 7 },
-          encoding: {
-            x: { field: "g", type: "band" },
-            y: { field: "value", type: "linear", domain: [0, 100], edit: drag() },
+          fill: "steelblue", size: 7,
+          channels: {
+            x: { field: "g" },
+            y: { field: "value", edit: drag() },
           },
         }),
       ],
@@ -99,12 +103,19 @@ export default {
 `mount(Elicit({
   width: 380, height: 280,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  y: { type: "linear", domain: [0, 100] },
   data: [
     { g: "A", mean: 50, lo: 35, hi: 65 },
     { g: "B", mean: 62, lo: 55, hi: 72 },
     { g: "C", mean: 44, lo: 28, hi: 58 },
   ],
+  // lo, mean and hi all land on the y axis. The axis spans the UNION of their
+  // declared domains, so no chart-level y scale is needed.
+  schema: {
+    g:    { type: "categorical",  domain: ["A", "B", "C"] },
+    lo:   { type: "quantitative", domain: [0, 60] },
+    mean: { type: "quantitative", domain: [0, 80] },
+    hi:   { type: "quantitative", domain: [20, 100] },
+  },
   features: [
     composite({
       id: "errorbar",
@@ -112,22 +123,22 @@ export default {
         // Inert visual: no edit, so the engine makes it pointer-transparent.
         ruleX({
           stroke: "#64748b", strokeWidth: 1.5,
-          encoding: { x: { field: "g" }, y1: { field: "lo" }, y2: { field: "hi" } },
+          channels: { x: { field: "g" }, y1: { field: "lo" }, y2: { field: "hi" } },
         }),
         point({
-          fill: "steelblue", size: { value: 6 },
-          encoding: {
-            x: { field: "g", type: "band" },
+          fill: "steelblue", size: 6,
+          channels: {
+            x: { field: "g" },
             y: { field: "mean", edit: drag() },
           },
         }),
         tick({
           stroke: "#334155", strokeWidth: 2,
-          encoding: { x: { field: "g" }, y: { field: "lo", edit: drag() } },
+          channels: { x: { field: "g" }, y: { field: "lo", edit: drag() } },
         }),
         tick({
           stroke: "#334155", strokeWidth: 2,
-          encoding: { x: { field: "g" }, y: { field: "hi", edit: drag() } },
+          channels: { x: { field: "g" }, y: { field: "hi", edit: drag() } },
         }),
       ],
     }),
@@ -149,11 +160,16 @@ export default {
 `mount(Elicit({
   width: 380, height: 280,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  y: { type: "linear", domain: [0, 100] },
   data: [
     { g: "A", mean: 50, lo: 35, hi: 65 },
     { g: "B", mean: 62, lo: 55, hi: 72 },
   ],
+  schema: {
+    g:    { type: "categorical",  domain: ["A", "B"] },
+    lo:   { type: "quantitative", domain: [0, 100] },
+    mean: { type: "quantitative", domain: [0, 100] },
+    hi:   { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     composite({
       id: "errorbar",
@@ -167,12 +183,12 @@ export default {
       parts: [
         ruleX({
           stroke: "#64748b", strokeWidth: 1.5,
-          encoding: { x: { field: "g" }, y1: { field: "lo" }, y2: { field: "hi" } },
+          channels: { x: { field: "g" }, y1: { field: "lo" }, y2: { field: "hi" } },
         }),
         point({
-          fill: "steelblue", size: { value: 6 },
-          encoding: {
-            x: { field: "g", type: "band" },
+          fill: "steelblue", size: 6,
+          channels: {
+            x: { field: "g" },
             // Coupled move: the dot shifts lo/hi by the mean's delta.
             y: { field: "mean",
                  edit: edit.custom((d, e, ctx) => {
@@ -185,11 +201,11 @@ export default {
         }),
         tick({
           stroke: "#334155", strokeWidth: 2,
-          encoding: { x: { field: "g" }, y: { field: "lo", edit: drag() } },
+          channels: { x: { field: "g" }, y: { field: "lo", edit: drag() } },
         }),
         tick({
           stroke: "#334155", strokeWidth: 2,
-          encoding: { x: { field: "g" }, y: { field: "hi", edit: drag() } },
+          channels: { x: { field: "g" }, y: { field: "hi", edit: drag() } },
         }),
       ],
     }),

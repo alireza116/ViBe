@@ -9,10 +9,10 @@
 //     id: 'errorbar',
 //     constraints: [centerWithinEnds],
 //     parts: [
-//       ruleX({ encoding: { x: {field:'g'}, y1: {field:'lo'}, y2: {field:'hi'} } }),
-//       point({ encoding: { x: {field:'g'}, y:  {field:'mean', edit: drag()} } }),
-//       tick({  encoding: { x: {field:'g'}, y:  {field:'lo',   edit: drag()} } }),
-//       tick({  encoding: { x: {field:'g'}, y:  {field:'hi',   edit: drag()} } }),
+//       ruleX({ channels: { x: {field:'g'}, y1: {field:'lo'}, y2: {field:'hi'} } }),
+//       point({ channels: { x: {field:'g'}, y:  {field:'mean', edit: drag()} } }),
+//       tick({  channels: { x: {field:'g'}, y:  {field:'lo',   edit: drag()} } }),
+//       tick({  channels: { x: {field:'g'}, y:  {field:'hi',   edit: drag()} } }),
 //     ],
 //   })
 //
@@ -54,7 +54,7 @@ export function composite(options = {}) {
         // Glyphs usually sit in category slots; a band gives each part a centred
         // slot. Stamped onto parts that don't state their own preference. (Scale
         // resolution lets 'band' win a disagreement between marks anyway.)
-        categoricalScale = 'band'
+        discreteScale = 'band'
     } = options;
 
     return parts.map((part, i) => ({
@@ -62,7 +62,7 @@ export function composite(options = {}) {
         // Deterministic, stable ids so a part keeps its identity across renders
         // (the engine keys scene nodes and driver sessions by feature id).
         id: part.id || `${id || 'composite'}/${i}`,
-        categoricalScale: part.categoricalScale || categoricalScale,
+        discreteScale: part.discreteScale || discreteScale,
         // Group-level invariants ride on the first part. Placement is immaterial —
         // the engine promotes every feature's `constraints` into one dataset-wide
         // set — but attaching them once keeps the set clean before it dedupes.

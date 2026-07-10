@@ -12,6 +12,7 @@
 // path. Styling lives in styles.css (linked below), never inline — keeps this lean.
 
 import * as vibe from '../src/index.js';
+import * as d3 from 'd3';
 import { SITE } from './_nav.js';
 
 // ---- dependency surface (namespace spread → self-maintaining) ---------------
@@ -29,6 +30,9 @@ const depObj = {
     edit: vibe.edit,
     guides: vibe.guides,
     widgets: vibe.widgets,
+    // A channel's `scale` takes a live d3 scale, and a guide option takes a
+    // function of the data — both want d3 in scope (see scales.html, guides.html).
+    d3,
 };
 const depNames = Object.keys(depObj);
 const depVals = Object.values(depObj);

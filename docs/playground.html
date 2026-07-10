@@ -520,29 +520,50 @@
         return cachedData;
       }
 
-      // Every mark is channel-native: the whole spec is one encoding — a map of
-      // channel -> { field, type?, domain?, edit? }. Each channel owns its edit
-      // (gesture->data). The controls assemble encoding + edits + guides below.
+      // Every mark is channel-native: a mark is a map of channel -> { field, edit? }
+      // over the chart's ONE dataset. Each channel owns its edit (gesture->data).
+      // The controls assemble channels + edits + guides below.
+      //
+      // Note what a channel does NOT carry: a data type or a domain. Those belong
+      // to the data and are declared once, on the spec's `schema`. The scale falls
+      // out of the two: a categorical field on a bar's x is a band (a bar needs the
+      // interval), on a dot's x it's a point (a dot wants the tick).
       const MARKS = { point: vibe.plot.point, bar: vibe.plot.bar, tick: vibe.plot.tick, line: vibe.plot.line };
 
       // The mark feature's id. In the new model declarative guides position by
       // value (not by target), and introspective guides are owned by their edit,
-      // so an id is rarely needed — kept for onChange/debugging clarity.
+      // so an id is rarely needed — kept for debugging clarity.
       const FEATURE_ID = "responses";
 
-      // One positional channel spec from its axis controls (no edit attached yet).
-      // A categorical ("band") selection resolves to the concrete scale the mark
-      // wants: `band` for a bar (needs the interval), `point` for a dot (a tick).
-      function axisChannel(field, type, domain, cats, catType) {
-        if (type === "none") return undefined;
-        return type === "band"
-          ? { field, type: catType, domain: cats }
-          : { field, type: "linear", domain };
+      // One positional channel from its axis controls (no edit attached yet).
+      function axisChannel(field, type) {
+        return type === "none" ? undefined : { field };
+      }
+
+      // The dataset's contract, from the same axis controls. `group` and `mag` are
+      // the extra fields every generated row carries (see `decorate`), so the
+      // fill/size channels always have something to bind to.
+      function buildSchema(opts) {
+        const axis = (type, domain, cats) =>
+          type === "band"
+            ? { type: "categorical", domain: cats }
+            : { type: "quantitative", domain };
+        const schema = {};
+        if (opts.xType !== "none") schema.x = axis(opts.xType, opts.xDomain, opts.xCats);
+        if (opts.yType !== "none") schema.y = axis(opts.yType, opts.yDomain, opts.yCats);
+        // Only ENCODED fields need declaring; `decorate` puts group/mag on every
+        // row, but a field nothing binds to has no scale and no schema entry.
+        if (opts.mark === "point") {
+          if (opts.color === "group") schema.group = { type: "categorical", domain: GROUPS };
+          if (opts.color === "mag" || opts.size === "mag")
+            schema.mag = { type: "quantitative", domain: [0, 100] };
+        }
+        return schema;
       }
 
       // ---- Codegen scaffolding -----------------------------------------------
       // A Raw marker lets us drop real API-call source (an edit()/constraint()
-      // call) into the serialized encoding object verbatim, so the printed spec
+      // call) into the serialized channels object verbatim, so the printed spec
       // matches the live one exactly.
       class Raw {
         constructor(s) {
@@ -552,7 +573,7 @@
       const raw = (s) => new Raw(s);
 
       // Pretty-print a value as JS source. Raw prints as-is; short objects/arrays
-      // inline, longer ones wrap. Kept in sync with the built encoding.
+      // inline, longer ones wrap. Kept in sync with the built channels map.
       function js(v, indent = "") {
         if (v instanceof Raw) return v.s;
         if (Array.isArray(v)) {
@@ -671,11 +692,13 @@
         const lineSequence = isLine && opts.order === "sequence";
         // Bars and ticks both live in a band (bar fills it, tick spans it as a
         // line), so both want the band interval; dots want a point per category.
+        // Neither is stated here — the MARK declares its `discreteScale`, and the
+        // schema says which fields are categorical. This is the only place that
+        // knowledge is needed, and it's now about DATA, not scales.
         const bandMark = isBar || isTick;
-        const catType = bandMark ? "band" : "point";
-        const isCat = (s) => s.type === "band" || s.type === "point";
-        const x = axisChannel("x", opts.xType, opts.xDomain, opts.xCats, catType);
-        const y = axisChannel("y", opts.yType, opts.yDomain, opts.yCats, catType);
+        const isCat = (axis) => opts[`${axis}Type`] === "band";
+        const x = axisChannel("x", opts.xType);
+        const y = axisChannel("y", opts.yType);
         const pos = [
           ["x", x],
           ["y", y],
@@ -684,10 +707,10 @@
           return { error: "Pick at least one positional axis (x or y)." };
 
         if (isBar) {
-          const bands = pos.filter(([, s]) => s.type === "band").length;
+          const bands = pos.filter(([n]) => isCat(n)).length;
           if (pos.length !== 2 || bands !== 1)
             return {
-              error: "A bar needs exactly one band axis and one linear axis.",
+              error: "A bar needs exactly one categorical axis and one numeric axis.",
             };
         }
 
@@ -695,17 +718,17 @@
         // for a band mark (bar/tick) it's the linear axis; for a point it's y if
         // present, else x.
         const valueAxis = bandMark
-          ? x && x.type !== "band"
+          ? x && !isCat("x")
             ? "x"
             : "y"
           : y
             ? "y"
             : "x";
-        // The category axis/axes (band) — what `unique` groups by. With two band
-        // axes (a categorical grid) the key is composite, so uniqueness is
-        // per-CELL, not per-column. Field name equals the channel name here.
+        // The category axis/axes — what `unique` groups by. With two categorical
+        // axes (a grid) the key is composite, so uniqueness is per-CELL, not
+        // per-column. Field name equals the channel name here.
         const categoryNames = pos
-          .filter(([, s]) => isCat(s))
+          .filter(([n]) => isCat(n))
           .map(([n]) => n);
         const categoryField =
           categoryNames.length === 0
@@ -736,7 +759,7 @@
         // plain click recolours (noAlt), Alt-click deletes (alt).
         const delSharesClick = opts.del && wantColorEdit;
 
-        // Build the encoding in parallel: enc (live) + encCode (Raw source).
+        // Build the channels in parallel: enc (live) + encCode (Raw source).
         const enc = {},
           encCode = {};
         const setCh = (name, base, editPair) => {
@@ -749,7 +772,7 @@
         for (const [name, base] of pos) {
           // A band mark's category axis isn't draggable; every other positional
           // channel gets a drag edit. Only the value axis carries constraints/guide.
-          if (bandMark && base.type === "band") {
+          if (bandMark && isCat(name)) {
             setCh(name, base);
             continue;
           }
@@ -787,14 +810,17 @@
           );
         }
 
-        // Non-positional channels (color/size) apply only to the point mark — the
+        // Non-positional channels (fill/size) apply only to the point mark — the
         // one whose channel controls are shown. Bars, ticks and lines omit them
-        // (for a line, a color FIELD would silently split it into series).
+        // (for a line, a `stroke` FIELD would silently split it into series).
+        //
+        // `fill` is the colour channel; the domain lives on the schema, and only
+        // the size channel's output RANGE (radii, in px) rides on its scale.
         if (opts.mark === "point") {
           if (opts.color === "group")
             setCh(
-              "color",
-              { field: "group", domain: GROUPS },
+              "fill",
+              { field: "group" },
               wantColorEdit
                 ? delSharesClick
                   ? {
@@ -804,11 +830,11 @@
                   : { real: cycle(), code: `cycle()` }
                 : null,
             );
-          else if (opts.color === "mag") setCh("color", { field: "mag" });
+          else if (opts.color === "mag") setCh("fill", { field: "mag" });
           if (opts.size === "mag")
             setCh(
               "size",
-              { field: "mag", domain: [0, 100], range: [4, 40] },
+              { field: "mag", scale: { range: [4, 40] } },
               wantResize
                 ? {
                     real: resize({ when: vibe.when.shift }),
@@ -870,10 +896,10 @@
         const guides = [],
           guideCodes = [];
         if (opts.gRule) {
-          if (y && !isCat(y)) {
+          if (y && !isCat("y")) {
             guides.push(vibe.guides.rule({ y: 50, label: "target 50" }));
             guideCodes.push(`vibe.guides.rule({ y: 50, label: "target 50" })`);
-          } else if (x && isCat(x)) {
+          } else if (x && isCat("x")) {
             const mid = opts.xCats[Math.floor(opts.xCats.length / 2)];
             guides.push(vibe.guides.rule({ x: mid, label: "midpoint" }));
             guideCodes.push(
@@ -882,28 +908,33 @@
           }
         }
 
+        // A mark never owns data — it is a view over the chart's one dataset, so
+        // `data`/`onChange`/`schema` all sit on the Elicit spec below.
         const feature = MARKS[opts.mark]({
           id: FEATURE_ID,
-          data,
-          encoding: enc,
+          channels: enc,
           edits: markEdits,
           constraints: featureCons.map((c) => c.real),
-          onChange,
           ...(isBar ? { fill: "#4f46e5" } : {}),
           ...(isTick ? { stroke: "#4f46e5", strokeWidth: 3 } : {}),
           ...(isLine ? { stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", order: opts.order } : {}),
         });
 
         const oneD = pos.length < 2;
+        const schema = buildSchema(opts);
         return {
           spec: {
             width: 600,
             height: oneD ? 200 : 380,
+            schema,
+            data,
+            onChange,
             features: [feature],
             guides,
           },
           code: generateCode(
             opts,
+            schema,
             encCode,
             markEditCodes,
             featureCons.map((c) => c.code),
@@ -929,7 +960,7 @@
       }
 
       // ---- Codegen: print the exact spec for the current selection -----------
-      function generateCode(opts, encCode, markEditCodes, constraintCodes, guideCodes, oneD) {
+      function generateCode(opts, schema, encCode, markEditCodes, constraintCodes, guideCodes, oneD) {
         const markFn =
           opts.mark === "bar" ? "vibe.plot.bar"
           : opts.mark === "tick" ? "vibe.plot.tick"
@@ -941,10 +972,14 @@
         out.push(`vibe.Elicit({`);
         out.push(`  width: 600,`);
         out.push(`  height: ${oneD ? 200 : 380},`);
+        out.push(`  // The contract of the elicited dataset: what each field IS, and`);
+        out.push(`  // its domain. Every scale below is derived from this.`);
+        out.push(`  schema: ${js(schema, "  ")},`);
+        out.push(`  data, // generated sample data (see Data panel)`);
+        out.push(`  onChange: (data) => { /* your belief state */ },`);
         out.push(`  features: [`);
         out.push(`    ${markFn}({`);
-        out.push(`      data, // generated sample data (see Data panel)`);
-        out.push(`      encoding: ${js(encCode, "      ")},`);
+        out.push(`      channels: ${js(encCode, "      ")},`);
         if (opts.mark === "bar") out.push(`      fill: "#4f46e5",`);
         if (opts.mark === "tick") {
           out.push(`      stroke: "#4f46e5",`);
@@ -966,7 +1001,6 @@
           constraintCodes.forEach((c) => out.push(`        ${c},`));
           out.push(`      ],`);
         }
-        out.push(`      onChange: (data) => { /* your belief state */ },`);
         out.push(`    }),`);
         out.push(`  ],`);
         if (guideCodes.length) {
@@ -979,21 +1013,22 @@
       }
 
       // Minimal syntax highlighting for the code panel (escape first, then wrap).
+      // One pass over the source, so a token can never be re-scanned. Chaining
+      // .replace() would emit `<span class="tok-com">` and then let the STRING
+      // rule match the `"tok-com"` inside the markup it just wrote.
       function highlightCode(code) {
         const esc = code
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;");
-        return esc
-          .replace(/(\/\/[^\n]*)/g, '<span class="tok-com">$1</span>')
-          .replace(
-            /(&quot;|")([^"]*)(")/g,
-            '<span class="tok-str">$1$2$3</span>',
-          )
-          .replace(
-            /\b(vibe(?:\.[a-zA-Z]+)+)/g,
-            '<span class="tok-fn">$1</span>',
-          );
+        return esc.replace(
+          /(\/\/[^\n]*)|("[^"]*")|\b(vibe(?:\.[a-zA-Z]+)+)/g,
+          (m, comment, string, fn) => {
+            if (comment) return `<span class="tok-com">${comment}</span>`;
+            if (string) return `<span class="tok-str">${string}</span>`;
+            return `<span class="tok-fn">${fn}</span>`;
+          },
+        );
       }
 
       // ---- Wiring ------------------------------------------------------------

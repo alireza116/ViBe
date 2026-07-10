@@ -12,7 +12,7 @@
 // gated off and the value is frozen, exactly as the original study instrument
 // behaved.
 //
-// Read the answer at any point with container.getData('lineCone') →
+// Read the answer at any point with container.getData() →
 // [{ r, spread }] where `r` is the correlation in [-1, 1] and `spread` is the
 // half-width of the plausible envelope in the same units. `container.on('stage')`
 // tells you which question the reader is on (2 = both answered).
@@ -50,6 +50,12 @@ export function lineCone(opts = {}) {
         // Side margins hold the two-line x labels; the top margin stacks the prompt
         // above the "y (high)" label.
         margins: { top: 56, right: 92, bottom: 52, left: 92 },
+        // The contract of the elicited dataset: a correlation in [-1, 1] and the
+        // half-width of its plausible envelope, in the same units.
+        schema: {
+            r: { type: 'quantitative', domain: [-1, 1], default: 0 },
+            spread: { type: 'quantitative', domain: [0, 1], default: 0 }
+        },
         // The elicited dataset: the correlation and its envelope half-width.
         data: [{ r, spread }],
         onChange,
@@ -58,16 +64,20 @@ export function lineCone(opts = {}) {
         features: [
             cone({
                 id: 'lineCone',
-                encoding: {
-                    // Stage 0: the pointer's angle IS the correlation.
+                channels: {
+                    // Stage 0: the pointer's angle IS the correlation. The scale's
+                    // RANGE is in degrees, so encode and edit are exact inverses —
+                    // that is the whole trick behind rotate() (see edit/basic.js).
                     angle: {
-                        field: 'r', type: 'linear', domain: [-1, 1], range: [-45, 45],
+                        field: 'r',
+                        scale: { range: [-45, 45] },
                         edit: rotate({ pick: 'probe', stage: 0 })
                     },
                     // Stage 1: the pointer's angular distance from the committed line
                     // is the envelope half-width — so the cone edge sits under the cursor.
                     spread: {
-                        field: 'spread', type: 'linear', domain: [0, 1], range: [0, 45],
+                        field: 'spread',
+                        scale: { range: [0, 45] },
                         edit: rotate({ pick: 'probe', stage: 1, relativeTo: 'angle' })
                     }
                 },

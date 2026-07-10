@@ -23,17 +23,17 @@ export default {
                 '<code class="inline">connectedScatter</code> and <code class="inline">path</code> default to ' +
                 '<code class="inline">order:"sequence"</code>.',
             signatures: [
-                'line({ encoding, series, order, curve, handles, handleRadius, samples, edits }) → Feature',
+                'line({ channels, series, order, curve, handles, handleSize, samples, edits }) → Feature',
                 'lineY(options) → Feature   // value on y (time series)',
                 'connectedScatter(options) → Feature   // order: "sequence"',
             ],
             options: [
-                { name: 'encoding', type: 'object', default: '{}', desc: 'Channel map — see <b>Channels</b>.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'Channel map — see <b>Channels</b>.' },
                 { name: 'series', type: 'string', default: 'auto', desc: 'Field grouping points into lines (alias <code class="inline">z</code>). Defaults to the stroke/color field so a coloured chart auto-groups.' },
                 { name: 'order', type: "'domain' | 'sequence' | field", default: "'domain'", desc: 'How each series is connected: sorted by the domain axis, as-drawn, or by a named field.' },
                 { name: 'curve', type: 'string', default: "'linear'", desc: 'Interpolation between handles (e.g. <code class="inline">"catmullRom"</code>, <code class="inline">"step"</code>).' },
                 { name: 'handles', type: 'boolean', default: 'true', desc: 'Show the per-datum handles. When false they stay (for hit-testing) but render invisible.' },
-                { name: 'handleRadius', type: 'number', default: '4', desc: 'Pixel radius of each handle.' },
+                { name: 'handleSize', type: 'number', default: '4', desc: 'Pixel radius of each handle.' },
                 { name: 'samples', type: 'number | any[]', default: 'ticks', desc: 'Domain grid used by line authoring (<code class="inline">newSeries</code>/<code class="inline">draw</code>).' },
                 { name: 'edits, constraints, id', type: '—', default: '—', desc: 'As on every mark. Line authoring edits live under <code class="inline">edit.line.*</code>.' },
             ],
@@ -68,12 +68,17 @@ export default {
     { x: 0, y: 40 }, { x: 1, y: 62 }, { x: 2, y: 48 },
     { x: 3, y: 78 }, { x: 4, y: 60 }, { x: 5, y: 84 },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 5] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 5] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
     }),
   ],
@@ -101,12 +106,17 @@ export default {
     { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
     { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 7] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 7] },
-        y: { field: "y", type: "linear", domain: [0, 100],
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
              edit: drag({ pick: "sweep", guide: true }) },
       },
     }),
@@ -121,7 +131,7 @@ export default {
             intro:
                 'The per-point handles are optional. handles: false renders them invisible but ' +
                 'keeps them for hit-testing, so the line stays fully editable — you just don’t ' +
-                'see the dots. handleRadius sizes them when shown.',
+                'see the dots. handleSize sizes them when shown.',
             examples: [
                 {
                     title: 'A clean line, still sweepable',
@@ -135,13 +145,18 @@ export default {
     { x: 0, y: 50 }, { x: 1, y: 50 }, { x: 2, y: 50 }, { x: 3, y: 50 },
     { x: 4, y: 50 }, { x: 5, y: 50 }, { x: 6, y: 50 }, { x: 7, y: 50 },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 7] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     lineY({
       stroke: "#7c3aed", strokeWidth: 3, curve: "catmullRom",
       handles: false,   // hide the anchor dots (still editable)
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 7] },
-        y: { field: "y", type: "linear", domain: [0, 100],
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
              edit: drag({ pick: "sweep", guide: true }) },
       },
     }),
@@ -170,14 +185,20 @@ export default {
     { g: "plan",   x: 0, y: 30 }, { g: "plan",   x: 1, y: 45 }, { g: "plan",   x: 2, y: 40 }, { g: "plan",   x: 3, y: 60 },
     { g: "actual", x: 0, y: 70 }, { g: "actual", x: 1, y: 62 }, { g: "actual", x: 2, y: 75 }, { g: "actual", x: 3, y: 68 },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 3] },
+    y: { type: "quantitative", domain: [0, 100] },
+    g: { type: "ordinal" },
+  },
   features: [
     lineY({
       strokeWidth: 3, curve: "catmullRom",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 3] },
-        y: { field: "y", type: "linear", domain: [0, 100],
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
              edit: drag({ pick: "sweep", guide: true }) },
-        stroke: { field: "g", type: "ordinal" }, // groups AND colours the lines
+        stroke: { field: "g" }, // groups AND colours the lines
       },
     }),
   ],
@@ -203,17 +224,21 @@ export default {
 `mount(Elicit({
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  schema: { s: {}, x: {}, y: {} },
   data: [
     { s: 0, x: 20, y: 30 }, { s: 0, x: 45, y: 70 },
     { s: 0, x: 70, y: 40 }, { s: 0, x: 85, y: 80 },
   ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     connectedScatter({
       stroke: "#0d9488", strokeWidth: 3, series: "s",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [
         drag({ channels: ["x", "y"], pick: "nearest", threshold: 40 }),
@@ -241,14 +266,18 @@ export default {
 `mount(Elicit({
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  schema: { s: {}, x: {}, y: {} },
   data: [],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 10] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", series: "s",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 10] },
-        y: { field: "y", type: "linear", domain: [0, 100],
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
              edit: drag({ pick: "sweep", guide: true }) },
       },
       edits: [ edit.line.newSeries({ domain: "x", value: "y", series: "s", samples: 6 }) ],
@@ -277,14 +306,18 @@ export default {
 `mount(Elicit({
   width: 420, height: 300,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
-  schema: { s: {}, x: {}, y: {} },
   data: [],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 10] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", series: "s",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 10] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [ edit.line.draw({ domain: "x", value: "y", series: "s", samples: 8 }) ],
     }),

@@ -16,14 +16,14 @@ export default {
                 'infers orientation from which axis is a band; <code class="inline">barY</code> forces ' +
                 'vertical, <code class="inline">barX</code> horizontal. All three share these options.',
             signatures: [
-                'bar({ encoding, orientation, edits, constraints, id }) → Feature',
+                'bar({ channels, orientation, edits, constraints, id }) → Feature',
                 'barY(options) → Feature   // orientation: "vertical"',
                 'barX(options) → Feature   // orientation: "horizontal"',
             ],
             options: [
-                { name: 'encoding', type: 'object', default: '{}', desc: 'Channel map — one band axis (category) and one linear axis (value or a span). See <b>Channels</b>.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'Channel map — one band axis (category) and one linear axis (value or a span). See <b>Channels</b>.' },
                 { name: 'orientation', type: "'vertical' | 'horizontal'", default: 'auto', desc: 'Override the inferred direction (bar only; barY/barX pin it).' },
-                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in <code class="inline">encoding[ch].edit</code>.' },
+                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in <code class="inline">channels[ch].edit</code>.' },
                 { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark (e.g. <code class="inline">maintainSum</code>).' },
                 { name: 'fill, stroke, …', type: 'style', default: "fill: 'steelblue'", desc: 'Style shorthands / channels (see the style surface on any mark).' },
             ],
@@ -54,12 +54,16 @@ export default {
     { cat: "A", n: 30 }, { cat: "B", n: 55 },
     { cat: "C", n: 22 }, { cat: "D", n: 44 },
   ],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n:   { type: "quantitative", domain: [0, 60] },
+  },
   features: [
     bar({
       fill: "#4f46e5",
-      encoding: {
-        x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "n",   type: "linear", domain: [0, 60] },
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n" },
       },
     }),
   ],
@@ -76,11 +80,16 @@ export default {
     { cat: "A", n: 34, kind: "low" },  { cat: "B", n: 58, kind: "high" },
     { cat: "C", n: 22, kind: "low" },  { cat: "D", n: 47, kind: "high" },
   ],
+  schema: {
+    cat:  { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n:    { type: "quantitative", domain: [0, 60] },
+    kind: { type: "categorical", domain: ["low", "high"] },
+  },
   features: [
     bar({
-      encoding: {
-        x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "n", type: "linear", domain: [0, 60] },
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n" },
         fill: { field: "kind" },
       },
     }),
@@ -107,13 +116,16 @@ export default {
     { region: "North", sales: 42 }, { region: "South", sales: 68 },
     { region: "East", sales: 30 },  { region: "West", sales: 54 },
   ],
+  schema: {
+    region: { type: "categorical", domain: ["North", "South", "East", "West"] },
+    sales:  { type: "quantitative", domain: [0, 80] },
+  },
   features: [
     barX({
       fill: "#0d9488",
-      encoding: {
-        y: { field: "region", type: "band",
-             domain: ["North", "South", "East", "West"] },
-        x: { field: "sales", type: "linear", domain: [0, 80] },
+      channels: {
+        y: { field: "region" },
+        x: { field: "sales" },
       },
     }),
   ],
@@ -142,13 +154,17 @@ export default {
     { person: "Grace", start: 1930, end: 1992 },
     { person: "Alan",  start: 1931, end: 1954 },
   ],
+  schema: {
+    person: { type: "categorical", domain: ["Ada", "Grace", "Alan"] },
+    start:  { type: "quantitative", domain: [1820, 2000] },
+    end:    { type: "quantitative", domain: [1840, 2000] },
+  },
   features: [
     barX({
       fill: "#7b2d8b",
-      encoding: {
-        y: { field: "person", type: "band",
-             domain: ["Ada", "Grace", "Alan"] },
-        x1: { field: "start", type: "linear", domain: [1820, 2000] },
+      channels: {
+        y: { field: "person" },
+        x1: { field: "start" },
         x2: { field: "end" },
       },
     }),
@@ -172,13 +188,17 @@ export default {
     { person: "Grace", start: 1930, end: 1992 },
     { person: "Alan",  start: 1931, end: 1954 },
   ],
+  schema: {
+    person: { type: "categorical", domain: ["Ada", "Grace", "Alan"] },
+    start:  { type: "quantitative", domain: [1820, 2000] },
+    end:    { type: "quantitative", domain: [1840, 2000] },
+  },
   features: [
     barX({
       fill: "#2563eb",
-      encoding: {
-        y: { field: "person", type: "band",
-             domain: ["Ada", "Grace", "Alan"] },
-        x1: { field: "start", type: "linear", domain: [1820, 2000] },
+      channels: {
+        y: { field: "person" },
+        x1: { field: "start" },
         x2: { field: "end" },
       },
       edits: [
@@ -210,12 +230,16 @@ export default {
     { x: "A", y: 20 }, { x: "B", y: 45 },
     { x: "C", y: 30 }, { x: "D", y: 60 },
   ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     bar({
       fill: "#4f46e5",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y", edit: drag() },
       },
     }),
   ],
@@ -233,12 +257,16 @@ export default {
     { x: "A", y: 20 }, { x: "B", y: 45 },
     { x: "C", y: 30 }, { x: "D", y: 60 },
   ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     bar({
       fill: "#2563eb",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "y", type: "linear", domain: [0, 100],
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
              edit: drag({ pick: "nearest", threshold: 40, guide: true }) },
       },
     }),

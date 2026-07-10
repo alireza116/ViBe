@@ -2,13 +2,31 @@ import { ScaleLinear, ScaleBand, ScaleOrdinal } from 'd3';
 
 export type Datum = Record<string, any>;
 
-export type ScaleType = 'linear' | 'time' | 'band' | 'point' | 'ordinal' | 'sequential';
+// How a channel DRAWS a field. Never written as `type` on a channel — that slot
+// holds the data type. A scale type is named by `scale` (a string, or the `type`
+// of a ScaleSpec). See scaleTypeFor in core/encoding.js for the routing.
+export type ScaleType =
+  | 'linear' | 'log' | 'pow' | 'sqrt' | 'time'
+  | 'band' | 'point' | 'ordinal' | 'sequential';
 
 // A field's MEASUREMENT type in the dataset schema (what the data means), as
-// opposed to a ScaleType (how a channel draws it). measureToScaleType translates
-// one to the other per channel. `quantitative`/`temporal` are continuous;
+// opposed to a ScaleType (how a channel draws it). scaleTypeFor translates one to
+// the other per channel. `quantitative`/`temporal` are continuous;
 // `categorical`/`ordinal` are discrete (ordinal's domain order is significant).
 export type MeasureType = 'quantitative' | 'categorical' | 'ordinal' | 'temporal';
+
+// A scale's own configuration — everything about HOW a field is drawn that isn't
+// the data's business. The domain is deliberately absent: it belongs to the data,
+// and is declared once on the schema (see FieldSchema.domain).
+export interface ScaleSpec {
+  type?: ScaleType;
+  range?: any[];
+  padding?: number;    // band / point
+  nice?: boolean;      // continuous
+  clamp?: boolean;     // continuous
+  base?: number;       // log
+  exponent?: number;   // pow
+}
 
 // One field of the elicited-dataset schema. Declares the field's measurement
 // type and (optionally) its domain — [min,max] for quantitative/temporal, the
@@ -25,8 +43,22 @@ export interface FieldSchema {
 // chart resolves its scales — and can mint new data — with zero starter data.
 export type Schema = Record<string, FieldSchema>;
 
+// What a scale can DO, sniffed from the scale object itself and stamped once at
+// creation/adoption. Marks, edits and axes branch on `kind` — never on `type`,
+// which is only a label (an adopted d3 scale has no type at all, and a `log`
+// scale behaves exactly like a `linear` one everywhere it matters).
+//   band       -> occupies an interval per category (bandwidth)
+//   point      -> a tick per category (no width)
+//   continuous -> has invert(): linear, log, pow, sqrt, time, symlog
+//   discrete   -> maps a value to a discrete output (ordinal, sequential ramp)
+export type ScaleKind = 'band' | 'point' | 'continuous' | 'discrete';
+
 export interface CustomScaleProperties {
-  type: ScaleType;
+  // A label, for axis tick formatting and debugging. NOT control flow.
+  type?: ScaleType;
+  kind: ScaleKind;
+  // The domain holds Dates, so encode() coerces values before positioning.
+  temporal: boolean;
   domainConfig?: any[];
   invertible: boolean;
   encode: (value: any, fallback?: any) => any;
@@ -52,9 +84,12 @@ export interface EditContext {
   pointer: { x: number; y: number };
   node: any | null;
   event: any;
+  // The edit's own target channels, resolved to { name, field, scale }.
   channels: ResolvedChannel[];
   scales: ScaleMap;
-  encoding: Record<string, any>;
+  // The whole mark's channel map (name -> ChannelSpec), for edits that need to
+  // look up a sibling channel's field. Distinct from `channels` above.
+  markChannels: Record<string, any>;
   // Plot pixel dimensions, for a gesture measured against the whole plane (e.g.
   // rotate about the centre), the angular sibling of resize's mark-centre radius.
   width?: number;
@@ -136,17 +171,29 @@ export interface Edit {
 }
 
 // A single channel binding on a mark (Observable Plot's model, declarative).
-// One of: `{ field }` (scaled through the channel's global scale), `{ value }`
-// (a constant, e.g. `fill: 'red'` desugars to this), or `{ field, scale: null }`
-// (a raw field, read unscaled — the datum already holds a literal colour/pixel).
+// One of:
+//   { field }              a data field, through the channel's global scale
+//   { value }              a VISUAL-space constant — skips the scale entirely
+//                          (`fill: 'red'` desugars to this)
+//   { datum }              a DATA-space constant — goes THROUGH the scale, so
+//                          `y: { datum: 25 }` lands at the pixel where y=25 is
+//   { field, scale: null } a raw field, read unscaled (the datum already holds a
+//                          literal colour / pixel)
 // No accessor functions, so specs stay serializable/introspectable.
 export interface ChannelSpec {
   field?: string;
   value?: any;
-  scale?: ScaleType | null;
-  type?: ScaleType;
-  domain?: any[];
-  range?: any[];
+  datum?: any;
+  // The field's DATA type. Overrides the schema's declaration for this channel;
+  // useful for a field the schema doesn't cover. Below an explicit `scale`.
+  type?: MeasureType;
+  // The scale, by name (`'log'`), by spec (`{ type: 'sqrt', range: [4, 20] }`),
+  // as a live d3 scale (adopted as-is; see adoptScale in core/scales.js), or
+  // `null` to read the field unscaled.
+  scale?: ScaleType | ScaleSpec | Function | null;
+  // Makes the channel writable: a gesture inverts back to `field` through this
+  // same scale. Collected by edit/route.js's collectEdits.
+  edit?: Edit;
 }
 
 // The standard style channels every mark understands. A field drives them
@@ -161,7 +208,7 @@ export interface StyleChannels {
   strokeOpacity?: ChannelSpec;
 }
 
-export interface Encoding extends StyleChannels {
+export interface Channels extends StyleChannels {
   x?: ChannelSpec;
   y?: ChannelSpec;
   // Explicit span endpoints (bar's x1/x2 or y1/y2): alternative to x/y for a
@@ -171,27 +218,29 @@ export interface Encoding extends StyleChannels {
   x2?: ChannelSpec;
   y1?: ChannelSpec;
   y2?: ChannelSpec;
+  // Circle radius in px. Constant form is the `size` shorthand, not resolveStyle.
   size?: ChannelSpec;
-  color?: ChannelSpec;
   [channel: string]: ChannelSpec | undefined;
 }
 
 // The shared option surface for every mark factory (bar, point, and new marks).
-// `encoding` carries the channels; the style shorthands are sugar that desugar
-// into constant channels via normalizeMarkOptions (explicit `encoding` wins).
+// `channels` carries the bindings; the shorthands are sugar that desugar into
+// constant channels via normalizeMarkOptions (an explicit `channels` entry wins).
 //
 // A mark NEVER owns data: `Elicit` owns the one dataset, and a mark is a view
 // over it that encodes some columns and may edit them. There is no `data` or
-// `onChange` here — both live on ElicitSpec.
+// `onChange` here — both live on ElicitSpec. Nor does it own a domain: that is
+// the data's, declared once on the schema.
 export interface MarkOptions {
-  encoding?: Encoding;
-  // Style shorthands (constants) — e.g. `fill: 'steelblue'`, `strokeWidth: 2`.
+  channels?: Channels;
+  // Constant shorthands — e.g. `fill: 'steelblue'`, `strokeWidth: 2`, `size: 9`.
   fill?: any;
   stroke?: any;
   strokeWidth?: number;
   opacity?: number;
   fillOpacity?: number;
   strokeOpacity?: number;
+  size?: number;
   id?: string;
   edits?: any[];
   // Sugar. Constraints are DATASET invariants; declaring them on a mark is a
@@ -212,7 +261,7 @@ export interface CompositeOptions {
   id?: string;
   // Stamped onto any part that doesn't declare its own (a glyph usually sits in a
   // band slot). See plot/composite.js.
-  categoricalScale?: 'band' | 'point';
+  discreteScale?: 'band' | 'point';
   // Group-level data invariants; promoted to the dataset like any mark's.
   constraints?: Constraint[];
 }
@@ -310,8 +359,8 @@ export interface AxisSpec {
   tickFormat?: string | ((v: any) => string); // d3-format string or a formatter
   tickSize?: number;
   title?: string;
-  stroke?: string;
-  color?: string;
+  stroke?: string;   // spine + ticks
+  fill?: string;     // tick labels + title (they are text nodes)
   fontSize?: number;
   grid?: boolean;               // also emit a paired gridline mark
 }
@@ -342,10 +391,12 @@ export interface ElicitSpec {
   // never own data. May be omitted: with a `schema`, scales resolve and `create`
   // mints rows from nothing.
   data?: Datum[];
-  // The elicited-dataset schema (field -> measurement type/domain/default). Lets a
-  // chart resolve scales and mint data with zero starter data; ranked above data
-  // inference but below an explicit per-channel type/domain or top-level x/y.
-  schema?: Schema;
+  // The elicited-dataset schema (field -> measurement type/domain/default), and
+  // the contract of the chart. REQUIRED: it owns every field's data type and
+  // DOMAIN, so a mark never declares one. A field encoded but left out of the
+  // schema is inferred from `data` with a dev-warning; a field with neither a
+  // schema entry nor data throws (there is nothing to build a scale from).
+  schema: Schema;
   // The dataset's invariants. They gate and REPAIR every edit, whichever mark fired
   // it: a rejected proposal is dropped; a returned array replaces it, and the marks
   // re-derive from the repaired rows on the next render. A mark's own `constraints`
@@ -361,8 +412,11 @@ export interface ElicitSpec {
   effects?: EffectsSpec;
   guides?: any[];
   renderer?: any;
-  x?: { type?: ScaleType; domain?: any[]; range?: any[] };
-  y?: { type?: ScaleType; domain?: any[]; range?: any[] };
+  // Chart-level scale overrides, keyed by channel ('x', 'y', 'fill', 'size', …).
+  // Scales are GLOBAL per channel, so this is their honest home; a channel's own
+  // `scale` is the shorthand for the single-mark case. This wins over it. No
+  // `domain` here either — that is the schema's.
+  scales?: Record<string, ScaleSpec>;
   // Initial stage index for multi-stage elicitation. Edits carrying a `stage`
   // are active only when it equals the current stage (see Edit.stage).
   stage?: number;

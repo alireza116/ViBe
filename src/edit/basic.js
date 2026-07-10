@@ -194,7 +194,7 @@ export function rotate(options = {}) {
                 return ctx.data.map((d) => ({ ...d, [ch.field]: scale.invertValue(deg) }));
             }
             // Spread: |pointer angle − the reference channel's encoded angle|.
-            const refSpec = ctx.encoding[relativeTo];
+            const refSpec = ctx.markChannels[relativeTo];
             const refField = refSpec ? refSpec.field : null;
             const refScale = ctx.scales[relativeTo];
             return ctx.data.map((d) => {

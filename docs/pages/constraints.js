@@ -80,12 +80,16 @@ export default {
     clamp({ field: "y", min: 0 }),
     maintainSum({ field: "y", targetSum: 100 }),
   ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     bar({
       fill: "#6366f1",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ guide: true }) },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y", edit: drag({ guide: true }) },
       },
     }),
   ],
@@ -113,12 +117,16 @@ export default {
     { x: "C", y: 30 }, { x: "D", y: 60 },
   ],
   constraints: [ clamp({ field: "y", min: 0, max: 90 }) ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     bar({
       fill: "#2563eb",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "y", type: "linear", domain: [0, 100],
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
              edit: drag({ pick: "nearest", threshold: 40, guide: true }) },
       },
     }),
@@ -144,12 +152,16 @@ export default {
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: "A", y: 40 }, { x: "C", y: 60 }],
   constraints: [ unique({ field: "x", max: 1 }) ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     bar({
       fill: "#0d9488",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y", edit: drag() },
       },
       edits: [ create({ defaults: { y: 20 } }) ],
     }),
@@ -169,14 +181,18 @@ export default {
     { x: "C", y: "High", group: "gamma" },
   ],
   constraints: [ unique({ field: ["x", "y"], max: 1 }) ],
+  schema: {
+    x:     { domain: ["A", "B", "C"] },
+    y:     { domain: ["Low", "Mid", "High"] },
+    group: { type: "ordinal", domain: ["alpha", "beta", "gamma"] },
+  },
   features: [
     point({
-      encoding: {
-        x: { field: "x", domain: ["A", "B", "C"] },
-        y: { field: "y", domain: ["Low", "Mid", "High"] },
-        size: { value: 12 },
-        color: { field: "group", type: "ordinal",
-                 domain: ["alpha", "beta", "gamma"] },
+      size: 12,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        fill: { field: "group" },
       },
       edits: [
         drag({ channels: ["x", "y"] }),

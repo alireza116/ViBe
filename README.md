@@ -11,9 +11,12 @@ The library is decoupled from any single rendering framework. It maintains an in
 Every mark reads a **channel** surface: a channel is a constant (`fill: "red"`) or a data field through a scale (`y: { field: "n" }`). Encoding maps **data → visual**. An **edit** attached to a channel maps a **gesture → data**, back through the *same* scale. That symmetry is the whole model:
 
 ```javascript
-y: { field: "n", type: "linear", domain: [0, 100], edit: drag() }
-//   ─────────── encode: n → pixel ───────────┘     └─ edit: drag pixel → n
+schema: { n: { type: "quantitative", domain: [0, 100] } }   // what n IS
+y: { field: "n", edit: drag() }
+//   ── encode: n → pixel ──┘  └─ edit: drag pixel → n
 ```
+
+Note what the channel does *not* carry. A field's **data type** and its **domain** describe the data, not one mark's view of it, so they are declared once on the spec's `schema`. The **scale** is then derived: a categorical field on a bar's x is a band (a bar needs the interval), on a dot's x it is a point (a dot wants the tick). Name a scale explicitly only when you want something else — `scale: "log"`, `scale: { type: "sqrt", range: [4, 20] }`, or a live `d3.scaleBand().padding(0.3)`, which is adopted as you built it.
 
 ---
 
@@ -22,6 +25,8 @@ y: { field: "n", type: "linear", domain: [0, 100], edit: drag() }
 VibeJS is layered for extensibility:
 
 1. **Core engine (`vibe.Elicit`)** — the orchestrator (`src/core/elicit.js`). Deep-copies the spec's **one dataset** into a reactive store, resolves one **global scale per channel** (Observable-Plot model), rebuilds the scene each render, and routes gesture events to the matching edits. The unidirectional flow: `gesture → invert through scale → data-space proposal → data invariants → commit → re-render`.
+
+   **One schema.** The schema is the contract of the elicited dataset: every field's measurement type and domain. It is what lets a chart resolve its scales and mint rows from *zero* starter data. Scales are resolved per channel by **unioning the schema domains of every field on that axis** — so an error bar's `mean`, `lo` and `hi` share one y axis that spans all three.
 
    **One dataset.** A chart elicits exactly one dataset — even a slider elicits a one-row dataset — so `data` lives on the spec, never on a mark. Each mark is a *view* over those rows: it encodes some columns, and where a channel carries an `edit`, it writes them back. Several marks over the same rows is the point, not a special case: a glyph is just marks that encode different columns of one row (see `composite`), and they all re-derive from the committed data on the next render.
 
@@ -32,7 +37,7 @@ VibeJS is layered for extensibility:
    - `bar` / `barY` / `barX` → `rect` (band axis = category + thickness, linear axis = value — or an explicit start/end span via x1/x2 or y1/y2; orientation auto-detected).
    - `tick` / `tickX` / `tickY` → `line` (a bar's zero-thickness sibling).
    - `line` / `lineY` / `lineX` / `connectedScatter` / `path` → a connecting `path` per series plus one `circle` handle per datum; grouped by `series`, ordered by `order`.
-   - `rule` / `ruleX` / `ruleY` → a straight reference line at a value on one axis, or a **span** segment (a stem / whisker) between `y1`/`y2` (or `x1`/`x2`) at a category.
+   - `rule` / `ruleX` / `ruleY` → a straight reference line at a data value (`y: { datum: 50 }`), or a **span** segment (a stem / whisker) between `y1`/`y2` (or `x1`/`x2`) at a category. An ordinary editable mark: put an `edit` on an endpoint and the cap becomes a handle.
    - `composite` → a **glyph**: a named group of ordinary marks as `parts` (a stem, a whisker, a dot, two caps). Each part encodes some columns of the same rows; a part whose channel carries an `edit` is a handle. It desugars into its parts as plain features — `Elicit` flattens them — so nothing about a glyph reaches the engine. Drag one handle and the rest re-derive from the changed row (lollipop, error bar). Because each handle is its own mark, dragging one cannot move another: dispatch already routes a gesture to the feature owning the node you touched.
    - `dotStack` / `dotStackY` / `dotStackX` → a stacked dot plot (token counter): one datum per token, tokens sharing a slot stack into a countable column (drop with `create`, take back with `remove`).
    - `waffle` / `waffleY` / `waffleX` → a bar subdivided into a grid of unit cells for exact counting and proportion picking; every cell is a drag target, `snap` lands drags on whole cells.
@@ -40,7 +45,7 @@ VibeJS is layered for extensibility:
    - `trend` → an intercept-then-slope line: `{ intercept, slope }` with an intercept handle (translate) and a slope handle (rotate about the anchor), stageable.
    - `axis` / `axisX` / `axisY` / `grid` / `gridX` / `gridY` → composable axis & gridline marks (or use the global `axes` convenience).
 
-4. **Edits (`vibe.edit.*`)** — a gesture that writes a channel back to the data. An edit is a small descriptor `{ gesture, channels, when, pick, scope, constrain, guide, apply }`, declared **co-located** on a channel (`encoding.y.edit = drag()`) or at **mark level** (`edits: [...]`).
+4. **Edits (`vibe.edit.*`)** — a gesture that writes a channel back to the data. An edit is a small descriptor `{ gesture, channels, when, pick, scope, constrain, guide, apply }`, declared **co-located** on a channel (`channels.y.edit = drag()`) or at **mark level** (`edits: [...]`).
    - **Universal** edits (any mark): `drag`, `resize`, `rotate` (pointer angle about the plot centre → a channel value), `cycle`, `create`, `toggle` (click a slot to pick or un-pick it), `remove`, `custom`.
    - **Line-scoped** edits, namespaced as `edit.line.*` so their scope is visible: `anchor` (add one point), `newSeries` (seed a whole line), `draw` (author a line by dragging), `sweep` (you-draw-it repaint), `removeSeries` (delete a whole line).
    - `pick` selects the target: `direct` (the mark hit), `nearest` (closest within a threshold), `plane` (no target — create), or a driver lifecycle (`sweep` / `draw` / `brush` / `probe`). Multi-event lifecycles live in **self-describing drivers** (`src/edit/drivers/`) — adding an interaction mode is a new driver file, not an engine change.
@@ -111,8 +116,12 @@ const { clamp, maintainSum } = vibe.constraints;
 const beliefChart = vibe.Elicit({
   width: 600,
   height: 400,
-  x: { type: "band", domain: ["A", "B", "C", "D"] },
-  y: { type: "linear", domain: [0, 100] },
+  // The contract of the elicited dataset: what each field IS, and its domain.
+  // Every scale below is derived from this — no mark declares one.
+  schema: {
+    x: { type: "categorical",  domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   // THE dataset. A chart elicits exactly one; every mark is a view over these rows.
   data: [
     { x: "A", y: 25 }, { x: "B", y: 25 },
@@ -122,14 +131,16 @@ const beliefChart = vibe.Elicit({
   constraints: [ clamp({ min: 0 }), maintainSum({ targetSum: 100 }) ],
   onChange: (data) => console.log("elicitation state:", data),
   features: [
-    vibe.plot.ruleY({ y: 50, stroke: "red", strokeDasharray: "4" }),
+    // `datum` is a DATA-space constant: it goes through the y scale, so the line
+    // lands where y = 50 is. (`value` would mean 50 pixels.)
+    vibe.plot.ruleY({ stroke: "red", strokeDasharray: "4", channels: { y: { datum: 50 } } }),
     barY({
       id: "elicited-probabilities",
       fill: "purple",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
+      channels: {
+        x: { field: "x" },                            // categorical + bar -> band
         // The value channel carries the edit; drag writes y back through the scale.
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag({ guide: true }) },
+        y: { field: "y", edit: drag({ guide: true }) }, // quantitative -> linear
       },
     }),
   ],

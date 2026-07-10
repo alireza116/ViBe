@@ -39,13 +39,13 @@
  * value is in DATA space (the channel's domain), not pixels.
  * @param {string | undefined} field
  * @param {any} scales
- * @param {any} encoding
+ * @param {any} markChannels
  * @returns {number[] | undefined}
  */
-function domainOfField(field, scales, encoding) {
-  if (!field || !scales || !encoding) return undefined;
-  for (const key of Object.keys(encoding)) {
-    const spec = encoding[key];
+function domainOfField(field, scales, markChannels) {
+  if (!field || !scales || !markChannels) return undefined;
+  for (const key of Object.keys(markChannels)) {
+    const spec = markChannels[key];
     if (spec && spec.field === field && scales[key]) {
       const s = scales[key];
       if (s.domainConfig) return s.domainConfig;
@@ -79,7 +79,7 @@ export function defineConstraint(reducer, meta = {}) {
       activeIndex != null && activeIndex >= 0 && activeIndex < newData.length;
     const active = hasActive ? newData[activeIndex] : undefined;
 
-    const domain = domainOfField(field, context.scales, context.encoding);
+    const domain = domainOfField(field, context.scales, context.markChannels);
 
     const ctx = {
       data: newData,

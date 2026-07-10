@@ -41,7 +41,7 @@ function baseTranslate(anchor, width, height) {
 
 /**
  * Tick values + a formatter for a scale.
- *   linear -> scale.ticks(count) (+ scale.tickFormat), unless `tickValues` given
+ *   continuous -> scale.ticks(count) (+ scale.tickFormat), unless `tickValues` given
  *   band/point/ordinal -> the domain (every category), formatter = identity
  * @param {any} scale
  * @param {{ ticks?: number, tickValues?: any[], tickFormat?: any }} opts
@@ -49,7 +49,8 @@ function baseTranslate(anchor, width, height) {
  */
 export function tickData(scale, opts = {}) {
     const { ticks = 5, tickValues, tickFormat } = opts;
-    const categorical = scale.type === 'band' || scale.type === 'point' || scale.type === 'ordinal';
+    // Every non-continuous kind labels one tick per domain entry.
+    const categorical = scale.kind !== 'continuous';
 
     let values;
     if (tickValues) {
@@ -92,8 +93,8 @@ export function axis(options = {}) {
         tickFormat,
         tickSize = 6,
         title,
-        stroke = '#6b7280',
-        color = '#374151',
+        stroke = '#6b7280',  // spine + ticks
+        fill = '#374151',    // tick labels + title (text nodes take a fill)
         fontSize = 10,
         grid = false,
         id
@@ -158,7 +159,7 @@ export function axis(options = {}) {
                     });
                     nodes.push({
                         type: 'text', x: px, y: t.y + dir * (tickSize + fontSize),
-                        text: format(v), textAnchor: 'middle', fill: color, fontSize,
+                        text: format(v), textAnchor: 'middle', fill, fontSize,
                         background: true, pointerEvents: 'none'
                     });
                 } else {
@@ -169,7 +170,7 @@ export function axis(options = {}) {
                     });
                     nodes.push({
                         type: 'text', x: t.x + dir * (tickSize + 3), y: py + fontSize / 3,
-                        text: format(v), textAnchor: dir < 0 ? 'end' : 'start', fill: color,
+                        text: format(v), textAnchor: dir < 0 ? 'end' : 'start', fill,
                         fontSize, background: true, pointerEvents: 'none'
                     });
                 }
@@ -180,13 +181,13 @@ export function axis(options = {}) {
                 if (isX) {
                     nodes.push({
                         type: 'text', x: t.x + width / 2, y: t.y + dir * (tickSize + fontSize * 2.4),
-                        text: title, textAnchor: 'middle', fill: color, fontSize: fontSize + 1,
+                        text: title, textAnchor: 'middle', fill, fontSize: fontSize + 1,
                         background: true, pointerEvents: 'none'
                     });
                 } else {
                     nodes.push({
                         type: 'text', x: t.x + dir * (tickSize + fontSize * 2.4), y: t.y + height / 2,
-                        text: title, textAnchor: 'middle', fill: color, fontSize: fontSize + 1,
+                        text: title, textAnchor: 'middle', fill, fontSize: fontSize + 1,
                         background: true, pointerEvents: 'none'
                     });
                 }

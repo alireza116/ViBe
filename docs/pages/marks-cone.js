@@ -15,10 +15,10 @@ export default {
             name: 'cone(options)',
             summary: 'Import from <code class="inline">vibe.plot</code>. A single-datum glyph; all nodes are non-interactive (the whole plane is the gesture surface).',
             signatures: [
-                'cone({ encoding, samples, seed, wedge, sigma, id }) → Feature',
+                'cone({ channels, samples, seed, wedge, sigma, id }) → Feature',
             ],
             options: [
-                { name: 'encoding', type: 'object', default: '{}', desc: 'An <code class="inline">angle</code> channel (r → degrees) and a <code class="inline">spread</code> channel; put a <code class="inline">rotate</code> edit on each.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'An <code class="inline">angle</code> channel (r → degrees) and a <code class="inline">spread</code> channel; put a <code class="inline">rotate</code> edit on each.' },
                 { name: 'samples', type: 'number', default: '40', desc: 'Number of cone sample lines.' },
                 { name: 'seed', type: 'number', default: '7', desc: 'PRNG seed — the fan is stable across re-renders, so a hover does not make it shimmer.' },
                 { name: 'wedge', type: 'boolean', default: 'false', desc: 'Fill a translucent wedge spanning the envelope.' },
@@ -50,12 +50,16 @@ export default {
   axes: false,
   data: [{ r: 0, spread: 0 }],
   onChange: (d) => console.log(d[0]),
+  schema: {
+    r:      { type: "quantitative", domain: [-1, 1] },
+    spread: { type: "quantitative", domain: [0, 1] },
+  },
   features: [
     cone({
-      encoding: {
-        angle:  { field: "r",      type: "linear", domain: [-1, 1], range: [-45, 45],
+      channels: {
+        angle: { field: "r", range: [-45, 45],
                   edit: rotate({ pick: "probe", stage: 0 }) },
-        spread: { field: "spread", type: "linear", domain: [0, 1],  range: [0, 45],
+        spread: { field: "spread",  range: [0, 45],
                   edit: rotate({ pick: "probe", stage: 1, relativeTo: "angle" }) },
       },
       samples: 60, wedge: true,
@@ -72,11 +76,15 @@ export default {
   margins: { top: 16, right: 16, bottom: 16, left: 16 },
   axes: false,
   data: [{ r: 0.6, spread: 0.25 }],
+  schema: {
+    r:      { type: "quantitative", domain: [-1, 1] },
+    spread: { type: "quantitative", domain: [0, 1] },
+  },
   features: [
     cone({
-      encoding: {
-        angle:  { field: "r",      type: "linear", domain: [-1, 1], range: [-45, 45] },
-        spread: { field: "spread", type: "linear", domain: [0, 1],  range: [0, 45] },
+      channels: {
+        angle: { field: "r", range: [-45, 45] },
+        spread: { field: "spread",  range: [0, 45] },
       },
       samples: 80, wedge: true, stroke: "#d33",
     }),

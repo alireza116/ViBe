@@ -40,11 +40,20 @@ export function matrix(opts = {}) {
         width,
         height,
         margins,
-        x: { type: 'band', domain: options },
-        // A y band defaults to the range [height, 0] (a value axis grows upward), so
-        // the first question would sit at the BOTTOM. A questionnaire reads top-down,
-        // so pin the range explicitly.
-        y: { type: 'band', domain: questions, range: [0, innerHeight] },
+        // The contract of the elicited dataset: which option answers which question.
+        schema: {
+            option: { type: 'ordinal', domain: options },
+            question: { type: 'categorical', domain: questions }
+        },
+        scales: {
+            // A `point` would give each option a tick; the cell grid wants the
+            // interval a band provides.
+            x: { type: 'band' },
+            // A y band defaults to the range [height, 0] (a value axis grows upward),
+            // so the first question would sit at the BOTTOM. A questionnaire reads
+            // top-down, so pin the range explicitly.
+            y: { type: 'band', range: [0, innerHeight] }
+        },
         // The elicited dataset: one row per answered question.
         data: value,
         // One answer per row: a pick elsewhere in the row replaces it.
@@ -55,11 +64,11 @@ export function matrix(opts = {}) {
         features: [
             point({
                 id: 'matrix',
-                encoding: {
-                    x: { field: 'option', type: 'band', domain: options },
-                    y: { field: 'question', type: 'band', domain: questions },
-                    size: { value: THEME.radius - 3 },
-                    fill: { value: THEME.accent }
+                size: THEME.radius - 3,
+                fill: THEME.accent,
+                channels: {
+                    x: { field: 'option' },
+                    y: { field: 'question' }
                 },
                 edits: [toggle({ pick: 'probe', channels: ['x', 'y'], advance: false, stage })]
             })

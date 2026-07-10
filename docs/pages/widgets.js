@@ -62,13 +62,16 @@ export default {
 mount(Elicit({
   width: 560, height: 130,
   margins: { top: 20, right: 60, bottom: 34, left: 60 },
-  x: { type: "band", domain: options },
   axes: { x: {}, y: false },
   data: [],
+  schema: {
+    choice: { type: "categorical", domain: options },
+  },
+  scales: { x: { type: "band" } },
   features: [
     point({
       id: "likert",
-      encoding: { x: { field: "choice", type: "band", domain: options } },
+      channels: { x: { field: "choice" } },
       edits: [ create({ pick: "probe", channels: ["x"], advance: false }) ],
       constraints: [ count({ max: 1, strategy: "replace" }) ],
     }),
@@ -102,13 +105,16 @@ mount(Elicit({
 mount(Elicit({
   width: 560, height: 130,
   margins: { top: 20, right: 60, bottom: 34, left: 60 },
-  x: { type: "band", domain: options },
   axes: { x: {}, y: false },
   data: [],
+  schema: {
+    choice: { type: "categorical", domain: options },
+  },
+  scales: { x: { type: "band" } },
   features: [
     point({
       id: "choice",
-      encoding: { x: { field: "choice", type: "band", domain: options } },
+      channels: { x: { field: "choice" } },
       edits: [ toggle({ pick: "probe", channels: ["x"], advance: false }) ],
       constraints: [
         unique({ field: "choice", strategy: "reject" }),
@@ -143,13 +149,15 @@ mount(Elicit({
 `mount(Elicit({
   width: 560, height: 130,
   margins: { top: 20, right: 40, bottom: 34, left: 40 },
-  x: { type: "linear", domain: [0, 100] },
   axes: { x: {}, y: false },
   data: [{ value: 40 }],
+  schema: {
+    value: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       id: "slider",
-      encoding: { x: { field: "value", type: "linear", domain: [0, 100],
+      channels: { x: { field: "value",
                        edit: drag({ pick: "probe", advance: false }) } },
       constraints: [ clamp({ min: 0, max: 100, field: "value" }), snap({ field: "value", step: 5 }) ],
     }),
@@ -184,16 +192,19 @@ const options = ["Poor","OK","Good","Great"];
 mount(Elicit({
   width: 560, height: 220,
   margins: { top: 24, right: 30, bottom: 30, left: 80 },
-  x: { type: "band", domain: options },
-  y: { type: "band", domain: questions },
   axes: { x: {}, y: {} },
   data: [],
+  schema: {
+    option:   { type: "categorical", domain: options },
+    question: { type: "categorical", domain: questions },
+  },
+  scales: { x: { type: "band" }, y: { type: "band" } },
   features: [
     point({
       id: "matrix",
-      encoding: {
-        x: { field: "option",   type: "band", domain: options },
-        y: { field: "question", type: "band", domain: questions },
+      channels: {
+        x: { field: "option" },
+        y: { field: "question" },
       },
       edits: [ toggle({ pick: "probe", channels: ["x", "y"], advance: false }) ],
       constraints: [ unique({ field: "question", strategy: "replace" }) ],

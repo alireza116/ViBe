@@ -61,8 +61,9 @@ export function Elicit(spec) {
         width = 600,
         height = 400,
         margins = { top: 20, right: 20, bottom: 30, left: 40 },
-        // Top-level x / y are read as global positional scale specs by
-        // resolveScales (spec.x / spec.y); channels beyond x/y come from marks.
+        // `schema` and `scales` are read straight off the spec by resolveScales:
+        // the schema owns each field's data type and DOMAIN, and `scales` is the
+        // chart-level per-channel scale override.
         features: userFeatures = [],
         // Global axis convenience: desugars into composable axis/grid marks (see
         // autoAxes). Explicit axis marks in `features` take precedence per channel.
@@ -159,10 +160,11 @@ export function Elicit(spec) {
     const featureNodes = {};
 
     // 2. Calculate scales (Observable Plot model): one GLOBAL scale per channel,
-    //    resolved from the union of every feature's encoding + the top-level
-    //    positional specs. Recomputed each render so inferred domains (e.g. a
-    //    colour/size channel) track data as create/drag mutate it. `scales` is a
-    //    channel map { x, y, color, size, … }; unused channels are absent.
+    //    resolved from the union of every feature's channels, with the schema
+    //    supplying each field's data type and domain. Recomputed each render so an
+    //    inferred domain (a field the schema left open) tracks data as create/drag
+    //    mutate it. `scales` is a channel map { x, y, fill, size, … }; unused
+    //    channels are absent.
     const dims = { width: innerWidth, height: innerHeight };
     let scales = resolveScales(features, dataset, spec, dims);
 
@@ -279,8 +281,8 @@ export function Elicit(spec) {
      */
     const computeEdit = (feature, edit, event, index) => {
         const currentData = dataset;
-        const encoding = feature.encoding || {};
-        const resolved = resolveChannels(edit.channels, encoding, scales);
+        const markChannels = feature.channels || {};
+        const resolved = resolveChannels(edit.channels, markChannels, scales);
         const ctx = {
             data: currentData,
             datum: index != null ? currentData[index] : undefined,
@@ -290,7 +292,7 @@ export function Elicit(spec) {
             event: event.rawEvent,
             channels: resolved,
             scales,
-            encoding,
+            markChannels,
             // Plot pixel dimensions, so a gesture whose geometry is the whole plane
             // (rotate about the centre) can measure against it without a mark node —
             // the angular sibling of resize reading the mark centre.
@@ -333,7 +335,7 @@ export function Elicit(spec) {
         // scales-as-geometry. A constraint may reject the proposal (false) or repair
         // it (return an array); the marks re-derive from the repaired rows.
         const invariants = [...datasetConstraints, ...edit.constrain];
-        const cctx = { activeIndex, scales, encoding };
+        const cctx = { activeIndex, scales, markChannels };
         let rejected = false;
         for (const constraint of invariants) {
             const r = constraint(newData, currentData, cctx);

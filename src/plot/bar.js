@@ -28,34 +28,34 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
  */
 function buildBar(options, forcedOrientation) {
     // Desugar top-level style shorthands (e.g. the legacy `fill: 'steelblue'`)
-    // into the encoding as constant channels, so bar reads style the same way
-    // every mark does. Explicit `encoding.fill` still wins.
+    // into the channels as constant channels, so bar reads style the same way
+    // every mark does. Explicit `channels.fill` still wins.
     const opts = normalizeMarkOptions(options);
     const {
-        encoding = {},
+        channels = {},
         id,
         edits,
         constraints,
         orientation: orientationOption
     } = opts;
 
-    // Channel-native: read the x/y field from the encoding, falling back to the
+    // Channel-native: read the x/y field from the channels, falling back to the
     // legacy x/y accessor options. Either way the scale for each channel is the
     // global one the engine resolves and passes in as scales.x / scales.y.
-    const xKey = (encoding.x && encoding.x.field) || options.x || 'x';
-    const yKey = (encoding.y && encoding.y.field) || options.y || 'y';
+    const xKey = (channels.x && channels.x.field) || 'x';
+    const yKey = (channels.y && channels.y.field) || 'y';
     // Span mode: both endpoint channels declared on that axis. Decided once per
     // mark (not per datum) — the missing form (baseline+value) stays the default.
-    const hasXSpan = !!(encoding.x1 && encoding.x2);
-    const hasYSpan = !!(encoding.y1 && encoding.y2);
+    const hasXSpan = !!(channels.x1 && channels.x2);
+    const hasYSpan = !!(channels.y1 && channels.y2);
 
     return {
         id,
-        encoding,
+        channels,
         edits,
         constraints,
         // A bar's categorical axis wants the band interval (its thickness).
-        categoricalScale: 'band',
+        discreteScale: 'band',
         xKey,
         yKey,
         /**
@@ -77,7 +77,7 @@ function buildBar(options, forcedOrientation) {
                 // Standard style surface (fill/stroke/opacity/…), resolved per
                 // datum through the same channels every mark uses. Defaults to the
                 // classic steelblue fill when no fill channel/shorthand is set.
-                const style = resolveStyle(scales, encoding, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
 
                 if (orientation === 'horizontal') {
                     // Category on y (band geometry), value/length on x. The value
@@ -88,12 +88,12 @@ function buildBar(options, forcedOrientation) {
                     const baseline = baselineOf(xScale);
                     let lo, hi;
                     if (hasXSpan) {
-                        const v1 = encodeChannel(scales, encoding, 'x1', d, baseline);
-                        const v2 = encodeChannel(scales, encoding, 'x2', d, baseline);
+                        const v1 = encodeChannel(scales, channels, 'x1', d, baseline);
+                        const v2 = encodeChannel(scales, channels, 'x2', d, baseline);
                         lo = Math.min(v1, v2);
                         hi = Math.max(v1, v2);
                     } else {
-                        const valuePos = encodeChannel(scales, encoding, 'x', d, baseline);
+                        const valuePos = encodeChannel(scales, channels, 'x', d, baseline);
                         lo = Math.min(valuePos, baseline);
                         hi = Math.max(valuePos, baseline);
                     }
@@ -118,12 +118,12 @@ function buildBar(options, forcedOrientation) {
                 const baseline = baselineOf(yScale);
                 let lo, hi;
                 if (hasYSpan) {
-                    const v1 = encodeChannel(scales, encoding, 'y1', d, baseline);
-                    const v2 = encodeChannel(scales, encoding, 'y2', d, baseline);
+                    const v1 = encodeChannel(scales, channels, 'y1', d, baseline);
+                    const v2 = encodeChannel(scales, channels, 'y2', d, baseline);
                     lo = Math.min(v1, v2);
                     hi = Math.max(v1, v2);
                 } else {
-                    const valuePos = encodeChannel(scales, encoding, 'y', d, baseline);
+                    const valuePos = encodeChannel(scales, channels, 'y', d, baseline);
                     lo = Math.min(valuePos, baseline);
                     hi = Math.max(valuePos, baseline);
                 }

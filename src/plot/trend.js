@@ -9,9 +9,17 @@
 // Stage the two handles (interceptStage / slopeStage) to elicit intercept first,
 // then slope — the "first pick the level, then pick the trend" flow.
 //
-//   Elicit({ data: [{ intercept: 0, slope: 1 }],
+//   Elicit({ schema: { x: { type: 'quantitative', domain: [-10, 10] },
+//                      y: { type: 'quantitative', domain: [-10, 10] },
+//                      intercept: {}, slope: {} },
+//            data: [{ intercept: 0, slope: 1 }],
 //            features: [ trend({ interceptStage: 0, slopeStage: 1 }) ] })
-//   // with spec.x / spec.y (or a schema) establishing the plot's scales.
+//
+// Trend is the one mark whose positional channels name the plot's AXES rather than
+// fields of its datum: the belief is about the relationship between x and y, while
+// the datum stores the two parameters of the line. So `x`/`y` default to the fields
+// of the same name, and the schema supplies their domains — the line's endpoints
+// and the two handles are then derived from that coordinate space.
 //
 // The line is a non-interactive visual and each handle is a draggable circle
 // tagged with a `channel` ('intercept' | 'slope'); the two edits are hoisted to
@@ -34,14 +42,18 @@ import { resolveStyle, normalizeMarkOptions } from './mark.js';
 export function trend(options = {}) {
     const opts = normalizeMarkOptions(options);
     const {
-        encoding = {},
         id,
         edits: userEdits,
         constraints,
-        handleRadius = 6,
+        handleSize = 6,
         interceptStage = null,
         slopeStage = null
     } = opts;
+
+    // The axes are the belief's coordinate space, not columns of its datum, so they
+    // default to the fields `x` and `y`. Declaring those in the schema is what gives
+    // the plot its domains — and therefore the anchor/probe positions.
+    const channels = { x: { field: 'x' }, y: { field: 'y' }, ...opts.channels };
 
     // The two x positions the handles sit at, read from the x scale's domain (so
     // the mark needs no data to place them — a single-datum belief). Options
@@ -97,11 +109,11 @@ export function trend(options = {}) {
 
     return {
         id,
-        encoding,
+        channels,
         constraints,
         edits: [interceptEdit, slopeEdit, ...(userEdits || [])],
-        xKey: (encoding.x && encoding.x.field) || 'x',
-        yKey: (encoding.y && encoding.y.field) || 'y',
+        xKey: (channels.x && channels.x.field) || 'x',
+        yKey: (channels.y && channels.y.field) || 'y',
         /**
          * @param {any[]} currentData
          * @param {import('../types').ScaleMap} scales
@@ -124,7 +136,7 @@ export function trend(options = {}) {
                 const a = Number(d.intercept) || 0;
                 const b = Number(d.slope) || 0;
                 const yOf = (/** @type {number} */ x) => a + b * x;
-                const style = resolveStyle(scales, encoding, d, { stroke: '#333', fill: '#333' });
+                const style = resolveStyle(scales, channels, d, { stroke: '#333', fill: '#333' });
 
                 // The fitted line spanning the x domain — derived values through the
                 // y scale's encode (not a field lookup), non-interactive.
@@ -141,14 +153,14 @@ export function trend(options = {}) {
                 nodes.push({
                     type: 'circle',
                     cx: xScale.encode(anchor), cy: yScale.encode(yOf(anchor)),
-                    r: handleRadius,
+                    r: handleSize,
                     fill: style.fill || '#333',
                     data: d, index: i, channel: 'intercept'
                 });
                 nodes.push({
                     type: 'circle',
                     cx: xScale.encode(probe), cy: yScale.encode(yOf(probe)),
-                    r: handleRadius,
+                    r: handleSize,
                     fill: style.fill || '#333',
                     data: d, index: i, channel: 'slope'
                 });

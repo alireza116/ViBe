@@ -15,7 +15,7 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 // `tick` auto-detects which axis is the value axis from the scale types;
 // `tickY` / `tickX` force one (matching Plot). Editing, proximity pick, create,
 // remove, constraints and the style surface all come from the shared model —
-// a tick with `encoding.y.edit = drag()` is draggable with no mark-specific code.
+// a tick with `channels.y.edit = drag()` is draggable with no mark-specific code.
 //
 // The span across the band is customizable with `inset` (px shrink each end) or
 // an explicit `length` (px, centred) — see bandSpan in core/scales.js, a
@@ -28,10 +28,10 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
  */
 function buildTick(options, forcedValueAxis) {
     // Desugar top-level style shorthands (stroke: '…', strokeWidth: …) into the
-    // encoding so tick reads style the same way every mark does.
+    // channels so tick reads style the same way every mark does.
     const opts = normalizeMarkOptions(options);
     const {
-        encoding = {},
+        channels = {},
         id,
         edits,
         constraints,
@@ -39,17 +39,17 @@ function buildTick(options, forcedValueAxis) {
         length
     } = opts;
 
-    const xKey = (encoding.x && encoding.x.field) || options.x || 'x';
-    const yKey = (encoding.y && encoding.y.field) || options.y || 'y';
+    const xKey = (channels.x && channels.x.field) || 'x';
+    const yKey = (channels.y && channels.y.field) || 'y';
 
     return {
         id,
-        encoding,
+        channels,
         edits,
         constraints,
         // A tick sits within a band (like a bar) — it wants the band interval to
         // span, so it asks for the band variant of the categorical scale.
-        categoricalScale: 'band',
+        discreteScale: 'band',
         xKey,
         yKey,
         /**
@@ -74,14 +74,14 @@ function buildTick(options, forcedValueAxis) {
             return currentData.map((d, i) => {
                 // Standard style surface; a tick reads as a stroked line, so its
                 // per-mark defaults are stroke/strokeWidth rather than a fill.
-                const style = resolveStyle(scales, encoding, d, {
+                const style = resolveStyle(scales, channels, d, {
                     stroke: 'steelblue',
                     strokeWidth: 2
                 });
 
                 if (valueAxis === 'x') {
                     // Vertical tick: value on x (linear), span the y band.
-                    const valuePos = encodeChannel(scales, encoding, 'x', d, width / 2);
+                    const valuePos = encodeChannel(scales, channels, 'x', d, width / 2);
                     const [y1, y2] = bandSpan(yScale, d[yKey], height, { inset, length });
                     return {
                         type: 'line',
@@ -98,7 +98,7 @@ function buildTick(options, forcedValueAxis) {
                 }
 
                 // Horizontal tick: value on y (linear), span the x band.
-                const valuePos = encodeChannel(scales, encoding, 'y', d, height / 2);
+                const valuePos = encodeChannel(scales, channels, 'y', d, height / 2);
                 const [x1, x2] = bandSpan(xScale, d[xKey], width, { inset, length });
                 return {
                     type: 'line',

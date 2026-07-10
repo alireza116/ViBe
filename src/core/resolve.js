@@ -2,28 +2,63 @@
 // resolve.js — the Observable Plot scale model for the engine.
 //
 // One scale per channel, GLOBAL to the plot, shared by every mark. Each mark is
-// a channel producer (it declares field-per-channel via its encoding); the
-// engine unions each channel's values across all marks to infer its domain, then
-// builds one scale. Marks then read scales by channel name (scales.x, scales.color)
-// and edits invert through the same objects.
+// a channel producer (it declares field-per-channel via its `channels` map); the
+// engine unions each channel's fields across all marks, asks the schema what they
+// are, and builds one scale. Marks then read scales by channel name (scales.x,
+// scales.fill) and edits invert through the same objects.
 //
-// Precedence for a channel's scale spec:
-//   1. Legacy top-level spec.x / spec.y            (explicit global positional scales)
-//   2. An explicit type/domain/range on any mark's channel encoding
-//   3. Inference from the union of that channel's data across marks
+// ── Who owns what ───────────────────────────────────────────────────────────
+// The SCHEMA owns a field's data type and DOMAIN — they are properties of the
+// data, not of a mark's view of it. A mark owns only which field lands on which
+// channel, and (rarely) how that channel draws it:
 //
-// A channel that no mark actually uses (no data, no spec) gets NO scale — this
-// preserves 1D plots (drop y -> no y scale -> marks fall back to centre).
+//   measure (data type):  channel `type` > schema `type` > inference from values
+//   scale (how to draw):  spec.scales[ch] > channel `scale` > scaleTypeFor(...)
+//   domain:               the UNION of the schema domains of every field on the
+//                         axis, else inferred from the union of their values
+//
+// The domain union is load-bearing: an error bar puts `mean`, `lo` and `hi` on y,
+// and the axis must span all three. Reading one field's domain and discarding the
+// rest is what forced charts to hand-write a chart-level y domain.
 
-import { createScale } from './scales.js';
+import { createScale, adoptScale } from './scales.js';
 import {
-    normalizeEncoding,
-    inferScaleType,
+    normalizeChannels,
+    inferMeasureType,
     inferDomainFromValues,
-    measureToScaleType,
+    unionDomains,
+    scaleTypeFor,
     channelRange,
     axisOf
 } from './encoding.js';
+
+const DEV = !!(import.meta.env && import.meta.env.DEV);
+
+// Scales re-resolve on every render, so a dev warning would repeat forever. Warn
+// once per offending field/channel, the way elicit.js's guards do.
+/** @type {Set<string>} */
+const warnedOnce = new Set();
+/** @param {string} key @param {string} message */
+function warnOnce(key, message) {
+    if (warnedOnce.has(key)) return;
+    warnedOnce.add(key);
+    console.warn(message);
+}
+
+/**
+ * Bring the three forms a `scale` option can take to one shape.
+ *   'log'                          -> { type: 'log' }
+ *   { type: 'sqrt', range: [...] } -> itself
+ *   d3.scaleBand().padding(0.3)    -> { instance }
+ * @param {any} opt
+ * @returns {{ type?: import('../types').ScaleType, range?: any[], instance?: any, [k: string]: any }}
+ */
+function normalizeScaleOption(opt) {
+    if (opt == null) return {};
+    if (typeof opt === 'function') return { instance: opt };
+    if (typeof opt === 'string') return { type: /** @type {import('../types').ScaleType} */ (opt) };
+    return opt;
+}
 
 /**
  * Resolves global scales across features.
@@ -34,26 +69,25 @@ import {
  * @returns {import('../types').ScaleMap}
  */
 export function resolveScales(features, dataset, spec, dims) {
-    // The dataset schema (field -> measurement type/domain/default). It is the
-    // declared source of truth for a field's scale, ranked above data inference —
-    // so a chart resolves its scales with ZERO data (see the skip guard below).
     /** @type {Record<string, import('../types').FieldSchema>} */
-    const schema = (/** @type {any} */ (spec).schema) || {};
+    const schema = spec.schema || {};
+    /** @type {Record<string, import('../types').ScaleSpec>} */
+    const chartScales = spec.scales || {};
 
-    // Accumulate, per channel: an explicit spec (type/domain/range), the field's
-    // schema entry (if any), the mark's preferred categorical scale, and the flat
-    // list of its values across all marks (for domain inference).
-    /** @type {Record<string, { type?: import('../types').ScaleType, domain?: any[], range?: any[], catPref?: import('../types').ScaleType, schema?: import('../types').FieldSchema, values: any[] }>} */
+    // Accumulate, per channel: the fields feeding it (in first-seen order), any
+    // explicit data type or scale option, the mark's preferred discrete scale, and
+    // the flat list of values across all marks (for inference).
+    /** @type {Record<string, { fields: string[], measure?: any, scaleOpt?: any, discretePref?: any, values: any[] }>} */
     const acc = {};
 
     /** @param {string} ch */
-    const ensure = (ch) => (acc[ch] || (acc[ch] = { values: [] }));
+    const ensure = (ch) => (acc[ch] || (acc[ch] = { fields: [], values: [] }));
 
     // A channel's scale is keyed by the AXIS it shares, not its own literal name —
     // x1/x2 (span endpoints) union into the same bucket as x, y1/y2 into y, so they
-    // share one inferred domain/range/scale instead of getting their own. Track
-    // which raw channel names fed each bucket, so the built scale can be aliased
-    // back onto every one of them below.
+    // share one domain/range/scale instead of getting their own. Track which raw
+    // channel names fed each bucket, so the built scale can be aliased back onto
+    // every one of them below.
     /** @type {Record<string, Set<string>>} */
     const bucketMembers = {};
     /** @param {string} ch @returns {string} */
@@ -63,43 +97,33 @@ export function resolveScales(features, dataset, spec, dims) {
         return bucket;
     };
 
-    // 1. Legacy top-level positional scale specs.
-    /** @type {any} */
-    const rawSpec = spec;
-    for (const ch of ['x', 'y']) {
-        if (rawSpec[ch]) {
-            const a = ensure(bucketOf(ch));
-            a.type = rawSpec[ch].type;
-            a.domain = rawSpec[ch].domain;
-            a.range = rawSpec[ch].range;
-        }
-    }
-
-    // 2 + 3. Per-mark encodings: carry explicit sub-specs, gather values, and note
-    // each mark's preferred categorical scale ('band' for bars, 'point' for dots).
-    // When marks disagree on a shared categorical axis, 'band' wins — a bar needs
-    // the interval, and a dot renders fine on a band (it just uses the centre).
-    //
     // Every mark reads the SAME dataset, so several marks encoding one field push
     // its values into that channel's bucket more than once. Harmless:
     // inferDomainFromValues takes min/max for continuous and dedupes discrete.
     for (const feature of features) {
-        const enc = normalizeEncoding(feature);
-        const data = dataset;
-        const pref = feature.categoricalScale || 'band';
-        for (const [ch, chSpec] of Object.entries(enc)) {
+        const channels = normalizeChannels(feature);
+        // Which concrete scale this mark wants for discrete data. When marks
+        // disagree on a shared axis, 'band' wins — a bar needs the interval, and a
+        // dot renders fine on a band (it just uses the centre).
+        const pref = feature.discreteScale || 'band';
+        for (const [ch, chSpec] of Object.entries(channels)) {
+            if (!chSpec) continue;
+            // `scale: null` reads the field raw (the datum holds a literal colour /
+            // pixel). No scale to build, so it contributes nothing — and needs no
+            // schema entry.
+            if (chSpec.scale === null) continue;
+
             const a = ensure(bucketOf(ch));
-            if (a.type == null && chSpec.type != null) a.type = chSpec.type;
-            if (a.domain == null && chSpec.domain != null) a.domain = chSpec.domain;
-            if (a.range == null && chSpec.range != null) a.range = chSpec.range;
-            if (a.catPref !== 'band') a.catPref = pref;
-            // The field's schema entry — the declared type/domain, ranked below an
-            // explicit channel spec but above data inference (first field wins).
-            if (a.schema == null && chSpec.field != null && schema[chSpec.field]) {
-                a.schema = schema[chSpec.field];
-            }
+            if (a.measure == null && chSpec.type != null) a.measure = chSpec.type;
+            if (a.scaleOpt == null && chSpec.scale != null) a.scaleOpt = chSpec.scale;
+            if (a.discretePref !== 'band') a.discretePref = pref;
+
             if (chSpec.field != null) {
-                for (const d of data) a.values.push(d[chSpec.field]);
+                if (!a.fields.includes(chSpec.field)) a.fields.push(chSpec.field);
+                for (const d of dataset) a.values.push(d[chSpec.field]);
+            } else if (chSpec.datum !== undefined) {
+                // A data-space constant still needs the axis to exist and to span it.
+                a.values.push(chSpec.datum);
             }
         }
     }
@@ -109,21 +133,64 @@ export function resolveScales(features, dataset, spec, dims) {
     /** @type {import('../types').ScaleMap} */
     const scales = {};
     for (const [bucket, a] of Object.entries(acc)) {
-        const hasSpec = a.type != null || a.domain != null;
-        const hasSchema = a.schema != null;
         const hasData = a.values.some((v) => v != null);
-        // A schema-backed channel counts as used even with no data — this is what
-        // lets an EMPTY chart resolve its scales (place marks, invert for create).
-        if (!hasSpec && !hasSchema && !hasData) continue; // channel unused (e.g. 1D dropped axis)
+        // A constant-only channel (`fill: { value: 'red' }`, `size: 9`) declares no
+        // field and no datum — there is nothing to scale. Leave it unresolved; a
+        // 1D plot with a dropped axis relies on this too (marks fall back to centre).
+        if (!a.fields.length && !hasData) continue;
 
-        const catPref = a.catPref || 'band';
-        // Precedence: explicit channel spec > schema declaration > data inference.
-        const type = a.type
-            || (a.schema ? measureToScaleType(bucket, a.schema.type, catPref) : inferScaleType(bucket, a.values, catPref));
-        const domain = a.domain
-            || (a.schema && a.schema.domain) || inferDomainFromValues(type, a.values);
-        const range = a.range || channelRange(bucket, type, dims);
-        const scale = createScale({ type, domain }, range);
+        const entries = a.fields.map((f) => schema[f]).filter(Boolean);
+        if (DEV) {
+            for (const f of a.fields) {
+                if (schema[f]) continue;
+                warnOnce(`schema:${f}:${bucket}`,
+                    `[vibe] field "${f}" is encoded on channel "${bucket}" but not declared in ` +
+                    `schema; inferring its type and domain from data. Declare it in the Elicit ` +
+                    `spec's schema — the schema is the contract of the elicited dataset.`);
+            }
+        }
+        if (!entries.length && !hasData) {
+            throw new Error(
+                `[vibe] cannot resolve a scale for channel "${bucket}": field(s) ` +
+                `${a.fields.map((f) => `"${f}"`).join(', ')} have no schema entry and there is no data ` +
+                `to infer from. Declare them in the Elicit spec's schema.`
+            );
+        }
+
+        const opt = { ...normalizeScaleOption(a.scaleOpt), ...normalizeScaleOption(chartScales[bucket]) };
+
+        // 1. What the data IS. An explicit channel type overrides the schema, which
+        //    overrides inference. Fields sharing an axis must agree.
+        const declared = entries.map((e) => e.type).filter(Boolean);
+        if (DEV && new Set(declared).size > 1) {
+            warnOnce(`measure:${bucket}`,
+                `[vibe] fields ${a.fields.map((f) => `"${f}"`).join(', ')} share channel "${bucket}" ` +
+                `but declare different schema types (${[...new Set(declared)].join(', ')}). ` +
+                `Using "${declared[0]}".`);
+        }
+        /** @type {import('../types').MeasureType} */
+        const measure = a.measure || declared[0] || inferMeasureType(a.values);
+
+        // 2. How this channel DRAWS it.
+        /** @type {import('../types').ScaleType} */
+        const type = opt.type || scaleTypeFor(bucket, measure, a.discretePref || 'band');
+
+        // 3. The domain, unioned across every field on the axis (the schema owns it).
+        /** @type {any[][]} */
+        const declaredDomains = [];
+        for (const e of entries) if (e.domain) declaredDomains.push(e.domain);
+        const domain = unionDomains(measure, declaredDomains)
+            || inferDomainFromValues(type, a.values);
+
+        const positional = !!axisOf(bucket);
+        const range = opt.range || channelRange(bucket, type, dims);
+
+        // A scale the author built themselves is adopted as-is: we only sniff its
+        // capabilities and hand it the pixel range if it's positional and named none.
+        const scale = opt.instance
+            ? adoptScale(opt.instance, { range: opt.range ? undefined : range, positional, domain })
+            : createScale({ ...opt, type, domain }, range);
+
         if (scale) {
             // Always alias onto the bucket key itself (e.g. 'x'), even when only
             // x1/x2 were declared and 'x' was never literally used as a channel —
@@ -136,4 +203,3 @@ export function resolveScales(features, dataset, spec, dims) {
 
     return scales;
 }
-

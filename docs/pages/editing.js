@@ -8,7 +8,7 @@ export default {
         '(drag / click / dblclick), <code class="inline">pick</code> (direct / nearest / plane), ' +
         '<code class="inline">when</code> (arbitration), <code class="inline">constrain</code>, ' +
         'and <code class="inline">guide</code>. Place it on a channel ' +
-        '(<code class="inline">encoding.y.edit</code>) or at mark level ' +
+        '(<code class="inline">channels.y.edit</code>) or at mark level ' +
         '(<code class="inline">edits: [...]</code>).',
     api: [
         {
@@ -30,7 +30,7 @@ export default {
             ],
             returns:
                 'The <code class="inline">ctx</code> passed to <code class="inline">apply</code>/<code class="inline">when</code> carries ' +
-                '<code class="inline">{ datum, index, data, pointer, event, node, channels, scales, encoding }</code>.',
+                '<code class="inline">{ datum, index, data, pointer, event, node, channels, scales, markChannels }</code>.',
         },
         {
             name: 'Edit catalogue',
@@ -69,12 +69,16 @@ export default {
     { x: "A", y: 20 }, { x: "B", y: 45 },
     { x: "C", y: 30 }, { x: "D", y: 60 },
   ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     bar({
       fill: "#4f46e5",
-      encoding: {
-        x: { field: "x", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "y", type: "linear", domain: [0, 100], edit: drag() },
+      channels: {
+        x: { field: "x" },
+        y: { field: "y", edit: drag() },
       },
     }),
   ],
@@ -99,13 +103,17 @@ export default {
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#ffffff", stroke: "#334155", strokeWidth: 2,
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 10 },
+      size: 10,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [ drag({ channels: ["x", "y"], pick: "nearest", threshold: 45, guide: true }) ],
     }),

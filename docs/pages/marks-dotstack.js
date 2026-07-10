@@ -17,11 +17,11 @@ export default {
                 'stacks upward (category on x); <code class="inline">dotStackX</code> rightward ' +
                 '(category on y); <code class="inline">dotStack</code> auto-detects.',
             signatures: [
-                'dotStack({ encoding, r, gap, ghost, label, edits, constraints, id }) → Feature',
+                'dotStack({ channels, size, gap, ghost, label, edits, constraints, id }) → Feature',
             ],
             options: [
-                { name: 'encoding', type: 'object', default: '{}', desc: 'A band/point category axis whose <code class="inline">domain</code> is the slot list.' },
-                { name: 'r', type: 'number', default: '7', desc: 'Token radius (fixed geometry — the stack offset is 2r + gap per token).' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'A band/point category axis whose <code class="inline">domain</code> is the slot list.' },
+                { name: 'size', type: 'number', default: '7', desc: 'Token radius (fixed geometry — the stack offset is 2·size + gap per token).' },
                 { name: 'gap', type: 'number', default: '2', desc: 'Vertical gap between stacked tokens.' },
                 { name: 'ghost', type: 'boolean', default: 'true', desc: 'Draw a faint open ring at each slot\'s next position (a droppable affordance).' },
                 { name: 'label', type: 'boolean', default: 'false', desc: 'Draw the per-slot count above each column.' },
@@ -47,16 +47,19 @@ export default {
 mount(Elicit({
   width: 560, height: 260,
   margins: { top: 20, right: 16, bottom: 28, left: 16 },
-  x: { type: "point", domain: bins },
   axes: { x: {}, y: false },
   data: [
     { bin: 0.3 }, { bin: 0.3 }, { bin: 0.3 },
     { bin: 0.4 }, { bin: 0.4 }, { bin: 0.5 },
   ],
   onChange: (d) => console.log("tokens:", d.length),
+  schema: {
+    bin: { type: "categorical", domain: bins },
+  },
+  scales: { x: { type: "point" } },
   features: [
     dotStack({
-      encoding: { x: { field: "bin", type: "point", domain: bins } },
+      channels: { x: { field: "bin" } },
       edits: [ create({ trigger: "click", channels: ["x"] }), remove() ],
       constraints: [ count({ max: 25 }) ],
       label: true,
@@ -73,13 +76,16 @@ mount(Elicit({
 const chart = Elicit({
   width: 560, height: 240,
   margins: { top: 16, right: 16, bottom: 28, left: 16 },
-  x: { type: "point", domain: bins },
   axes: { x: {}, y: false },
   data: [],
+  schema: {
+    bin: { type: "categorical", domain: bins },
+  },
+  scales: { x: { type: "point" } },
   features: [
     dotStack({
       id: "tokens",
-      encoding: { x: { field: "bin", type: "point", domain: bins } },
+      channels: { x: { field: "bin" } },
       edits: [
         // Hover previews the drop; the click commits it. advance:false keeps the
         // edit live so you can keep dropping tokens.
@@ -106,12 +112,15 @@ mount(out);`,
 mount(Elicit({
   width: 420, height: 240,
   margins: { top: 16, right: 16, bottom: 28, left: 16 },
-  x: { type: "band", domain: cats },
   axes: { x: {}, y: false },
   data: [{ bin: "A" }, { bin: "B" }, { bin: "B" }],
+  schema: {
+    bin: { type: "categorical", domain: cats },
+  },
+  scales: { x: { type: "band" } },
   features: [
     dotStack({
-      encoding: { x: { field: "bin", type: "band", domain: cats } },
+      channels: { x: { field: "bin" } },
       edits: [ create({ trigger: "click", channels: ["x"] }), remove() ],
       constraints: [ unique({ field: "bin", max: 5, strategy: "reject" }) ],
       label: true,

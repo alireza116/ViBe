@@ -10,6 +10,10 @@ Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/p
 
 ## Non-negotiable invariants
 
+**The schema owns the data type and the DOMAIN; a mark owns neither.** A field's measurement type (`quantitative`/`categorical`/`ordinal`/`temporal`) and its domain describe the *data*, so they live once on `spec.schema`. A channel's `type` is the **data** type (an override for a field the schema doesn't cover), never a scale type. A channel's `scale` is the scale — a name, a `ScaleSpec`, a live d3 scale, or `null`. There is no `domain` or `range` on a channel. `resolveScales` picks a scale via `scaleTypeFor(channel, measure, discretePref)` and takes the axis domain as the **union of the schema domains of every field bucketed onto it** (`unionDomains`) — that union is why an error bar's `mean`/`lo`/`hi` share one y axis. Don't re-add a per-channel domain "just for this chart"; declare the field.
+
+**Never branch on `scale.type`.** `type` is a label. Control flow reads the capability flags `createScale`/`adoptScale` stamp on every scale: `kind` (`band` | `point` | `continuous` | `discrete`), `temporal`, `invertible`. A `log` scale behaves exactly like a `linear` one everywhere it matters, and a user-supplied `d3.scaleBand()` has no `type` at all — an allowlist of type strings silently marks it non-invertible, so the chart draws and **every edit on that channel dies with no error**. Adding a scale type means adding a case in `core/scales.js` and nowhere else.
+
 **One dataset. `Elicit` owns it; marks never do.** A chart elicits exactly one dataset — even a slider elicits a one-row dataset. `data` lives on `ElicitSpec`; the engine holds it as a single array (`dataset` in `elicit.js`). A mark is a *view* over those rows: it encodes some columns and, where a channel carries an `edit`, writes them back. Do not add a `data` (or `onChange`) option to a mark factory, and do not reintroduce a per-feature data store keyed by feature id — that model made two marks over the same rows impossible and is what forced `composite` to fake a glyph inside one feature.
 
 **A whole-dataset edit belongs on exactly one mark.** A plane gesture carries no node, so it fans to *every* feature's plane-pick edits (`dispatchPlaneEdits`). With one dataset that means `create()` on two marks appends twice per click, and two `rotate()`s rotate twice. Direct-pick edits are immune — they route to the touched node's feature alone. The engine dev-warns (`warnDuplicatePlaneEdits`) rather than branching; keep it that way. Sequential composition of *direct* edits within one event is intended: a coupled edit writes fields, sibling marks re-derive on the next render.
@@ -24,7 +28,9 @@ Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/p
 
 **Scope goes in the name.** An edit that only works on marks with series grouping (a `line` family capability) belongs under `edit.line.*` and must set `scope: 'line'` in its descriptor (the engine dev-warns on a scope mismatch — see `warnLineScopeMismatch` in `elicit.js`). A genuinely universal edit (works on any mark) stays top-level in `edit.*`. Don't add a mark-specific edit to the top-level namespace "because it's simpler" — that's the flat-namespace problem the namespacing fixed.
 
-**One positional-resolution path.** Every mark resolves a datum → pixel through `encodeChannel` (`src/plot/mark.js`) for its value axis, or the band-geometry helpers (`bandwidthOf`/`baselineOf`/`isBand` in `core/scales.js`) for its category axis. Do not call `scale(d[key])` directly in a new mark — that reintroduces the "four different ways to place a point" inconsistency that existed across `bar`/`dot`/`rule` before the cleanup.
+**One positional-resolution path.** Every mark resolves a datum → pixel through `encodeChannel` (`src/plot/mark.js`) for its value axis, or the band-geometry helpers (`bandwidthOf`/`baselineOf`/`isBand`/`isDiscrete` in `core/scales.js`) for its category axis. Do not call `scale(d[key])` directly in a new mark — that reintroduces the "four different ways to place a point" inconsistency that existed across `bar`/`dot`/`rule` before the cleanup. `core/encoding.js` once carried a whole *second*, unused resolution path (`resolveChannel`/`resolveEncoding`/`adjustDatum`/`assignChannel`/`datumFromPointer`); it was deleted. Don't grow another.
+
+**`value` is visual space; `datum` is data space.** On a channel, `{ value: 25 }` is the output — it skips the scale, so on `y` it means pixel 25. `{ datum: 25 }` is in the field's own units and goes *through* the scale, so it lands where y = 25 is. Top-level constant shorthands (`fill: 'red'`, `size: 9`) desugar to `{ value }` via `normalizeMarkOptions`. Keep `SHORTHANDS` (what desugars) distinct from `STANDARD_STYLE_CHANNELS` (what `resolveStyle` sweeps onto a node): `size` belongs to the first only, because marks read it themselves.
 
 **One guide path.** `src/edit/guide.js`'s `buildEditGuide` is the only constraint-guide drawer. If you add a constraint, either let it fall through to no guide (acceptable for cardinality rules like `count`/`unique`) or add a case in `constraintGuide`'s switch — don't create a second standalone guide module that reads the constraint set independently.
 
@@ -35,7 +41,9 @@ Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/p
 Follow the contract documented at the top of `src/plot/mark.js`. Concretely:
 - `build(currentData, scales, width, height) -> FeatureNode[]` is the one required method. `currentData` is the chart's dataset, handed in by the engine — the mark takes no `data` option and no `onChange`.
 - Resolve position/style through `encodeChannel` / `resolveStyle` — don't hand-roll scale lookups.
-- Set `categoricalScale: 'band'` (bar/tick — needs an interval) or `'point'` (point/line — needs a tick), plus `xKey`/`yKey`.
+- Set `discreteScale: 'band'` (bar/tick — needs an interval) or `'point'` (point/line — needs a tick), plus `xKey`/`yKey`. This says what the mark needs for *discrete* data; the schema says which fields are discrete. A mark that merely spans (like `rule`) should leave it undefined so a `composite` can stamp its own.
+- Return `edits`, `constraints`, `xKey`, `yKey` from the factory. `rule` silently dropped all four for a long time, which made a draggable whisker impossible; if a mark accepts an option, it must pass it on.
+- Don't set `pointerEvents` on your nodes to make them inert — leave it, and the engine silences any mark with no direct-pick edit (see the pointer-transparency invariant). Setting it yourself also disables the mark when it *does* carry an edit.
 - If the mark groups points into series (a line-family mark), set `seriesKey`, `order`, and `supportsSeries: true` so line-scoped edits and the dev guard work.
 - Export both a bare form (auto-detects orientation/axis) and, where the mark has a natural direction, `...X`/`...Y` variants — every directional mark in this codebase (`bar`, `tick`, `line`, `axis`, `grid`, `rule`) follows that pairing. Don't ship an asymmetric `ruleY`-with-no-`ruleX` again.
 
@@ -52,6 +60,10 @@ Follow the contract documented at the top of `src/plot/mark.js`. Concretely:
 
 ## Naming conventions to preserve
 
+- `channels` is the mark's channel map (Observable Plot's word). `EditContext.markChannels` is that map as an edit sees it; `EditContext.channels` / `Edit.channels` are a *list of channel names*. Don't collapse the two.
+- `type` is always a **data** type (`MeasureType`). A scale type is named by `scale`, or by `ScaleSpec.type`. The two vocabularies never share a key.
+- `size` is a radius in px, on every mark. Not `r`, not `handleRadius` — those were three names for one idea. A sub-element's radius is `handleSize`.
+- `fill` / `stroke` are the colour channels. There is no `color` channel (it used to mean a fill fallback on `point`/`line` *and* the label colour on `axis`).
 - `series` is the public option name; `seriesKey` is the internal feature field. Don't introduce a third synonym.
 - `pick` values are target-selection strategies or driver keys (`direct`, `nearest`, `plane`, `sweep`, `draw`) — not arbitrary interaction descriptors.
 - `constrain` (edit-scoped, singular) vs `constraints` (plural, the dataset's invariants — canonical on `spec`, accepted on a mark as sugar and promoted) — keep the distinction; don't rename one to match the other.
@@ -75,3 +87,7 @@ Follow the contract documented at the top of `src/plot/mark.js`. Concretely:
 - Engine code that branches on a specific `pick`/edit `type` outside the driver registry.
 - A standalone guide or constraint-introspection module that duplicates `edit/guide.js`.
 - A glyph that fakes several marks inside one feature and arbitrates its own handles, when a `composite` group of real marks would do.
+- A `domain` or `range` on a channel, or a `spec.x` / `spec.y` scale block. Domains live on the schema; scale config lives on `scale` (per channel) or `spec.scales` (per chart).
+- A `scale.type === '…'` branch anywhere outside `core/scales.js`. Read `kind` / `temporal` / `invertible`.
+- A second name for a field on a mark: `channels` is the only place a field is named. (`x` once meant a field name on `bar`, a constant on `rule`, a scale config on `spec`, and nothing on `point`.)
+- A mark factory that accepts `edits` / `constraints` and drops them.

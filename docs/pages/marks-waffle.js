@@ -17,10 +17,10 @@ export default {
                 '<code class="inline">waffleY</code> forces vertical, ' +
                 '<code class="inline">waffleX</code> horizontal.',
             signatures: [
-                'waffleY({ encoding, cols, gap, emptyFill, edits, constraints, id }) → Feature',
+                'waffleY({ channels, cols, gap, emptyFill, edits, constraints, id }) → Feature',
             ],
             options: [
-                { name: 'encoding', type: 'object', default: '{}', desc: 'One band (category) axis and one linear (value) axis; put <code class="inline">edit: drag()</code> on the value channel.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'One band (category) axis and one linear (value) axis; put <code class="inline">edit: drag()</code> on the value channel.' },
                 { name: 'cols', type: 'number', default: '10', desc: 'Cells across the band; rows follow from the value domain (near-square cells).' },
                 { name: 'gap', type: 'number', default: '1', desc: 'Pixel gap between cells.' },
                 { name: 'emptyFill', type: 'string', default: "'#eee'", desc: 'Fill for unfilled cells (filled cells use the standard style surface).' },
@@ -45,18 +45,21 @@ export default {
 mount(Elicit({
   width: 460, height: 300,
   margins: { top: 16, right: 12, bottom: 28, left: 34 },
-  x: { type: "band", domain: cats },
-  y: { type: "linear", domain: [0, 320] },
   data: [
     { cat: "apples", value: 212 }, { cat: "bananas", value: 207 },
     { cat: "oranges", value: 315 }, { cat: "pears", value: 11 },
   ],
+  schema: {
+    cat:   { type: "categorical", domain: cats },
+    value: { type: "quantitative", domain: [0, 320] },
+  },
+  scales: { x: { type: "band" } },
   features: [
     waffleY({
       fill: "#4f46e5",
-      encoding: {
-        x: { field: "cat", type: "band", domain: cats },
-        y: { field: "value", type: "linear", domain: [0, 320] },
+      channels: {
+        x: { field: "cat" },
+        y: { field: "value" },
       },
       cols: 6,
     }),
@@ -78,16 +81,19 @@ mount(Elicit({
 `mount(Elicit({
   width: 220, height: 300,
   margins: { top: 16, right: 12, bottom: 24, left: 34 },
-  x: { type: "band", domain: ["belief"] },
-  y: { type: "linear", domain: [0, 1] },
   data: [{ cat: "belief", value: 0.4 }],
   onChange: (d) => console.log("proportion:", d[0].value.toFixed(2)),
+  schema: {
+    cat:   { type: "categorical", domain: ["belief"] },
+    value: { type: "quantitative", domain: [0, 1] },
+  },
+  scales: { x: { type: "band" } },
   features: [
     waffleY({
       fill: "#0ea5e9",
-      encoding: {
-        x: { field: "cat", type: "band", domain: ["belief"] },
-        y: { field: "value", type: "linear", domain: [0, 1], edit: drag() },
+      channels: {
+        x: { field: "cat" },
+        y: { field: "value", edit: drag() },
       },
       cols: 5,
       constraints: [ snap({ field: "value", step: 1/50 }), clamp({ min: 0, max: 1, field: "value" }) ],

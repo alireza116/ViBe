@@ -25,7 +25,7 @@ export default {
                 { name: 'tickFormat', type: 'string | fn', default: 'auto', desc: 'A d3-format string or a formatter function.' },
                 { name: 'tickSize', type: 'number', default: '6', desc: 'Tick mark length in pixels.' },
                 { name: 'title', type: 'string', default: '—', desc: 'Axis title, centred and pushed past the labels.' },
-                { name: 'stroke / color / fontSize', type: 'style', default: '#6b7280 / #374151 / 10', desc: 'Spine colour, label colour, label size.' },
+                { name: 'stroke / fill / fontSize', type: 'style', default: '#6b7280 / #374151 / 10', desc: 'Spine + tick colour, label colour (labels are text nodes, so they take a <code class="inline">fill</code>), label size.' },
                 { name: 'grid', type: 'boolean', default: 'false', desc: 'Also add a matching grid mark alongside the axis.' },
             ],
             returns: 'A background <b>feature</b> emitting <code class="inline">line</code> + <code class="inline">text</code> nodes; redraws as the domain grows.',
@@ -46,19 +46,23 @@ export default {
             name: 'rule · ruleX · ruleY',
             summary:
                 'A straight reference line at a value on one axis — or, with a pair of endpoint ' +
-                'channels, a <b>span</b> segment (a lollipop stem / error-bar whisker) at a category. Non-interactive.',
+                'channels, a <b>span</b> segment (a lollipop stem / error-bar whisker) at a category. ' +
+                'An ordinary editable mark: put an <code class="inline">edit</code> on an endpoint ' +
+                'channel and its cap becomes a handle. A rule with no edit is left ' +
+                '<code class="inline">pointerEvents:"none"</code> by the engine, so an inert whisker ' +
+                'never swallows a sibling handle’s drag.',
             signatures: [
-                'ruleY({ y: 50, stroke, strokeDasharray }) → Feature   // reference line',
-                'ruleX({ encoding: { x, y1, y2 } }) → Feature          // span per datum',
+                'ruleY({ channels: { y: { datum: 50 } } }) → Feature   // reference line at y = 50',
+                'ruleX({ channels: { x, y1, y2 } }) → Feature          // span per datum',
             ],
             options: [
-                { name: 'x / y', type: 'number | any', default: '—', desc: 'Constant reference value on that axis (e.g. <code class="inline">ruleY({ y: 50 })</code>).' },
-                { name: 'encoding', type: 'object', default: '{}', desc: 'Value channel for data-bound rules; <code class="inline">y1/y2</code> or <code class="inline">x1/x2</code> switch to span mode.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'The value channel — <code class="inline">{ datum }</code> for a constant, <code class="inline">{ field }</code> for one rule per row. <code class="inline">y1/y2</code> or <code class="inline">x1/x2</code> switch to span mode.' },
+                { name: 'edits / constraints', type: 'Edit[] / Constraint[]', default: '—', desc: 'As on any mark. A per-channel <code class="inline">edit</code> makes that endpoint draggable.' },
                 { name: 'strokeDasharray', type: 'string', default: '—', desc: 'Dash pattern passthrough.' },
                 { name: 'stroke, strokeWidth, opacity', type: 'style', default: "stroke:'black'", desc: 'Standard style surface.' },
             ],
             channels: [
-                { name: 'x / y', type: 'const | field', desc: 'The reference value axis (data-bound form).' },
+                { name: 'x / y', type: 'datum | field', desc: 'The reference value axis. <code class="inline">{ datum: 50 }</code> is DATA space — it goes through the scale. (<code class="inline">{ value: 50 }</code> would be 50 pixels.)' },
                 { name: 'y1 / y2', type: 'linear', desc: 'Span endpoints (vertical). A lone endpoint spans from the value-axis baseline.' },
                 { name: 'x1 / x2', type: 'linear', desc: 'Span endpoints (horizontal).' },
             ],
@@ -88,12 +92,15 @@ export default {
     { step: "Visit", rate: 1.0 }, { step: "Signup", rate: 0.62 },
     { step: "Active", rate: 0.41 }, { step: "Paid", rate: 0.18 },
   ],
+  schema: {
+    step: { type: "categorical", domain: ["Visit", "Signup", "Active", "Paid"] },
+    rate: { type: "quantitative", domain: [0, 1] },
+  },
   features: [
     bar({
-      encoding: {
-        x: { field: "step", type: "band",
-             domain: ["Visit", "Signup", "Active", "Paid"] },
-        y: { field: "rate", type: "linear", domain: [0, 1] },
+      channels: {
+        x: { field: "step" },
+        y: { field: "rate" },
       },
     }),
   ],
@@ -114,12 +121,16 @@ export default {
     { x: -8, y: 6 }, { x: 5, y: -3 }, { x: -4, y: -7 },
     { x: 9, y: 4 }, { x: 2, y: 8 }, { x: -6, y: 2 },
   ],
+  schema: {
+    x: { type: "quantitative", domain: [-10, 10] },
+    y: { type: "quantitative", domain: [-10, 10] },
+  },
   features: [
     point({
-      encoding: {
-        x: { field: "x", type: "linear", domain: [-10, 10] },
-        y: { field: "y", type: "linear", domain: [-10, 10] },
-        size: { value: 5 }, color: { value: "#4f46e5" },
+      size: 5, fill: "#4f46e5",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
     }),
   ],
@@ -138,11 +149,14 @@ export default {
     y: false,   // drop the default y axis
   },
   data: [{ v: 20 }, { v: 55 }, { v: 80 }],
+  schema: {
+    v: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
-      encoding: {
-        x: { field: "v", type: "linear", domain: [0, 100] },
-        size: { value: 8 }, color: { value: "#0d9488" },
+      size: 8, fill: "#0d9488",
+      channels: {
+        x: { field: "v" },
       },
       edits: [ drag({ channels: ["x"] }) ],
     }),
@@ -167,15 +181,19 @@ export default {
   margins: { top: 16, right: 16, bottom: 30, left: 36 },
   axes: false,   // no auto axes; we place our own
   data: [{ x: 15, y: 30 }, { x: 40, y: 62 }, { x: 65, y: 44 }, { x: 88, y: 74 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     gridY({ ticks: 5 }),
     ruleY({ y: 50, stroke: "#e4572e", strokeDasharray: "4 3" }),
     point({
       fill: "#4f46e5",
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 8 },
+      size: 8,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
     }),
     axisX({ title: "x", ticks: 5 }),

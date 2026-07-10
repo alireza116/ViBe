@@ -44,13 +44,17 @@ export default {
   width: 340, height: 240,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#ffffff", stroke: "#334155", strokeWidth: 2,
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 10 },
+      size: 10,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [ drag({ channels: ["x", "y"], pick: "nearest", threshold: 45, guide: true }) ],
     }),
@@ -83,13 +87,17 @@ export default {
     },
   },
   data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       fill: "#ffffff", stroke: "#334155", strokeWidth: 2,
-      encoding: {
-        x: { field: "x", type: "linear", domain: [0, 100] },
-        y: { field: "y", type: "linear", domain: [0, 100] },
-        size: { value: 10 },
+      size: 10,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
       },
       edits: [ drag({ channels: ["x", "y"], pick: "nearest", threshold: 45, guide: true }) ],
     }),

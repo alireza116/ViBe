@@ -37,7 +37,11 @@ export function multipleChoice(opts = {}) {
         width,
         height,
         margins: { top: 34, right: 60, bottom: 44, left: 60 },
-        x: { type: 'band', domain: options },
+        // The contract of the elicited dataset: one categorical pick per row.
+        schema: { choice: { type: 'categorical', domain: options } },
+        // A `point` would give each option a tick; the rings want the interval a
+        // band provides, so the chart overrides the mark's preference.
+        scales: { x: { type: 'band' } },
         // The elicited dataset: one row per pick.
         data: value.map((v) => ({ choice: v })),
         constraints,
@@ -47,10 +51,10 @@ export function multipleChoice(opts = {}) {
         features: [
             point({
                 id: 'choice',
-                encoding: {
-                    x: { field: 'choice', type: 'band', domain: options },
-                    size: { value: THEME.radius - 3 },
-                    fill: { value: THEME.accent }
+                size: THEME.radius - 3,
+                fill: THEME.accent,
+                channels: {
+                    x: { field: 'choice' }
                 },
                 // One gesture, both directions: click an empty option to pick it,
                 // click a pick to take it back. The hover shows which it will be.

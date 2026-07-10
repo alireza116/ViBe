@@ -4,7 +4,7 @@ export default {
     title: 'VibeJS documentation',
     lead:
         'A chart is a declarative <code class="inline">Elicit(spec)</code>: a list of ' +
-        '<b>marks</b>, each with an <b>encoding</b> that maps data to visuals. Every ' +
+        '<b>marks</b>, each with <b>channels</b> that map data fields to visuals. Every ' +
         'example on these pages shows the <b>exact code that drew the chart beside it</b> — ' +
         'the snippet is run verbatim. This page is the 30-second tour; the sidebar goes deep ' +
         'on each mark and feature.',
@@ -53,12 +53,16 @@ export default {
     { cat: "A", n: 30 }, { cat: "B", n: 55 },
     { cat: "C", n: 22 }, { cat: "D", n: 44 },
   ],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n:   { type: "quantitative", domain: [0, 60] },
+  },
   features: [
     bar({
       fill: "#4f46e5",
-      encoding: {
-        x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "n",   type: "linear", domain: [0, 60] },
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n" },
       },
     }),
   ],
@@ -87,12 +91,16 @@ export default {
     { cat: "A", n: 30 }, { cat: "B", n: 55 },
     { cat: "C", n: 22 }, { cat: "D", n: 44 },
   ],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n:   { type: "quantitative", domain: [0, 60] },
+  },
   features: [
     bar({
       fill: "#4f46e5",
-      encoding: {
-        x: { field: "cat", type: "band", domain: ["A", "B", "C", "D"] },
-        y: { field: "n", type: "linear", domain: [0, 60], edit: drag() },
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n", edit: drag() },
       },
     }),
   ],

@@ -5,19 +5,24 @@
 // scale.encode() a mark would. Non-interactive.
 //
 //   vibe.guides.rule({ y: 50, label: "target" })   // horizontal line at y = 50
-//   vibe.guides.rule({ x: "Neutral" })              // vertical line at a category
+//   vibe.guides.rule({ x: "Neutral" })             // vertical line at a category
+//
+// Any option may instead be a function of the guide context, so a reference line
+// can be DERIVED from the elicited data rather than fixed:
+//
+//   vibe.guides.rule({ y: ({ data }) => d3.mean(data, (d) => d.y), label: "mean" })
 //
 // Because it positions through scale.encode, it works on any scale type (linear
 // pixel, band centre) with no special-casing — a reference line on a Likert band
 // axis is the same call as one on a continuous axis.
 
+import { resolveGuideOptions } from './shared.js';
+
 /**
- * @param {{ x?: any, y?: any, stroke?: string, strokeDasharray?: string, label?: string }} [options]
+ * @param {{ x?: any, y?: any, stroke?: any, strokeDasharray?: any, label?: any }} [options]
  * @returns {any}
  */
 export function rule(options = {}) {
-    const { x, y, stroke = '#64748b', strokeDasharray = '5 4', label } = options;
-
     return {
         isGuide: true,
         /**
@@ -26,6 +31,10 @@ export function rule(options = {}) {
          */
         build: (ctx) => {
             const { scales, width, height } = ctx;
+            const {
+                x, y, stroke = '#64748b', strokeDasharray = '5 4', label
+            } = resolveGuideOptions(options, ctx);
+
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 

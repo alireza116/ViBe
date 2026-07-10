@@ -7,20 +7,25 @@ export default {
         'slope }</code> is a linear belief; the mark draws <code class="inline">y = intercept + ' +
         'slope·x</code> across the x domain plus two handles — an <b>intercept</b> handle that ' +
         'translates the line and a <b>slope</b> handle that rotates it about the anchor. Stage ' +
-        'the two handles to elicit the level first, then the trend.',
+        'the two handles to elicit the level first, then the trend. Trend is the one mark whose ' +
+        '<code class="inline">x</code>/<code class="inline">y</code> channels name the plot’s ' +
+        '<i>axes</i> rather than columns of its datum: the belief is about how y relates to x, ' +
+        'while the datum holds the line’s two parameters. Declare <code class="inline">x</code> ' +
+        'and <code class="inline">y</code> in the schema and their domains become the coordinate ' +
+        'space the handles live in.',
     api: [
         {
             name: 'trend(options)',
             summary: 'Import from <code class="inline">vibe.plot</code>. A single-datum glyph; the fitted line is non-interactive and each handle is a draggable circle scoped to its own field.',
             signatures: [
-                'trend({ anchor, probe, interceptStage, slopeStage, handleRadius, id }) → Feature',
+                'trend({ anchor, probe, interceptStage, slopeStage, handleSize, id }) → Feature',
             ],
             options: [
                 { name: 'anchor', type: 'number', default: 'x-domain min', desc: 'x position of the intercept handle and the slope-rotation pivot.' },
                 { name: 'probe', type: 'number', default: 'x-domain max', desc: 'x position of the slope handle.' },
                 { name: 'interceptStage', type: 'number', default: 'null', desc: 'Stage in which the intercept handle is active (null = always).' },
                 { name: 'slopeStage', type: 'number', default: 'null', desc: 'Stage in which the slope handle is active (null = always).' },
-                { name: 'handleRadius', type: 'number', default: '6', desc: 'Handle circle radius.' },
+                { name: 'handleSize', type: 'number', default: '6', desc: 'Handle circle radius.' },
             ],
             returns: 'A <b>feature</b> emitting the fitted <code class="inline">line</code> plus two handle <code class="inline">circle</code>s (tagged <code class="inline">intercept</code> / <code class="inline">slope</code>).',
         },
@@ -33,14 +38,18 @@ export default {
             examples: [
                 {
                     title: 'Trend line',
-                    blurb: 'The plot x/y scales come from spec.x / spec.y.',
+                    blurb: 'The plot\'s coordinate space is the schema\'s x and y; the datum holds intercept and slope.',
                     try: 'drag the left dot; press Next; drag the right dot.',
                     code:
 `const chart = Elicit({
   width: 360, height: 300,
   margins: { top: 16, right: 16, bottom: 28, left: 34 },
-  x: { type: "linear", domain: [0, 10] },
-  y: { type: "linear", domain: [-10, 10] },
+  schema: {
+    x: { type: "quantitative", domain: [0, 10] },    // the axes …
+    y: { type: "quantitative", domain: [-10, 10] },
+    intercept: { type: "quantitative" },             // … the belief
+    slope:     { type: "quantitative" },
+  },
   data: [{ intercept: 0, slope: 1 }],
   onChange: (d) => console.log(d[0]),
   features: [
@@ -64,8 +73,12 @@ mount(btn);`,
 `mount(Elicit({
   width: 360, height: 300,
   margins: { top: 16, right: 16, bottom: 28, left: 34 },
-  x: { type: "linear", domain: [0, 10] },
-  y: { type: "linear", domain: [0, 20] },
+  schema: {
+    x: { type: "quantitative", domain: [0, 10] },
+    y: { type: "quantitative", domain: [0, 20] },
+    intercept: { type: "quantitative" },
+    slope:     { type: "quantitative" },
+  },
   data: [{ intercept: 4, slope: 1 }],
   features: [
     trend(),

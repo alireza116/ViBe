@@ -50,13 +50,17 @@ export default {
   margins: { top: 20, right: 20, bottom: 20, left: 20 },
   axes: false,
   data: [{ r: 0, spread: 0 }],
+  schema: {
+    r:      { type: "quantitative", domain: [-1, 1] },
+    spread: { type: "quantitative", domain: [0, 1] },
+  },
   features: [
     cone({
       id: "belief",
-      encoding: {
-        angle:  { field: "r",      type: "linear", domain: [-1, 1], range: [-45, 45],
+      channels: {
+        angle: { field: "r", range: [-45, 45],
                   edit: rotate({ pick: "probe", stage: 0 }) },
-        spread: { field: "spread", type: "linear", domain: [0, 1],  range: [0, 45],
+        spread: { field: "spread",  range: [0, 45],
                   edit: rotate({ pick: "probe", stage: 1, relativeTo: "angle" }) },
       },
       samples: 60, wedge: true,
@@ -91,15 +95,17 @@ mount(out);`,
 `const chart = Elicit({
   width: 380, height: 130,
   margins: { top: 20, right: 24, bottom: 34, left: 24 },
-  x: { type: "linear", domain: [0, 100] },
   axes: { x: {}, y: false },
   data: [{ v: 20 }],
+  schema: {
+    v: { type: "quantitative", domain: [0, 100] },
+  },
   features: [
     point({
       id: "belief",
-      encoding: { x: { field: "v", type: "linear", domain: [0, 100],
-                       edit: drag({ pick: "probe", advance: false }) },
-                  size: { value: 9 }, fill: { value: "#2563eb" } },
+      size: 9, fill: "#2563eb",
+      channels: { x: { field: "v",
+                       edit: drag({ pick: "probe", advance: false }) },},
       constraints: [ clamp({ min: 0, max: 100, field: "v" }) ],
     }),
   ],
@@ -120,12 +126,15 @@ mount(out);`,
 mount(Elicit({
   width: 420, height: 220,
   margins: { top: 16, right: 20, bottom: 28, left: 20 },
-  x: { type: "point", domain: bins },
   axes: { x: {}, y: false },
   data: [],
+  schema: {
+    bin: { type: "categorical", domain: bins },
+  },
+  scales: { x: { type: "point" } },
   features: [
     dotStack({
-      encoding: { x: { field: "bin", type: "point", domain: bins } },
+      channels: { x: { field: "bin" } },
       edits: [
         create({ pick: "probe", channels: ["x"], advance: false, when: when.noAlt }),
         remove({ pick: "nearest", when: when.alt }),

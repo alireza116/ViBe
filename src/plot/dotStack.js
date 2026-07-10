@@ -6,9 +6,10 @@
 // on a token removes it (edit.remove), and the belief is just how many tokens sit
 // in each slot — `data.filter(d => d.bin === b).length`.
 //
-//   // Elicit({ data: [], features: [ dotStack({ … }) ] })
+//   // Elicit({ schema: { bin: { type: 'ordinal', domain: bins } }, data: [], … })
 //   dotStack({
-//     encoding: { x: { field: 'bin', type: 'point', domain: bins } },
+//     size: 7,                                  // token radius
+//     channels: { x: { field: 'bin' } },
 //     edits: [ create({ trigger: 'click', channels: ['x'] }), remove() ],
 //     constraints: [ count({ max: 20 }), unique({ field: 'bin', max: 10 }) ],
 //   })
@@ -24,10 +25,8 @@
 // rightward with the category on y — the bare + X/Y pairing every directional
 // mark in this codebase follows.
 
+import { isDiscrete } from '../core/scales.js';
 import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
-
-/** A discrete positional scale (the slots tokens drop into). @param {any} s */
-const isCategorical = (s) => !!s && (s.type === 'band' || s.type === 'point');
 
 /**
  * The discrete slots along the category axis — the ghost/label layer iterates
@@ -54,26 +53,25 @@ function slotsOf(scale, key, data) {
 function buildDotStack(options, forcedAxis) {
     const opts = normalizeMarkOptions(options);
     const {
-        encoding = {},
+        channels = {},
         id,
         edits,
         constraints,
-        r = 7,
         gap = 2,
         ghost = true,
         label = false
     } = opts;
 
-    const xKey = (encoding.x && encoding.x.field) || options.x || 'x';
-    const yKey = (encoding.y && encoding.y.field) || options.y || 'y';
+    const xKey = (channels.x && channels.x.field) || 'x';
+    const yKey = (channels.y && channels.y.field) || 'y';
 
     return {
         id,
-        encoding,
+        channels,
         edits,
         constraints,
         // Tokens sit in discrete slots; a point scale gives each slot a tick.
-        categoricalScale: 'point',
+        discreteScale: 'point',
         xKey,
         yKey,
         /**
@@ -87,8 +85,12 @@ function buildDotStack(options, forcedAxis) {
             // Stack direction (bar-style autodetect): category on x -> stack UP
             // (along y); a categorical y with no x category -> stack RIGHT (along x).
             let stackAxis = forcedAxis;
-            if (!stackAxis) stackAxis = (isCategorical(scales.y) && !isCategorical(scales.x)) ? 'x' : 'y';
+            if (!stackAxis) stackAxis = (isDiscrete(scales.y) && !isDiscrete(scales.x)) ? 'x' : 'y';
 
+            // Token radius, from the `size` shorthand. A token is a unit of count,
+            // so the stack geometry needs ONE radius for every token — resolve it
+            // against no datum, which yields the constant (or the default).
+            const r = encodeChannel(scales, channels, 'size', null, 7);
             const slot = 2 * r + gap;
             const categoryKey = stackAxis === 'y' ? xKey : yKey;
             const categoryChannel = stackAxis === 'y' ? 'x' : 'y';
@@ -107,7 +109,7 @@ function buildDotStack(options, forcedAxis) {
 
             /** The pixel of a slot's `n`-th token along the stack axis. */
             const placeAt = (/** @type {any} */ datum, /** @type {number} */ n) => {
-                const along = encodeChannel(scales, encoding, categoryChannel, datum, (stackAxis === 'y' ? width : height) / 2);
+                const along = encodeChannel(scales, channels, categoryChannel, datum, (stackAxis === 'y' ? width : height) / 2);
                 const offset = (n + 0.5) * slot;
                 return {
                     cx: stackAxis === 'y' ? along : base + offset,
@@ -142,7 +144,7 @@ function buildDotStack(options, forcedAxis) {
                 const key = d[categoryKey];
                 const n = seen.get(key) || 0;
                 seen.set(key, n + 1);
-                const style = resolveStyle(scales, encoding, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
                 nodes.push({
                     type: 'circle',
                     ...placeAt(d, n),
@@ -159,7 +161,7 @@ function buildDotStack(options, forcedAxis) {
                     const n = counts.get(s) || 0;
                     if (n === 0) continue;
                     const synthetic = { [categoryKey]: s };
-                    const along = encodeChannel(scales, encoding, categoryChannel, synthetic, (stackAxis === 'y' ? width : height) / 2);
+                    const along = encodeChannel(scales, channels, categoryChannel, synthetic, (stackAxis === 'y' ? width : height) / 2);
                     const offset = (n + 1) * slot;
                     nodes.push({
                         type: 'text',

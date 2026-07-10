@@ -40,7 +40,8 @@ export function slider(opts = {}) {
         width,
         height,
         margins: { top: 34, right: 40, bottom: 40, left: 40 },
-        x: { type: 'linear', domain },
+        // The contract of the elicited dataset: one quantitative value, bounded.
+        schema: { value: { type: 'quantitative', domain } },
         // The elicited dataset: the single value the knob carries.
         data: [{ value: value != null ? value : domain[0] }],
         constraints,
@@ -50,10 +51,10 @@ export function slider(opts = {}) {
         features: [
             point({
                 id: 'slider',
-                encoding: {
-                    x: { field: 'value', type: 'linear', domain },
-                    size: { value: THEME.radius - 2 },
-                    fill: { value: THEME.accent }
+                size: THEME.radius - 2,
+                fill: THEME.accent,
+                channels: {
+                    x: { field: 'value' }
                 },
                 // The knob tracks the pointer; a click settles it. No `create` — the
                 // value always exists, so there is exactly one knob to move.

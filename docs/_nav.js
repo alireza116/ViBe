@@ -50,7 +50,7 @@ export const SITE = [
     {
         group: 'Scales & data',
         pages: [
-            { path: 'scales.html', title: 'Scales & encoding' },
+            { path: 'scales.html', title: 'Scales & channels' },
             { path: 'schema.html', title: 'Data schema' },
             { path: 'constraints.html', title: 'Constraints' },
         ],

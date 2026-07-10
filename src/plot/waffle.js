@@ -38,7 +38,7 @@ function domainExtent(scale) {
 function buildWaffle(options, forcedOrientation) {
     const opts = normalizeMarkOptions(options);
     const {
-        encoding = {},
+        channels = {},
         id,
         edits,
         constraints,
@@ -48,15 +48,15 @@ function buildWaffle(options, forcedOrientation) {
         emptyFill = '#eee'
     } = opts;
 
-    const xKey = (encoding.x && encoding.x.field) || options.x || 'x';
-    const yKey = (encoding.y && encoding.y.field) || options.y || 'y';
+    const xKey = (channels.x && channels.x.field) || 'x';
+    const yKey = (channels.y && channels.y.field) || 'y';
 
     return {
         id,
-        encoding,
+        channels,
         edits,
         constraints,
-        categoricalScale: 'band',
+        discreteScale: 'band',
         xKey,
         yKey,
         /**
@@ -78,7 +78,7 @@ function buildWaffle(options, forcedOrientation) {
             const nodes = [];
 
             currentData.forEach((/** @type {any} */ d, i) => {
-                const style = resolveStyle(scales, encoding, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
                 const vertical = orientation !== 'horizontal';
 
                 // Band (category) geometry vs value (length) geometry — the same
@@ -92,7 +92,7 @@ function buildWaffle(options, forcedOrientation) {
                 const bandStart = bandScale ? bandScale(d[bandKey]) : 0;
                 const thickness = bandwidthOf(bandScale, 20);
                 const baseline = baselineOf(valueScale);
-                const level = encodeChannel(scales, encoding, valueChannel, d, baseline);
+                const level = encodeChannel(scales, channels, valueChannel, d, baseline);
 
                 // Grid: cols across the band, rows spanning the value DOMAIN (so the
                 // grid is stable as the value changes — only how many cells are

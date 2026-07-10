@@ -48,14 +48,14 @@ export default {
     class:  { type: "categorical",  domain: ["A", "B", "C"] },
   },
   axes: { x: { title: "age" }, y: { title: "belief" } },
-  data: [],   // start from nothing,
+  data: [],   // start from nothing
   onChange: (d) => console.log("elicited", d),
   features: [
     point({
-      encoding: {
+      size: 7, stroke: "#1f2733", strokeWidth: 1,
+      channels: {
         x: { field: "age" }, y: { field: "belief" },
         fill: { field: "class" },
-        size: { value: 7 }, stroke: { value: "#1f2733" }, strokeWidth: { value: 1 },
       },
       edits: [
         create({ trigger: "dblclick" }),
@@ -89,10 +89,9 @@ export default {
   data: [],
   features: [
     point({
-      encoding: {
+      size: 7, fill: "#0d9488", stroke: "#0f5c53", strokeWidth: 1,
+      channels: {
         x: { field: "when" }, y: { field: "belief" },
-        size: { value: 7 }, fill: { value: "#0d9488" },
-        stroke: { value: "#0f5c53" }, strokeWidth: { value: 1 },
       },
       edits: [
         create({ trigger: "dblclick" }),

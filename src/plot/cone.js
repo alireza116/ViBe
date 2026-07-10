@@ -10,7 +10,7 @@
 //
 //   // Elicit({ data: [{ r: 0, spread: 0 }], features: [ cone({ … }) ] })
 //   cone({
-//     encoding: {
+//     channels: {
 //       angle:  { field: 'r',      type: 'linear', domain: [-1, 1], range: [-45, 45],
 //                 edit: rotate({ pick: 'probe', stage: 0 }) },
 //       spread: { field: 'spread', type: 'linear', domain: [0, 1],  range: [0, 45],
@@ -63,7 +63,7 @@ const clamp = (/** @type {number} */ v, /** @type {number} */ lo, /** @type {num
 export function cone(options = {}) {
     const opts = normalizeMarkOptions(options);
     const {
-        encoding = {},
+        channels = {},
         id,
         edits,
         constraints,
@@ -77,12 +77,12 @@ export function cone(options = {}) {
         sigma = 1.96
     } = opts;
 
-    const angleField = encoding.angle && encoding.angle.field;
-    const spreadField = encoding.spread && encoding.spread.field;
+    const angleField = channels.angle && channels.angle.field;
+    const spreadField = channels.spread && channels.spread.field;
 
     return {
         id,
-        encoding,
+        channels,
         edits,
         constraints,
         xKey: angleField,
@@ -109,11 +109,11 @@ export function cone(options = {}) {
             const nodes = [];
 
             currentData.forEach((/** @type {any} */ d) => {
-                const meanDeg = encodeChannel(scales, encoding, 'angle', d, 0);
+                const meanDeg = encodeChannel(scales, channels, 'angle', d, 0);
                 const rMean = angleField != null ? Number(d[angleField]) : 0;
                 const halfWidth = spreadField != null ? Math.abs(Number(d[spreadField])) || 0 : 0;
                 const angleScale = scales.angle;
-                const style = resolveStyle(scales, encoding, d, { stroke: '#d33' });
+                const style = resolveStyle(scales, channels, d, { stroke: '#d33' });
 
                 // Optional filled wedge spanning the envelope — its edges are exactly
                 // where the pointer sat when the spread was set.

@@ -55,8 +55,8 @@ export function autoEditGuides(features) {
  */
 export function buildEditGuide(feature, edit, ctx) {
     const { scales, data, constraints, ui, width, height, featureNodes } = ctx;
-    const encoding = feature.encoding || {};
-    const resolved = resolveChannels(edit.channels, encoding, scales);
+    const markChannels = feature.channels || {};
+    const resolved = resolveChannels(edit.channels, markChannels, scales);
     const primary = resolved[0];
     const color = edit.guideColor || DEFAULT_CONSTRAINT_COLOR;
     /** @type {import('../types').FeatureNode[]} */
