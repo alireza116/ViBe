@@ -49,13 +49,18 @@ export class D3Renderer {
      * @param {any} context
      */
     render(context) {
-        const { container, scene, width, height, margins, onEvent, planeOnTop = false, responsive = 'fixed' } = context;
+        const { container, scene, width, height, margins, onEvent, planeOnTop = false, planeCursor = 'pointer', responsive = 'fixed' } = context;
         const effects = context.effects || DEFAULT_EFFECTS;
 
         const innerWidth = width - margins.left - margins.right;
         const innerHeight = height - margins.top - margins.bottom;
 
         const { g, plane } = this._ensureScene(container, { width, height, margins, innerWidth, innerHeight, responsive });
+
+        // Stashed for the text mark's content-edit overlay (_editText), which is
+        // spawned from a node's dblclick handler outside this closure.
+        this._sceneG = g;
+        this._onEvent = onEvent;
 
         /** @param {any} event */
         const pointer = (event) => d3.pointer(event, g.node());
@@ -101,14 +106,19 @@ export class D3Renderer {
 
         this._drawGuideCircles(g, allCircles.filter((/** @type {any} */ n) => n.guide));
         this._drawLines(g, allLines.filter((/** @type {any} */ n) => !n.background), { drag, markClick });
-        this._drawLabels(g, allTexts.filter((/** @type {any} */ n) => !n.background));
+        // Foreground text splits by role: an editable text MARK (its feature has a
+        // direct-pick edit) gets the interactive draw (drag + click + retype); guide
+        // labels and inert label marks stay non-interactive.
+        const fgTexts = allTexts.filter((/** @type {any} */ n) => !n.background);
+        this._drawTextMarks(g, fgTexts.filter((/** @type {any} */ n) => n.editable), { drag, markClick });
+        this._drawLabels(g, fgTexts.filter((/** @type {any} */ n) => !n.editable));
 
         // In plane-on-top (proximity) mode the plane must sit above the marks and
         // own all pointer events; the marks become purely visual. Guides already
         // use pointer-events:none, so they remain visible through the plane.
         if (planeOnTop) {
             g.selectAll('.mark').style('pointer-events', 'none');
-            plane.raise().style('cursor', 'pointer');
+            plane.raise().style('cursor', planeCursor || 'pointer');
         }
     }
 
@@ -319,7 +329,13 @@ export class D3Renderer {
         sel.attr('x', (/** @type {any} */ d) => d.x)
             .attr('y', (/** @type {any} */ d) => d.y)
             .attr('text-anchor', (/** @type {any} */ d) => d.textAnchor || anchorDefault)
+            // Vertical anchor (text mark's `lineAnchor` → dominant-baseline). Axis
+            // tick labels leave this unset and keep the SVG default.
+            .attr('dominant-baseline', (/** @type {any} */ d) => d.dominantBaseline || null)
             .attr('font-size', (/** @type {any} */ d) => (d.fontSize != null ? d.fontSize : 10))
+            // A rotated label (text mark's `angle`, in degrees) spins about its own
+            // anchor point so the pivot stays put as the value changes.
+            .attr('transform', (/** @type {any} */ d) => (d.angle ? `rotate(${d.angle} ${d.x} ${d.y})` : null))
             .text((/** @type {any} */ d) => d.text);
     }
 
@@ -442,6 +458,91 @@ export class D3Renderer {
             .attr('d', (/** @type {any} */ d) =>
                 d3.line().curve(resolveCurve(d.curve))(d.points || []));
         this._applyStyle(sel, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 });
+    }
+
+    /**
+     * Interactive text MARKS (editable labels). Mirrors _drawMarks: click + drag
+     * wiring, cursor only when editable, honoring a mark's pointerEvents opt-out.
+     * Double-click opens an inline editor for content editing (see _editText).
+     * @param {any} g
+     * @param {any[]} texts
+     * @param {{ drag: any, markClick: (e: any, d: any) => void }} io
+     */
+    _drawTextMarks(g, texts, { drag, markClick }) {
+        const sel = g.selectAll('text.mark').data(texts).join('text')
+            .attr('class', 'mark')
+            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
+            .style('cursor', (/** @type {any} */ d) => (d.editable ? (d.cursor || 'move') : 'default'))
+            .on('click', markClick)
+            .on('dblclick', (/** @type {any} */ event, /** @type {any} */ d) => {
+                // Stop the browser's synthetic click/drag noise and keep dblclick
+                // from racing a dragstart when drag + editText share one mark.
+                event.preventDefault();
+                event.stopPropagation();
+                this._editText(event, d);
+            })
+            .call(drag);
+        this._geomText(sel, 'middle');
+        this._applyStyle(sel, { fill: 'black', opacity: 1 });
+    }
+
+    /**
+     * Inline content editor for a text mark. On double-click of a node that opted in
+     * (`editText: true`, set by the mark when an editText edit is wired) mount a
+     * `<foreignObject>` input over the label; Enter/blur emits a `commit` gesture
+     * carrying the typed string (the editText edit stores it), Esc cancels. The
+     * renderer owns the keyboard lifecycle so the engine stays pointer/mode-agnostic.
+     * @param {any} event
+     * @param {any} d the text node
+     */
+    _editText(event, d) {
+        if (!d || !d.editText) return;
+        const g = this._sceneG;
+        const onEvent = this._onEvent;
+        if (!g || !onEvent) return;
+
+        // Only one editor at a time.
+        g.selectAll('foreignObject.text-editor').remove();
+
+        const size = d.fontSize != null ? d.fontSize : 12;
+        const w = 140;
+        const h = size + 10;
+        const fo = g.append('foreignObject')
+            .attr('class', 'text-editor')
+            .attr('x', d.x - w / 2)
+            .attr('y', d.y - h + 4)
+            .attr('width', w)
+            .attr('height', h);
+        const input = /** @type {HTMLInputElement} */ (fo.append('xhtml:input')
+            .attr('type', 'text')
+            .style('width', '100%')
+            .style('box-sizing', 'border-box')
+            .style('font-size', size + 'px')
+            .style('text-align', 'center')
+            .node());
+        input.value = d.text != null ? String(d.text) : '';
+        input.focus();
+        input.select();
+
+        let done = false;
+        const commit = () => {
+            if (done) return;
+            done = true;
+            const value = input.value;
+            fo.remove();
+            onEvent({ type: 'commit', node: d, value, x: d.x, y: d.y, rawEvent: event });
+        };
+        const cancel = () => {
+            if (done) return;
+            done = true;
+            fo.remove();
+        };
+        input.addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            e.stopPropagation();
+        });
+        input.addEventListener('blur', commit);
     }
 
     /**

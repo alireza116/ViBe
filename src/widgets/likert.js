@@ -7,8 +7,8 @@
 //
 // Returns an ElicitSpec: Elicit(likert({ question, options })).
 //
-// The plain-chart equivalent is the same mark + edit + constraint with the default
-// axes instead of the ring guides; see docs/widgets.html.
+// The plain-API twin is the same mark + edit + constraint + guides; see
+// docs/widgets.html — expand the widget to customize.
 
 import { point } from '../plot/index.js';
 import { create } from '../edit/index.js';

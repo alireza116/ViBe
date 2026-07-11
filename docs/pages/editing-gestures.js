@@ -42,13 +42,18 @@ export default {
         },
         {
             name: 'custom(fn, options)',
-            summary: 'The escape hatch — an arbitrary edit over the whole datum + event.',
+            summary:
+                'The escape hatch — an arbitrary edit. <code class="inline">fn</code> is the body of ' +
+                '<code class="inline">apply</code>; the descriptor still declares which gesture fires it.',
             signature: 'custom((datum, event, ctx) => datum | data[] | undefined, options?) → Edit',
             options: [
-                { name: 'fn', type: '(datum, event, ctx) => …', default: '—', desc: 'Return a datum, a full dataset, or <code class="inline">undefined</code> to no-op.' },
-                { name: 'options', type: 'object', default: '{}', desc: 'Any shared Edit fields — <code class="inline">gesture</code>, <code class="inline">channels</code>, <code class="inline">when</code>, <code class="inline">pick</code>, …' },
+                { name: 'fn', type: '(datum, event, ctx) => …', default: '—', desc: '<code class="inline">datum</code> is <code class="inline">ctx.datum</code>, <code class="inline">event</code> is the raw DOM event (<code class="inline">ctx.event</code>), <code class="inline">ctx</code> is the full <b>EditContext</b> (see Editing overview). Return a new datum, a full dataset, or <code class="inline">undefined</code> to no-op — whatever fields you put on the datum become data.' },
+                { name: 'options.gesture', type: "'drag'|'click'|…", default: "'drag'", desc: 'Which gesture runs this edit. The engine matches <code class="inline">event.type</code> to this; <code class="inline">fn</code> itself does not choose the gesture.' },
+                { name: 'options.pick, when, …', type: '—', default: '—', desc: 'Any shared Edit fields (see the Editing overview).' },
             ],
-            returns: 'An <b>Edit</b> that runs <code class="inline">fn</code> in <code class="inline">apply</code> (default gesture <code class="inline">drag</code>).',
+            returns:
+                'An <b>Edit</b>. Default <code class="inline">gesture: "drag"</code>, <code class="inline">pick: "direct"</code>. ' +
+                'Full <code class="inline">ctx</code> field list lives on the Editing overview under <b>EditContext</b>.',
         },
     ],
     sections: [
@@ -139,19 +144,24 @@ export default {
             id: 'custom',
             title: 'Custom — the escape hatch',
             intro:
-                'custom((datum, event, ctx) => …) gets the whole datum + event and returns a new ' +
-                'datum. Reach for it when no primitive fits.',
+                'custom(fn) wraps fn as apply. The edit still declares its gesture (default drag) — ' +
+                'the engine only calls fn when that gesture fires. fn receives (datum, event, ctx): ' +
+                'datum is the touched row, event the raw DOM event, ctx the EditContext (pointer, ' +
+                'scales, data, … — see the Editing overview). Return a new datum (or array); every ' +
+                'field you set is written into the belief store.',
             examples: [
                 {
-                    title: 'A drag that stamps a flag',
-                    blurb: 'Sets y from the inverted pointer and marks the datum touched.',
-                    try: '<b>Drag</b> a dot (watch the console for `touched: true`).',
+                    title: 'Invert y yourself',
+                    blurb:
+                        'gesture defaults to drag. ctx.pointer is plot pixels; scales.y.invertValue ' +
+                        'maps them back to data. touched: true is just another field on the returned ' +
+                        'datum — it shows up in getData() because you put it there.',
+                    try: '<b>Drag</b> a dot — y follows the pointer; the data panel gains <code class="inline">touched: true</code>.',
                     code:
 `mount(Elicit({
   width: 380, height: 260,
   margins: { top: 14, right: 14, bottom: 26, left: 30 },
   data: [{ x: 30, y: 30 }, { x: 70, y: 70 }],
-  onChange: (d) => console.log("custom", d),
   schema: {
     x: { type: "quantitative", domain: [0, 100] },
     y: { type: "quantitative", domain: [0, 100] },
@@ -165,10 +175,11 @@ export default {
         y: { field: "y" },
       },
       edits: [
+        // default gesture: "drag" — pass { gesture: "click" } to change it
         custom((datum, event, ctx) => ({
           ...datum,
           y: ctx.scales.y.invertValue(ctx.pointer.y),
-          touched: true,
+          touched: true, // becomes data; omit if you only want to rewrite y
         })),
       ],
     }),

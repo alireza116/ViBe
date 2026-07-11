@@ -6,6 +6,7 @@ import { when } from './edit/index.js';
 import * as constraints from './constraints/index.js';
 import * as guides from './guides/index.js';
 import * as widgets from './widgets/index.js';
+import * as format from './format.js';
 import { D3Renderer } from './renderers/d3-renderer.js';
 
 export {
@@ -16,5 +17,6 @@ export {
     constraints,
     guides,
     widgets,
+    format,
     D3Renderer
 };

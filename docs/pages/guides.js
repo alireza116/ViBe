@@ -15,7 +15,7 @@ export default {
         '<code class="inline">guide: true</code>.)',
     api: [
         {
-            name: 'guides.rule · guides.region · guides.proximity',
+            name: 'guides.rule · guides.region · guides.proximity · guides.legend',
             summary:
                 'Import from <code class="inline">vibe.guides</code> and pass in the chart’s ' +
                 '<code class="inline">guides: [...]</code>. All position in <b>data space</b> through the same ' +
@@ -24,6 +24,7 @@ export default {
                 'guides.rule({ x?, y?, stroke, strokeDasharray, label }) → Guide',
                 'guides.region({ x?, y?, fill, opacity }) → Guide',
                 'guides.proximity({ target, color }) → Guide',
+                'guides.legend({ channel, x, y, size, gap, columns }) → Guide',
                 'guides.custom((ctx) => FeatureNode[]) → Guide',
                 '',
                 '// any option may be a function of the guide context:',
@@ -37,6 +38,7 @@ export default {
                 { name: 'region.fill / opacity', type: 'style', default: '#64748b / 0.1', desc: 'Band fill and opacity.' },
                 { name: 'proximity.target', type: 'string', default: '—', desc: 'The feature id whose nearest-pick selection to visualize (ring + highlight).' },
                 { name: 'proximity.color', type: 'string', default: 'effect', desc: 'Override the highlight colour (else the effects layer’s).' },
+                { name: 'legend.channel', type: 'string', default: "'fill'", desc: 'Discrete channel whose domain becomes swatches. Pair with <code class="inline">edit.legend</code> using the same layout.' },
             ],
             returns:
                 'Each returns a <b>Guide</b> (<code class="inline">{ isGuide: true, build(ctx) }</code>), rebuilt every render so it tracks live data.',

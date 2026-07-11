@@ -1,23 +1,60 @@
 // @ts-check
 import { defineConstraint } from './define.js';
 
-// maintainSum: keeps the total of a field at or below `targetSum` — a cross-datum
-// data invariant.
+// maintainSum: keeps the total of a field related to `targetSum` — a cross-datum
+// data invariant. Three modes:
+//   'cap' (default)     — bound the touched datum so total ≤ targetSum (drag freely
+//                         up to the remaining budget, then stop)
+//   'normalize'         — after the edit, scale ALL values so sum === targetSum
+//   'redistribute'      — hold the edited value, proportionally adjust siblings so
+//                         the total stays at targetSum
 //
-// Rather than rejecting an overshoot (which would freeze the gesture), it bounds
-// the value of the datum just touched so the total can rise only until it reaches
-// `targetSum`: the user drags freely up to the remaining budget and stops there.
 // `field` names the data field summed (default 'y'). Because this is a dataset
-// invariant, it holds no matter which edit moved a value — a drag, a resize, or a
-// create can't push the total past the target.
+// invariant, it holds no matter which edit moved a value.
 
 /**
- * @param {{ targetSum: number, field?: string }} options
+ * @param {{ targetSum: number, field?: string, mode?: 'cap' | 'normalize' | 'redistribute' }} options
  * @returns {import('../types').Constraint}
  */
 export function maintainSum(options) {
-    const { targetSum, field = 'y' } = options;
+    const { targetSum, field = 'y', mode = 'cap' } = options;
 
+    if (mode === 'normalize') {
+        return defineConstraint(
+            ({ data, activeIndex, value }) => {
+                const next = data.map((d, i) =>
+                    (i === activeIndex && value !== undefined) ? { ...d, [field]: value } : { ...d }
+                );
+                const sum = next.reduce((s, d) => s + (Number(d[field]) || 0), 0);
+                if (sum === 0) return next;
+                const scale = targetSum / sum;
+                return next.map((d) => ({ ...d, [field]: (Number(d[field]) || 0) * scale }));
+            },
+            { type: 'maintainSum', options: { targetSum, mode }, field }
+        );
+    }
+
+    if (mode === 'redistribute') {
+        return defineConstraint(
+            ({ data, activeIndex, value }) => {
+                if (activeIndex == null || value === undefined) return value;
+                const held = Math.max(0, Math.min(targetSum, Number(value) || 0));
+                const others = data
+                    .map((d, i) => (i === activeIndex ? 0 : (Number(d[field]) || 0)))
+                    .reduce((s, v) => s + v, 0);
+                const remain = Math.max(0, targetSum - held);
+                const scale = others > 0 ? remain / others : 0;
+                return data.map((d, i) => {
+                    if (i === activeIndex) return { ...d, [field]: held };
+                    const v = Number(d[field]) || 0;
+                    return { ...d, [field]: others > 0 ? v * scale : (data.length > 1 ? remain / (data.length - 1) : 0) };
+                });
+            },
+            { type: 'maintainSum', options: { targetSum, mode }, field }
+        );
+    }
+
+    // mode === 'cap' (default)
     return defineConstraint(
         ({ data, activeIndex, value }) => {
             if (activeIndex == null || value === undefined) return value;
@@ -31,6 +68,17 @@ export function maintainSum(options) {
             const headroom = Math.max(0, targetSum - sumOthers);
             return Math.min(value, headroom);
         },
-        { type: 'maintainSum', options: { targetSum }, field }
+        { type: 'maintainSum', options: { targetSum, mode: 'cap' }, field }
     );
+}
+
+/**
+ * normalize — sugar for maintainSum({ mode: 'normalize' }): after every edit,
+ * scale the field so the dataset sums exactly to `targetSum` (default 1).
+ * @param {{ field?: string, targetSum?: number }} [options]
+ * @returns {import('../types').Constraint}
+ */
+export function normalize(options = {}) {
+    const { field = 'y', targetSum = 1 } = options;
+    return maintainSum({ targetSum, field, mode: 'normalize' });
 }

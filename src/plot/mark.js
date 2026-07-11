@@ -64,8 +64,15 @@ export const STANDARD_STYLE_CHANNELS = Object.keys(STYLE_DEFAULTS);
 //
 // A superset of the style channels: `size` is a constant a mark reads itself
 // (a circle's radius, via encodeChannel), not one resolveStyle spreads onto a
-// node — so it belongs here and NOT in STANDARD_STYLE_CHANNELS.
-const SHORTHANDS = [...STANDARD_STYLE_CHANNELS, 'size'];
+// node — so it belongs here and NOT in STANDARD_STYLE_CHANNELS. `text`/`fontSize`/
+// `textAnchor`/`lineAnchor`/`dx`/`dy` are the text mark's own constants (read raw
+// by the mark, not swept by resolveStyle), so `text({ text: 'hi', dy: -8 })`
+// reads like every other shorthand. (`format` is a mark-level option, not a
+// channel — it stays off this list.)
+const SHORTHANDS = [
+    ...STANDARD_STYLE_CHANNELS,
+    'size', 'text', 'fontSize', 'textAnchor', 'lineAnchor', 'dx', 'dy'
+];
 
 /**
  * Map a datum through one channel using the global scale. Handles visual

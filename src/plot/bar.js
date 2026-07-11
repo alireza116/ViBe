@@ -17,9 +17,51 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 // The value axis also accepts an explicit SPAN instead of a single value: two
 // endpoint channels (x1/x2 for barX, y1/y2 for barY) place the bar between them
 // rather than from the baseline — e.g. a Gantt-style "years active" span per
-// category (Observable Plot's bar model, minus stacking). x1/x2 share the same
-// resolved scale as x (and y1/y2 as y — see core/resolve.js's axis aliasing), so
-// they're read through encodeChannel exactly like the single-value form.
+// category. x1/x2 share the same resolved scale as x (and y1/y2 as y — see
+// core/resolve.js's axis aliasing), so they're read through encodeChannel exactly
+// like the single-value form.
+//
+// Optional `stack: true | <seriesField>` stacks bars that share a category: each
+// segment sits on the cumulative sum of prior series in that band. Declare a
+// schema domain that covers the stacked total. Span mode and stack are mutually
+// exclusive (span wins).
+
+/**
+ * Cumulative data-space baselines for stacked bars, keyed by datum index.
+ * @param {any[]} data
+ * @param {string} catKey
+ * @param {string} valueKey
+ * @param {string | null} seriesField
+ * @returns {Map<number, { y0: number, y1: number }>}
+ */
+function stackOffsets(data, catKey, valueKey, seriesField) {
+    /** @type {Map<any, number>} */
+    const running = new Map();
+    /** @type {Map<number, { y0: number, y1: number }>} */
+    const out = new Map();
+    // Stable series order: first-seen series key.
+    /** @type {any[]} */
+    const seriesOrder = [];
+    if (seriesField) {
+        for (const d of data) {
+            const s = d[seriesField];
+            if (!seriesOrder.includes(s)) seriesOrder.push(s);
+        }
+    }
+    const ordered = seriesField
+        ? [...data].map((d, i) => ({ d, i })).sort((a, b) =>
+            seriesOrder.indexOf(a.d[seriesField]) - seriesOrder.indexOf(b.d[seriesField]))
+        : data.map((d, i) => ({ d, i }));
+
+    for (const { d, i } of ordered) {
+        const cat = d[catKey];
+        const y0 = running.get(cat) || 0;
+        const y1 = y0 + (Number(d[valueKey]) || 0);
+        running.set(cat, y1);
+        out.set(i, { y0, y1 });
+    }
+    return out;
+}
 
 /**
  * @param {any} options
@@ -36,7 +78,8 @@ function buildBar(options, forcedOrientation) {
         id,
         edits,
         constraints,
-        orientation: orientationOption
+        orientation: orientationOption,
+        stack
     } = opts;
 
     // Channel-native: read the x/y field from the channels, falling back to the
@@ -48,6 +91,10 @@ function buildBar(options, forcedOrientation) {
     // mark (not per datum) — the missing form (baseline+value) stays the default.
     const hasXSpan = !!(channels.x1 && channels.x2);
     const hasYSpan = !!(channels.y1 && channels.y2);
+    const seriesField = stack === true
+        ? (opts.series || (channels.fill && channels.fill.field) || null)
+        : (typeof stack === 'string' ? stack : null);
+    const doStack = !!stack && !hasXSpan && !hasYSpan;
 
     return {
         id,
@@ -73,6 +120,15 @@ function buildBar(options, forcedOrientation) {
                 else orientation = 'vertical';
             }
 
+            const stacks = doStack
+                ? stackOffsets(
+                    currentData,
+                    orientation === 'horizontal' ? yKey : xKey,
+                    orientation === 'horizontal' ? xKey : yKey,
+                    seriesField
+                )
+                : null;
+
             return currentData.map((d, i) => {
                 // Standard style surface (fill/stroke/opacity/…), resolved per
                 // datum through the same channels every mark uses. Defaults to the
@@ -92,6 +148,12 @@ function buildBar(options, forcedOrientation) {
                         const v2 = encodeChannel(scales, channels, 'x2', d, baseline);
                         lo = Math.min(v1, v2);
                         hi = Math.max(v1, v2);
+                    } else if (stacks) {
+                        const { y0, y1 } = stacks.get(i) || { y0: 0, y1: d[xKey] };
+                        const p0 = xScale ? xScale.encode(y0, baseline) : baseline;
+                        const p1 = xScale ? xScale.encode(y1, baseline) : baseline;
+                        lo = Math.min(p0, p1);
+                        hi = Math.max(p0, p1);
                     } else {
                         const valuePos = encodeChannel(scales, channels, 'x', d, baseline);
                         lo = Math.min(valuePos, baseline);
@@ -122,6 +184,12 @@ function buildBar(options, forcedOrientation) {
                     const v2 = encodeChannel(scales, channels, 'y2', d, baseline);
                     lo = Math.min(v1, v2);
                     hi = Math.max(v1, v2);
+                } else if (stacks) {
+                    const { y0, y1 } = stacks.get(i) || { y0: 0, y1: d[yKey] };
+                    const p0 = yScale ? yScale.encode(y0, baseline) : baseline;
+                    const p1 = yScale ? yScale.encode(y1, baseline) : baseline;
+                    lo = Math.min(p0, p1);
+                    hi = Math.max(p0, p1);
                 } else {
                     const valuePos = encodeChannel(scales, channels, 'y', d, baseline);
                     lo = Math.min(valuePos, baseline);

@@ -84,6 +84,10 @@ export interface EditContext {
   pointer: { x: number; y: number };
   node: any | null;
   event: any;
+  // A gesture-supplied payload value, for edits whose input isn't a pixel: the
+  // text mark's content-edit `commit` carries the typed string here. Undefined
+  // for pointer-only gestures.
+  value?: any;
   // The edit's own target channels, resolved to { name, field, scale }.
   channels: ResolvedChannel[];
   scales: ScaleMap;
@@ -145,7 +149,7 @@ export interface Edit {
   gesture: string;
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
-  pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' | 'probe';
+  pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' | 'brushRect' | 'probe' | (string & {});
   // null = universal (any mark); 'line' = needs a series-grouping mark. The engine
   // dev-warns when a 'line' edit is attached to a mark without series support.
   scope: 'line' | null;
@@ -220,6 +224,17 @@ export interface Channels extends StyleChannels {
   y2?: ChannelSpec;
   // Circle radius in px. Constant form is the `size` shorthand, not resolveStyle.
   size?: ChannelSpec;
+  // Text mark channels: the label string, its size/anchors/offsets (read RAW,
+  // not scaled — constant forms are shorthands), and rotation in degrees
+  // (scaled when a scale is declared, so rotate() is an exact inverse; else raw).
+  // `format` is a mark-level option (string | fn), not a channel — see MarkOptions.
+  text?: ChannelSpec;
+  fontSize?: ChannelSpec;
+  textAnchor?: ChannelSpec;   // horizontal: 'start' | 'middle' | 'end'
+  lineAnchor?: ChannelSpec;   // vertical: 'top' | 'middle' | 'bottom'
+  dx?: ChannelSpec;           // horizontal pixel offset
+  dy?: ChannelSpec;           // vertical pixel offset
+  angle?: ChannelSpec;
   [channel: string]: ChannelSpec | undefined;
 }
 
@@ -241,6 +256,16 @@ export interface MarkOptions {
   fillOpacity?: number;
   strokeOpacity?: number;
   size?: number;
+  // Text-mark shorthands (desugar into raw channels via normalizeMarkOptions).
+  text?: any;
+  fontSize?: number;
+  textAnchor?: 'start' | 'middle' | 'end' | string;
+  lineAnchor?: 'top' | 'middle' | 'bottom' | string;
+  dx?: number;
+  dy?: number;
+  // Text-mark display formatter: a d3-format string or `(value) => string`.
+  // Display-only — the underlying field stays the raw value. See `vibe.format`.
+  format?: string | ((v: any) => string);
   id?: string;
   edits?: any[];
   // Sugar. Constraints are DATASET invariants; declaring them on a mark is a
@@ -296,6 +321,14 @@ export interface FeatureNode {
   text?: string;
   fontSize?: number;
   textAnchor?: string;
+  // Text mark: vertical anchor ('top'|'middle'|'bottom') and the SVG
+  // dominant-baseline the mark derived from it; rotation in degrees (rendered
+  // as a rotate() transform about x,y); `editText` opts the node into the
+  // renderer's inline content editor on dblclick.
+  lineAnchor?: string;
+  dominantBaseline?: string;
+  angle?: number;
+  editText?: boolean;
   data?: Datum;
   index?: number;
   featureId?: string;
@@ -335,8 +368,11 @@ export interface Session {
   lastY?: number | null;
   // brush driver: the dragstart-locked grab zone (+ which field an edge zone
   // targets), forced to 'canonicalize' for the one-time dragend cleanup tick.
-  zone?: 'edgeA' | 'edgeB' | 'body' | 'canonicalize' | null;
+  zone?: 'edgeA' | 'edgeB' | 'body' | 'canonicalize' | 'corner' | 'edgeX' | 'edgeY' | null;
   field?: string | null;
+  // brushRect driver: the field(s) an edge/corner grab locked (1 for an edge,
+  // 2 for a corner). The 2-D sibling of `field`.
+  fields?: string[] | null;
 }
 
 // Config for a single positional axis (the `axes` convenience, or an explicit
@@ -426,6 +462,9 @@ export interface ElicitSpec {
   // Initial stage index for multi-stage elicitation. Edits carrying a `stage`
   // are active only when it equals the current stage (see Edit.stage).
   stage?: number;
+  // Optional labels for stages (index -> name). Surfaced via getStageLabel() and
+  // the second argument of on('stage', (index, label) => …).
+  stageLabels?: (string | null)[];
   [key: string]: any;
 }
 
@@ -439,10 +478,12 @@ export interface ElicitElement extends HTMLDivElement {
   // Replace the dataset and re-render. Bypasses constraints (trusted seed/reset).
   setData(data: Datum[]): void;
   // Subscribe to committed changes ('change': (data)) or stage advances
-  // ('stage': (stageIndex)). Returns an unsubscribe function.
+  // ('stage': (stageIndex, stageLabel?)). Returns an unsubscribe function.
   on(type: 'change' | 'stage', cb: (...args: any[]) => void): () => void;
   // Multi-stage controls (see ElicitSpec.stage). getStage reads the current index.
   getStage(): number;
+  // Optional label for the current stage (from ElicitSpec.stageLabels), or null.
+  getStageLabel(): string | null;
   setStage(stage: number): void;
   nextStage(): void;
   // Detach the ResizeObserver used by `responsive: 'reflow'`. No-op otherwise;

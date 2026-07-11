@@ -1,7 +1,7 @@
 // @ts-check
 import { SceneGraph } from './scene.js';
 import { resolveScales } from './resolve.js';
-import { collectEdits, resolveChannels } from '../edit/route.js';
+import { collectEdits, resolveChannels, warnMisplacedEdits } from '../edit/route.js';
 import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
 import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
@@ -137,6 +137,10 @@ export function Elicit(spec) {
     // branch, so the one-interaction-model invariant holds. `activeEdits` is the
     // single gate the dispatch/editable/plane-on-top paths run their edits through.
     let currentStage = spec.stage != null ? spec.stage : 0;
+    /** @type {(string | null)[]} */
+    const stageLabels = Array.isArray(spec.stageLabels) ? spec.stageLabels : [];
+    /** @param {number} n @returns {string | null} */
+    const stageLabelOf = (n) => (stageLabels[n] != null ? stageLabels[n] : null);
     /**
      * @param {any} feature
      * @returns {import('../types').Edit[]}
@@ -153,7 +157,7 @@ export function Elicit(spec) {
         currentStage = n;
         ui.session = {};
         ui.preview = null;
-        for (const cb of listeners.stage) cb(currentStage);
+        for (const cb of listeners.stage) cb(currentStage, stageLabelOf(currentStage));
     };
 
     // Transient interaction (UI) state, separate from the belief `dataset`. The
@@ -238,6 +242,16 @@ export function Elicit(spec) {
         // above the marks and own the gesture. Computed per render because the
         // active edit set — and thus this flag — can change with the stage.
         const planeOnTop = features.some(feature => needsPlaneOnTop(activeEdits(feature)));
+        // Plane-on-top drivers (brushRect, nearest, …) may stash a cursor hint in
+        // their per-feature session so the interaction plane can show edge/body
+        // affordances without a second interaction system.
+        let planeCursor = 'pointer';
+        if (planeOnTop && ui.session) {
+            for (const fid of Object.keys(ui.session)) {
+                const cur = ui.session[fid] && ui.session[fid].cursor;
+                if (cur) { planeCursor = cur; break; }
+            }
+        }
 
         if (DEV) warnDuplicatePlaneEdits(features, activeEdits);
 
@@ -250,6 +264,7 @@ export function Elicit(spec) {
             featureNodes[feature.id] = nodes;
 
             if (DEV) warnLineScopeMismatch(feature, collectEdits(feature));
+            if (DEV) warnMisplacedEdits(feature);
 
             // A feature with an ACTIVE direct-pick edit is interactive on its marks,
             // so the renderer should show an editable cursor on them. Plane-pick
@@ -306,6 +321,7 @@ export function Elicit(spec) {
             scales,
             spec,
             planeOnTop,
+            planeCursor,
             responsive: mode,
             effects,
             onEvent: handleEvent
@@ -341,6 +357,8 @@ export function Elicit(spec) {
             pointer: { x: event.x, y: event.y },
             node: event.node || null,
             event: event.rawEvent,
+            // A non-pixel gesture payload (the text mark's `commit` typed string).
+            value: event.value,
             channels: resolved,
             scales,
             markChannels,
@@ -575,6 +593,7 @@ export function Elicit(spec) {
     // Multi-stage controls. Advancing the stage re-renders (the active edit set,
     // plane-on-top, and cursors all follow currentStage) and drops every transient.
     el.getStage = () => currentStage;
+    el.getStageLabel = () => stageLabelOf(currentStage);
     el.setStage = (/** @type {number} */ stage) => {
         applyStage(stage);
         update();

@@ -26,11 +26,35 @@ export default {
                 { name: 'scope', type: "null | 'line'", default: 'null', desc: 'Universal, or line-scoped (needs a series-grouping mark).' },
                 { name: 'constrain', type: 'Constraint[]', default: '[]', desc: 'Per-edit constraint sugar; the canonical home is the spec’s <code class="inline">constraints</code> (the dataset’s invariants).' },
                 { name: 'guide', type: 'boolean', default: 'null', desc: 'Self-draw this edit’s guide (constraint bounds + snap ring).' },
-                { name: 'apply', type: '(ctx) => datum | data[] | undefined', default: '—', desc: 'The edit itself — maps the gesture to data through the same scale.' },
+                { name: 'apply', type: '(ctx) => datum | data[] | undefined', default: '—', desc: 'The edit itself — maps the gesture to data through the same scale. Never mutate <code class="inline">ctx.data</code>; return a new datum or array.' },
             ],
             returns:
-                'The <code class="inline">ctx</code> passed to <code class="inline">apply</code>/<code class="inline">when</code> carries ' +
-                '<code class="inline">{ datum, index, data, pointer, event, node, channels, scales, markChannels }</code>.',
+                'An <b>Edit</b>. The engine matches <code class="inline">gesture</code> + <code class="inline">pick</code>, builds an ' +
+                '<code class="inline">EditContext</code>, then calls <code class="inline">apply(ctx)</code>.',
+        },
+        {
+            name: 'EditContext (ctx)',
+            summary:
+                'The object handed to <code class="inline">apply(ctx)</code> and <code class="inline">when(ctx)</code> — and to the ' +
+                'third argument of <code class="inline">custom(fn)</code>. It is the gesture already resolved into ' +
+                'plot space plus the mark/scale state needed to invert it. Built once per edit invocation ' +
+                'in the engine; read it, don’t mutate it.',
+            options: [
+                { name: 'pointer', type: '{ x, y }', default: '—', desc: 'Pointer position in <b>plot pixels</b> (origin at the plot’s top-left, inside the margins). Invert with <code class="inline">ctx.scales.y.invertValue(ctx.pointer.y)</code>.' },
+                { name: 'datum', type: 'object | undefined', default: '—', desc: 'The row being edited. Set for direct/nearest picks; absent for plane creates that append.' },
+                { name: 'index', type: 'number | null', default: '—', desc: 'Index of <code class="inline">datum</code> in <code class="inline">data</code>. Returning a plain object splices it back at this index.' },
+                { name: 'data', type: 'Datum[]', default: '—', desc: 'The full current dataset (read-only). Return a new array from <code class="inline">apply</code> for whole-dataset edits (create/remove).' },
+                { name: 'scales', type: 'ScaleMap', default: '—', desc: 'Live scales by channel name (<code class="inline">ctx.scales.x</code>, <code class="inline">.y</code>, …). Each has <code class="inline">invertValue(pixel)</code> / <code class="inline">encode(value)</code>.' },
+                { name: 'channels', type: 'ResolvedChannel[]', default: '—', desc: 'This edit’s governed channels, each <code class="inline">{ name, field, scale }</code>. Empty when the edit named none (typical for bare <code class="inline">custom</code>).' },
+                { name: 'markChannels', type: 'object', default: '—', desc: 'The mark’s full channel map (name → ChannelSpec). Use to look up a sibling field the edit didn’t declare.' },
+                { name: 'event', type: 'Event', default: '—', desc: 'The raw DOM event (for modifiers like <code class="inline">shiftKey</code>). Prefer <code class="inline">vibe.when</code> for arbitration when you can.' },
+                { name: 'node', type: 'FeatureNode | null', default: '—', desc: 'The scene node under the pointer (direct pick), or null on the plane.' },
+                { name: 'value', type: 'any', default: '—', desc: 'Non-pixel gesture payload — e.g. the typed string from <code class="inline">editText</code>’s <code class="inline">commit</code>. Undefined for pointer gestures.' },
+                { name: 'schema, width, height', type: '—', default: '—', desc: 'Dataset schema (for minting rows) and the plot’s inner pixel size (for plane-relative geometry like rotate).' },
+            ],
+            returns:
+                'See <code class="inline">EditContext</code> in <code class="inline">src/types.d.ts</code> for the full shape ' +
+                '(including line-scoped fields like <code class="inline">seriesKey</code> / <code class="inline">drawState</code>).',
         },
         {
             name: 'Edit catalogue',

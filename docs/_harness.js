@@ -20,16 +20,23 @@ import { SITE } from './_nav.js';
 // examples read `edit: drag()`. The line-scoped edits stay under `edit.line.*` so
 // their scope shows in the example; `line` (the edit namespace) and the internal
 // `nextSeriesKey` are excluded from the spread so they don't shadow the line MARK.
+//
+// Spread order matters: `constraints.custom` is an alias of `defineConstraint`, and
+// would overwrite `edit.custom` if constraints landed last — the gestures page's
+// bare `custom(...)` would then install a constraint (no pick/gesture) and the
+// mark would stay pointer-transparent. Edits win; author a custom constraint via
+// `define` / `defineConstraint` or `constraints.custom`.
 const { line: _editLine, nextSeriesKey: _nsk, when: _editWhen, ...universalEdits } = vibe.edit;
 const depObj = {
     ...vibe.plot,
-    ...universalEdits,
     ...vibe.constraints,
+    ...universalEdits,
     Elicit: vibe.Elicit,
     when: vibe.when,
     edit: vibe.edit,
     guides: vibe.guides,
     widgets: vibe.widgets,
+    format: vibe.format,
     // A channel's `scale` takes a live d3 scale, and a guide option takes a
     // function of the data — both want d3 in scope (see scales.html, guides.html).
     d3,

@@ -21,6 +21,7 @@ import { nearestDriver } from './nearest.js';
 import { sweepDriver } from './sweep.js';
 import { drawDriver } from './draw.js';
 import { brushDriver } from './brush.js';
+import { brushRectDriver } from './brushRect.js';
 import { probeDriver } from './probe.js';
 
 /**
@@ -58,16 +59,36 @@ import { probeDriver } from './probe.js';
  */
 
 /** @type {Driver[]} */
-export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, probeDriver];
+export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, brushRectDriver, probeDriver];
+
+/**
+ * Register a custom driver (or replace a built-in by the same `name`). The engine
+ * reads this mutable registry from dispatchPlaneEdits — no elicit.js branches.
+ * @param {Driver} driver
+ */
+export function registerDriver(driver) {
+    if (!driver || !driver.name || typeof driver.wants !== 'function' || typeof driver.onEvent !== 'function') {
+        throw new Error('[vibe] registerDriver expects { name, wants(edit), onEvent(ctx) }');
+    }
+    const i = drivers.findIndex((d) => d.name === driver.name);
+    if (i >= 0) drivers[i] = driver;
+    else drivers.push(driver);
+}
 
 /**
  * Does any of these edits need the plane raised above the marks (a driver whose
  * lifecycle resolves its target from an arbitrary pointer position)? The engine
- * reads this to decide plane-on-top mode.
+ * reads this to decide plane-on-top mode. Unknown pick values that match a
+ * registered driver are treated as plane-on-top (custom drivers own the plane).
  * @param {import('../../types').Edit[]} edits
  * @returns {boolean}
  */
 export function needsPlaneOnTop(edits) {
-    return edits.some((e) => e.pick === 'nearest' || e.pick === 'sweep' || e.pick === 'draw'
-        || e.pick === 'brush' || e.pick === 'probe');
+    return edits.some((e) => {
+        if (e.pick === 'direct' || e.pick === 'plane') return false;
+        // Built-in proximity / lifecycle picks, or any custom registered driver.
+        return e.pick === 'nearest' || e.pick === 'sweep' || e.pick === 'draw'
+            || e.pick === 'brush' || e.pick === 'brushRect' || e.pick === 'probe'
+            || drivers.some((d) => d.name === e.pick || d.wants(e));
+    });
 }

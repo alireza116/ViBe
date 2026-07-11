@@ -1,0 +1,79 @@
+// @ts-check
+// labeledValue.js — editable numeric or string readout via text mark.
+// Plain-chart twin: text + drag and/or editText.
+
+import { text } from '../plot/index.js';
+import { drag, editText } from '../edit/index.js';
+import { clamp } from '../constraints/index.js';
+import { prompt, THEME } from './theme.js';
+
+/**
+ * @param {{ question?: string, mode?: 'number' | 'text', value?: any,
+ *   domain?: [number, number], label?: string,
+ *   onChange?: (data: any[]) => void, width?: number, height?: number }} [opts]
+ * @returns {import('../types').ElicitSpec}
+ */
+export function labeledValue(opts = {}) {
+    const {
+        question = 'Set the value',
+        mode = 'number',
+        value,
+        domain = [0, 100],
+        label = 'value',
+        onChange,
+        width = 360,
+        height = 200
+    } = opts;
+
+    if (mode === 'text') {
+        return {
+            width,
+            height,
+            margins: { top: 40, right: 24, bottom: 24, left: 24 },
+            schema: { label: { type: 'categorical' } },
+            data: [{ x: 5, y: 5, label: value != null ? String(value) : label }],
+            onChange,
+            axes: false,
+            guides: [prompt(question)],
+            features: [
+                text({
+                    id: 'label',
+                    fontSize: 18,
+                    fill: THEME.accent,
+                    channels: {
+                        x: { field: 'x' },
+                        y: { field: 'y' },
+                        text: { field: 'label', edit: editText() }
+                    },
+                    edits: [drag({ channels: ['x', 'y'] })]
+                })
+            ]
+        };
+    }
+
+    return {
+        width,
+        height,
+        margins: { top: 40, right: 40, bottom: 36, left: 48 },
+        schema: {
+            cat: { type: 'categorical', domain: ['v'] },
+            n: { type: 'quantitative', domain }
+        },
+        data: [{ cat: 'v', n: value != null ? value : domain[0] }],
+        constraints: [clamp({ min: domain[0], max: domain[1], field: 'n' })],
+        onChange,
+        guides: [prompt(question)],
+        features: [
+            text({
+                id: 'readout',
+                fontSize: 22,
+                fill: THEME.accent,
+                channels: {
+                    x: { field: 'cat' },
+                    y: { field: 'n', edit: drag({ guide: true }) },
+                    text: { field: 'n' }
+                }
+            })
+        ]
+    };
+}

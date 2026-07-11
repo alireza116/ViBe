@@ -5,6 +5,7 @@
 // (line.js) share one implementation of these primitives.
 
 import { visualForChannel, axisOf } from '../core/encoding.js';
+import { rangeExtent } from '../core/scales.js';
 
 /**
  * @param {any} v
@@ -132,9 +133,16 @@ export function invertChannel(ch, pointer) {
 /**
  * Recenter a mark's CURRENT pixel span (read off its rendered node) on the
  * pointer, then invert both new endpoints back to data — the whole-span-move
- * computation `dragSpan` and `brushSpan`'s body zone both use. Stateless: no
- * dragstart/delta tracking, just "the gesture sets the absolute position",
- * the same model `drag()`/`invertChannel` already use for a single field.
+ * computation `dragSpan` and `brushSpan`/`brushRect`'s body zone both use.
+ * Stateless: no dragstart/delta tracking, just "the gesture sets the absolute
+ * position", the same model `drag()`/`invertChannel` already use for a single
+ * field.
+ *
+ * The span's WIDTH is preserved when the pointer pushes it against the scale's
+ * pixel range: the whole interval shifts as a unit rather than each endpoint
+ * clamping independently (which would shrink the span to zero at the edge and
+ * leave it stuck). If the span is already wider than the range, it pins to the
+ * full range.
  * @param {any} node the mark's current scene node (rect: x/y/width/height)
  * @param {import('../types').ResolvedChannel} chA
  * @param {import('../types').ResolvedChannel} chB
@@ -151,7 +159,23 @@ export function recenterSpan(node, chA, chB, pointer) {
     const span = axis === 'x' ? node.width : node.height;
     if (visual === undefined || span == null) return undefined;
 
-    const p1 = visual - span / 2;
-    const p2 = visual + span / 2;
+    let p1 = visual - span / 2;
+    let p2 = visual + span / 2;
+
+    // Keep the span rigid inside the scale's pixel range. invertValue clamps each
+    // endpoint on its own — without this shift, a body-drag into the wall shrinks
+    // the interval (and a zero-width span can never grow again).
+    const [r0, r1] = rangeExtent(chA.scale);
+    const rLo = Math.min(r0, r1);
+    const rHi = Math.max(r0, r1);
+    const rangeSpan = rHi - rLo;
+    if (span >= rangeSpan) {
+        p1 = rLo;
+        p2 = rHi;
+    } else {
+        if (p1 < rLo) { p2 += rLo - p1; p1 = rLo; }
+        if (p2 > rHi) { p1 -= p2 - rHi; p2 = rHi; }
+    }
+
     return { a: chA.scale.invertValue(p1), b: chB.scale.invertValue(p2) };
 }

@@ -6,10 +6,44 @@
 import { axisX, axisY, gridX, gridY } from '../plot/axis.js';
 
 /**
+ * Flatten nested feature arrays (composite / a mark that returns parts) so
+ * capability flags like `isAxis` / `isTrend` are visible to autoAxes.
+ * @param {any[]} features
+ * @returns {any[]}
+ */
+function flattenFeatures(features) {
+    return /** @type {any[]} */ (features || []).flat(Infinity).filter(
+        (f) => f && typeof f === 'object'
+    );
+}
+
+/**
+ * Origin-crossing transforms for a trend chart: pin each axis to 0 on the other
+ * scale. Falls back to no override when 0 isn't encodable (e.g. missing scale).
+ * @param {'x' | 'y'} ch
+ * @returns {(ctx: any) => { x?: number, y?: number }}
+ */
+function originTransform(ch) {
+    return ({ scales }) => {
+        if (ch === 'x') {
+            const yScale = scales.y;
+            if (!yScale) return {};
+            const y = typeof yScale.encode === 'function' ? yScale.encode(0) : yScale(0);
+            return y != null && !Number.isNaN(Number(y)) ? { y: Number(y) } : {};
+        }
+        const xScale = scales.x;
+        if (!xScale) return {};
+        const x = typeof xScale.encode === 'function' ? xScale.encode(0) : xScale(0);
+        return x != null && !Number.isNaN(Number(x)) ? { x: Number(x) } : {};
+    };
+}
+
+/**
  * Resolve the global `axes` convenience into composable axis/grid marks. Only
  * channels the user did not already compose an explicit axis mark for are
  * auto-injected, so an explicit `axisX(...)` in `features` always wins. `axesOpt`:
- *   undefined -> default axis on both positional channels (today's behaviour)
+ *   undefined -> default axis on both positional channels; when a trend mark is
+ *                present, axes cross at the origin (intercept/slope frame)
  *   false     -> no axes at all
  *   { x, y }  -> per-channel config object, or `false` to suppress that channel.
  * @param {any[]} features
@@ -18,16 +52,24 @@ import { axisX, axisY, gridX, gridY } from '../plot/axis.js';
  */
 export function autoAxes(features, axesOpt) {
     if (axesOpt === false) return [];
+    const flat = flattenFeatures(features);
+    // Trend's natural frame is axes through the origin. Only when the chart left
+    // `axes` unspecified — an explicit axes:{} always wins.
+    const originCross = axesOpt == null && flat.some((f) => f.isTrend);
     /** @type {any[]} */
     const injected = [];
     /** @param {string} ch */
-    const hasExplicit = (ch) => features.some(f => (f.isAxis || f.isGrid) && f.channel === ch);
+    const hasExplicit = (ch) => flat.some((f) => (f.isAxis || f.isGrid) && f.channel === ch);
     const builders = { x: { axis: axisX, grid: gridX }, y: { axis: axisY, grid: gridY } };
     for (const ch of /** @type {const} */ (['x', 'y'])) {
-        const cfg = axesOpt ? axesOpt[ch] : {};
+        const cfg = axesOpt ? axesOpt[ch] : undefined;
         if (cfg === false) continue;           // channel suppressed
         if (hasExplicit(ch)) continue;         // user composed their own
-        const opts = cfg || {};
+        /** @type {any} */
+        const opts = cfg ? { ...cfg } : {};
+        if (originCross && opts.transform == null) {
+            opts.transform = originTransform(ch);
+        }
         injected.push(builders[ch].axis(opts));
         if (opts.grid) injected.push(builders[ch].grid(opts));
     }

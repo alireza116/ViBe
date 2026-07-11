@@ -35,7 +35,9 @@ VibeJS is layered for extensibility:
 3. **Marks (`vibe.plot.*`)** — pure data-to-geometry factories on a shared foundation (`src/plot/mark.js`): every mark resolves its channels through `encodeChannel` and the standard style surface (`fill`, `stroke`, `strokeWidth`, `opacity`, …) the same way. Marks compose across scale types and orientations.
    - `point` → `circle` (scatter; x/y/size/fill/stroke channels).
    - `bar` / `barY` / `barX` → `rect` (band axis = category + thickness, linear axis = value — or an explicit start/end span via x1/x2 or y1/y2; orientation auto-detected).
+   - `rect` / `rectX` / `rectY` → the generalized bar: each axis independently resolves a **span** (x1/x2, y1/y2), a **band**, or a baseline→value length, so a rectangle can span both axes (heatmap cells, 2-D regions, binned histograms). `brushRect()` adds composable 2-D editing — grab an **edge** to resize a side, a **corner** for two extents, the **body** to move; `resize` (`'both'`/`'x'`/`'y'`/`'none'`) and `move` (bool) make it opt-in.
    - `tick` / `tickX` / `tickY` → `line` (a bar's zero-thickness sibling).
+   - `text` / `textX` / `textY` → a per-datum `text` label (string at x/y; `text`/`fontSize`/`textAnchor`/`lineAnchor`/`dx`/`dy` raw, `angle` in degrees, `format` a d3-format string or function for display). Editable like any mark: `drag` to reposition, a value channel sharing the label's field for a draggable numeric readout, `cycle`/`rotate`, or `editText()` to double-click-and-retype (an inline input; the renderer owns the keyboard lifecycle and emits a `commit` gesture).
    - `line` / `lineY` / `lineX` / `connectedScatter` / `path` → a connecting `path` per series plus one `circle` handle per datum; grouped by `series`, ordered by `order`.
    - `rule` / `ruleX` / `ruleY` → a straight reference line at a data value (`y: { datum: 50 }`), or a **span** segment (a stem / whisker) between `y1`/`y2` (or `x1`/`x2`) at a category. An ordinary editable mark: put an `edit` on an endpoint and the cap becomes a handle.
    - `composite` → a **glyph**: a named group of ordinary marks as `parts` (a stem, a whisker, a dot, two caps). Each part encodes some columns of the same rows; a part whose channel carries an `edit` is a handle. It desugars into its parts as plain features — `Elicit` flattens them — so nothing about a glyph reaches the engine. Drag one handle and the rest re-derive from the changed row (lollipop, error bar). Because each handle is its own mark, dragging one cannot move another: dispatch already routes a gesture to the feature owning the node you touched.
@@ -46,7 +48,7 @@ VibeJS is layered for extensibility:
    - `axis` / `axisX` / `axisY` / `grid` / `gridX` / `gridY` → composable axis & gridline marks (or use the global `axes` convenience).
 
 4. **Edits (`vibe.edit.*`)** — a gesture that writes a channel back to the data. An edit is a small descriptor `{ gesture, channels, when, pick, scope, constrain, guide, apply }`, declared **co-located** on a channel (`channels.y.edit = drag()`) or at **mark level** (`edits: [...]`).
-   - **Universal** edits (any mark): `drag`, `resize`, `rotate` (pointer angle about the plot centre → a channel value), `cycle`, `create`, `toggle` (click a slot to pick or un-pick it), `remove`, `custom`.
+   - **Universal** edits (any mark): `drag`, `dragSpan` / `brushSpan` (move / edge-resize a 1-D span), `brushRect` (composable 2-D edge/corner/body editing of a rect's four extents), `resize`, `rotate` (pointer angle about the plot centre → a channel value), `cycle`, `create`, `toggle` (click a slot to pick or un-pick it), `remove`, `editText` (retype a text mark's content), `custom`.
    - **Line-scoped** edits, namespaced as `edit.line.*` so their scope is visible: `anchor` (add one point), `newSeries` (seed a whole line), `draw` (author a line by dragging), `sweep` (you-draw-it repaint), `removeSeries` (delete a whole line).
    - `pick` selects the target: `direct` (the mark hit), `nearest` (closest within a threshold), `plane` (no target — create), or a driver lifecycle (`sweep` / `draw` / `brush` / `probe`). Multi-event lifecycles live in **self-describing drivers** (`src/edit/drivers/`) — adding an interaction mode is a new driver file, not an engine change.
    - `pick: 'probe'` is the **hover-preview / click-commit** flow, with no drag: the pointer probes a value (the mark follows the cursor as an *uncommitted preview*), and a click settles it. Any edit works this way. Preview and commit run the same `apply` + the same invariants through one code path, so the preview cannot drift from what the click writes — and a preview never reaches `onChange` or `getData`.
@@ -57,9 +59,11 @@ VibeJS is layered for extensibility:
 
 6. **Guides (`vibe.guides.*`)** — non-interactive annotations, rebuilt every render so they track live data. `guides.rule` (reference line), `guides.region` (shaded band), `guides.proximity` (nearest-pick selection), `guides.custom(fn)` (draw arbitrary nodes from the render context). An edit's own constraint bounds + snap ring draw automatically when it declares `guide: true`. Guide nodes never capture the pointer, which is why the survey widgets' affordances live here.
 
-7. **Widgets (`vibe.widgets.*`)** — higher-level named elicitations, each a pure recipe over the core API (no new interaction surface): `likert`, `multipleChoice`, `slider`, `matrix`, `lineCone`. Each returns an **ElicitSpec** you pass straight to `Elicit(widgets.likert({…}))`. They look like survey instruments rather than charts — option rings, a cell grid, a track — but that styling is *only* the guide layer (`widgets.THEME`, `optionRings`, `cellGrid`, `sliderTrack`, `crosshair`), so each has a plain-chart twin built from the same mark, edit and constraint.
+7. **Format (`vibe.format.*`)** — display formatters for text marks (and anywhere a value is shown as a string). A mark's `format` option takes a d3-format string or `(v) => string`; helpers mint common ones (`format.number('.1f')`, `format.percent()`, `format.si()`, `format.time('%b %Y')`, `format.prefix('$')`, `format.suffix(' kg')`). Display-only — the underlying field stays the raw value.
 
-8. **Renderer (`vibe.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
+8. **Widgets (`vibe.widgets.*`)** — higher-level named elicitations, each a pure recipe over the core API (no new interaction surface): `likert`, `multipleChoice`, `slider`, `matrix`, `lineCone`. Each returns an **ElicitSpec** you pass straight to `Elicit(widgets.likert({…}))`. They look like survey instruments rather than charts — option rings, a cell grid, a track — but that styling is *only* the guide layer (`widgets.THEME`, `optionRings`, `cellGrid`, `sliderTrack`, `crosshair`), so each has a plain-chart twin built from the same mark, edit and constraint.
+
+9. **Renderer (`vibe.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
 
 **Reading data out.** `Elicit(spec)` returns the chart element augmented with a small observation API: `getData()` (a deep copy of the committed belief dataset), `setData(data)` (seed/reset + re-render), and `on("change" | "stage", cb)` (subscribe; returns an unsubscribe). This is in addition to the spec's `onChange`.
 
@@ -82,10 +86,10 @@ vibe-js/
 │   │   ├── effects.js      # Interaction-feedback layer (grab / select)
 │   │   └── scene.js        # Abstract scene graph
 │   ├── plot/               # Marks (mark.js = shared channel/style foundation)
-│   │   ├── point.js · bar.js · tick.js · line.js · rule.js · composite.js · axis.js
+│   │   ├── point.js · bar.js · rect.js · tick.js · text.js · line.js · rule.js · composite.js · axis.js
 │   │   ├── dotStack.js · waffle.js · cone.js · trend.js
 │   ├── edit/               # The edit model
-│   │   ├── basic.js        # Universal edits (drag/resize/rotate/cycle/create/toggle/remove/custom)
+│   │   ├── basic.js        # Universal edits (drag/dragSpan/brushSpan/brushRect/resize/rotate/cycle/create/toggle/remove/editText/custom)
 │   │   ├── line.js         # Line-scoped edits (anchor/newSeries/draw/sweep/removeSeries)
 │   │   ├── when.js         # Arbitration predicates
 │   │   ├── pick.js         # Target selection (nearest / proximity)
@@ -96,6 +100,7 @@ vibe-js/
 │   ├── constraints/        # Data-layer invariants (define/clamp/maintainSum/count/unique/snap)
 │   ├── widgets/            # Named survey instruments (likert/choice/slider/matrix/lineCone) + theme.js
 │   ├── guides/             # rule / region / proximity / custom annotations
+│   ├── format.js           # Display formatters (number/percent/si/time/prefix/suffix)
 │   ├── renderers/
 │   │   └── d3-renderer.js  # The default SVG renderer
 │   ├── types.d.ts          # Type contracts for the whole API
@@ -170,6 +175,6 @@ npm run typecheck  # tsc --noEmit against types.d.ts
 
 ## Roadmap
 
-- Cross-category dragging along a band axis (snap the pointer to the nearest band).
-- Orientation-aware constraint guides for `clamp` on x-value marks and box regions for 2D clamps.
-- A legend/swatch picker edit for discrete channels (the old `legendChannel`, to be re-expressed against the edit model once interactive legends land).
+- Faceted / coordinated multi-chart layouts (compose multiple `Elicit` instances at the app level for now).
+- Arc / pie marks for radial allocation (angular `rotate` + normalize covers many cases today).
+- Animation / alternate renderers (Canvas, WebGL).

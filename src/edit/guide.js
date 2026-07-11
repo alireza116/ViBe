@@ -74,6 +74,12 @@ export function buildEditGuide(feature, edit, ctx) {
                 feature, data, scales, width, height, primary, color
             }));
         }
+        // 2-D clamp box when this edit governs both axes and each has a clamp.
+        if (resolved.length >= 2) {
+            nodes.push(...clampBoxGuide(invariants, resolved, {
+                feature, data, scales, width, height, primary, color
+            }));
+        }
     }
 
     // Proximity ring + highlight for nearest/sweep/brush-pick edits (the `select`
@@ -156,12 +162,13 @@ function clampGuide({ min, max }, gctx) {
     const { primary, width, height, color } = gctx;
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
+    const onX = axisOf(primary.name) === 'x';
 
     if (min !== undefined && max !== undefined) {
         const a = primary.scale(min);
         const b = primary.scale(max);
         const lo = Math.min(a, b), hi = Math.max(a, b);
-        nodes.push(primary.name === 'x'
+        nodes.push(onX
             ? { type: 'rect', x: lo, y: 0, width: hi - lo, height,
                 fill: color, opacity: 0.07, pointerEvents: 'none', guide: true }
             : { type: 'rect', x: 0, y: lo, width, height: hi - lo,
@@ -171,6 +178,41 @@ function clampGuide({ min, max }, gctx) {
     nodes.push(...boundaryLine(min, `min ${min}`, gctx));
     nodes.push(...boundaryLine(max, `max ${max}`, gctx));
     return nodes;
+}
+
+/**
+ * 2-D clamp box when an edit governs both x and y and each has a clamp invariant.
+ * @param {import('../types').Constraint[]} invariants
+ * @param {import('../types').ResolvedChannel[]} resolved
+ * @param {any} gctx
+ * @returns {import('../types').FeatureNode[]}
+ */
+function clampBoxGuide(invariants, resolved, gctx) {
+    const xCh = resolved.find((ch) => axisOf(ch.name) === 'x');
+    const yCh = resolved.find((ch) => axisOf(ch.name) === 'y');
+    if (!xCh || !yCh || !xCh.scale || !yCh.scale) return [];
+    const xClamp = invariants.find((c) => c.constraintType === 'clamp' && c.field === xCh.field);
+    const yClamp = invariants.find((c) => c.constraintType === 'clamp' && c.field === yCh.field);
+    if (!xClamp || !yClamp) return [];
+    const xo = xClamp.options || {}, yo = yClamp.options || {};
+    if (xo.min == null || xo.max == null || yo.min == null || yo.max == null) return [];
+    const x0 = xCh.scale(xo.min), x1 = xCh.scale(xo.max);
+    const y0 = yCh.scale(yo.min), y1 = yCh.scale(yo.max);
+    const { color } = gctx;
+    return [{
+        type: 'rect',
+        x: Math.min(x0, x1),
+        y: Math.min(y0, y1),
+        width: Math.abs(x1 - x0),
+        height: Math.abs(y1 - y0),
+        fill: color,
+        opacity: 0.08,
+        stroke: color,
+        strokeWidth: 1,
+        strokeDasharray: '4 4',
+        pointerEvents: 'none',
+        guide: true
+    }];
 }
 
 /**
@@ -188,9 +230,10 @@ function clampGuide({ min, max }, gctx) {
  */
 function maintainSumGuide({ targetSum }, gctx) {
     const { feature, data, scales, primary, color } = gctx;
-    const valueName = primary.name;                       // 'x' or 'y'
-    const catName = valueName === 'y' ? 'x' : 'y';        // the other positional axis
-    const valueKey = valueName === 'y' ? (feature.yKey || 'y') : (feature.xKey || 'x');
+    const valueName = primary.name;
+    const valueAxis = axisOf(valueName) || (valueName === 'x' ? 'x' : 'y');
+    const catName = valueAxis === 'y' ? 'x' : 'y';
+    const valueKey = valueAxis === 'y' ? (feature.yKey || 'y') : (feature.xKey || 'x');
     const catKey = catName === 'y' ? (feature.yKey || 'y') : (feature.xKey || 'x');
     const valueScale = primary.scale;
     const catScale = scales[catName];
@@ -211,7 +254,7 @@ function maintainSumGuide({ targetSum }, gctx) {
 
         const catPos = catScale(d[catKey]);
         const at = valueScale(cap);
-        nodes.push(valueName === 'y'
+        nodes.push(valueAxis === 'y'
             ? { type: 'line', x1: catPos - 2, x2: catPos + band + 2, y1: at, y2: at,
                 stroke: color, strokeDasharray: '3 3', strokeWidth: 1.5,
                 opacity: 0.9, pointerEvents: 'none', guide: true }

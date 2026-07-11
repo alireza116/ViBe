@@ -8,6 +8,7 @@
 // edit's apply() maps a gesture -> that channel's data, through the SAME scale.
 
 import { makeEdit, markCenter, schemaDefaults, resolveMarkNode, invertChannel, recenterSpan } from './shared.js';
+import { axisOf } from '../core/encoding.js';
 
 /**
  * drag — position edit: invert the pointer coordinate on each positional channel.
@@ -124,6 +125,105 @@ export function brushSpan(options = {}) {
             return { ...datum, [target.field]: value };
         }
     });
+}
+
+/**
+ * brushRect — the 2-D sibling of brushSpan: composable edge / corner / body editing
+ * of a rect's four extents (x1/x2 AND y1/y2 spans). Grab near an EDGE to resize
+ * that one side, near a CORNER to resize two extents at once, or the BODY to move
+ * the whole rect. Which zone a gesture means is classified ONCE at dragstart by the
+ * brushRect driver (src/edit/drivers/brushRect.js) and locked in the feature's
+ * session for the gesture — this apply() is stateless per tick, branching on the
+ * driver's lock (`ctx.drawState.zone` + `ctx.drawState.fields`), exactly like
+ * brushSpan reads its 1-D lock.
+ *
+ * Editing is OPT-IN and composable, via two options the driver reads directly (the
+ * same way it reads `edgeInset`):
+ *   resize — 'both' (default) | 'x' | 'y' | 'none'. Which axes' edges/corners are
+ *            live. 'x'/'y' resize only that axis; 'none' disables resize (move-only).
+ *   move   — true (default) | false. Whether a body drag translates the whole rect.
+ * A disabled resize zone degrades to `body` (when `move`), so brushRect({ resize:'x' })
+ * behaves like a per-axis brushSpan, brushRect({ resize:'none' }) is a pure 2-D move,
+ * and brushRect({ move:false }) is resize-only.
+ *
+ * Like brushSpan, the endpoint fields aren't guaranteed to stay ordered mid-gesture
+ * (dragging an edge past its partner is fine — rect.js always takes min/max). At
+ * dragend the driver re-invokes with `zone:'canonicalize'`, a one-time data cleanup
+ * that swaps any inverted pair's VALUES (on both axes) with no visual change.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function brushRect(options = {}) {
+    // `pick` is dropped (brushRect only works with its driver, which sets the
+    // zone lock). `resize`/`move`/`edgeInset` are driver-only knobs: makeEdit keeps
+    // only canonical Edit fields, so they're attached to the descriptor AFTER it's
+    // built (the driver reads them off the edit object, like edgeInsetOf does).
+    const { channels, edgeInset, resize = 'both', move = true, pick: _pick, ...rest } = options;
+    const edit = makeEdit({
+        type: 'brushRect',
+        gesture: 'drag',
+        channels: channels || ['x1', 'x2', 'y1', 'y2'],
+        ...rest,
+        pick: 'brushRect',
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const zone = ctx.drawState && ctx.drawState.zone;
+            const datum = ctx.datum;
+            if (!zone || !datum) return undefined;
+
+            // Group the resolved endpoint channels by axis into [lo, hi] pairs.
+            const xPair = ctx.channels.filter((ch) => axisOf(ch.name) === 'x');
+            const yPair = ctx.channels.filter((ch) => axisOf(ch.name) === 'y');
+            const node = resolveMarkNode(ctx);
+
+            if (zone === 'canonicalize') {
+                const out = { ...datum };
+                let changed = false;
+                for (const [a, b] of [xPair, yPair]) {
+                    if (!a || !b) continue;
+                    const va = datum[a.field], vb = datum[b.field];
+                    if (va == null || vb == null || va <= vb) continue;
+                    out[a.field] = vb;
+                    out[b.field] = va;
+                    changed = true;
+                }
+                return changed ? out : undefined;
+            }
+
+            if (zone === 'body') {
+                // Recenter BOTH spans on the pointer — the 2-D whole-rect move.
+                const out = { ...datum };
+                let placed = false;
+                for (const [a, b] of [xPair, yPair]) {
+                    if (!a || !b) continue;
+                    const span = recenterSpan(node, a, b, ctx.pointer);
+                    if (!span) continue;
+                    out[a.field] = span.a;
+                    out[b.field] = span.b;
+                    placed = true;
+                }
+                return placed ? out : undefined;
+            }
+
+            // edge / corner: the driver named which field(s) the grab locked.
+            const fields = (ctx.drawState && ctx.drawState.fields) || [];
+            const out = { ...datum };
+            let placed = false;
+            for (const ch of ctx.channels) {
+                if (!ch.field || !fields.includes(ch.field)) continue;
+                const value = invertChannel(ch, ctx.pointer);
+                if (value === undefined) continue;
+                out[ch.field] = value;
+                placed = true;
+            }
+            return placed ? out : undefined;
+        }
+    });
+    // Attach the driver-only knobs (dropped by makeEdit's canonical filter).
+    const e = /** @type {any} */ (edit);
+    e.edgeInset = edgeInset;
+    e.resize = resize;
+    e.move = move;
+    return edit;
 }
 
 /**
@@ -341,6 +441,122 @@ export function remove(options = {}) {
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             if (ctx.index == null) return undefined; // no target resolved
             return ctx.data.filter((_, i) => i !== ctx.index);
+        }
+    });
+}
+
+/**
+ * editText — content edit: write a typed string back into the text channel's field.
+ * Unlike every other edit its input isn't a pixel to invert — it's the string the
+ * user typed. The renderer owns the keyboard lifecycle (double-click a text mark →
+ * inline input → Enter/blur commits, Esc cancels) and emits a single `commit`
+ * gesture carrying the value in `ctx.value`; this edit just stores it. Keeping the
+ * keyboard lifecycle in the renderer means the engine treats `commit` as an
+ * ordinary direct gesture (no new pick/driver), staying ignorant of the mode.
+ *
+ * Placed on the text channel (`text: { field:'label', edit: editText() }`) or at
+ * mark level (`edits: [editText({ channels:['text'] })]`).
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function editText(options = {}) {
+    const { channel, channels, ...rest } = options;
+    return makeEdit({
+        type: 'editText',
+        gesture: 'commit',
+        pick: 'direct',
+        channels: channels || (channel ? [channel] : ['text']),
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const ch = ctx.channels[0];
+            if (!ch || !ch.field || ctx.value === undefined || !ctx.datum) return undefined;
+            return { ...ctx.datum, [ch.field]: ctx.value };
+        }
+    });
+}
+
+/**
+ * rank — reorder by dragging along a discrete (band/point) or quantitative rank
+ * axis. Inverts the pointer to a rank slot, then SWAPS with whoever currently
+ * occupies that slot so ranks stay unique. Returns a full dataset (whole-dataset
+ * edit). Place on the rank channel: `y: { field: 'rank', edit: rank() }` or
+ * `edits: [rank({ channels: ['y'] })]`.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function rank(options = {}) {
+    const { channel, channels, field, ...rest } = options;
+    return makeEdit({
+        type: 'rank',
+        gesture: 'drag',
+        pick: rest.pick || 'direct',
+        channels: channels || (channel ? [channel] : null),
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const ch = ctx.channels[0];
+            if (!ch || !ctx.datum || ctx.index == null) return undefined;
+            const f = field || ch.field;
+            if (!f) return undefined;
+            const nextRank = invertChannel(ch, ctx.pointer);
+            if (nextRank === undefined) return undefined;
+            const oldRank = ctx.datum[f];
+            if (oldRank === nextRank) return undefined;
+            // Swap: the dragged datum takes nextRank; whoever held it gets oldRank.
+            return ctx.data.map((d, i) => {
+                if (i === ctx.index) return { ...d, [f]: nextRank };
+                if (d[f] === nextRank) return { ...d, [f]: oldRank };
+                return d;
+            });
+        }
+    });
+}
+
+/**
+ * legend — pick a discrete domain value by clicking a swatch in a legend row.
+ * Pair with `guides.legend({ channel })` for the visual row. Layout options
+ * (`x`, `y`, `size`, `gap`, `columns`) must match the guide so hit-testing
+ * aligns. Writes the chosen domain value into the channel's field on the
+ * active (or sole) datum.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function legend(options = {}) {
+    const {
+        channel, channels,
+        x = 8, y = 8, size = 14, gap = 6, columns,
+        labelWidth = 48,
+        ...rest
+    } = options;
+    const pitch = size + gap + labelWidth;
+    return makeEdit({
+        type: 'legend',
+        gesture: 'click',
+        pick: 'plane',
+        channels: channels || (channel ? [channel] : ['fill']),
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const ch = ctx.channels[0];
+            if (!ch || !ch.field || !ch.scale || typeof ch.scale.domain !== 'function') return undefined;
+            const domain = ch.scale.domain();
+            if (!domain.length) return undefined;
+            const cols = columns || domain.length;
+            const px = ctx.pointer.x, py = ctx.pointer.y;
+            let hit = null;
+            domain.forEach((value, i) => {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const sx = x + col * pitch;
+                const sy = y + row * (size + gap);
+                if (px >= sx && px <= sx + size && py >= sy && py <= sy + size) hit = value;
+            });
+            if (hit == null) return undefined;
+            if (ctx.datum && ctx.index != null) {
+                return { ...ctx.datum, [ch.field]: hit };
+            }
+            if (ctx.data.length === 1) {
+                return [{ ...ctx.data[0], [ch.field]: hit }];
+            }
+            return undefined;
         }
     });
 }

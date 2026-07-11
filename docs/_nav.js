@@ -14,14 +14,18 @@ export const SITE = [
             { path: 'index.html', title: 'Overview' },
             { path: 'concepts.html', title: 'Core concepts' },
             { path: 'sizing.html', title: 'Responsive sizing' },
+            { path: 'authoring.html', title: 'Authoring SDK' },
         ],
     },
     {
         group: 'Marks',
         pages: [
             { path: 'marks/bar.html', title: 'Bar' },
+            { path: 'marks/rect.html', title: 'Rect' },
+            { path: 'marks/area.html', title: 'Area' },
             { path: 'marks/tick.html', title: 'Tick' },
             { path: 'marks/point.html', title: 'Point & Dot' },
+            { path: 'marks/text.html', title: 'Text' },
             { path: 'marks/line.html', title: 'Line' },
             { path: 'marks/composite.html', title: 'Composite' },
             { path: 'marks/dotstack.html', title: 'Stacked dots' },
@@ -45,7 +49,7 @@ export const SITE = [
     {
         group: 'Widgets',
         pages: [
-            { path: 'widgets.html', title: 'Likert · Choice · Slider · Matrix' },
+            { path: 'widgets.html', title: 'Survey instruments' },
         ],
     },
     {

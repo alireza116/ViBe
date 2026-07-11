@@ -7,7 +7,9 @@ export default {
         'a linear <b>value</b> drawn as length from a baseline (or an explicit start/end span ' +
         'via x1/x2 or y1/y2). <code class="inline">bar</code> auto-detects orientation from ' +
         'which axis is a band; <code class="inline">barY</code> forces vertical, ' +
-        '<code class="inline">barX</code> horizontal.',
+        '<code class="inline">barX</code> horizontal. For rectangles that span <b>both</b> axes ' +
+        '(heatmap cells, 2-D regions), use <code class="inline">rect</code> + ' +
+        '<code class="inline">brushRect()</code> instead.',
     api: [
         {
             name: 'bar(options) · barY(options) · barX(options)',
@@ -23,6 +25,7 @@ export default {
             options: [
                 { name: 'channels', type: 'object', default: '{}', desc: 'Channel map — one band axis (category) and one linear axis (value or a span). See <b>Channels</b>.' },
                 { name: 'orientation', type: "'vertical' | 'horizontal'", default: 'auto', desc: 'Override the inferred direction (bar only; barY/barX pin it).' },
+                { name: 'stack', type: 'true | string', default: '—', desc: 'Stack bars that share a category. <code class="inline">true</code> uses the fill/series field; a string names the series field. Declare a schema domain covering the stacked total.' },
                 { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in <code class="inline">channels[ch].edit</code>.' },
                 { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark (e.g. <code class="inline">maintainSum</code>).' },
                 { name: 'fill, stroke, …', type: 'style', default: "fill: 'steelblue'", desc: 'Style shorthands / channels (see the style surface on any mark).' },

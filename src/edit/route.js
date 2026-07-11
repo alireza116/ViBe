@@ -14,6 +14,17 @@
 // now structural).
 
 /**
+ * Looks like an Edit descriptor (gesture + apply) rather than a ChannelSpec.
+ * Used by the DEV misplaced-edit guard — authors sometimes put `edit: drag()` as
+ * a sibling channel key instead of on a channel or in `feature.edits`.
+ * @param {any} v
+ * @returns {boolean}
+ */
+function looksLikeEdit(v) {
+    return !!(v && typeof v === 'object' && typeof v.apply === 'function' && v.gesture);
+}
+
+/**
  * @param {any} feature
  * @returns {import('../types').Edit[]}
  */
@@ -30,6 +41,32 @@ export function collectEdits(feature) {
     }
     for (const e of (feature.edits || [])) edits.push(e);
     return edits;
+}
+
+/** @type {Set<string>} */
+const warnedMisplaced = new Set();
+
+/**
+ * DEV guard: warn when a channel map looks like it misplaced an edit (a key named
+ * `edit`, or a channel value that is itself an Edit descriptor). Those never reach
+ * collectEdits, so the mark stays pointer-transparent and "drag does nothing".
+ * @param {any} feature
+ */
+export function warnMisplacedEdits(feature) {
+    const channels = feature.channels || {};
+    const fid = feature.id || '?';
+    for (const [name, chSpec] of Object.entries(channels)) {
+        const key = `${fid}:${name}`;
+        if (warnedMisplaced.has(key)) continue;
+        if (name === 'edit' || looksLikeEdit(chSpec)) {
+            warnedMisplaced.add(key);
+            console.warn(
+                `[vibe] feature "${fid}" has a misplaced edit under channels.${name}. ` +
+                `Attach edits on a channel (y: { field, edit: drag() }) or at mark level ` +
+                `(edits: [drag({ channels: ['x','y'] })]). A bare channels.edit key is ignored.`
+            );
+        }
+    }
 }
 
 /**
