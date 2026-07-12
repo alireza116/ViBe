@@ -21,6 +21,15 @@ export type MeasureType = 'quantitative' | 'categorical' | 'ordinal' | 'temporal
 export interface ScaleSpec {
   type?: ScaleType;
   range?: any[];
+  // A named colour scheme (colour channels only), resolved to a `range` when the
+  // channel names none: a categorical palette ('tableau10', 'category10', 'set2',
+  // …) for a discrete field, or a diverging/sequential ramp ('RdBu', 'blues',
+  // 'viridis', …). An explicit `range` still wins. See schemeRange in core/encoding.js.
+  scheme?: string;
+  // Flip the resolved range (after `range` / `scheme`). Useful for diverging
+  // ordinal colour when the domain order is the opposite of the scheme's native
+  // direction — e.g. D→R wants blue→red, which is `scheme: "RdBu", reverse: true`.
+  reverse?: boolean;
   padding?: number;    // band / point
   nice?: boolean;      // continuous
   clamp?: boolean;     // continuous
@@ -64,6 +73,10 @@ export interface CustomScaleProperties {
   encode: (value: any, fallback?: any) => any;
   invertValue: (pixel: number) => any;
   domain?: () => any[];
+  // The schema fields unioned onto this axis, in first-seen order (stamped by
+  // resolveScales). Metadata for an editable axis: a domain edit writes each of
+  // these fields' schema domains. Not a domain/range on the channel.
+  fields?: string[];
 }
 
 export type Scale = (
@@ -95,9 +108,13 @@ export interface EditContext {
   // look up a sibling channel's field. Distinct from `channels` above.
   markChannels: Record<string, any>;
   // Plot pixel dimensions, for a gesture measured against the whole plane (e.g.
-  // rotate about the centre), the angular sibling of resize's mark-centre radius.
+  // rotate about the plot centre by default; rotate({ pivot: 'mark' }) uses the
+  // mark centre instead — the angular sibling of resize's mark-centre radius).
   width?: number;
   height?: number;
+  // The chart's margins, so a grow-mode axis edit can turn an inner axis length
+  // back into the chart's outer width/height. Rarely needed by other edits.
+  margins?: { top: number; right: number; bottom: number; left: number };
   // The dataset schema, so a `create` edit can mint a datum carrying every
   // declared field (its default or null), not only the positional ones.
   schema?: Schema;
@@ -150,9 +167,11 @@ export interface Edit {
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
   pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' | 'brushRect' | 'probe' | (string & {});
-  // null = universal (any mark); 'line' = needs a series-grouping mark. The engine
-  // dev-warns when a 'line' edit is attached to a mark without series support.
-  scope: 'line' | null;
+  // null = universal (any mark); 'line' = needs a series-grouping mark; 'axis' /
+  // 'arc' = belongs on that mark kind (the scope shows in the name, e.g.
+  // edit.line.*, edit.axis.*, edit.arc.*). The engine dev-warns when a 'line' edit
+  // is attached to a mark without series support.
+  scope: 'line' | 'axis' | 'arc' | null;
   threshold: number;
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
@@ -171,7 +190,23 @@ export interface Edit {
   // probe-pick only: does a click that settles this edit advance the stage?
   // Default true; `advance: false` commits repeatedly within one stage.
   advance: boolean;
+  // What this edit WRITES. Absent (the default) -> the dataset: apply returns a
+  // datum (spliced at `index`) or a whole array. 'domain' -> the schema: apply
+  // returns { domains: { [field]: any[] }, data?, resize? } and the engine writes
+  // each field's schema domain (and optionally replaces the dataset / resizes the
+  // chart). A capability flag, read like the array-vs-datum classification — not
+  // an interaction-mode branch. Used by the editable-axis edits (edit.axis.*).
+  target?: 'domain';
   apply: (ctx: EditContext) => any;
+}
+
+// The result an edit with `target: 'domain'` returns from apply(): the schema
+// domains to write, plus (for a coupled schema+data edit like category-remove) a
+// replacement dataset, and (for grow-the-chart numeric drag) a chart resize hint.
+export interface DomainEditResult {
+  domains: Record<string, any[]>;
+  data?: Datum[];
+  resize?: { width?: number; height?: number };
 }
 
 // A single channel binding on a mark (Observable Plot's model, declarative).
@@ -228,6 +263,9 @@ export interface Channels extends StyleChannels {
   // not scaled — constant forms are shorthands), and rotation in degrees
   // (scaled when a scale is declared, so rotate() is an exact inverse; else raw).
   // `format` is a mark-level option (string | fn), not a channel — see MarkOptions.
+  // Also the primary channel of needle / axisRadial / cone (degrees via scale.range;
+  // default range [180, 0] = left→right through the top). For arc/pie, the field is
+  // the slice magnitude (layout stacks and normalizes; the scale is not used for placement).
   text?: ChannelSpec;
   fontSize?: ChannelSpec;
   textAnchor?: ChannelSpec;   // horizontal: 'start' | 'middle' | 'end'
@@ -297,6 +335,9 @@ export interface FeatureNode {
   // interpolation name (see the renderer's resolveCurve).
   points?: [number, number][];
   curve?: string;
+  // Authored SVG path `d` (arcs, needles, pie slices). When set, the renderer
+  // uses it instead of building a line from `points`.
+  d?: string;
   cx?: number;
   cy?: number;
   r?: number;
@@ -373,6 +414,18 @@ export interface Session {
   // brushRect driver: the field(s) an edge/corner grab locked (1 for an edge,
   // 2 for a corner). The 2-D sibling of `field`.
   fields?: string[] | null;
+  // axisDrag driver: the dragstart-locked handle for an editable numeric axis —
+  // which end is grabbed, the axis it runs along, the opposite (anchored) end's
+  // pixel + value, the grabbed end's starting pixel + value, and (grow mode) the
+  // pixels-per-data-unit held constant while the chart resizes.
+  grabEnd?: 'min' | 'max';
+  axis?: 'x' | 'y';
+  anchorPixel?: number;
+  anchorValue?: any;
+  grabPixel?: number;
+  grabValue?: any;
+  pxPerUnit?: number;
+  cursor?: string;
 }
 
 // Config for a single positional axis (the `axes` convenience, or an explicit
@@ -399,6 +452,15 @@ export interface AxisSpec {
   fill?: string;     // tick labels + title (they are text nodes)
   fontSize?: number;
   grid?: boolean;               // also emit a paired gridline mark
+  // Make the axis INTERACTIVE (opt-in; axes are inert by default). A domain edit
+  // (edit.axis.scale() for a numeric/temporal axis, edit.axis.categories() for a
+  // discrete one) reshapes the field's schema domain — grids, guides and marks
+  // reflow from it. Accepts one edit or a list.
+  edit?: Edit | Edit[];
+  // The schema field whose domain this axis edits, when the axis's channel carries
+  // more than one field and the edit shouldn't touch them all. Defaults to every
+  // field on the axis (scale.fields).
+  field?: string;
 }
 
 // Interaction-effects layer: transient visual feedback for interaction STATE,
@@ -453,6 +515,10 @@ export interface ElicitSpec {
   // at native pixels on resize — crisp text, width tracks the container, height
   // stays the given value. Reflow charts expose `destroy()` to detach the observer.
   responsive?: 'fixed' | 'scale' | 'reflow' | boolean;
+  // SVG overflow. 'hidden' (default) clips marks to the viewport; 'visible' lets
+  // content in the margin band show — needed for radial/gauge axis labels that
+  // sit just outside the plot area.
+  overflow?: 'hidden' | 'visible';
   renderer?: any;
   // Chart-level scale overrides, keyed by channel ('x', 'y', 'fill', 'size', …).
   // Scales are GLOBAL per channel, so this is their honest home; a channel's own
@@ -475,6 +541,9 @@ export interface ElicitSpec {
 export interface ElicitElement extends HTMLDivElement {
   // A deep copy of the committed dataset.
   getData(): Datum[];
+  // A deep copy of the engine-owned schema, including any DOMAIN an editable axis
+  // (edit.axis.*) reshaped. The caller's original spec.schema is never mutated.
+  getSchema(): Schema;
   // Replace the dataset and re-render. Bypasses constraints (trusted seed/reset).
   setData(data: Datum[]): void;
   // Subscribe to committed changes ('change': (data)) or stage advances

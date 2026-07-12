@@ -49,13 +49,13 @@ export class D3Renderer {
      * @param {any} context
      */
     render(context) {
-        const { container, scene, width, height, margins, onEvent, planeOnTop = false, planeCursor = 'pointer', responsive = 'fixed' } = context;
+        const { container, scene, width, height, margins, onEvent, planeOnTop = false, planeCursor = 'pointer', responsive = 'fixed', overflow = 'hidden' } = context;
         const effects = context.effects || DEFAULT_EFFECTS;
 
         const innerWidth = width - margins.left - margins.right;
         const innerHeight = height - margins.top - margins.bottom;
 
-        const { g, plane } = this._ensureScene(container, { width, height, margins, innerWidth, innerHeight, responsive });
+        const { g, plane } = this._ensureScene(container, { width, height, margins, innerWidth, innerHeight, responsive, overflow });
 
         // Stashed for the text mark's content-edit overlay (_editText), which is
         // spawned from a node's dblclick handler outside this closure.
@@ -96,8 +96,9 @@ export class D3Renderer {
         this._drawGuideRegions(g, allRects.filter((/** @type {any} */ n) => n.guide));
 
         // Connecting paths (line marks) sit above guide regions but BELOW the
-        // handle dots, so the dots stay grabbable on top of the line.
-        this._drawPaths(g, allPaths);
+        // handle dots, so the dots stay grabbable on top of the line. Editable
+        // paths (needle / pie) also get drag wiring here.
+        this._drawPaths(g, allPaths, { drag, markClick });
 
         this._drawMarks(g,
             allRects.filter((/** @type {any} */ n) => !n.guide),
@@ -129,10 +130,10 @@ export class D3Renderer {
      * interaction plane, and the background layer (behind every mark). Idempotent
      * — on re-render it just returns the existing nodes.
      * @param {any} container
-     * @param {{ width: number, height: number, margins: any, innerWidth: number, innerHeight: number, responsive?: string }} dims
+     * @param {{ width: number, height: number, margins: any, innerWidth: number, innerHeight: number, responsive?: string, overflow?: string }} dims
      * @returns {{ svg: any, g: any, plane: any }}
      */
-    _ensureScene(container, { width, height, margins, innerWidth, innerHeight, responsive = 'fixed' }) {
+    _ensureScene(container, { width, height, margins, innerWidth, innerHeight, responsive = 'fixed', overflow = 'hidden' }) {
         /** @type {any} */
         let svg = d3.select(container).select('svg');
         if (svg.empty()) {
@@ -176,6 +177,10 @@ export class D3Renderer {
                 .style('width', null)
                 .style('height', null);
         }
+
+        // Let marks draw into the margin band (radial/gauge labels) when asked; the
+        // default keeps the historical clip to the SVG viewport.
+        svg.style('overflow', overflow === 'visible' ? 'visible' : null);
 
         const g = svg.select('.scene-container').attr('transform', `translate(${margins.left},${margins.top})`);
         g.select('rect.plane').attr('width', innerWidth).attr('height', innerHeight);
@@ -444,20 +449,29 @@ export class D3Renderer {
     }
 
     /**
-     * Connecting paths for line marks: one `<path>` per node, its `d` built from
-     * the node's `points` with the requested `curve` interpolation. Non-interactive
-     * (pointer-events off) — the line is edited through its handle dots, not the
-     * path itself — and `fill:'none'` by default so a stroked path reads as a line.
+     * Path marks: connecting lines (points + curve) OR authored SVG `d` strings
+     * (arcs, needles, pie slices). Non-interactive by default — line connectors
+     * are edited through handle dots — but an `editable` path (needle, pie slice)
+     * gets the same click + drag wiring as other marks.
      * @param {any} g
      * @param {any[]} paths
+     * @param {{ drag: any, markClick: (e: any, d: any) => void }} [io]
      */
-    _drawPaths(g, paths) {
+    _drawPaths(g, paths, io) {
         const sel = g.selectAll('path.mark-line').data(paths).join('path')
             .attr('class', 'mark-line')
-            .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'none')
-            .attr('d', (/** @type {any} */ d) =>
-                d3.line().curve(resolveCurve(d.curve))(d.points || []));
+            .style('pointer-events', (/** @type {any} */ d) =>
+                d.pointerEvents || (d.editable ? 'auto' : 'none'))
+            .style('cursor', (/** @type {any} */ d) =>
+                d.editable ? (d.cursor || 'pointer') : 'default')
+            .attr('d', (/** @type {any} */ d) => {
+                if (d.d) return d.d;
+                return d3.line().curve(resolveCurve(d.curve))(d.points || []);
+            });
         this._applyStyle(sel, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 });
+        if (io) {
+            sel.on('click', io.markClick).call(io.drag);
+        }
     }
 
     /**

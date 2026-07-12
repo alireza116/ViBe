@@ -18,7 +18,48 @@
 // translate component(s) — e.g. cross at the origin, or a centred 1D slider axis.
 
 import * as d3 from 'd3';
-import { positionOnScale } from '../core/scales.js';
+import { positionOnScale, isDiscrete } from '../core/scales.js';
+
+/** Numeric view of a domain value (a Date sorts by its timestamp). */
+const numOf = (/** @type {any} */ v) => (v instanceof Date ? v.getTime() : v);
+
+/** Normalize the axis `edit` option to a flat list, injecting the axis channel. */
+function flatEdits(/** @type {any} */ edit, /** @type {string} */ channel) {
+    const list = edit == null ? [] : Array.isArray(edit) ? edit.flat(Infinity) : [edit];
+    return list
+        .filter((e) => e && typeof e.apply === 'function')
+        .map((e) => (e.channels ? e : { ...e, channels: [channel] }));
+}
+
+/**
+ * An interactive category label (editable DISCRETE axis): a foreground text node
+ * that carries its `category` so edit.axis.categories() can rename it (dblclick ->
+ * inline input -> commit) and route the gesture. `index: 0` is a sentinel so the
+ * engine's direct-pick dispatch (which keys on node.index) accepts it — a domain
+ * edit ignores the index.
+ * @param {{ x: number, y: number, textAnchor: string, v: any, format: (v: any) => string, fill: string, fontSize: number }} o
+ * @returns {import('../types').FeatureNode}
+ */
+function categoryLabel({ x, y, textAnchor, v, format, fill, fontSize }) {
+    return {
+        type: 'text', x, y, text: format(v), textAnchor, fill, fontSize,
+        category: v, editText: true, index: 0, cursor: 'text'
+    };
+}
+
+/**
+ * The "×" remove affordance next to a category label (editable DISCRETE axis). A
+ * click routes to edit.axis.categories()'s remove edit, which drops the category
+ * and its rows.
+ * @param {{ x: number, y: number, v: any, fontSize: number }} o
+ * @returns {import('../types').FeatureNode}
+ */
+function removeGlyph({ x, y, v, fontSize }) {
+    return {
+        type: 'text', x, y, text: '×', textAnchor: 'middle', fill: '#dc2626',
+        fontSize: fontSize + 1, cursor: 'pointer', removeCategory: v, index: 0
+    };
+}
 
 /**
  * The base translate (axis-group origin, in inner-plot pixels) for an anchor.
@@ -97,16 +138,29 @@ export function axis(options = {}) {
         fill = '#374151',    // tick labels + title (text nodes take a fill)
         fontSize = 10,
         grid = false,
+        // Opt-in interactivity: an edit (edit.axis.scale / edit.axis.categories) or
+        // a list of them, and an optional single field the edit pins (defaults to
+        // every field on the axis). Axes are inert unless `edit` is given.
+        edit,
+        field,
+        handleColor = '#2563eb',
         id
     } = options;
 
     const isX = channel === 'x';
+    const edits = flatEdits(edit, channel);
+    const editable = edits.length > 0;
 
     return {
         id,
         isAxis: true,
         channel,
         layer: 'background',
+        // Interactive-axis wiring: the edits the engine collects (mark-level, so
+        // collectEdits picks them up) and the field they pin. Empty/undefined for a
+        // plain inert axis.
+        edits,
+        field,
         // A paired grid, when `grid: true` — the engine reads this to auto-add a
         // matching grid mark alongside the axis (see elicit.js). Harmless otherwise.
         grid,
@@ -134,6 +188,12 @@ export function axis(options = {}) {
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 
+            // An editable DISCRETE axis makes its category labels interactive (rename
+            // by dblclick-typing, remove via an × affordance); an editable CONTINUOUS
+            // axis grows draggable end-handles. Both leave the spine/ticks inert.
+            const discrete = editable && isDiscrete(scale);
+            const continuous = editable && scale.kind === 'continuous';
+
             // Domain spine — spans the scale's pixel range along the axis.
             if (isX) {
                 nodes.push({
@@ -157,21 +217,55 @@ export function axis(options = {}) {
                         type: 'line', x1: px, x2: px, y1: t.y, y2: t.y + dir * tickSize,
                         stroke, strokeWidth: 1, background: true, pointerEvents: 'none'
                     });
-                    nodes.push({
-                        type: 'text', x: px, y: t.y + dir * (tickSize + fontSize),
-                        text: format(v), textAnchor: 'middle', fill, fontSize,
-                        background: true, pointerEvents: 'none'
-                    });
+                    const ly = t.y + dir * (tickSize + fontSize);
+                    nodes.push(discrete
+                        ? categoryLabel({ x: px, y: ly, textAnchor: 'middle', v, format, fill, fontSize })
+                        : { type: 'text', x: px, y: ly, text: format(v), textAnchor: 'middle', fill, fontSize, background: true, pointerEvents: 'none' });
+                    if (discrete) nodes.push(removeGlyph({ x: px, y: ly + fontSize, v, fontSize }));
                 } else {
                     const py = t.y + p;
                     nodes.push({
                         type: 'line', x1: t.x, x2: t.x + dir * tickSize, y1: py, y2: py,
                         stroke, strokeWidth: 1, background: true, pointerEvents: 'none'
                     });
+                    const lx = t.x + dir * (tickSize + 3);
+                    nodes.push(discrete
+                        ? categoryLabel({ x: lx, y: py + fontSize / 3, textAnchor: dir < 0 ? 'end' : 'start', v, format, fill, fontSize })
+                        : { type: 'text', x: lx, y: py + fontSize / 3, text: format(v), textAnchor: dir < 0 ? 'end' : 'start', fill, fontSize, background: true, pointerEvents: 'none' });
+                    if (discrete) nodes.push(removeGlyph({ x: lx + dir * (fontSize + 4), y: py + fontSize / 3, v, fontSize }));
+                }
+            }
+
+            // Editable affordances past the ticks: a "+" to add a category, or the two
+            // numeric end-handles the axisDrag driver grabs.
+            if (discrete) {
+                const addX = isX ? t.x + width + fontSize : t.x;
+                const addY = isX ? t.y + dir * (tickSize + fontSize) : t.y + height + dir * (tickSize + fontSize);
+                nodes.push({
+                    type: 'text', x: addX, y: addY, text: '＋', textAnchor: 'middle',
+                    fill: handleColor, fontSize: fontSize + 4, cursor: 'pointer',
+                    addCategory: true, editText: true, index: 0
+                });
+            } else if (continuous) {
+                const dom = typeof scale.domain === 'function' ? scale.domain() : [];
+                const loV = dom[0];
+                const hiV = dom[dom.length - 1];
+                const along = (/** @type {any} */ vv) => (isX ? t.x : t.y) + positionOnScale(scale, vv);
+                for (const end of /** @type {const} */ (['min', 'max'])) {
+                    const gV = end === 'max' ? hiV : loV;
+                    const aV = end === 'max' ? loV : hiV;
+                    const gPix = along(gV);
+                    const aPix = along(aV);
+                    const denom = numOf(gV) - numOf(aV) || 1;
                     nodes.push({
-                        type: 'text', x: t.x + dir * (tickSize + 3), y: py + fontSize / 3,
-                        text: format(v), textAnchor: dir < 0 ? 'end' : 'start', fill,
-                        fontSize, background: true, pointerEvents: 'none'
+                        type: 'circle',
+                        cx: isX ? t.x + positionOnScale(scale, gV) : t.x,
+                        cy: isX ? t.y : t.y + positionOnScale(scale, gV),
+                        r: 5, fill: handleColor, stroke: '#fff', strokeWidth: 1.5,
+                        axisHandle: true, handle: end, axis: channel,
+                        anchorPixel: aPix, anchorValue: aV, grabPixel: gPix, grabValue: gV,
+                        pxPerUnit: (gPix - aPix) / denom,
+                        cursor: isX ? 'ew-resize' : 'ns-resize'
                     });
                 }
             }

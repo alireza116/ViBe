@@ -17,16 +17,20 @@ import { SITE } from './_nav.js';
 
 // ---- dependency surface (namespace spread → self-maintaining) ---------------
 // Universal edits (drag, create, remove, resize, cycle, custom) are spread bare so
-// examples read `edit: drag()`. The line-scoped edits stay under `edit.line.*` so
-// their scope shows in the example; `line` (the edit namespace) and the internal
-// `nextSeriesKey` are excluded from the spread so they don't shadow the line MARK.
+// examples read `edit: drag()`. The scoped edit namespaces — `line`, `axis`, `arc`
+// — stay under `edit.*.*` so their scope shows in the example AND so they don't
+// shadow the same-named MARKS (plot.axis / plot.arc / the line mark). The internal
+// `nextSeriesKey` is excluded too.
 //
 // Spread order matters: `constraints.custom` is an alias of `defineConstraint`, and
 // would overwrite `edit.custom` if constraints landed last — the gestures page's
 // bare `custom(...)` would then install a constraint (no pick/gesture) and the
 // mark would stay pointer-transparent. Edits win; author a custom constraint via
 // `define` / `defineConstraint` or `constraints.custom`.
-const { line: _editLine, nextSeriesKey: _nsk, when: _editWhen, ...universalEdits } = vibe.edit;
+const {
+    line: _editLine, axis: _editAxis, arc: _editArc,
+    nextSeriesKey: _nsk, when: _editWhen, ...universalEdits
+} = vibe.edit;
 const depObj = {
     ...vibe.plot,
     ...vibe.constraints,

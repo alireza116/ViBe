@@ -23,6 +23,7 @@ import { drawDriver } from './draw.js';
 import { brushDriver } from './brush.js';
 import { brushRectDriver } from './brushRect.js';
 import { probeDriver } from './probe.js';
+import { axisDragDriver } from './axisDrag.js';
 
 /**
  * @typedef {Object} DriverSession
@@ -59,7 +60,7 @@ import { probeDriver } from './probe.js';
  */
 
 /** @type {Driver[]} */
-export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, brushRectDriver, probeDriver];
+export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, brushRectDriver, probeDriver, axisDragDriver];
 
 /**
  * Register a custom driver (or replace a built-in by the same `name`). The engine

@@ -31,6 +31,9 @@ export const SITE = [
             { path: 'marks/dotstack.html', title: 'Stacked dots' },
             { path: 'marks/waffle.html', title: 'Waffle' },
             { path: 'marks/cone.html', title: 'Line + Cone' },
+            { path: 'marks/needle.html', title: 'Needle' },
+            { path: 'marks/axis-radial.html', title: 'Radial axis' },
+            { path: 'marks/arc.html', title: 'Arc · Pie · Donut' },
             { path: 'marks/trend.html', title: 'Trend line' },
             { path: 'marks/axes.html', title: 'Axis, Grid & Rule' },
         ],
@@ -44,6 +47,7 @@ export const SITE = [
             { path: 'editing/existence.html', title: 'Create · Remove · Anchors' },
             { path: 'editing/probe.html', title: 'Probe (hover · click)' },
             { path: 'editing/stages.html', title: 'Stages (multi-step)' },
+            { path: 'editing/axis.html', title: 'Editable axes (domain)' },
         ],
     },
     {

@@ -41,3 +41,16 @@ import { anchor, newSeries, draw, sweep, removeSeries } from './line.js';
 
 // Line-scoped edits, namespaced so the API shows they need a `line` mark.
 export const line = { anchor, newSeries, draw, sweep, removeSeries };
+
+import { scale as axisScale, categories as axisCategories } from './axis.js';
+
+// Axis-scoped edits, namespaced so the API shows they belong on an axis mark and
+// reshape the field's DOMAIN (not the dataset). `scale` = numeric/temporal drag;
+// `categories` = discrete add/rename/remove (returns an array of edits).
+export const axis = { scale: axisScale, categories: axisCategories };
+
+import { edge as arcEdge } from './arc.js';
+
+// Arc-scoped edit, namespaced so the API shows it belongs on an arc/pie/donut mark:
+// drag a slice boundary to redistribute the two adjacent rows (total preserved).
+export const arc = { edge: arcEdge };

@@ -10,10 +10,17 @@ export { text, textX, textY } from './text.js';
 export { dotStack, dotStackX, dotStackY } from './dotStack.js';
 export { waffle, waffleX, waffleY } from './waffle.js';
 export { cone } from './cone.js';
+export { needle } from './needle.js';
+export { axisRadial } from './axisRadial.js';
+export { arc, pie, donut } from './arc.js';
 export { composite } from './composite.js';
 export { axis, axisX, axisY, grid, gridX, gridY } from './axis.js';
 // Shared mark foundation — for authoring new marks (channel resolution + the
 // standard style surface). See mark.js.
 export { encodeChannel, resolveStyle, normalizeMarkOptions, STANDARD_STYLE_CHANNELS } from './mark.js';
+export {
+    polarToXY, arcPath, arcSpine, arcSpan, angularBand, needleTriangle, degToRad,
+    ORIENT_SPAN,
+} from './polar.js';
 
 export { trend } from './trend.js';

@@ -29,6 +29,7 @@ import {
     unionDomains,
     scaleTypeFor,
     channelRange,
+    schemeRange,
     axisOf
 } from './encoding.js';
 
@@ -196,7 +197,13 @@ export function resolveScales(features, dataset, spec, dims) {
             || inferDomainFromValues(type, a.values);
 
         const positional = !!axisOf(bucket);
-        const range = opt.range || channelRange(bucket, type, dims);
+        // Range precedence: an explicit `range` array wins; then a named `scheme`
+        // (colour channels only — resolves to a palette / sampled ramp); then the
+        // channel's built-in default. `reverse` flips whichever of those landed.
+        let range = opt.range
+            || schemeRange(opt.scheme, type, domain.length)
+            || channelRange(bucket, type, dims);
+        if (opt.reverse && Array.isArray(range)) range = [...range].reverse();
 
         // A scale the author built themselves is adopted as-is: we only sniff its
         // capabilities and hand it the pixel range if it's positional and named none.
@@ -205,6 +212,11 @@ export function resolveScales(features, dataset, spec, dims) {
             : createScale({ ...opt, type, domain }, range);
 
         if (scale) {
+            // The schema fields that fed this axis, in first-seen order. Metadata
+            // only (NOT a domain/range on the channel) — an editable axis reads it
+            // to know which schema field domains a domain edit should write back to
+            // (a single-field axis -> one field; an error bar's y -> mean/lo/hi).
+            scale.fields = a.fields;
             // Always alias onto the bucket key itself (e.g. 'x'), even when only
             // x1/x2 were declared and 'x' was never literally used as a channel —
             // baselineOf/bandwidthOf and other axis-keyed lookups expect scales.x

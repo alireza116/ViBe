@@ -8,12 +8,13 @@
 // edit's apply() maps a gesture -> that channel's data, through the SAME scale.
 
 import { makeEdit, markCenter, schemaDefaults, resolveMarkNode, invertChannel, recenterSpan } from './shared.js';
-import { axisOf } from '../core/encoding.js';
+import { axisOf, pointerDegrees, unwrapDegrees } from '../core/encoding.js';
 
 /**
  * drag — position edit: invert the pointer coordinate on each positional channel.
- * On x AND y it's a 2D move; on y alone it's a bar drag. Works on any invertible
- * scale (linear pixel, band -> nearest category) via scale.invertValue.
+ * On x AND y it's a 2D move; on y alone it's a bar drag. On `angle` (with a mark
+ * centre) it is a rotate. Works on any invertible scale (linear pixel, band ->
+ * nearest category) via scale.invertValue.
  * @param {any} [options]
  * @returns {import('../types').Edit}
  */
@@ -26,8 +27,9 @@ export function drag(options = {}) {
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const next = { ...ctx.datum };
+            const center = markCenter(resolveMarkNode(ctx));
             for (const ch of ctx.channels) {
-                const value = invertChannel(ch, ctx.pointer);
+                const value = invertChannel(ch, ctx.pointer, center);
                 if (value !== undefined) next[ch.field] = value;
             }
             return next;
@@ -251,32 +253,50 @@ export function resize(options = {}) {
 }
 
 /**
- * rotate — angular edit: the pointer's ANGLE about the plot centre inverts back
- * to the channel's value, mirroring how the channel encodes value -> degrees. It
- * is the angular sibling of `resize` (which inverts the pointer's radius): the
- * gesture-geometry half is the atan2 below; the data half goes through the SAME
- * channel scale (its `range` is in degrees), so encode and edit stay exact
- * inverses. Used for a correlation line: `angle: { field:'r', domain:[-1,1],
- * range:[-45,45], edit: rotate() }` maps a drag to a slope in [-1, 1].
+ * rotate — angular edit: the pointer's ANGLE about a pivot inverts back to the
+ * channel's value, mirroring how the channel encodes value -> degrees. It is the
+ * angular sibling of `resize` (which inverts the pointer's radius): the
+ * gesture-geometry half is atan2; the data half goes through the SAME channel
+ * scale (its `range` is in degrees), so encode and edit stay exact inverses.
  *
- * A line through the centre is direction-agnostic (up-right == down-left), so the
- * raw pointer angle is folded into (-90, 90] before it hits the scale (which then
- * clamps to its own range). `relativeTo` names another angular channel and makes
- * the gesture measure the ABSOLUTE angular distance from that channel's current
- * angle — the "open the cone" spread gesture, where widening the gap from the
- * mean line increases the value. `pick: 'plane'` (the whole plane is the target).
+ * Options:
+ *   pivot: 'plot' (default) — plot centre; 'mark' — markCentre of the hit node
+ *   fold:  true (default) — fold into (-90, 90] for direction-agnostic lines
+ *          (cone); false — full-circle degrees for gauges/dials
+ *   pick:  'plane' (default) updates the whole dataset; 'direct' updates the
+ *          hit datum only (needle handle); 'probe' keeps the hover/click flow
+ *
+ * `relativeTo` names another angular channel and makes the gesture measure the
+ * ABSOLUTE angular distance from that channel's current angle — the "open the
+ * cone" spread gesture.
  * @param {any} [options]
  * @returns {import('../types').Edit}
  */
 export function rotate(options = {}) {
-    const { channel, relativeTo, ...rest } = options;
-    // Fold a screen-space pointer into a math-convention angle in (-90, 90].
+    const { channel, relativeTo, pivot = 'plot', fold = true, ...rest } = options;
+    const pick = rest.pick || 'plane';
     const pointerAngle = (/** @type {import('../types').EditContext} */ ctx) => {
-        const cx = (ctx.width || 0) / 2;
-        const cy = (ctx.height || 0) / 2;
-        let deg = Math.atan2(-(ctx.pointer.y - cy), ctx.pointer.x - cx) * 180 / Math.PI;
-        if (deg > 90) deg -= 180;
-        else if (deg <= -90) deg += 180;
+        let cx = (ctx.width || 0) / 2;
+        let cy = (ctx.height || 0) / 2;
+        if (pivot === 'mark') {
+            const c = markCenter(resolveMarkNode(ctx));
+            if (c) { cx = c.cx; cy = c.cy; }
+        }
+        let deg = pointerDegrees(ctx.pointer, { cx, cy });
+        if (fold) {
+            if (deg > 90) deg -= 180;
+            else if (deg <= -90) deg += 180;
+        } else {
+            // Gauge/dial (unfolded): unwrap the raw atan2 angle onto the channel's
+            // authored degree span so dragging past an endpoint clamps to THAT end
+            // instead of wrapping across the ±180° seam to the far value.
+            const scale = /** @type {any} */ (ctx.channels[0] && ctx.channels[0].scale);
+            const range = scale && typeof scale.range === 'function' ? scale.range() : null;
+            if (range && range.length >= 2
+                && typeof range[0] === 'number' && typeof range[range.length - 1] === 'number') {
+                deg = unwrapDegrees(deg, range[0], range[range.length - 1]);
+            }
+        }
         return deg;
     };
     return makeEdit({
@@ -288,20 +308,26 @@ export function rotate(options = {}) {
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const ch = ctx.channels[0];
             const scale = ch && ch.scale;
-            if (!scale || !scale.invertible || !ctx.data.length) return undefined;
+            if (!scale || !scale.invertible) return undefined;
             const deg = pointerAngle(ctx);
-            if (!relativeTo) {
-                return ctx.data.map((d) => ({ ...d, [ch.field]: scale.invertValue(deg) }));
-            }
-            // Spread: |pointer angle − the reference channel's encoded angle|.
-            const refSpec = ctx.markChannels[relativeTo];
-            const refField = refSpec ? refSpec.field : null;
-            const refScale = ctx.scales[relativeTo];
-            return ctx.data.map((d) => {
+            const writeOne = (/** @type {any} */ d) => {
+                if (!relativeTo) {
+                    return { ...d, [ch.field]: scale.invertValue(deg) };
+                }
+                const refSpec = ctx.markChannels[relativeTo];
+                const refField = refSpec ? refSpec.field : null;
+                const refScale = ctx.scales[relativeTo];
                 const refDeg = refField != null && refScale?.encode ? refScale.encode(d[refField]) : 0;
                 const delta = Math.abs(deg - refDeg);
                 return { ...d, [ch.field]: scale.invertValue(delta) };
-            });
+            };
+            // Direct-pick (needle): write the hit datum only.
+            if (pick === 'direct') {
+                if (!ctx.datum) return undefined;
+                return writeOne(ctx.datum);
+            }
+            if (!ctx.data.length) return undefined;
+            return ctx.data.map(writeOne);
         }
     });
 }

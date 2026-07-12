@@ -28,10 +28,109 @@
 // Observable Plot model). This module supplies the inference and the per-channel
 // output ranges that resolver needs.
 
-// Illustrative categorical palette (swap for a real design-system palette later).
-export const DEFAULT_PALETTE = ['#4f46e5', '#0d9488', '#e4572e', '#f2b705', '#7b2d8b', '#3aa5d1'];
+import * as d3 from 'd3';
+
+// Default categorical palette — 10 distinct hues (Tableau-style) so a domain of
+// up to ten categories gets its own colour before an ordinal scale recycles.
+// Override per-channel with `scale: { range: [...] }` or `scale: { scheme: '…' }`.
+export const DEFAULT_PALETTE = [
+    '#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
+    '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac',
+];
 // Default two-stop ramp for a continuous colour channel.
 export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
+
+// Named colour schemes. Categorical entries are ready-made palettes (d3-scale-
+// chromatic scheme arrays); ramp entries are interpolators sampled to N swatches.
+// Keys are lowercase so authors write `scheme: 'tableau10'` / `scheme: 'RdBu'`
+// without worrying about d3's internal CamelCase.
+/** @type {Record<string, readonly string[]>} */
+const CATEGORICAL_SCHEMES = {
+    category10: d3.schemeCategory10,
+    tableau10: d3.schemeTableau10,
+    observable10: d3.schemeObservable10,
+    accent: d3.schemeAccent,
+    dark2: d3.schemeDark2,
+    paired: d3.schemePaired,
+    pastel1: d3.schemePastel1,
+    pastel2: d3.schemePastel2,
+    set1: d3.schemeSet1,
+    set2: d3.schemeSet2,
+    set3: d3.schemeSet3,
+};
+/** @type {Record<string, (t: number) => string>} */
+const RAMP_SCHEMES = {
+    rdbu: d3.interpolateRdBu,
+    rdylbu: d3.interpolateRdYlBu,
+    rdylgn: d3.interpolateRdYlGn,
+    brbg: d3.interpolateBrBG,
+    piyg: d3.interpolatePiYG,
+    spectral: d3.interpolateSpectral,
+    blues: d3.interpolateBlues,
+    greens: d3.interpolateGreens,
+    greys: d3.interpolateGreys,
+    oranges: d3.interpolateOranges,
+    purples: d3.interpolatePurples,
+    reds: d3.interpolateReds,
+    viridis: d3.interpolateViridis,
+    magma: d3.interpolateMagma,
+    inferno: d3.interpolateInferno,
+    plasma: d3.interpolatePlasma,
+    cividis: d3.interpolateCividis,
+    turbo: d3.interpolateTurbo,
+    warm: d3.interpolateWarm,
+    cool: d3.interpolateCool,
+};
+// ColorBrewer discrete diverging/sequential palettes (arrays indexed by n = 3..11).
+// Prefer these for ordinal colour so a 7-class RdBu is the true Brewer set, not a
+// quantized sample of the continuous interpolator (which overshoots the ends).
+/** @type {Record<string, { [n: number]: readonly string[] } | readonly string[][]>} */
+const DISCRETE_RAMP_SCHEMES = {
+    rdbu: d3.schemeRdBu,
+    rdylbu: d3.schemeRdYlBu,
+    rdylgn: d3.schemeRdYlGn,
+    brbg: d3.schemeBrBG,
+    piyg: d3.schemePiYG,
+    spectral: d3.schemeSpectral,
+    blues: d3.schemeBlues,
+    greens: d3.schemeGreens,
+    greys: d3.schemeGreys,
+    oranges: d3.schemeOranges,
+    purples: d3.schemePurples,
+    reds: d3.schemeReds,
+};
+
+/**
+ * Resolve a named colour `scheme` to a concrete range array, or null if the name
+ * is unknown / not given. A categorical scheme returns its palette as-is (an
+ * ordinal scale recycles it if the domain is longer); a ramp scheme uses the
+ * ColorBrewer discrete palette sized to the domain when available, otherwise is
+ * sampled into `count` swatches — or handed to createScale as a two-stop range
+ * for a continuous (sequential) colour channel.
+ * @param {string | undefined} scheme
+ * @param {import('../types').ScaleType} type the resolved scale type
+ * @param {number} count domain length (categories), min 1
+ * @returns {any[] | null}
+ */
+export function schemeRange(scheme, type, count) {
+    if (!scheme || typeof scheme !== 'string') return null;
+    const key = scheme.toLowerCase();
+    if (CATEGORICAL_SCHEMES[key]) return [...CATEGORICAL_SCHEMES[key]];
+    const interp = RAMP_SCHEMES[key];
+    if (!interp) return null;
+    // A continuous colour channel wants a two-stop ramp for createScale; a discrete
+    // one wants one swatch per category.
+    if (type === 'sequential') return [interp(0), interp(1)];
+    const n = Math.max(2, count || 2);
+    const discrete = DISCRETE_RAMP_SCHEMES[key];
+    if (discrete) {
+        // Brewer discrete sets exist for n = 3..11; clamp into that window.
+        const k = Math.max(3, Math.min(11, n));
+        const palette = discrete[k];
+        if (palette) return [...palette];
+    }
+    return d3.quantize(interp, n);
+}
 
 // Channel families that share scale semantics, so a field-driven fill/stroke is
 // colour-scaled and a field-driven fillOpacity/strokeOpacity is opacity-scaled —
@@ -152,6 +251,9 @@ export function channelRange(channelName, type, dims) {
         case 'x': return [0, dims.width];
         case 'y': return [dims.height, 0];   // pixel y is inverted
         case 'size': return [3, 18];         // radius, px
+        // Degrees in math convention (y-up). Default matches arcSpan semi/`orient:
+        // 'top'` — left (180°) → right (0°) through the top (NYT / speedometer).
+        case 'angle': return [180, 0];
     }
     // Family-based ranges: any opacity/colour channel gets the same output range
     // as its base channel, so fillOpacity/strokeOpacity and fill/stroke behave
@@ -176,11 +278,47 @@ export function normalizeChannels(feature) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Math-convention angle in degrees (y-up, 0° = +x, counterclockwise) of a
+ * pointer about a centre. Shared by visualForChannel('angle') and rotate().
+ * @param {{ x: number, y: number }} pointer
+ * @param {{ cx: number, cy: number }} center
+ * @returns {number}
+ */
+export function pointerDegrees(pointer, center) {
+    return Math.atan2(-(pointer.y - center.cy), pointer.x - center.cx) * 180 / Math.PI;
+}
+
+/**
+ * Bring a raw atan2 angle (from pointerDegrees, in (-180, 180]) onto the
+ * continuous line an authored arc SPAN lives on, then clamp to that span. This
+ * kills the ±180° branch-cut discontinuity: a top gauge's 0 endpoint sits at
+ * 180°, so dragging just past it wraps atan2 to ≈-179° — without unwrapping,
+ * scale.invert reads that as the FAR end (a jump to the max value). We instead
+ * normalize `deg` (mod 360) to the representative within ±180° of the span
+ * centre, then clamp to [min, max] of the span. A full circle (|span| ≈ 360)
+ * leaves every angle inside its own window, so this is a no-op there (the dial
+ * is untouched). Shared by rotate() and the arc edge edit.
+ * @param {number} deg raw angle in (-180, 180]
+ * @param {number} spanStart degrees (scale.range[0])
+ * @param {number} spanEnd degrees (scale.range[last])
+ * @returns {number}
+ */
+export function unwrapDegrees(deg, spanStart, spanEnd) {
+    const lo = Math.min(spanStart, spanEnd);
+    const hi = Math.max(spanStart, spanEnd);
+    const center = (lo + hi) / 2;
+    // Shift by whole turns into (center - 180, center + 180].
+    const unwrapped = center + ((((deg - center) % 360) + 540) % 360) - 180;
+    return Math.max(lo, Math.min(hi, unwrapped));
+}
+
+/**
  * The gesture->visual half of a channel-scoped interaction: given a pointer and
  * (for radial channels) the mark's centre, what visual value is the user
  * setting on `channelName`?  Positional channels read the pointer coordinate;
- * `size` reads the distance from the mark centre (a resize handle). New
- * draggable channels register here — this is the one place gestures are mapped.
+ * `size` reads the distance from the mark centre (a resize handle); `angle`
+ * reads atan2 about the centre (a rotate gesture). New draggable channels
+ * register here — this is the one place gestures are mapped.
  * @param {string} channelName
  * @param {{ x: number, y: number }} pointer
  * @param {{ cx: number, cy: number } | null} [center]
@@ -192,6 +330,9 @@ export function visualForChannel(channelName, pointer, center) {
     if (axis === 'y') return pointer.y;
     if (channelName === 'size') { // radius = distance from centre -> a resize gesture
         return center ? Math.hypot(pointer.x - center.cx, pointer.y - center.cy) : undefined;
+    }
+    if (channelName === 'angle') {
+        return center ? pointerDegrees(pointer, center) : undefined;
     }
     return undefined; // channel isn't spatially adjustable this way
 }

@@ -52,6 +52,17 @@ function warnDuplicatePlaneEdits(features, editsOf) {
     );
 }
 
+// Best-effort measure type for a domain a caller left undeclared but an axis edit
+// just wrote (a numeric range, or a discrete value list). Only used to synthesize a
+// missing schema entry — a declared field keeps its own type.
+/** @param {any[]} domain @returns {import('../types').MeasureType} */
+function inferMeasureOfDomain(domain) {
+    const vals = domain || [];
+    if (vals.some((v) => v instanceof Date)) return 'temporal';
+    if (vals.every((v) => typeof v === 'number')) return 'quantitative';
+    return 'categorical';
+}
+
 /**
  * @param {import('../types').ElicitSpec} spec
  * @returns {import('../types').ElicitElement}
@@ -79,6 +90,10 @@ export function Elicit(spec) {
         // (crisp text, width tracks the container, height stays the given value).
         // `responsive: true` is an alias for 'reflow'.
         responsive,
+        // SVG overflow. Default 'hidden' clips marks to the viewport. 'visible' lets
+        // content in the margin band show — needed for radial/gauge axis labels that
+        // sit just outside the plot area.
+        overflow = 'hidden',
         renderer = new D3Renderer()
     } = spec;
 
@@ -114,6 +129,16 @@ export function Elicit(spec) {
     //    JSON round-trip so seed `Date` values survive for a time-scale edit.
     /** @type {any[]} */
     let dataset = structuredClone(spec.data || []);
+
+    // The engine OWNS the schema too — an editable axis (edit.axis.*) reshapes a
+    // field's DOMAIN, which lives on the schema. Clone it so a domain edit never
+    // mutates the caller's spec object; resolveScales reads this copy every render,
+    // so a domain write reflows axis, grid, guides and marks for free. Exposed
+    // read-only via el.getSchema(). A `{ ...spec, schema }` view is what the
+    // resolver sees (spec.scales and the rest pass through untouched).
+    /** @type {Record<string, import('../types').FieldSchema>} */
+    const schema = structuredClone(spec.schema || {});
+    const liveSpec = { ...spec, schema };
 
     // The dataset's invariants, gathered once. A mark may declare `constraints` as
     // sugar; they are promoted here, so an invariant holds for EVERY edit over the
@@ -189,7 +214,7 @@ export function Elicit(spec) {
     //    mutate it. `scales` is a channel map { x, y, fill, size, … }; unused
     //    channels are absent.
     const dims = { width: innerWidth, height: innerHeight };
-    let scales = resolveScales(features, dataset, spec, dims);
+    let scales = resolveScales(features, dataset, liveSpec, dims);
 
     // Set up container. 'fixed' pins pixel dims; the responsive modes fill the
     // parent's width (the SVG scales via viewBox in 'scale', or is redrawn at the
@@ -234,8 +259,9 @@ export function Elicit(spec) {
         measure(); // reflow: pick up the container's current width before drawing
         scene.clear();
 
-        // Re-resolve global scales so inferred domains follow the live data.
-        scales = resolveScales(features, dataset, spec, dims);
+        // Re-resolve global scales so inferred domains follow the live data, and
+        // an edited schema domain (edit.axis.*) reshapes every axis/grid/mark.
+        scales = resolveScales(features, dataset, liveSpec, dims);
 
         // Plane-on-top mode: when an ACTIVE edit resolves its target from an
         // arbitrary pointer position (nearest/sweep/draw/brush), the plane must sit
@@ -323,6 +349,7 @@ export function Elicit(spec) {
             planeOnTop,
             planeCursor,
             responsive: mode,
+            overflow,
             effects,
             onEvent: handleEvent
         });
@@ -344,7 +371,7 @@ export function Elicit(spec) {
      * @param {import('../types').Edit} edit
      * @param {any} event
      * @param {number | null} index
-     * @returns {any[] | null}
+     * @returns {any[] | { __domain: import('../types').DomainEditResult } | null}
      */
     const computeEdit = (feature, edit, event, index) => {
         const currentData = dataset;
@@ -367,9 +394,13 @@ export function Elicit(spec) {
             // the angular sibling of resize reading the mark centre.
             width: innerWidth,
             height: innerHeight,
-            // The dataset schema, so a mint (create) can populate every declared
-            // field with its default (or null) — not just the positional ones.
-            schema: spec.schema,
+            // The chart margins, so a grow-mode axis edit recovers the outer size
+            // from an inner axis length (inner + margins). Harmless to other edits.
+            margins,
+            // The engine-owned dataset schema, so a mint (create) can populate
+            // every declared field with its default (or null) — not just the
+            // positional ones — and an axis domain edit reads a field's domain.
+            schema,
             xKey: feature.xKey || 'x',
             yKey: feature.yKey || 'y',
             // The feature's series (grouping) field and its current scene nodes, so
@@ -386,6 +417,17 @@ export function Elicit(spec) {
 
         const result = edit.apply(ctx);
         if (result === undefined) return null;
+
+        // A DOMAIN edit (edit.axis.*) writes the SCHEMA, not the dataset: apply
+        // returns { domains, data?, resize? }. It bypasses the datum-splice and the
+        // data-layer constraints (a schema change isn't a datum proposal — the same
+        // reason setData is trusted). runEdit's domain-commit path handles the write;
+        // wrap it so runEdit/previewEdit can tell it apart from a dataset proposal.
+        if (edit.target === 'domain') {
+            return (result && typeof result === 'object' && result.domains)
+                ? /** @type {any} */ ({ __domain: result })
+                : null;
+        }
 
         // A whole-dataset edit (create appends, remove filters) returns an array; a
         // mark edit returns the new datum, spliced in at `index`.
@@ -426,13 +468,53 @@ export function Elicit(spec) {
      * @returns {boolean}
      */
     const runEdit = (feature, edit, event, index) => {
-        const newData = computeEdit(feature, edit, event, index);
-        if (!newData) return false;
-        dataset = newData;
+        const proposed = computeEdit(feature, edit, event, index);
+        if (!proposed) return false;
+        // A domain edit reshapes the schema (and maybe the dataset / chart size).
+        if (proposed && !Array.isArray(proposed) && proposed.__domain) {
+            return commitDomainEdit(proposed.__domain);
+        }
+        dataset = /** @type {any[]} */ (proposed);
         ui.preview = null;
-        if (spec.onChange) spec.onChange(newData);
-        for (const cb of listeners.change) cb(structuredClone(newData));
+        if (spec.onChange) spec.onChange(dataset);
+        for (const cb of listeners.change) cb(structuredClone(dataset));
         return true;
+    };
+
+    // Commit a DOMAIN edit's proposal: write each field's schema domain (creating a
+    // schema entry, with an inferred measure type, for a field the caller left
+    // undeclared), replace the dataset when the edit coupled a data change (category
+    // remove/rename deletes/relabels rows), and resize the chart for grow-mode
+    // numeric drag. Then notify. The next update() re-resolves scales from the new
+    // schema, so axis/grid/guides/marks all reflow.
+    /** @param {import('../types').DomainEditResult} result @returns {boolean} */
+    const commitDomainEdit = (result) => {
+        for (const [field, domain] of Object.entries(result.domains || {})) {
+            const prev = schema[field];
+            schema[field] = { ...(prev || { type: inferMeasureOfDomain(domain) }), domain };
+        }
+        if (Array.isArray(result.data)) dataset = result.data;
+        if (result.resize) applyResize(result.resize);
+        ui.preview = null;
+        if (spec.onChange) spec.onChange(dataset);
+        for (const cb of listeners.change) cb(structuredClone(dataset));
+        return true;
+    };
+
+    // Grow-the-chart: adopt new outer pixel dims (numeric axis drag in `grow` mode),
+    // mirror them onto the container the way the initial sizing does, and recompute
+    // the inner rect so the next render draws at the new size.
+    /** @param {{ width?: number, height?: number }} size */
+    const applyResize = (size) => {
+        if (typeof size.width === 'number' && size.width > 0) curW = size.width;
+        if (typeof size.height === 'number' && size.height > 0) curH = size.height;
+        if (mode === 'fixed') {
+            container.style.width = `${curW}px`;
+            container.style.height = `${curH}px`;
+        } else if (mode === 'reflow') {
+            container.style.height = `${curH}px`;
+        }
+        recomputeInner();
     };
 
     // Preview an edit: compute the SAME proposal (same apply, same invariants) but
@@ -448,7 +530,9 @@ export function Elicit(spec) {
      */
     const previewEdit = (feature, edit, event, index) => {
         const newData = computeEdit(feature, edit, event, index);
-        if (!newData) return false;
+        // Only a dataset proposal can be previewed; a domain edit commits directly
+        // (numeric drag commits each tick, categorical add/remove is one-shot).
+        if (!newData || !Array.isArray(newData)) return false;
         ui.preview = newData;
         return true;
     };
@@ -577,6 +661,9 @@ export function Elicit(spec) {
     // A deep copy so callers can't mutate the live store; structuredClone (not a
     // JSON round-trip) preserves Date values a time-scale edit may have written.
     el.getData = () => structuredClone(dataset);
+    // A deep copy of the engine-owned schema, so a caller can read a DOMAIN an
+    // editable axis reshaped (the caller's original spec.schema is never mutated).
+    el.getSchema = () => structuredClone(schema);
     // Replace the dataset and re-render. Bypasses constraints by design:
     // constraints gate GESTURES; caller-supplied data is trusted (seeding/reset).
     el.setData = (/** @type {any[]} */ data) => {

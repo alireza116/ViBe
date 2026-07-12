@@ -43,6 +43,9 @@ export function makeEdit(spec) {
         // Defaults to true for a staged edit (the "line, then cone" flow); set false
         // to commit repeatedly within one stage (the dot plot's create).
         advance: spec.advance !== false,
+        // Write target: absent -> the dataset (a datum or array); 'domain' -> the
+        // schema (edit.axis.*). Read as a capability flag by the engine's commit path.
+        target: spec.target || undefined,
         apply: spec.apply
     };
 }
@@ -97,15 +100,16 @@ export function resolveMarkNode(ctx) {
 }
 
 /**
- * Centre of a scene node: circles carry cx/cy; rects carry x/y/width/height.
+ * Centre of a scene node: circles / needles carry cx/cy; rects carry
+ * x/y/width/height; paths may stamp cx/cy for angular edits about a pivot.
  * @param {any} node
  * @returns {{ cx: number, cy: number } | null}
  */
 export function markCenter(node) {
     if (!node) return null;
-    if (node.cx != null) return { cx: node.cx, cy: node.cy };
+    if (node.cx != null && node.cy != null) return { cx: node.cx, cy: node.cy };
     if (node.x != null && node.width != null) {
-        return { cx: node.x + node.width / 2, cy: node.y + node.height / 2 };
+        return { cx: node.x + node.width / 2, cy: node.y + (node.height || 0) / 2 };
     }
     return null;
 }
@@ -118,14 +122,16 @@ export const numOf = (p) => (p instanceof Date ? p.getTime() : p);
 /**
  * Invert the pointer through ONE channel's scale — the single-field half of
  * `drag()`'s move, factored out so `brushSpan`'s edge-zone tick can reuse the
- * exact same computation instead of a second copy.
+ * exact same computation instead of a second copy. Pass `center` for radial
+ * channels (`size`, `angle`) that need a pivot.
  * @param {import('../types').ResolvedChannel} ch
  * @param {{ x: number, y: number }} pointer
+ * @param {{ cx: number, cy: number } | null} [center]
  * @returns {any}
  */
-export function invertChannel(ch, pointer) {
+export function invertChannel(ch, pointer, center = null) {
     if (!ch || !ch.scale || !ch.scale.invertible) return undefined;
-    const visual = visualForChannel(ch.name, pointer);
+    const visual = visualForChannel(ch.name, pointer, center);
     if (visual === undefined) return undefined;
     return ch.scale.invertValue(visual);
 }

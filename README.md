@@ -16,7 +16,7 @@ y: { field: "n", edit: drag() }
 //   ── encode: n → pixel ──┘  └─ edit: drag pixel → n
 ```
 
-Note what the channel does *not* carry. A field's **data type** and its **domain** describe the data, not one mark's view of it, so they are declared once on the spec's `schema`. The **scale** is then derived: a categorical field on a bar's x is a band (a bar needs the interval), on a dot's x it is a point (a dot wants the tick). Name a scale explicitly only when you want something else — `scale: "log"`, `scale: { type: "sqrt", range: [4, 20] }`, or a live `d3.scaleBand().padding(0.3)`, which is adopted as you built it.
+Note what the channel does *not* carry. A field's **data type** and its **domain** describe the data, not one mark's view of it, so they are declared once on the spec's `schema`. The **scale** is then derived: a categorical field on a bar's x is a band (a bar needs the interval), on a dot's x it is a point (a dot wants the tick). Name a scale explicitly only when you want something else — `scale: "log"`, `scale: { type: "sqrt", range: [4, 20] }`, or a live `d3.scaleBand().padding(0.3)`, which is adopted as you built it. For a colour channel, set the palette with `scale: { scheme: "tableau10" }` (categorical) or `scale: { scheme: "RdBu" }` (a ColorBrewer diverging / sequential set — discrete for ordinal domains, a two-stop ramp for continuous; add `reverse: true` to flip direction), or a raw `scale: { range: [...] }`.
 
 ---
 
@@ -44,12 +44,17 @@ VibeJS is layered for extensibility:
    - `dotStack` / `dotStackY` / `dotStackX` → a stacked dot plot (token counter): one datum per token, tokens sharing a slot stack into a countable column (drop with `create`, take back with `remove`).
    - `waffle` / `waffleY` / `waffleX` → a bar subdivided into a grid of uniform, touching cells (`rect` or `circle`) where one cell is a fixed quantity (`unit`); `value / unit` cells fill, laid out `multiple` across the band (auto-sized square, width ≤ bandwidth) — exact counting and proportion picking. Drive it with `edit.waffleFill()`, which maps the pointer to the exact cell (row + column) and fills up to and including it, consistently for click and drag.
    - `cone` → a line + cone correlation glyph: a single `{ r, spread }` belief drawn as a rotating mean line plus a `Normal(r, spread)` fan (paired with the `rotate` edit and stages).
+   - `needle` → a pivoted gauge/dial pointer (tapered path + hub). Encodes a value on `angle` (degrees via the channel scale; default range `[180, 0]` = left→right through the top). `orient: 'top'|'right'|'bottom'|'left'` (or `arc`/`start`/`end`) picks the semicircle — keep `scale.range` in sync. Optional `x`/`y` place the pivot on categorical or linear axes. Pair with `axisRadial` for chrome and `text` for a center readout.
+   - `axisRadial` → circular / semicircular axis chrome (arc spine, ticks, labels, optional colored categorical bands). Sibling of `axisX`/`axisY`; reads the global `angle` scale. Tick labels anchor by angle (so long category names grow outward, not off the edge) and take `tickFormat`/`tickValues`/`labelFill`. Bind `x`/`y` to fields and it draws **one ring per row** — a mini axis around each small-multiple needle.
+   - `arc` / `pie` / `donut` → stacked angular slices (part-to-whole). Magnitudes on `angle`'s field normalize to a full or partial circle; `innerRadius` makes a donut. Pass `edit: edit.arc.edge()` to drag a slice boundary and redistribute the two adjacent shares (see `edit.arc.*` below).
    - `trend` → an intercept-then-slope line: `{ intercept, slope }` with an intercept handle (translate) and a slope handle (rotate about the anchor), stageable.
-   - `axis` / `axisX` / `axisY` / `grid` / `gridX` / `gridY` → composable axis & gridline marks (or use the global `axes` convenience).
+   - `axis` / `axisX` / `axisY` / `grid` / `gridX` / `gridY` → composable axis & gridline marks (or use the global `axes` convenience). Pass an `edit` to make an axis **interactive** — see `edit.axis.*` below.
 
 4. **Edits (`vibe.edit.*`)** — a gesture that writes a channel back to the data. An edit is a small descriptor `{ gesture, channels, when, pick, scope, constrain, guide, apply }`, declared **co-located** on a channel (`channels.y.edit = drag()`) or at **mark level** (`edits: [...]`).
-   - **Universal** edits (any mark): `drag`, `dragSpan` / `brushSpan` (move / edge-resize a 1-D span), `brushRect` (composable 2-D edge/corner/body editing of a rect's four extents), `resize`, `rotate` (pointer angle about the plot centre → a channel value), `cycle`, `create`, `toggle` (click a slot to pick or un-pick it), `remove`, `editText` (retype a text mark's content), `custom`.
+   - **Universal** edits (any mark): `drag`, `dragSpan` / `brushSpan` (move / edge-resize a 1-D span), `brushRect` (composable 2-D edge/corner/body editing of a rect's four extents), `resize`, `rotate` (pointer angle about the plot centre — or `pivot: 'mark'` — → a channel value; `fold: false` for full-circle dials; `pick: 'direct'` for a needle handle), `cycle`, `create`, `toggle` (click a slot to pick or un-pick it), `remove`, `editText` (retype a text mark's content), `custom`.
    - **Line-scoped** edits, namespaced as `edit.line.*` so their scope is visible: `anchor` (add one point), `newSeries` (seed a whole line), `draw` (author a line by dragging), `sweep` (you-draw-it repaint), `removeSeries` (delete a whole line).
+   - **Axis-scoped** edits, namespaced as `edit.axis.*` — the one family that writes the **schema's domain**, not a datum (they carry `target: 'domain'`): `edit.axis.scale()` drags a numeric/temporal axis's end-handle to grow/shrink its range (`mode: 'grow'` resizes the chart instead of rescaling in place); `edit.axis.categories()` adds / renames / removes categories on a discrete axis (reusing the `editText` inline-typing lifecycle; rename relabels matching rows, remove deletes them; `mode: 'grow'` grows the chart by one band-step per category instead of re-dividing it — e.g. extending a 5-point Likert scale to 7). The domain lives on the schema and scales re-resolve every render, so the grid, guides and marks reflow for free. Read the reshaped domain with `el.getSchema()`.
+   - **Arc-scoped** edit, namespaced as `edit.arc.*`: `edit.arc.edge()` drags a slice boundary of an `arc`/`pie`/`donut` to move value between the two touching rows — one grows by what the other loses, holding the total fixed. Every boundary gets a grab handle, including the seam that wraps the last slice back to the first on a full circle (so *n* slices → *n* handles); `handles: false` keeps them grabbable but invisible.
    - `pick` selects the target: `direct` (the mark hit), `nearest` (closest within a threshold), `plane` (no target — create), or a driver lifecycle (`sweep` / `draw` / `brush` / `probe`). Multi-event lifecycles live in **self-describing drivers** (`src/edit/drivers/`) — adding an interaction mode is a new driver file, not an engine change.
    - `pick: 'probe'` is the **hover-preview / click-commit** flow, with no drag: the pointer probes a value (the mark follows the cursor as an *uncommitted preview*), and a click settles it. Any edit works this way. Preview and commit run the same `apply` + the same invariants through one code path, so the preview cannot drift from what the click writes — and a preview never reaches `onChange` or `getData`.
    - `when` arbitrates when several edits share a gesture (`vibe.when.alt`, `noAlt`, `shift`, `near`, `far`, …): e.g. plain click recolours, Alt-click deletes.
@@ -65,7 +70,7 @@ VibeJS is layered for extensibility:
 
 9. **Renderer (`vibe.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
 
-**Reading data out.** `Elicit(spec)` returns the chart element augmented with a small observation API: `getData()` (a deep copy of the committed belief dataset), `setData(data)` (seed/reset + re-render), and `on("change" | "stage", cb)` (subscribe; returns an unsubscribe). This is in addition to the spec's `onChange`.
+**Reading data out.** `Elicit(spec)` returns the chart element augmented with a small observation API: `getData()` (a deep copy of the committed belief dataset), `getSchema()` (a deep copy of the engine-owned schema, including any domain an editable axis reshaped — the caller's `spec.schema` is never mutated), `setData(data)` (seed/reset + re-render), and `on("change" | "stage", cb)` (subscribe; returns an unsubscribe). This is in addition to the spec's `onChange`.
 
 **Sizing.** `width`/`height` are pixels by default (`responsive: "fixed"`). Set `responsive: "scale"` to wrap the SVG in a `viewBox` so the browser scales it to fill the parent (one draw, aspect ratio preserved), or `responsive: "reflow"` (alias `true`) to measure the parent and redraw at native pixels on resize (crisp text; width tracks the container, height stays the given value). A reflow chart wires a `ResizeObserver` — call `el.destroy()` when unmounting it. See `docs/sizing.html`.
 
@@ -91,12 +96,13 @@ vibe-js/
 │   ├── edit/               # The edit model
 │   │   ├── basic.js        # Universal edits (drag/dragSpan/brushSpan/brushRect/resize/rotate/cycle/create/toggle/remove/editText/custom)
 │   │   ├── line.js         # Line-scoped edits (anchor/newSeries/draw/sweep/removeSeries)
+│   │   ├── axis.js         # Axis-scoped edits (scale/categories) — write the schema DOMAIN, not the dataset
 │   │   ├── when.js         # Arbitration predicates
 │   │   ├── pick.js         # Target selection (nearest / proximity)
 │   │   ├── route.js        # collectEdits / resolveChannels
 │   │   ├── guide.js        # An edit's self-drawn guide (bounds + snap ring)
 │   │   ├── shared.js       # makeEdit + datum/series helpers
-│   │   └── drivers/        # Self-describing interaction modes (plane/nearest/sweep/draw/brush/probe)
+│   │   └── drivers/        # Self-describing interaction modes (plane/nearest/sweep/draw/brush/probe/axisDrag)
 │   ├── constraints/        # Data-layer invariants (define/clamp/maintainSum/count/unique/snap)
 │   ├── widgets/            # Named survey instruments (likert/choice/slider/matrix/lineCone) + theme.js
 │   ├── guides/             # rule / region / proximity / custom annotations
@@ -176,5 +182,5 @@ npm run typecheck  # tsc --noEmit against types.d.ts
 ## Roadmap
 
 - Faceted / coordinated multi-chart layouts (compose multiple `Elicit` instances at the app level for now).
-- Arc / pie marks for radial allocation (angular `rotate` + normalize covers many cases today).
 - Animation / alternate renderers (Canvas, WebGL).
+- Needle uncertainty fuzz.
