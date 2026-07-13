@@ -14,11 +14,12 @@
 import * as vibe from '../src/index.js';
 import * as d3 from 'd3';
 import { SITE } from './_nav.js';
+import vancouver from './data/vancouver.js';
 
 // ---- dependency surface (namespace spread → self-maintaining) ---------------
 // Universal edits (drag, create, remove, resize, cycle, custom) are spread bare so
-// examples read `edit: drag()`. The scoped edit namespaces — `line`, `axis`, `arc`
-// — stay under `edit.*.*` so their scope shows in the example AND so they don't
+// examples read `edit: drag()`. The scoped edit namespaces — `line`, `axis`, `arc`,
+// `geo` — stay under `edit.*.*` so their scope shows in the example AND so they don't
 // shadow the same-named MARKS (plot.axis / plot.arc / the line mark). The internal
 // `nextSeriesKey` is excluded too.
 //
@@ -28,7 +29,7 @@ import { SITE } from './_nav.js';
 // mark would stay pointer-transparent. Edits win; author a custom constraint via
 // `define` / `defineConstraint` or `constraints.custom`.
 const {
-    line: _editLine, axis: _editAxis, arc: _editArc,
+    line: _editLine, axis: _editAxis, arc: _editArc, geo: _editGeo,
     nextSeriesKey: _nsk, when: _editWhen, ...universalEdits
 } = vibe.edit;
 const depObj = {
@@ -44,6 +45,9 @@ const depObj = {
     // A channel's `scale` takes a live d3 scale, and a guide option takes a
     // function of the data — both want d3 in scope (see scales.html, guides.html).
     d3,
+    // Sample basemap GeoJSON for geo docs (Vancouver local areas). Authors pass
+    // their own FeatureCollection the same way: geoBasemap({ geojson: myMap }).
+    vancouver,
 };
 const depNames = Object.keys(depObj);
 const depVals = Object.values(depObj);

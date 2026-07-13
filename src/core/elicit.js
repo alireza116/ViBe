@@ -1,12 +1,15 @@
 // @ts-check
 import { SceneGraph } from './scene.js';
 import { resolveScales } from './resolve.js';
+import { createProjection } from './projection.js';
+import { resolveLock, lockConstraint, isNodeLocked } from './lock.js';
 import { collectEdits, resolveChannels, warnMisplacedEdits } from '../edit/route.js';
 import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
 import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
 import { resolveEffects } from './effects.js';
 import { autoAxes } from './axes.js';
+import { axisOf } from './encoding.js';
 
 // Dev-only builds get the capability guards below. `import.meta.env.DEV` must be
 // written PLAINLY: Vite only injects `import.meta.env` into a module that mentions
@@ -30,6 +33,48 @@ function warnLineScopeMismatch(feature, edits) {
             `(feature "${feature.id}"). Line-scoped edits expect a line mark; it may not behave.`
         );
     }
+}
+
+/** @type {Set<string>} */
+const warnedGeoScope = new Set();
+/**
+ * @param {any} feature
+ * @param {import('../types').Edit[]} edits
+ */
+function warnGeoScopeMismatch(feature, edits) {
+    for (const e of edits) {
+        if (e.scope !== 'geo' || feature.supportsGeo) continue;
+        const key = `${feature.id}:${e.type}`;
+        if (warnedGeoScope.has(key)) continue;
+        warnedGeoScope.add(key);
+        console.warn(
+            `[vibe] edit.geo.${e.type}() is attached to a mark without geo support ` +
+            `(feature "${feature.id}"). Geo-scoped edits expect a geo* mark; it may not behave.`
+        );
+    }
+}
+
+let warnedProjCartesian = false;
+/**
+ * A projection chart replaces x/y placement for geo marks. Mixing ordinary
+ * cartesian x/y channels on the same chart is unsupported in v1.
+ * @param {any[]} features
+ * @param {import('../types').ScaleMap} scales
+ */
+function warnProjectionCartesianMix(features, scales) {
+    if (warnedProjCartesian || !/** @type {any} */ (scales).projection) return;
+    const offenders = features.filter((f) => {
+        if (f.supportsGeo || f.isAxis || f.isGrid) return false;
+        const ch = f.channels || {};
+        return Object.keys(ch).some((name) => axisOf(name) && ch[name] && ch[name].scale !== null);
+    });
+    if (!offenders.length) return;
+    warnedProjCartesian = true;
+    console.warn(
+        `[vibe] spec.projection is set together with cartesian x/y channels on ` +
+        `${offenders.map((f) => `"${f.id}"`).join(', ')}. Projection charts use geo* marks ` +
+        `(geoPoint, geoLine, …); mixing ordinary positional marks is unsupported.`
+    );
 }
 
 // A plane gesture carries no node, so it fans to EVERY feature's plane-pick edits.
@@ -105,8 +150,11 @@ export function Elicit(spec) {
 
     // Prepend auto-injected axis/grid marks (drawn behind marks via the background
     // layer). Explicit axis marks the user composed into `features` are preserved.
+    // A projection chart has no cartesian axes — skip autoAxes unless the caller
+    // forced them (axes !== undefined still respected via autoAxes(false)).
     // Flattened because a group mark (composite) desugars to an ARRAY of features.
-    const features = [...autoAxes(userFeatures, axes), ...userFeatures].flat(Infinity);
+    const axesOpt = spec.projection != null && axes === undefined ? false : axes;
+    const features = [...autoAxes(userFeatures, axesOpt), ...userFeatures].flat(Infinity);
 
     // Working dims. In 'reflow' mode `curW` tracks the container's measured width
     // (height stays the given value); 'fixed'/'scale' keep the design dims. Marks
@@ -129,6 +177,16 @@ export function Elicit(spec) {
     //    JSON round-trip so seed `Date` values survive for a time-scale edit.
     /** @type {any[]} */
     let dataset = structuredClone(spec.data || []);
+
+    // Read-only rows (see core/lock.js). `lock: 'seed'` fixes the rows the chart was
+    // seeded with — they are given, not elicited — while leaving every later row
+    // free; a predicate locks rows by what they ARE. Two halves: a dataset invariant
+    // (run last in computeEdit, so a lock has the final word) and a `locked` stamp on
+    // those rows' scene nodes, which makes them pointer-transparent and invisible to
+    // proximity picking. `seedCount` is a live read because setData re-seeds.
+    let seedCount = dataset.length;
+    const isLocked = resolveLock(spec.lock, () => seedCount);
+    const lockRows = isLocked ? lockConstraint(isLocked) : null;
 
     // The engine OWNS the schema too — an editable axis (edit.axis.*) reshapes a
     // field's DOMAIN, which lives on the schema. Clone it so a domain edit never
@@ -262,6 +320,14 @@ export function Elicit(spec) {
         // Re-resolve global scales so inferred domains follow the live data, and
         // an edited schema domain (edit.axis.*) reshapes every axis/grid/mark.
         scales = resolveScales(features, dataset, liveSpec, dims);
+        // Chart-level geographic projection (Plot model): shared apply/invert/path
+        // for every geo mark and edit.geo.*. Attached on the scale map so build()
+        // and edit ctx see the same object without a second argument.
+        const projection = createProjection(liveSpec.projection, dims);
+        // Attached on the scale map as a reserved non-Scale key (cast) so build()
+        // and edit ctx share one object without widening ScaleMap's channel types.
+        if (projection) /** @type {any} */ (scales).projection = projection;
+        if (DEV) warnProjectionCartesianMix(features, scales);
 
         // Plane-on-top mode: when an ACTIVE edit resolves its target from an
         // arbitrary pointer position (nearest/sweep/draw/brush), the plane must sit
@@ -290,6 +356,7 @@ export function Elicit(spec) {
             featureNodes[feature.id] = nodes;
 
             if (DEV) warnLineScopeMismatch(feature, collectEdits(feature));
+            if (DEV) warnGeoScopeMismatch(feature, collectEdits(feature));
             if (DEV) warnMisplacedEdits(feature);
 
             // A feature with an ACTIVE direct-pick edit is interactive on its marks,
@@ -306,9 +373,15 @@ export function Elicit(spec) {
             // lines after circles, so an inert rule (a glyph's whisker) would sit over
             // a sibling's handle and swallow its drag. Silence it unless the mark
             // asked for a specific value.
+            //
+            // A node over a LOCKED row is inert for the same reason, one level down:
+            // its row is read-only, so it is not grabbable, shows no editable cursor,
+            // and pick.js skips it when resolving a proximity target.
             nodes.forEach((/** @type {any} */ node) => {
                 node.featureId = feature.id;
-                if (editable) node.editable = true;
+                const locked = isLocked && isNodeLocked(node, feature, currentData, isLocked);
+                if (locked) node.locked = true;
+                if (editable && !locked) node.editable = true;
                 else if (node.pointerEvents == null) node.pointerEvents = 'none';
                 scene.add(node);
             });
@@ -389,6 +462,11 @@ export function Elicit(spec) {
             channels: resolved,
             scales,
             markChannels,
+            // Chart projection context (null on cartesian charts). Geo edits invert
+            // through the same object geo marks use for apply/path.
+            projection: /** @type {import('../types').ProjectionContext | null} */ (
+                /** @type {any} */ (scales).projection || null
+            ),
             // Plot pixel dimensions, so a gesture whose geometry is the whole plane
             // (rotate about the centre) can measure against it without a mark node —
             // the angular sibling of resize reading the mark centre.
@@ -445,7 +523,10 @@ export function Elicit(spec) {
         // every mark), then any edit-scoped guard sugar. Pure data context — no
         // scales-as-geometry. A constraint may reject the proposal (false) or repair
         // it (return an array); the marks re-derive from the repaired rows.
-        const invariants = [...datasetConstraints, ...edit.constrain];
+        //
+        // The lock (spec.lock) runs LAST so it has the final word: a repair by any
+        // other invariant still can't write a read-only row.
+        const invariants = [...datasetConstraints, ...edit.constrain, ...(lockRows ? [lockRows] : [])];
         const cctx = { activeIndex, scales, markChannels };
         let rejected = false;
         for (const constraint of invariants) {
@@ -666,8 +747,11 @@ export function Elicit(spec) {
     el.getSchema = () => structuredClone(schema);
     // Replace the dataset and re-render. Bypasses constraints by design:
     // constraints gate GESTURES; caller-supplied data is trusted (seeding/reset).
+    // That includes the lock: setData RE-SEEDS the chart, so under `lock: 'seed'`
+    // the rows it hands in become the new read-only seed.
     el.setData = (/** @type {any[]} */ data) => {
         dataset = structuredClone(data);
+        seedCount = dataset.length;
         ui.preview = null;
         update();
     };

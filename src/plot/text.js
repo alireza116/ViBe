@@ -78,9 +78,61 @@ function rawChannel(channels, name, datum, fallback) {
  * @param {Record<string, any>} channels
  * @returns {boolean}
  */
-function hasEditText(edits, channels) {
+export function hasEditText(edits, channels) {
     if ((edits || []).some((e) => e && e.type === 'editText')) return true;
     return Object.values(channels).some((c) => c && c.edit && c.edit.type === 'editText');
+}
+
+/**
+ * A text FeatureNode at an ALREADY-RESOLVED pixel position. Everything about a
+ * label except where it sits — the string, font, anchors, rotation, dx/dy nudge,
+ * the editText opt-in, the style sweep — is positional-system agnostic, so it is
+ * defined once here. `text` resolves (px, py) through the global x/y scales;
+ * `geoText` projects lon/lat through the chart projection and hands the pixels in.
+ *
+ * dx/dy are visual-only offsets applied AFTER positioning (a drag still inverts
+ * the raw pointer, so a nudged label doesn't poison its own edit).
+ *
+ * @param {import('../types').ScaleMap} scales
+ * @param {Record<string, any>} channels
+ * @param {any} d the datum
+ * @param {number} i its index in the dataset
+ * @param {number} px @param {number} py resolved position, before dx/dy
+ * @param {{ format?: (v: any) => any, canEditText?: boolean }} [opts]
+ * @returns {import('../types').FeatureNode}
+ */
+export function textNodeAt(scales, channels, d, i, px, py, opts = {}) {
+    const { format = (/** @type {any} */ v) => v, canEditText = false } = opts;
+    const style = resolveStyle(scales, channels, d, { fill: '#111' });
+
+    const dx = +rawChannel(channels, 'dx', d, 0) || 0;
+    const dy = +rawChannel(channels, 'dy', d, 0) || 0;
+
+    // Angle: scaled to degrees when a scale is declared (so rotate() is an exact
+    // inverse), else the raw degrees value. (scales is an index signature, so read
+    // the optional angle scale via a cast.)
+    const angleScale = /** @type {any} */ (scales)['angle'];
+    const angle = angleScale
+        ? encodeChannel(scales, channels, 'angle', d, 0)
+        : rawChannel(channels, 'angle', d, 0);
+
+    const lineAnchor = rawChannel(channels, 'lineAnchor', d, 'middle');
+
+    return {
+        type: 'text',
+        x: px + dx,
+        y: py + dy,
+        text: format(rawChannel(channels, 'text', d, '')),
+        fontSize: rawChannel(channels, 'fontSize', d, 12),
+        textAnchor: rawChannel(channels, 'textAnchor', d, 'middle'),
+        lineAnchor,
+        dominantBaseline: dominantBaselineOf(lineAnchor),
+        ...(angle ? { angle } : {}),
+        ...(canEditText ? { editText: true } : {}),
+        ...style,
+        data: d,
+        index: i,
+    };
 }
 
 /**
@@ -113,46 +165,15 @@ function buildText(options, forcedAxis) {
          */
         build: (currentData, scales, width, height) => {
             return currentData.map((d, i) => {
-                const style = resolveStyle(scales, channels, d, { fill: '#111' });
-
                 // Position: each axis through its global scale, parked at the centre
                 // when the axis isn't used (textX/textY force the counter-axis centre).
-                // dx/dy are visual-only pixel offsets (drag still inverts the pointer
-                // through the scale, so they don't poison edits).
-                const dx = +rawChannel(channels, 'dx', d, 0) || 0;
-                const dy = +rawChannel(channels, 'dy', d, 0) || 0;
-                const x = (forcedAxis === 'y'
+                const x = forcedAxis === 'y'
                     ? width / 2
-                    : encodeChannel(scales, channels, 'x', d, width / 2)) + dx;
-                const y = (forcedAxis === 'x'
+                    : encodeChannel(scales, channels, 'x', d, width / 2);
+                const y = forcedAxis === 'x'
                     ? height / 2
-                    : encodeChannel(scales, channels, 'y', d, height / 2)) + dy;
-
-                // Angle: scaled to degrees when a scale is declared (so rotate() is an
-                // exact inverse), else the raw degrees value. (scales is an index
-                // signature, so read the optional angle scale via a cast.)
-                const angleScale = /** @type {any} */ (scales)['angle'];
-                const angle = angleScale
-                    ? encodeChannel(scales, channels, 'angle', d, 0)
-                    : rawChannel(channels, 'angle', d, 0);
-
-                const lineAnchor = rawChannel(channels, 'lineAnchor', d, 'middle');
-
-                return {
-                    type: 'text',
-                    x,
-                    y,
-                    text: format(rawChannel(channels, 'text', d, '')),
-                    fontSize: rawChannel(channels, 'fontSize', d, 12),
-                    textAnchor: rawChannel(channels, 'textAnchor', d, 'middle'),
-                    lineAnchor,
-                    dominantBaseline: dominantBaselineOf(lineAnchor),
-                    ...(angle ? { angle } : {}),
-                    ...(canEditText ? { editText: true } : {}),
-                    ...style,
-                    data: d,
-                    index: i
-                };
+                    : encodeChannel(scales, channels, 'y', d, height / 2);
+                return textNodeAt(scales, channels, d, i, x, y, { format, canEditText });
             });
         }
     };

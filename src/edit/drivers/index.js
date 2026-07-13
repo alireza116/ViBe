@@ -22,6 +22,7 @@ import { sweepDriver } from './sweep.js';
 import { drawDriver } from './draw.js';
 import { brushDriver } from './brush.js';
 import { brushRectDriver } from './brushRect.js';
+import { geoBrushDriver } from './geoBrush.js';
 import { probeDriver } from './probe.js';
 import { axisDragDriver } from './axisDrag.js';
 
@@ -60,7 +61,7 @@ import { axisDragDriver } from './axisDrag.js';
  */
 
 /** @type {Driver[]} */
-export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, brushRectDriver, probeDriver, axisDragDriver];
+export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, brushRectDriver, geoBrushDriver, probeDriver, axisDragDriver];
 
 /**
  * Register a custom driver (or replace a built-in by the same `name`). The engine
@@ -89,7 +90,8 @@ export function needsPlaneOnTop(edits) {
         if (e.pick === 'direct' || e.pick === 'plane') return false;
         // Built-in proximity / lifecycle picks, or any custom registered driver.
         return e.pick === 'nearest' || e.pick === 'sweep' || e.pick === 'draw'
-            || e.pick === 'brush' || e.pick === 'brushRect' || e.pick === 'probe'
+            || e.pick === 'brush' || e.pick === 'brushRect' || e.pick === 'geoBrush'
+            || e.pick === 'probe'
             || drivers.some((d) => d.name === e.pick || d.wants(e));
     });
 }

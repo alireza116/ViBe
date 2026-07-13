@@ -24,3 +24,6 @@ export {
 } from './polar.js';
 
 export { trend } from './trend.js';
+export { geoBasemap, geoTile, geoPoint, geoPolygon, geoLine, geoText, geoRect } from './geo.js';
+export { tileCover, tileUrl, isWebMercator } from '../core/tiles.js';
+export { projectPoint, invertPoint, projectBounds, createProjection } from '../core/projection.js';

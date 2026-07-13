@@ -54,3 +54,22 @@ import { edge as arcEdge } from './arc.js';
 // Arc-scoped edit, namespaced so the API shows it belongs on an arc/pie/donut mark:
 // drag a slice boundary to redistribute the two adjacent rows (total preserved).
 export const arc = { edge: arcEdge };
+
+import {
+    drag as geoDrag,
+    create as geoCreate,
+    draw as geoDraw,
+    dragVertex as geoDragVertex,
+    brush as geoBrush,
+    createRect as geoCreateRect,
+} from './geo.js';
+
+// Geo-scoped edits for the geo* mark family (chart `projection` apply/invert).
+export const geo = {
+    drag: geoDrag,
+    create: geoCreate,
+    draw: geoDraw,
+    dragVertex: geoDragVertex,
+    brush: geoBrush,
+    createRect: geoCreateRect,
+};

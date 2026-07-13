@@ -86,11 +86,13 @@ export class D3Renderer {
         const allLines = byType('line');
         const allPaths = byType('path');
         const allTexts = byType('text');
+        const allImages = byType('image');
 
         // Draw order == z-order: background, then guide regions (behind marks),
         // then interactive marks, then guide circles (proximity rings, in front
         // of marks), then foreground lines, then labels.
-        this._drawBackground(g, allLines.filter((/** @type {any} */ n) => n.background),
+        this._drawBackground(g, allImages,
+            allLines.filter((/** @type {any} */ n) => n.background),
             allTexts.filter((/** @type {any} */ n) => n.background));
 
         this._drawGuideRegions(g, allRects.filter((/** @type {any} */ n) => n.guide));
@@ -347,14 +349,37 @@ export class D3Renderer {
     // -- semantic draws ------------------------------------------------------
 
     /**
-     * Axis spines/ticks, gridlines, and axis labels — into the dedicated layer
-     * behind the marks. Non-interactive.
+     * Raster tiles, axis spines/ticks, gridlines, and axis labels — into the
+     * dedicated layer behind the marks. Non-interactive.
+     *
+     * Images are joined FIRST (and keyed by {z}/{x}/{y}), so they sit at the back
+     * of the layer, under the gridlines: a basemap is the floor of the chart. The
+     * key is what makes panning/zooming cheap — a tile that stays on screen keeps
+     * its <image> element and never re-fetches.
+     *
      * @param {any} g
+     * @param {any[]} bgImages
      * @param {any[]} bgLines
      * @param {any[]} bgTexts
      */
-    _drawBackground(g, bgLines, bgTexts) {
+    _drawBackground(g, bgImages, bgLines, bgTexts) {
         const bgLayer = g.select('g.bg-layer');
+
+        const imgSel = bgLayer.selectAll('image')
+            .data(bgImages, (/** @type {any} */ d) => d.key)
+            .join('image')
+            .style('pointer-events', 'none')
+            .attr('x', (/** @type {any} */ d) => d.x)
+            .attr('y', (/** @type {any} */ d) => d.y)
+            .attr('width', (/** @type {any} */ d) => d.width)
+            .attr('height', (/** @type {any} */ d) => d.height)
+            // Tiles are photographic: let the browser smooth them when a fitted
+            // (fractional) zoom scales them off their native 256px.
+            .attr('preserveAspectRatio', 'none')
+            .attr('href', (/** @type {any} */ d) => d.href)
+            .attr('opacity', (/** @type {any} */ d) => (d.opacity != null ? d.opacity : null));
+        imgSel.lower();
+
         const lineSel = bgLayer.selectAll('line').data(bgLines).join('line')
             .style('pointer-events', 'none');
         this._geomLine(lineSel);

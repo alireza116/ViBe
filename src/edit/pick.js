@@ -88,6 +88,7 @@ export function nearestMark(marks, px, py, threshold, series) {
     let bestDist = Infinity;
     (marks || []).forEach((mark) => {
         if (mark.index == null) return; // datum-bearing marks only (skip a line's path)
+        if (mark.locked) return;        // a read-only row is not a target (spec.lock)
         if (series !== undefined && mark.series !== series) return;
         const d = distanceToMark(mark, px, py);
         // Address the DATUM (mark.index), not the array slot — a feature may emit
@@ -115,6 +116,9 @@ export function nearestSeries(marks, px, py, threshold) {
     let bestDist = Infinity;
     (marks || []).forEach((mark) => {
         if (mark.series === undefined) return;
+        // A fully locked line is not there as far as a gesture is concerned, so a
+        // drag beside it draws a new line instead of grabbing a frozen one.
+        if (mark.locked) return;
         // Prefer the drawn line (path); fall back to a handle's centre.
         let d;
         if (mark.type === 'path') d = distanceToMark(mark, px, py);
@@ -142,6 +146,7 @@ export function nearestMarkOnAxis(marks, px, py, threshold, axis, series) {
     let best = null;
     let bestDist = Infinity;
     (marks || []).forEach((mark, i) => {
+        if (mark.locked) return;        // a read-only row is not a target (spec.lock)
         if (series !== undefined && mark.series !== series) return;
         const center = axis === 'x' ? mark.cx : mark.cy;
         if (center == null) return; // not a point handle

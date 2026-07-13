@@ -47,6 +47,12 @@ export interface FieldSchema {
   default?: any;
 }
 
+// Which rows of the dataset are READ-ONLY (see ElicitSpec.lock, core/lock.js).
+// 'seed' (or true) fixes the rows the chart was seeded with — they are given, not
+// elicited — and leaves every row an edit adds free. A predicate locks rows by
+// what they are (`d => d.year <= 1990`).
+export type LockSpec = 'seed' | boolean | ((datum: Datum, index: number) => boolean);
+
 // The dataset-wide schema: what data is being elicited, keyed by field name. It
 // is the source of truth for a field's scale (ranked above data inference), so a
 // chart resolves its scales — and can mint new data — with zero starter data.
@@ -90,6 +96,30 @@ export interface ScaleMap {
   [channelName: string]: Scale;
 }
 
+/** Chart geographic projection (see core/projection.js createProjection). */
+export interface ProjectionContext {
+  apply(p: [number, number]): [number, number] | null;
+  invert(p: [number, number]): [number, number] | null;
+  path(object?: any): string | null;
+  invertible: boolean;
+  raw: any;
+}
+
+export interface ProjectionSpec {
+  type?: string | ((...args: any[]) => any);
+  domain?: any;
+  rotate?: [number, number] | [number, number, number];
+  parallels?: [number, number];
+  precision?: number;
+  clipAngle?: number;
+  inset?: number;
+  insetTop?: number;
+  insetRight?: number;
+  insetBottom?: number;
+  insetLeft?: number;
+  [key: string]: any;
+}
+
 export interface EditContext {
   data: Datum[];
   datum?: Datum;
@@ -131,6 +161,9 @@ export interface EditContext {
   // last pointer/domain), read and mutated across a single press-drag. Set by the
   // draw driver.
   drawState?: Session | null;
+  // Chart geographic projection when `ElicitSpec.projection` is set. Geo edits
+  // invert the pointer through the same object geo marks use for apply/path.
+  projection?: ProjectionContext | null;
 }
 
 export interface ResolvedChannel {
@@ -171,7 +204,7 @@ export interface Edit {
   // 'arc' = belongs on that mark kind (the scope shows in the name, e.g.
   // edit.line.*, edit.axis.*, edit.arc.*). The engine dev-warns when a 'line' edit
   // is attached to a mark without series support.
-  scope: 'line' | 'axis' | 'arc' | null;
+  scope: 'line' | 'axis' | 'arc' | 'geo' | null;
   threshold: number;
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
@@ -330,7 +363,7 @@ export interface CompositeOptions {
 }
 
 export interface FeatureNode {
-  type: 'circle' | 'rect' | 'line' | 'path' | 'text';
+  type: 'circle' | 'rect' | 'line' | 'path' | 'text' | 'image';
   // Connecting-path geometry (line mark): the ordered pixel points and the curve
   // interpolation name (see the renderer's resolveCurve).
   points?: [number, number][];
@@ -359,6 +392,11 @@ export interface FeatureNode {
   // Marks the node for the background render layer (axes/gridlines), drawn behind
   // interactive marks by the renderer.
   background?: boolean;
+  // Raster tile (geoTile): the image source, and the {z}/{x}/{y} identity the
+  // renderer keys its data join on so an on-screen tile survives a re-render
+  // without re-fetching.
+  href?: string;
+  key?: string;
   text?: string;
   fontSize?: number;
   textAnchor?: string;
@@ -376,6 +414,10 @@ export interface FeatureNode {
   // Set by the engine when the node's feature has a direct-pick edit, so the
   // renderer shows an interactive cursor on it.
   editable?: boolean;
+  // Set by the engine when the node's row is READ-ONLY (ElicitSpec.lock): the node
+  // is never `editable`, is pointer-transparent, and proximity picking skips it. A
+  // line's connector path is locked when every row of its series is.
+  locked?: boolean;
   // Runtime tags set by marks for the pick/driver layer: `series` groups a line's
   // nodes; `sweepAxis`/`bandAxis` name the axis proximity measures along; `cursor`
   // overrides the interactive cursor (e.g. a tick's ew-resize); `channel` tags one
@@ -404,16 +446,24 @@ export interface Session {
   // draw driver: the locked mode + series and the pointer/domain trail.
   mode?: 'edit' | 'draw';
   drawSeries?: any;
+  // geo draw: index of the row whose coordinates list is being authored this stroke.
+  drawIndex?: number | null;
   lastDomain?: any;
   lastX?: number | null;
   lastY?: number | null;
   // brush driver: the dragstart-locked grab zone (+ which field an edge zone
   // targets), forced to 'canonicalize' for the one-time dragend cleanup tick.
-  zone?: 'edgeA' | 'edgeB' | 'body' | 'canonicalize' | 'corner' | 'edgeX' | 'edgeY' | null;
+  zone?: 'edgeA' | 'edgeB' | 'body' | 'canonicalize' | 'corner' | 'edgeX' | 'edgeY' | 'edge' | null;
   field?: string | null;
   // brushRect driver: the field(s) an edge/corner grab locked (1 for an edge,
   // 2 for a corner). The 2-D sibling of `field`.
   fields?: string[] | null;
+  // geoBrush driver: which geographic edge(s) the grab locked, plus the anchor it
+  // latched at dragstart — the pointer's lon/lat and the box as it stood then, so
+  // a body move translates by the geographic delta instead of recentering.
+  edges?: string[] | null;
+  grab?: { lon: number; lat: number } | null;
+  box0?: { west: number; south: number; east: number; north: number } | null;
   // axisDrag driver: the dragstart-locked handle for an editable numeric axis —
   // which end is grabbed, the axis it runs along, the opposite (anchored) end's
   // pixel + value, the grabbed end's starting pixel + value, and (grow mode) the
@@ -495,6 +545,13 @@ export interface ElicitSpec {
   // schema is inferred from `data` with a dev-warning; a field with neither a
   // schema entry nor data throws (there is nothing to build a scale from).
   schema: Schema;
+  // Read-only rows. `'seed'` (or `true`) fixes the rows in `data` — they are given,
+  // not elicited — while every row an edit ADDS stays free; a predicate locks rows
+  // by what they are. A locked row can't be changed or deleted by any gesture (a
+  // dataset invariant, run last, so it outranks every other repair), its marks are
+  // not grabbable, and proximity picking (nearest / sweep / draw) skips them. Note
+  // `setData` re-seeds the chart, so it also re-takes a `'seed'` lock.
+  lock?: LockSpec;
   // The dataset's invariants. They gate and REPAIR every edit, whichever mark fired
   // it: a rejected proposal is dropped; a returned array replaces it, and the marks
   // re-derive from the repaired rows on the next render. A mark's own `constraints`
@@ -525,6 +582,11 @@ export interface ElicitSpec {
   // `scale` is the shorthand for the single-mark case. This wins over it. No
   // `domain` here either — that is the schema's.
   scales?: Record<string, ScaleSpec>;
+  // Geographic projection for geo* marks (Plot model). Replaces x/y placement for
+  // map elicitation: `"mercator"`, `{ type, domain, rotate, … }`, or a live
+  // d3.geo* instance. When set, auto axes default off; use geoBasemap / geoPoint /
+  // geoLine / geoPolygon / geoRect with edit.geo.*.
+  projection?: string | ProjectionSpec | ProjectionContext | ((...args: any[]) => any) | any;
   // Initial stage index for multi-stage elicitation. Edits carrying a `stage`
   // are active only when it equals the current stage (see Edit.stage).
   stage?: number;
