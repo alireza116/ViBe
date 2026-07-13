@@ -6,6 +6,8 @@ import { Editor } from 'react-live';
 import type { ExampleMeta } from '../lib/types';
 import { createVibeScope } from '../lib/vibeScope';
 
+const EVAL_DEBOUNCE_MS = 280;
+
 function esc(c: string) {
   return c.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -45,14 +47,18 @@ function DataPanel({ chart }: { chart: ElicitEl | null }) {
   useEffect(() => {
     if (!chart) return;
     const render = () => {
-      const rows = chart.getData();
-      setCount(rows.length === 1 ? '1 row' : `${rows.length} rows`);
-      const pad = String(Math.max(rows.length - 1, 0)).length;
-      setHtml(
-        rows.length
-          ? rows.map((d, i) => fmtRow(d, i, pad)).join('\n')
-          : '<span class="empty">no rows</span>'
-      );
+      try {
+        const rows = chart.getData();
+        setCount(rows.length === 1 ? '1 row' : `${rows.length} rows`);
+        const pad = String(Math.max(rows.length - 1, 0)).length;
+        setHtml(
+          rows.length
+            ? rows.map((d, i) => fmtRow(d, i, pad)).join('\n')
+            : '<span class="empty">no rows</span>'
+        );
+      } catch {
+        setHtml('<span class="empty">unavailable</span>');
+      }
     };
     const unsub = chart.on('change', render);
     render();
@@ -78,8 +84,15 @@ type Props = {
   tall?: boolean;
 };
 
+function formatEvalError(err: unknown): string {
+  if (err instanceof SyntaxError) return `Syntax error: ${err.message}`;
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 /**
- * Editable example: react-live-style editor + harness-style `mount(Elicit(…))` eval.
+ * Editable example: react-live editor + harness-style `mount(Elicit(…))` eval.
+ * Eval failures stay in the card (no console.error — Next would overlay them).
  * Reset restores the module's default `code`.
  */
 export function ExampleLive({ code: initialCode, meta, tall }: Props) {
@@ -89,6 +102,7 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
   const [fluid, setFluid] = useState(false);
   const [resultWidth, setResultWidth] = useState<string | undefined>();
   const chartRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<ElicitEl | null>(null);
   const scope = useMemo(() => createVibeScope(), []);
 
   useEffect(() => {
@@ -99,52 +113,70 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
     const chart = chartRef.current;
     if (!chart) return;
 
-    chart.replaceChildren();
-    setError(null);
-    setElicited(null);
-    setFluid(false);
-    setResultWidth(undefined);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
 
-    let active: ElicitEl | null = null;
-    const mount = (node: HTMLElement) => {
-      chart.appendChild(node);
-      if (
-        !active &&
-        node &&
-        typeof (node as ElicitEl).getData === 'function' &&
-        typeof (node as ElicitEl).on === 'function'
-      ) {
-        active = node as ElicitEl;
-      }
-      return node;
-    };
+      activeRef.current?.destroy?.();
+      activeRef.current = null;
+      chart.replaceChildren();
+      setElicited(null);
+      setFluid(false);
+      setResultWidth(undefined);
 
-    try {
-      const names = Object.keys(scope);
-      const vals = Object.values(scope);
-      // eslint-disable-next-line no-new-func
-      new Function(...names, 'mount', code)(...vals, mount);
-      // `active` is assigned inside `mount`, which TS cannot see through `new Function`.
-      const chartEl = active as ElicitEl | null;
-      setElicited(chartEl);
-      if (chartEl) {
-        if (chartEl.style.width && chartEl.style.width.endsWith('px')) {
-          setResultWidth(chartEl.style.width);
-        } else {
-          setFluid(true);
+      let active: ElicitEl | null = null;
+      const mount = (node: HTMLElement) => {
+        chart.appendChild(node);
+        if (
+          !active &&
+          node &&
+          typeof (node as ElicitEl).getData === 'function' &&
+          typeof (node as ElicitEl).on === 'function'
+        ) {
+          active = node as ElicitEl;
         }
+        return node;
+      };
+
+      try {
+        const names = Object.keys(scope);
+        const vals = Object.values(scope);
+        // eslint-disable-next-line no-new-func
+        const run = new Function(...names, 'mount', code);
+        run(...vals, mount);
+        if (cancelled) {
+          active?.destroy?.();
+          chart.replaceChildren();
+          return;
+        }
+        activeRef.current = active;
+        setError(null);
+        setElicited(active);
+        if (active) {
+          if (active.style.width && active.style.width.endsWith('px')) {
+            setResultWidth(active.style.width);
+          } else {
+            setFluid(true);
+          }
+        }
+      } catch (err) {
+        if (cancelled) return;
+        active?.destroy?.();
+        chart.replaceChildren();
+        activeRef.current = null;
+        setElicited(null);
+        // UI-only — do not console.error (Next.js surfaces those as overlays).
+        setError(formatEvalError(err));
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
-      console.error('Example failed:', meta.title, err);
-    }
+    }, EVAL_DEBOUNCE_MS);
 
     return () => {
-      (active as ElicitEl | null)?.destroy?.();
-      chart.replaceChildren();
+      cancelled = true;
+      window.clearTimeout(timer);
+      activeRef.current?.destroy?.();
+      activeRef.current = null;
     };
-  }, [code, scope, meta.title]);
+  }, [code, scope]);
 
   return (
     <div className={`card${tall ? ' card-tall' : ''}`}>
@@ -182,13 +214,11 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
           style={resultWidth ? { width: resultWidth } : undefined}
         >
           <div className="chart" ref={chartRef} />
-          {error ? (
-            <pre className="live-error">⚠ {error}</pre>
-          ) : null}
-          {meta.try ? (
+          {error ? <pre className="live-error">⚠ {error}</pre> : null}
+          {!error && meta.try ? (
             <span className="try" dangerouslySetInnerHTML={{ __html: `Try: ${meta.try}` }} />
           ) : null}
-          <DataPanel chart={elicited} />
+          {!error ? <DataPanel chart={elicited} /> : null}
         </div>
       </div>
     </div>

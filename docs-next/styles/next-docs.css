@@ -62,6 +62,12 @@
   color: #b91c1c;
   font-size: 0.75rem;
   white-space: pre-wrap;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  max-height: 8rem;
+  overflow: auto;
 }
 
 .card-tall .body {
