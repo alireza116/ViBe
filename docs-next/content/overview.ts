@@ -1,9 +1,9 @@
 import type { DocPage } from '../lib/types';
 
 const page: DocPage = {
-  "route": "/",
-  "title": "VibeJS documentation",
-  "lead": "A chart is a declarative <code class=\"inline\">Elicit(spec)</code>: a list of <b>marks</b>, each with <b>channels</b> that map data fields to visuals. Every example on these pages shows the <b>exact code that drew the chart beside it</b> — the snippet is run verbatim. This page is the 30-second tour; the sidebar goes deep on each mark and feature.",
+  "route": "/overview",
+  "title": "Overview",
+  "lead": "A chart is a declarative <code class=\"inline\">Elicit(spec)</code>: a list of <b>marks</b>, each with <b>channels</b> that map data fields to visuals. Every example on these pages shows the <b>exact code that drew the chart beside it</b> — the snippet is run verbatim. This page is the 30-second API tour; the sidebar goes deep on each mark and feature.",
   "api": [
     {
       "name": "Elicit(spec)",

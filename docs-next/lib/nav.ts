@@ -5,7 +5,8 @@ export const SITE: NavGroup[] = [
   {
     group: 'Getting started',
     pages: [
-      { href: '/', title: 'Overview' },
+      { href: '/', title: 'Intro' },
+      { href: '/overview', title: 'Overview' },
       { href: '/concepts', title: 'Core concepts' },
       { href: '/sizing', title: 'Responsive sizing' },
       { href: '/authoring', title: 'Authoring SDK' },

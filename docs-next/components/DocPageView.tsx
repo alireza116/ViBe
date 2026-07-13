@@ -32,7 +32,14 @@ export function DocPageView({ page, examples }: Props) {
                   </div>
                 );
               }
-              return <ExampleLive key={key} code={mod.code} meta={mod.meta} />;
+              return (
+                <ExampleLive
+                  key={key}
+                  code={mod.code}
+                  meta={mod.meta}
+                  codeMode={sec.codeMode}
+                />
+              );
             })}
           </div>
         </section>

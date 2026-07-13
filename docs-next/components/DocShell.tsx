@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { SITE } from '../lib/nav';
-import type { DocPage } from '../lib/types';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { SITE } from "../lib/nav";
+import type { DocPage } from "../lib/types";
 
 type Props = {
   children: React.ReactNode;
   /** Active page metadata for in-page anchors. */
-  page?: Pick<DocPage, 'api' | 'sections'>;
+  page?: Pick<DocPage, "api" | "sections">;
 };
 
 export function DocShell({ children, page }: Props) {
-  const pathname = usePathname() || '/';
-  const active = pathname === '/' ? '/' : pathname.replace(/\/$/, '');
+  const pathname = usePathname() || "/";
+  const active = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
 
   return (
     <div className="layout">
@@ -29,12 +29,19 @@ export function DocShell({ children, page }: Props) {
               const isActive = p.href === active;
               return (
                 <span key={p.href}>
-                  <Link href={p.href} className={isActive ? 'active' : undefined}>
+                  <Link
+                    href={p.href}
+                    className={isActive ? "active" : undefined}
+                  >
                     {p.title}
                   </Link>
-                  {isActive && page && (page.api?.length || (page.sections?.length ?? 0) > 1) ? (
+                  {isActive &&
+                  page &&
+                  (page.api?.length || (page.sections?.length ?? 0) > 1) ? (
                     <div className="anchors">
-                      {page.api?.length ? <a href="#api">API reference</a> : null}
+                      {page.api?.length ? (
+                        <a href="#api">API reference</a>
+                      ) : null}
                       {page.sections?.map((s) => (
                         <a key={s.id} href={`#${s.id}`}>
                           {s.title}

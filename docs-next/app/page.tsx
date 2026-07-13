@@ -1,11 +1,42 @@
 import { DocPageView } from '../components/DocPageView';
-import page from '../content/overview';
-import { meta as ex0Meta, code as ex0Code } from '../examples/overview/a-bar-mark';
-import { meta as ex1Meta, code as ex1Code } from '../examples/overview/the-same-bar-now-editable';
+import page from '../content/intro';
+import {
+  meta as allocateMeta,
+  code as allocateCode,
+} from '../examples/intro/allocate-a-budget';
+import {
+  meta as beliefsMeta,
+  code as beliefsCode,
+} from '../examples/intro/place-beliefs';
+import {
+  meta as forecastMeta,
+  code as forecastCode,
+} from '../examples/intro/draw-a-forecast';
+import {
+  meta as needleMeta,
+  code as needleCode,
+} from '../examples/intro/likelihood-needle';
+import {
+  meta as geoMeta,
+  code as geoCode,
+} from '../examples/intro/pins-on-a-map';
+import {
+  meta as scaleMeta,
+  code as scaleCode,
+} from '../examples/intro/answer-a-scale';
+import {
+  meta as anatomyMeta,
+  code as anatomyCode,
+} from '../examples/intro/how-a-chart-is-built';
 
 const examples = {
-  'overview/a-bar-mark': { meta: ex0Meta, code: ex0Code },
-  'overview/the-same-bar-now-editable': { meta: ex1Meta, code: ex1Code },
+  'intro/allocate-a-budget': { meta: allocateMeta, code: allocateCode },
+  'intro/place-beliefs': { meta: beliefsMeta, code: beliefsCode },
+  'intro/draw-a-forecast': { meta: forecastMeta, code: forecastCode },
+  'intro/likelihood-needle': { meta: needleMeta, code: needleCode },
+  'intro/pins-on-a-map': { meta: geoMeta, code: geoCode },
+  'intro/answer-a-scale': { meta: scaleMeta, code: scaleCode },
+  'intro/how-a-chart-is-built': { meta: anatomyMeta, code: anatomyCode },
 };
 
 export default function Page() {

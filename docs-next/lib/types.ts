@@ -26,12 +26,17 @@ export type ExampleModule = {
   code: string;
 };
 
+/** How ExampleLive presents the source snippet. Default: editable. */
+export type CodeMode = 'editable' | 'collapsed' | 'readonly';
+
 export type DocSection = {
   id: string;
   title: string;
   intro?: string;
   /** Keys into the page's examples map, e.g. "constraints/bars-that-compensate" */
   examples: string[];
+  /** Presentation for examples in this section. Default: editable. */
+  codeMode?: CodeMode;
 };
 
 export type DocPage = {

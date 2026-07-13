@@ -9,6 +9,7 @@ export { createVibeScope } from '../lib/vibeScope';
 export type {
   DocPage,
   DocSection,
+  CodeMode,
   ExampleMeta,
   ExampleModule,
   ApiEntry,

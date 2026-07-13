@@ -1,0 +1,45 @@
+export const meta = {
+  title: "Age vs immigration attitude",
+  blurb: "An empty scatter plot. Double-click to place people; drag to move them. Color runs from red (anti) to green (pro).",
+  try: "<b>Double-click</b> to add a person · <b>drag</b> to move them.",
+};
+
+export const code = `mount(Elicit({
+  width: 560, height: 280,
+  responsive: "reflow",
+  margins: { top: 20, right: 24, bottom: 48, left: 110 },
+  schema: {
+    age: { type: "quantitative", domain: [18, 80] },
+    immigration: {
+      type: "quantitative",
+      domain: [-1, 1],
+      default: 0,
+    },
+  },
+  axes: {
+    x: { title: "Age" },
+    y: {
+      tickValues: [-1, 0, 1],
+      tickFormat: (v) =>
+        v === -1 ? "−1 (anti immigration)"
+        : v === 1 ? "1 (pro immigration)"
+        : "0 (neutral)",
+    },
+  },
+  data: [],
+  features: [
+    point({
+      size: 7, stroke: "#1f2733", strokeWidth: 1,
+      channels: {
+        x: { field: "age" },
+        y: { field: "immigration" },
+        // RdYlGn: low → red (anti), high → green (pro)
+        fill: { field: "immigration", scale: { scheme: "RdYlGn" } },
+      },
+      edits: [
+        create({ trigger: "dblclick" }),
+        drag({ channels: ["x", "y"] }),
+      ],
+    }),
+  ],
+}))`;

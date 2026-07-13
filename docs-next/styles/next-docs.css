@@ -10,6 +10,13 @@
 .card-head h3 { margin: 0 0 0.2rem; }
 .card-head p { margin: 0; color: var(--muted); font-size: 0.85rem; }
 
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
 .reset-btn {
   flex: 0 0 auto;
   font-size: 0.75rem;
@@ -24,6 +31,82 @@
 .reset-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* Intro gallery: chart (2/3) | data (1/3); code stacks below when shown */
+.card-visual .body-visual {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.9rem;
+}
+.card-visual .visual-row {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.card-visual .visual-row .result {
+  flex: 2 1 0;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+}
+.card-visual .visual-row .result.fluid {
+  flex: 2 1 0;
+  width: auto;
+}
+/* Reflow charts need a definite parent width to measure into */
+.card-visual .chart {
+  width: 100%;
+}
+.card-visual .visual-data {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.card-visual .visual-data .data {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-top: 0;
+  min-height: 0;
+}
+.card-visual .visual-data .data-body {
+  flex: 1;
+  height: auto;
+  min-height: 12em;
+}
+.card-visual .code-wrap.code-below {
+  flex: 1 1 auto;
+  width: 100%;
+  max-height: 360px;
+}
+@media (max-width: 720px) {
+  .card-visual .visual-row {
+    flex-direction: column;
+  }
+  .card-visual .visual-row .result,
+  .card-visual .visual-row .result.fluid,
+  .card-visual .visual-data {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .card-visual .visual-data .data-body {
+    height: 7.4em;
+    min-height: 0;
+    flex: none;
+  }
+}
+.readonly-code {
+  margin: 0 !important;
+  padding: 0.75rem 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 0.76rem !important;
+  line-height: 1.5 !important;
+  overflow-x: auto;
+  white-space: pre;
 }
 
 .code-wrap {

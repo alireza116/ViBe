@@ -9,9 +9,9 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
-import { themes } from 'prism-react-renderer';
+import { Highlight, themes } from 'prism-react-renderer';
 import { Editor } from 'react-live';
-import type { ExampleMeta } from '../lib/types';
+import type { CodeMode, ExampleMeta } from '../lib/types';
 import { createVibeScope } from '../lib/vibeScope';
 
 const EVAL_DEBOUNCE_MS = 280;
@@ -138,18 +138,44 @@ const CodePane = memo(function CodePane({
   );
 });
 
+const ReadOnlyCode = memo(function ReadOnlyCode({ code }: { code: string }) {
+  return (
+    <Highlight theme={themes.nightOwl} code={code.trimEnd()} language="jsx">
+      {({ className, style, tokens, getLineProps, getTokenProps }) => (
+        <pre className={`readonly-code ${className}`} style={style}>
+          {tokens.map((line, i) => (
+            <div key={i} {...getLineProps({ line })}>
+              {line.map((token, key) => (
+                <span key={key} {...getTokenProps({ token })} />
+              ))}
+            </div>
+          ))}
+        </pre>
+      )}
+    </Highlight>
+  );
+});
+
 type Props = {
   code: string;
   meta: ExampleMeta;
   /** Wider editor (playground). */
   tall?: boolean;
+  /** How to present the source. Default: editable. */
+  codeMode?: CodeMode;
 };
 
 /**
- * Editable example: react-live editor + harness-style `mount(Elicit(…))` eval.
- * The editor keeps its own draft state so chart/error updates never reset the caret.
+ * Live example: harness-style `mount(Elicit(…))` eval with chart + getData panel.
+ * `codeMode` controls whether source is editable, always-visible read-only, or
+ * collapsed behind a toggle (intro gallery).
  */
-export function ExampleLive({ code: initialCode, meta, tall }: Props) {
+export function ExampleLive({
+  code: initialCode,
+  meta,
+  tall,
+  codeMode = 'editable',
+}: Props) {
   const [source, setSource] = useState(initialCode);
   const [evalCode, setEvalCode] = useState(initialCode);
   const [editorKey, setEditorKey] = useState(0);
@@ -157,16 +183,22 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
   const [elicited, setElicited] = useState<ElicitEl | null>(null);
   const [fluid, setFluid] = useState(false);
   const [resultWidth, setResultWidth] = useState<string | undefined>();
+  const [codeOpen, setCodeOpen] = useState(codeMode === 'readonly');
   const chartRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<ElicitEl | null>(null);
   const debounceRef = useRef<number | null>(null);
   const scope = useMemo(() => createVibeScope(), []);
 
+  const isEditable = codeMode === 'editable';
+  const isVisual = codeMode === 'collapsed' || codeMode === 'readonly';
+  const showCode = isEditable || codeMode === 'readonly' || codeOpen;
+
   useEffect(() => {
     setSource(initialCode);
     setEvalCode(initialCode);
     setEditorKey((k) => k + 1);
-  }, [initialCode]);
+    setCodeOpen(codeMode === 'readonly');
+  }, [initialCode, codeMode]);
 
   const onDraftChange = useCallback((value: string) => {
     if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
@@ -256,42 +288,93 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
     };
   }, [evalCode, scope]);
 
+  const cardClass = [
+    'card',
+    tall ? 'card-tall' : '',
+    isVisual ? 'card-visual' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className={`card${tall ? ' card-tall' : ''}`}>
+    <div className={cardClass}>
       <div className="card-head">
         <div>
           <h3>{meta.title}</h3>
           {meta.blurb ? <p>{meta.blurb}</p> : null}
         </div>
-        <button
-          type="button"
-          className="reset-btn"
-          onClick={reset}
-          title="Restore the default example"
-        >
-          Reset
-        </button>
-      </div>
-      <div className="body">
-        <div className={`code-wrap${tall ? ' tall' : ''}`}>
-          <CodePane
-            key={editorKey}
-            source={source}
-            tall={tall}
-            onDraftChange={onDraftChange}
-          />
-        </div>
-        <div
-          className={`result${fluid ? ' fluid' : ''}`}
-          style={resultWidth ? { width: resultWidth } : undefined}
-        >
-          <div className="chart" ref={chartRef} />
-          {error ? <pre className="live-error">⚠ {error}</pre> : null}
-          {!error && meta.try ? (
-            <span className="try" dangerouslySetInnerHTML={{ __html: `Try: ${meta.try}` }} />
+        <div className="card-actions">
+          {codeMode === 'collapsed' ? (
+            <button
+              type="button"
+              className="reset-btn"
+              onClick={() => setCodeOpen((o) => !o)}
+              title={codeOpen ? 'Hide the source' : 'Show the source'}
+            >
+              {codeOpen ? 'Hide code' : 'Show code'}
+            </button>
           ) : null}
-          {!error ? <DataPanel chart={elicited} /> : null}
+          <button
+            type="button"
+            className="reset-btn"
+            onClick={reset}
+            title="Restore the default example"
+          >
+            Reset
+          </button>
         </div>
+      </div>
+      <div className={`body${isVisual ? ' body-visual' : ''}`}>
+        {showCode && isEditable ? (
+          <div className={`code-wrap${tall ? ' tall' : ''}`}>
+            <CodePane
+              key={editorKey}
+              source={source}
+              tall={tall}
+              onDraftChange={onDraftChange}
+            />
+          </div>
+        ) : null}
+        {isVisual ? (
+          <div className="visual-row">
+            <div
+              className={`result${fluid ? ' fluid' : ''}`}
+              style={resultWidth ? { width: resultWidth } : undefined}
+            >
+              <div className="chart" ref={chartRef} />
+              {error ? <pre className="live-error">⚠ {error}</pre> : null}
+              {!error && meta.try ? (
+                <span
+                  className="try"
+                  dangerouslySetInnerHTML={{ __html: `Try: ${meta.try}` }}
+                />
+              ) : null}
+            </div>
+            <div className="visual-data">
+              {!error ? <DataPanel chart={elicited} /> : null}
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`result${fluid ? ' fluid' : ''}`}
+            style={resultWidth ? { width: resultWidth } : undefined}
+          >
+            <div className="chart" ref={chartRef} />
+            {error ? <pre className="live-error">⚠ {error}</pre> : null}
+            {!error && meta.try ? (
+              <span
+                className="try"
+                dangerouslySetInnerHTML={{ __html: `Try: ${meta.try}` }}
+              />
+            ) : null}
+            {!error ? <DataPanel chart={elicited} /> : null}
+          </div>
+        )}
+        {showCode && !isEditable ? (
+          <div className={`code-wrap code-below${tall ? ' tall' : ''}`}>
+            <ReadOnlyCode code={source} />
+          </div>
+        ) : null}
       </div>
     </div>
   );
