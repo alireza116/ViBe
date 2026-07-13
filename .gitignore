@@ -4,9 +4,9 @@ jspm_packages/
 web_modules/
 
 # --- Build & Distribution ---
-# Vite builds to 'dist' by default. If you use other bundlers (like Rollup/Webpack)
-# or custom output directories, adjust this list.
+# Lib bundle (vite.lib.config.js) → dist/; docs site (vite.config.js) → site/.
 dist/
+site/
 build/
 out/
 .parcel-cache/

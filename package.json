@@ -3,10 +3,31 @@
   "version": "1.0.0",
   "description": "Declarative, grammar-of-graphics-inspired library for interactive visual belief elicitation.",
   "type": "module",
-  "main": "src/index.js",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "types": "./src/types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/types.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./dist": {
+      "import": "./dist/vibe.js",
+      "default": "./dist/vibe.js"
+    }
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:lib": "vite build --config vite.lib.config.js",
+    "build:docs": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "verify:browser": "node scripts/verify-browser.mjs"

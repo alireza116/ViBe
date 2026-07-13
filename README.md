@@ -122,6 +122,8 @@ vibe-js/
 │   └── index.js            # Public API aggregator
 ├── index.html              # Landing page → docs/
 ├── docs/                   # Multi-page documentation site (+ playground.html)
+├── vite.config.js          # Docs site build → site/
+├── vite.lib.config.js      # Library build → dist/vibe.js
 └── package.json
 ```
 
@@ -173,13 +175,79 @@ document.getElementById("chart-container").appendChild(beliefChart);
 
 ---
 
+## Install & use
+
+VibeJS is ESM. Consumers need a bundler (Vite, webpack, etc.) or a browser that can resolve bare imports via import maps. Runtime dependency: `d3`.
+
+### From source (default — works off `main` with no build)
+
+Clone or install the package and import the public API from the package root. `package.json` points `exports` / `main` at `src/index.js`, so a normal install resolves to source:
+
+```bash
+npm install vibe-js
+# or, from a checkout / GitHub:
+# npm install github:alireza116/ViBe
+```
+
+```javascript
+import * as vibe from "vibe-js";
+const { Elicit, plot, edit, constraints } = vibe;
+```
+
+Types ship from `src/types.d.ts` (`"types"` in `package.json`).
+
+### From the built bundle
+
+If you want a single ESM file (CDN, simpler packaging, or to avoid resolving the `src/` tree):
+
+```bash
+npm install
+npm run build:lib   # → dist/vibe.js (+ sourcemap); d3 stays external
+```
+
+Then either:
+
+```javascript
+// After publishing / packing with dist/ included:
+import * as vibe from "vibe-js/dist";
+```
+
+```html
+<!-- Browser: load d3 first, then the bundle (adjust paths as needed) -->
+<script type="importmap">
+  { "imports": { "d3": "https://cdn.jsdelivr.net/npm/d3@7/+esm" } }
+</script>
+<script type="module">
+  import * as vibe from "./dist/vibe.js";
+</script>
+```
+
+`d3` is not bundled — your app (or the import map) must provide it.
+
+---
+
 ## Development
 
 ```bash
 cd vibe-js
 npm install
-npx vite          # dev server with hot reload
-npm run typecheck  # tsc --noEmit against types.d.ts
+npm run dev          # docs / playground with hot reload
+npm run typecheck    # tsc --noEmit against types.d.ts
+npm run verify:browser
+```
+
+### Builds (docs and lib are separate)
+
+| Command | Config | Output | What it is |
+|---|---|---|---|
+| `npm run build:lib` | `vite.lib.config.js` | `dist/vibe.js` | Publishable ESM library (`d3` external) |
+| `npm run build` / `build:docs` | `vite.config.js` | `site/` | Static docs + playground |
+| `npm run preview` | `vite.config.js` | serves `site/` | Preview the docs build |
+
+```bash
+npm run build:lib    # library → dist/
+npm run build:docs   # docs site → site/  (alias: npm run build)
+npm run preview      # serve the docs site build
 ```
 
 - `index.html` — landing page linking into the docs.
