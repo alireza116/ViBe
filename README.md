@@ -30,6 +30,8 @@ VibeJS is layered for extensibility:
 
    **One dataset.** A chart elicits exactly one dataset — even a slider elicits a one-row dataset — so `data` lives on the spec, never on a mark. Each mark is a *view* over those rows: it encodes some columns, and where a channel carries an `edit`, it writes them back. Several marks over the same rows is the point, not a special case: a glyph is just marks that encode different columns of one row (see `composite`), and they all re-derive from the committed data on the next render.
 
+   **Locked rows (`lock`).** Some rows are *given* rather than elicited — the record so far, the points already measured, last quarter's actuals. `lock: "seed"` fixes the rows the chart was seeded with while leaving every row an edit *adds* free; `lock: (d) => d.year <= 1990` locks rows by what they are. A lock is a property of the data, so it sits on the spec beside `data` and `schema`, and it has two halves, both automatic: a **dataset invariant** run last on every commit (so it outranks every other repair — a gesture that spans locked and free rows keeps its changes to the free ones and snaps the locked ones back; deleting a locked row is rejected), and a **pointer** policy (a locked row's marks aren't grabbable, show no editable cursor, and are skipped by proximity picking — so `nearest` / `sweep` / `draw` never target one). That last part is what makes a you-draw-it chart work: because the seeded line is invisible to picking, a drag beside it doesn't grab a frozen line, it starts drawing. `setData` re-seeds the chart, so it re-takes a `"seed"` lock. See `docs/editing/lock.html`.
+
 2. **Abstract scene graph (`src/core/scene.js`)** — a flat, layout-calculated collection of abstract nodes (`circle`, `rect`, `line`, `path`, `text`), independent of the DOM or any renderer.
 
 3. **Marks (`vibe.plot.*`)** — pure data-to-geometry factories on a shared foundation (`src/plot/mark.js`): every mark resolves its channels through `encodeChannel` and the standard style surface (`fill`, `stroke`, `strokeWidth`, `opacity`, …) the same way. Marks compose across scale types and orientations.
@@ -85,6 +87,7 @@ vibe-js/
 ├── src/
 │   ├── core/
 │   │   ├── elicit.js       # Engine: state store, scale resolution, event routing, render loop
+│   │   ├── lock.js         # Read-only rows (spec.lock): the invariant + the pointer policy
 │   │   ├── axes.js         # Resolve the global `axes` convenience into axis/grid marks
 │   │   ├── resolve.js      # Global per-channel scale resolution
 │   │   ├── scales.js       # Scale wrappers (encode / invertValue) over d3-scale
@@ -180,7 +183,7 @@ npm run typecheck  # tsc --noEmit against types.d.ts
 ```
 
 - `index.html` — landing page linking into the docs.
-- `docs/` — a page per mark (bar, tick, point, line, composite, stacked dots, waffle, line + cone, trend) and per feature (editing, probe, stages, scales, constraints, widgets, effects, guides, schema). Each page opens with an **API reference** (signature, options, channels, returns/emits) and then shows live examples with the exact code beside each result.
+- `docs/` — a page per mark (bar, tick, point, line, composite, stacked dots, waffle, line + cone, trend) and per feature (editing, sweep, locked rows, probe, stages, scales, constraints, widgets, effects, guides, schema). Each page opens with an **API reference** (signature, options, channels, returns/emits) and then shows live examples with the exact code beside each result.
 - `docs/playground.html` — a composition playground: pick a mark, scales, edits, constraints, and guides from dropdowns and see the spec built and rendered live.
 
 ---

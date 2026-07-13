@@ -120,6 +120,91 @@ async function main() {
             check(`click cell #${k}: filled === value/unit`, filled === value / 5, `filled ${filled}, value/unit ${value / 5}`);
         }
 
+        // ---- Locked rows (spec.lock) --------------------------------------
+        // The lock is half data-invariant, half pointer policy, and only the second
+        // half proves out under real pointer events: a locked mark must be
+        // ungrabbable AND invisible to proximity picking, so a drag beside a locked
+        // line draws instead of grabbing it. Drive the actual gestures.
+        console.log('\nLocked rows (docs/editing/lock.html)');
+        await page.goto(`${BASE}/docs/editing/lock.html`, { waitUntil: 'networkidle' });
+        await page.waitForSelector('#seed .chart svg');
+
+        const rowsOf = (id) => page.$eval(`#${id} .chart > div`, (el) => el.getData());
+        // Aim in DATA space: scroll the plot in, then map a value pair to page px.
+        const frameOf = async (id, { m, w, h, xd, yd }) => {
+            await page.locator(`#${id} .chart svg`).scrollIntoViewIfNeeded();
+            await page.waitForTimeout(120);
+            const box = await page.$eval(`#${id} .chart svg`, (svg) => {
+                const r = svg.getBoundingClientRect();
+                return { left: r.left, top: r.top };
+            });
+            const iw = w - m.left - m.right, ih = h - m.top - m.bottom;
+            return (xv, yv) => ({
+                x: box.left + m.left + (xv - xd[0]) / (xd[1] - xd[0]) * iw,
+                y: box.top + m.top + (1 - (yv - yd[0]) / (yd[1] - yd[0])) * ih
+            });
+        };
+        const dragPath = async (from, to, steps = 24) => {
+            await page.mouse.move(from.x, from.y);
+            await page.mouse.down();
+            for (let i = 1; i <= steps; i++) {
+                await page.mouse.move(from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps);
+                await page.waitForTimeout(8);
+            }
+            await page.mouse.up();
+            await page.waitForTimeout(60);
+        };
+
+        // Scatter: the 5 seeded points are read-only; created points are not.
+        const at = await frameOf('seed', {
+            m: { top: 16, right: 16, bottom: 32, left: 40 }, w: 400, h: 300, xd: [0, 10], yd: [0, 10]
+        });
+        const seed = await rowsOf('seed');
+        const lockedPE = await page.$$eval('#seed .chart svg circle',
+            (cs) => cs.slice(0, 5).every((c) => (c.style.pointerEvents || c.getAttribute('pointer-events')) === 'none'));
+        check('lock: seeded marks are pointer-transparent', lockedPE);
+
+        await page.mouse.click(at(8, 8).x, at(8, 8).y);       // plane click -> create
+        await page.waitForTimeout(60);
+        let rows = await rowsOf('seed');
+        check('lock: a click still creates a free row', rows.length === 6, `${rows.length} rows`);
+        check('lock: the created row takes the schema default', rows[5].source === 'yours');
+
+        await dragPath(at(rows[5].x, rows[5].y), at(3, 8));    // your point moves
+        rows = await rowsOf('seed');
+        check('lock: a free row drags', Math.abs(rows[5].x - 3) < 0.5 && Math.abs(rows[5].y - 8) < 0.5);
+
+        await dragPath(at(seed[0].x, seed[0].y), at(9, 1));    // a locked point does not
+        rows = await rowsOf('seed');
+        check('lock: a drag on a locked row leaves it unchanged',
+            JSON.stringify(rows.slice(0, 5)) === JSON.stringify(seed), JSON.stringify(rows.slice(0, 5)));
+
+        // You-draw-it: draw the free years, then sweep back over the locked record.
+        const ny = await frameOf('you-draw-it', {
+            m: { top: 20, right: 24, bottom: 32, left: 56 }, w: 560, h: 340, xd: [1968, 2016], yd: [0, 60000]
+        });
+        const record = await rowsOf('you-draw-it');
+        check('lock: the record seeds 1968-1990', record.length === 23 && record[22].year === 1990);
+
+        await dragPath(ny(1991, 20000), ny(2016, 20000), 40);
+        let drawn = await rowsOf('you-draw-it');
+        const mine = drawn.filter((d) => d.year > 1990);
+        check('lock: a drag beside a locked line DRAWS (it never grabs it)', mine.length >= 20, `${mine.length} drawn`);
+        check('lock: the drawn years took the swept value',
+            mine.every((d) => Math.abs(d.deaths - 20000) < 3000));
+        check('lock: the record survived the draw',
+            JSON.stringify(drawn.slice(0, 23)) === JSON.stringify(record));
+
+        // A stroke back across the record: the locked rows repair, the free rows
+        // the SAME stroke crossed still take the paint (a lock repairs, not rejects).
+        await dragPath(ny(2010, 55000), ny(1970, 55000), 40);
+        drawn = await rowsOf('you-draw-it');
+        check('lock: sweeping back over the record leaves it intact',
+            JSON.stringify(drawn.slice(0, 23)) === JSON.stringify(record));
+        const repainted = drawn.filter((d) => d.year >= 1991 && d.year <= 2010);
+        check('lock: the free years in that same stroke were repainted',
+            repainted.length > 0 && repainted.every((d) => Math.abs(d.deaths - 55000) < 3000));
+
         check('no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     } finally {
         await browser.close();
