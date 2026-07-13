@@ -1,12 +1,25 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { themes } from 'prism-react-renderer';
 import { Editor } from 'react-live';
 import type { ExampleMeta } from '../lib/types';
 import { createVibeScope } from '../lib/vibeScope';
 
 const EVAL_DEBOUNCE_MS = 280;
+
+const EDITOR_STYLE_BASE: CSSProperties = {
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontSize: 12.5,
+};
 
 function esc(c: string) {
   return c.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -77,13 +90,6 @@ function DataPanel({ chart }: { chart: ElicitEl | null }) {
   );
 }
 
-type Props = {
-  code: string;
-  meta: ExampleMeta;
-  /** Wider editor (playground). */
-  tall?: boolean;
-};
-
 function formatEvalError(err: unknown): string {
   if (err instanceof SyntaxError) return `Syntax error: ${err.message}`;
   if (err instanceof Error) return err.message;
@@ -91,22 +97,99 @@ function formatEvalError(err: unknown): string {
 }
 
 /**
+ * Isolated from chart/error state so parent re-renders (after debounce eval)
+ * do not remount the editor and jump the caret.
+ */
+const CodePane = memo(function CodePane({
+  source,
+  tall,
+  onDraftChange,
+}: {
+  source: string;
+  tall?: boolean;
+  onDraftChange: (value: string) => void;
+}) {
+  const [value, setValue] = useState(source);
+  const style = useMemo(
+    () => ({
+      ...EDITOR_STYLE_BASE,
+      minHeight: tall ? 420 : 200,
+    }),
+    [tall]
+  );
+
+  // Remount when `source` identity changes (Reset / new preset) via key on parent.
+  useEffect(() => {
+    setValue(source);
+  }, [source]);
+
+  return (
+    <Editor
+      className="live-editor"
+      code={value}
+      language="jsx"
+      theme={themes.nightOwl}
+      onChange={(next) => {
+        setValue(next);
+        onDraftChange(next);
+      }}
+      style={style}
+    />
+  );
+});
+
+type Props = {
+  code: string;
+  meta: ExampleMeta;
+  /** Wider editor (playground). */
+  tall?: boolean;
+};
+
+/**
  * Editable example: react-live editor + harness-style `mount(Elicit(…))` eval.
- * Eval failures stay in the card (no console.error — Next would overlay them).
- * Reset restores the module's default `code`.
+ * The editor keeps its own draft state so chart/error updates never reset the caret.
  */
 export function ExampleLive({ code: initialCode, meta, tall }: Props) {
-  const [code, setCode] = useState(initialCode);
+  const [source, setSource] = useState(initialCode);
+  const [evalCode, setEvalCode] = useState(initialCode);
+  const [editorKey, setEditorKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [elicited, setElicited] = useState<ElicitEl | null>(null);
   const [fluid, setFluid] = useState(false);
   const [resultWidth, setResultWidth] = useState<string | undefined>();
   const chartRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<ElicitEl | null>(null);
+  const debounceRef = useRef<number | null>(null);
   const scope = useMemo(() => createVibeScope(), []);
 
   useEffect(() => {
-    setCode(initialCode);
+    setSource(initialCode);
+    setEvalCode(initialCode);
+    setEditorKey((k) => k + 1);
+  }, [initialCode]);
+
+  const onDraftChange = useCallback((value: string) => {
+    if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      setEvalCode(value);
+      debounceRef.current = null;
+    }, EVAL_DEBOUNCE_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const reset = useCallback(() => {
+    if (debounceRef.current != null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setSource(initialCode);
+    setEvalCode(initialCode);
+    setEditorKey((k) => k + 1);
   }, [initialCode]);
 
   useEffect(() => {
@@ -114,69 +197,64 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
     if (!chart) return;
 
     let cancelled = false;
-    const timer = window.setTimeout(() => {
-      if (cancelled) return;
 
-      activeRef.current?.destroy?.();
-      activeRef.current = null;
-      chart.replaceChildren();
-      setElicited(null);
-      setFluid(false);
-      setResultWidth(undefined);
+    activeRef.current?.destroy?.();
+    activeRef.current = null;
+    chart.replaceChildren();
+    setElicited(null);
+    setFluid(false);
+    setResultWidth(undefined);
 
-      let active: ElicitEl | null = null;
-      const mount = (node: HTMLElement) => {
-        chart.appendChild(node);
-        if (
-          !active &&
-          node &&
-          typeof (node as ElicitEl).getData === 'function' &&
-          typeof (node as ElicitEl).on === 'function'
-        ) {
-          active = node as ElicitEl;
-        }
-        return node;
-      };
+    let active: ElicitEl | null = null;
+    const mount = (node: HTMLElement) => {
+      chart.appendChild(node);
+      if (
+        !active &&
+        node &&
+        typeof (node as ElicitEl).getData === 'function' &&
+        typeof (node as ElicitEl).on === 'function'
+      ) {
+        active = node as ElicitEl;
+      }
+      return node;
+    };
 
-      try {
-        const names = Object.keys(scope);
-        const vals = Object.values(scope);
-        // eslint-disable-next-line no-new-func
-        const run = new Function(...names, 'mount', code);
-        run(...vals, mount);
-        if (cancelled) {
-          active?.destroy?.();
-          chart.replaceChildren();
-          return;
-        }
-        activeRef.current = active;
-        setError(null);
-        setElicited(active);
-        if (active) {
-          if (active.style.width && active.style.width.endsWith('px')) {
-            setResultWidth(active.style.width);
-          } else {
-            setFluid(true);
-          }
-        }
-      } catch (err) {
-        if (cancelled) return;
+    try {
+      const names = Object.keys(scope);
+      const vals = Object.values(scope);
+      // eslint-disable-next-line no-new-func
+      const run = new Function(...names, 'mount', evalCode);
+      run(...vals, mount);
+      if (cancelled) {
         active?.destroy?.();
         chart.replaceChildren();
-        activeRef.current = null;
-        setElicited(null);
-        // UI-only — do not console.error (Next.js surfaces those as overlays).
-        setError(formatEvalError(err));
+        return;
       }
-    }, EVAL_DEBOUNCE_MS);
+      activeRef.current = active;
+      setError(null);
+      setElicited(active);
+      if (active) {
+        if (active.style.width && active.style.width.endsWith('px')) {
+          setResultWidth(active.style.width);
+        } else {
+          setFluid(true);
+        }
+      }
+    } catch (err) {
+      if (cancelled) return;
+      active?.destroy?.();
+      chart.replaceChildren();
+      activeRef.current = null;
+      setElicited(null);
+      setError(formatEvalError(err));
+    }
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
       activeRef.current?.destroy?.();
       activeRef.current = null;
     };
-  }, [code, scope]);
+  }, [evalCode, scope]);
 
   return (
     <div className={`card${tall ? ' card-tall' : ''}`}>
@@ -188,7 +266,7 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
         <button
           type="button"
           className="reset-btn"
-          onClick={() => setCode(initialCode)}
+          onClick={reset}
           title="Restore the default example"
         >
           Reset
@@ -196,17 +274,11 @@ export function ExampleLive({ code: initialCode, meta, tall }: Props) {
       </div>
       <div className="body">
         <div className={`code-wrap${tall ? ' tall' : ''}`}>
-          <Editor
-            className="live-editor"
-            code={code}
-            language="jsx"
-            theme={themes.nightOwl}
-            onChange={setCode}
-            style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              fontSize: 12.5,
-              minHeight: tall ? 420 : 200,
-            }}
+          <CodePane
+            key={editorKey}
+            source={source}
+            tall={tall}
+            onDraftChange={onDraftChange}
           />
         </div>
         <div
