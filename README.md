@@ -121,8 +121,9 @@ vibe-js/
 │   ├── types.d.ts          # Type contracts for the whole API
 │   └── index.js            # Public API aggregator
 ├── index.html              # Landing page → docs/
-├── docs/                   # Multi-page documentation site (+ playground.html)
-├── vite.config.js          # Docs site build → site/
+├── docs/                   # Classic HTML docs (+ playground.html) — kept for now
+├── docs-next/              # Next.js React docs (editable examples + playground)
+├── vite.config.js          # Classic docs site build → site/
 ├── vite.lib.config.js      # Library build → dist/vibe.js
 └── package.json
 ```
@@ -231,28 +232,58 @@ import * as vibe from "vibe-js/dist";
 ```bash
 cd vibe-js
 npm install
-npm run dev          # docs / playground with hot reload
-npm run typecheck    # tsc --noEmit against types.d.ts
+npm run dev            # classic Vite docs / playground (HTML harness)
+npm run dev:docs-next  # Next.js React docs (editable examples)
+npm run typecheck      # tsc --noEmit against types.d.ts
 npm run verify:browser
 ```
 
-### Builds (docs and lib are separate)
+### Builds (lib, classic docs, and Next docs are separate)
 
 | Command | Config | Output | What it is |
 |---|---|---|---|
 | `npm run build:lib` | `vite.lib.config.js` | `dist/vibe.js` | Publishable ESM library (`d3` external) |
-| `npm run build` / `build:docs` | `vite.config.js` | `site/` | Static docs + playground |
-| `npm run preview` | `vite.config.js` | serves `site/` | Preview the docs build |
+| `npm run build` / `build:docs` | `vite.config.js` | `site/` | Classic static HTML docs |
+| `npm run build:docs-next` | `docs-next/` | `docs-next/.next/` | Next.js React docs |
+| `npm run start:docs-next` | — | — | Serve the Next docs production build |
+| `npm run preview` | `vite.config.js` | serves `site/` | Preview the classic docs build |
 
 ```bash
-npm run build:lib    # library → dist/
-npm run build:docs   # docs site → site/  (alias: npm run build)
-npm run preview      # serve the docs site build
+npm run build:lib         # library → dist/
+npm run build:docs        # classic docs → site/
+npm run build:docs-next   # React docs (Next)
+npm run start:docs-next   # serve React docs
 ```
 
+### Classic docs (`docs/`)
+
+Kept for now as the historical harness-based site:
+
 - `index.html` — landing page linking into the docs.
-- `docs/` — a page per mark (bar, tick, point, line, composite, stacked dots, waffle, line + cone, trend) and per feature (editing, sweep, locked rows, probe, stages, scales, constraints, widgets, effects, guides, schema). Each page opens with an **API reference** (signature, options, channels, returns/emits) and then shows live examples with the exact code beside each result.
-- `docs/playground.html` — a composition playground: pick a mark, scales, edits, constraints, and guides from dropdowns and see the spec built and rendered live.
+- `docs/` — a page per mark and feature; examples are `code` strings run by `_harness.js`.
+- `docs/playground.html` — dropdown composition playground.
+
+### Next.js docs (`docs-next/`) — preferred going forward
+
+React/Next App Router site with **live-editable** examples (`react-live` editor + Reset to default). Content lives in `docs-next/content/`; each example is a file under `docs-next/examples/` exporting `{ meta, code }`. The playground (`/playground`) loads curated presets into the same live editor.
+
+```bash
+npm run dev:docs-next      # http://localhost:3000
+```
+
+To re-generate content/examples/routes from the classic `docs/pages/*.js` modules:
+
+```bash
+npm run migrate:docs-next
+```
+
+**Reuse in another Next app** (e.g. a lab site): import the docs UI from the package export, or copy `docs-next/`:
+
+```javascript
+import { DocShell, ExampleLive, SITE, createVibeScope } from "vibe-js/docs-ui";
+```
+
+Chart surfaces are client components (`'use client'`); the lab page that embeds them must be a client boundary too.
 
 ---
 

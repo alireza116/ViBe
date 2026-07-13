@@ -1,0 +1,92 @@
+/* Next docs extras on top of the ported harness styles */
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
+}
+.card-head h3 { margin: 0 0 0.2rem; }
+.card-head p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+.reset-btn {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.28rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+.reset-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.code-wrap {
+  flex: 1 1 52%;
+  min-width: 0;
+  background: #0f172a;
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 460px;
+  overflow-y: auto;
+}
+.code-wrap.tall {
+  max-height: min(70vh, 720px);
+  flex-basis: 55%;
+}
+
+.live-editor,
+.code-wrap pre,
+.code-wrap textarea {
+  margin: 0 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-size: 0.76rem !important;
+  line-height: 1.5 !important;
+  background: #0f172a !important;
+  color: #cbd5e1 !important;
+  min-height: 200px;
+  outline: none;
+}
+
+.live-editor textarea {
+  outline: none !important;
+}
+
+.live-error {
+  margin: 0.4rem 0 0;
+  color: #b91c1c;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+}
+
+.card-tall .body {
+  min-height: 60vh;
+}
+
+/* Playground */
+.playground-page {
+  max-width: none;
+}
+.playground-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 0 0 1rem;
+}
+.playground-toolbar label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.playground-toolbar select {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+}

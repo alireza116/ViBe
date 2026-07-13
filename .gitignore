@@ -13,6 +13,10 @@ out/
 .cache/
 .vite/
 
+# Next.js docs app
+docs-next/.next/
+docs-next/out/
+
 # --- Environment Variables & Secrets ---
 # Keep local environment configs, API keys, and credentials out of git
 .env

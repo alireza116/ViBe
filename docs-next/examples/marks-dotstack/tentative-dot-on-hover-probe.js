@@ -1,0 +1,7 @@
+export const meta = {
+  title: "Tentative dot on hover (probe)",
+  blurb: "create({ pick: \"probe\" }) shows the token before it is real; the click commits it.",
+  try: "hover a bin — a dot appears but is not counted until you click. Alt-click removes.",
+};
+
+export const code = "const bins = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1];\nconst chart = Elicit({\n  width: 560, height: 240,\n  margins: { top: 16, right: 16, bottom: 28, left: 16 },\n  axes: { x: {}, y: false },\n  data: [],\n  schema: {\n    bin: { type: \"categorical\", domain: bins },\n  },\n  scales: { x: { type: \"point\" } },\n  features: [\n    dotStack({\n      id: \"tokens\",\n      channels: { x: { field: \"bin\" } },\n      edits: [\n        // Hover previews the drop; the click commits it. advance:false keeps the\n        // edit live so you can keep dropping tokens.\n        create({ pick: \"probe\", channels: [\"x\"], advance: false, when: when.noAlt }),\n        // The plane owns the pointer in probe mode, so removal picks the nearest.\n        remove({ pick: \"nearest\", when: when.alt }),\n      ],\n      constraints: [ count({ max: 20, strategy: \"reject\" }) ],\n    }),\n  ],\n});\nmount(chart);\nconst out = document.createElement(\"div\");\nout.style.cssText = \"font:12px ui-monospace,monospace;color:#64748b\";\nconst show = () => { out.textContent = \"committed tokens: \" + chart.getData().length + \" / 20\"; };\nchart.on(\"change\", show); show();\nmount(out);";

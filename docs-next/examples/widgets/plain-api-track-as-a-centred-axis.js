@@ -1,0 +1,7 @@
+export const meta = {
+  title: "Plain API — track as a centred axis",
+  blurb: "Same mark/edit/constraints. axisX with transform pins the spine to mid-height; tickValues at the domain ends are the labels; tickSize draws the end caps. Usually the simpler path when the chrome is an axis.",
+  try: "same interaction — chrome comes from axes, not guides.",
+};
+
+export const code = "const prompt = (text) => guides.custom(() => [{\n  type: \"text\", x: 0, y: -18, text,\n  textAnchor: \"start\", fontSize: 13, fill: \"#0f172a\",\n}]);\n\nmount(Elicit({\n  width: 560, height: 120,\n  margins: { top: 34, right: 40, bottom: 40, left: 40 },\n  // Centred 1-D axis: spine = track, end ticks = caps + labels.\n  axes: {\n    x: {\n      transform: ({ height }) => ({ y: height / 2 }),\n      tickValues: [0, 100],\n      tickSize: 7,\n      stroke: \"#cbd5e1\",\n      fill: \"#334155\",\n      fontSize: 12,\n    },\n    y: false,\n  },\n  data: [{ value: 40 }],\n  schema: { value: { type: \"quantitative\", domain: [0, 100] } },\n  constraints: [\n    clamp({ min: 0, max: 100, field: \"value\" }),\n    snap({ field: \"value\", step: 5, origin: 0 }),\n  ],\n  guides: [ prompt(\"How likely is it? (%)\") ],\n  features: [\n    point({\n      id: \"slider\",\n      size: 9,\n      fill: \"#2563eb\",\n      channels: {\n        x: { field: \"value\",\n             edit: drag({ pick: \"probe\", advance: false }) },\n      },\n    }),\n  ],\n}));";
