@@ -1,0 +1,73 @@
+// U.S. motor-vehicle deaths per year (NHTSA/FARS, rounded).
+// 1968-1990 is the record; the rest is what you believe happened.
+const record = [
+  [1968, 52725], [1969, 53543], [1970, 52627], [1971, 52542],
+  [1972, 54589], [1973, 54052], [1974, 45196], [1975, 44525],
+  [1976, 45523], [1977, 47878], [1978, 50331], [1979, 51093],
+  [1980, 51091], [1981, 49301], [1982, 43945], [1983, 42589],
+  [1984, 44257], [1985, 43825], [1986, 46087], [1987, 46390],
+  [1988, 47087], [1989, 45582], [1990, 44599],
+].map(([year, deaths]) => ({ year, deaths }));
+
+const truth = [
+  [1991, 41508], [1992, 39250], [1993, 40150], [1994, 40716],
+  [1995, 41817], [1996, 42065], [1997, 42013], [1998, 41501],
+  [1999, 41717], [2000, 41945], [2001, 42196], [2002, 43005],
+  [2003, 42884], [2004, 42836], [2005, 43510], [2006, 42708],
+  [2007, 41259], [2008, 37423], [2009, 33883], [2010, 32999],
+  [2011, 32479], [2012, 33782], [2013, 32893], [2014, 32744],
+  [2015, 35485], [2016, 37806],
+].map(([year, deaths]) => ({ year, deaths }));
+
+const chart = mount(Elicit({
+  width: 560, height: 340,
+  margins: { top: 20, right: 24, bottom: 32, left: 56 },
+  schema: {
+    year:   { type: "quantitative", domain: [1968, 2016] },
+    deaths: { type: "quantitative", domain: [0, 60000] },
+  },
+  data: record,
+  lock: "seed",   // the record is fact: undraggable, unsweepable, unpickable
+  axes: {
+    x: { tickFormat: "d",  grid: true },
+    y: { tickFormat: "~s", grid: true },
+  },
+  // Stage 0 = you draw. Stage 1 = the answer is on screen, drawing is over.
+  stageLabels: ["draw", "revealed"],
+  guides: [
+    // The years you were given (the NYT's grey box).
+    guides.region({ x: [1968, 1990], fill: "#94a3b8", opacity: 0.12 }),
+    // The endpoint readouts.
+    guides.custom(({ data, scales }) => [1968, 1990]
+      .map((y) => data.find((d) => d.year === y))
+      .filter(Boolean)
+      .map((d) => ({
+        type: "text", text: d3.format(",")(d.deaths),
+        x: scales.x.encode(d.year), y: scales.y.encode(d.deaths) - 12,
+        fontSize: 12, textAnchor: "middle", fill: "#0f172a",
+      }))),
+    // The answer key. Not data — it is not elicited, so it is a guide, and it
+    // stays out of getData(). It appears when the chart advances to stage 1.
+    guides.custom(({ scales, stage }) => stage < 1 ? [] : [{
+      type: "path", fill: "none", stroke: "#e8833a", strokeWidth: 2.5,
+      points: truth.map((d) => [scales.x.encode(d.year),
+                                scales.y.encode(d.deaths)]),
+    }]),
+  ],
+  features: [
+    lineY({
+      stroke: "#7f9dc9", strokeWidth: 3, curve: "catmullRom", handleSize: 3,
+      channels: {
+        x: { field: "year" },
+        y: { field: "deaths" },
+      },
+      // One drag per year column. `stage: 0` retires the edit once you've asked
+      // to see the answer.
+      edits: [ edit.line.draw({ samples: d3.range(1991, 2017), stage: 0 }) ],
+    }),
+  ],
+}));
+
+const btn = mount(document.createElement("button"));
+btn.textContent = "Show me how I did.";
+btn.onclick = () => chart.nextStage();

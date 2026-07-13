@@ -1,0 +1,25 @@
+mount(Elicit({
+  width: 360, height: 300,
+  margins: { top: 16, right: 16, bottom: 24, left: 28 },
+  axes: {
+    x: { transform: ({ scales }) => ({ y: scales.y(0) }), ticks: 5 },
+    y: { transform: ({ scales }) => ({ x: scales.x(0) }), ticks: 5 },
+  },
+  data: [
+    { x: -8, y: 6 }, { x: 5, y: -3 }, { x: -4, y: -7 },
+    { x: 9, y: 4 }, { x: 2, y: 8 }, { x: -6, y: 2 },
+  ],
+  schema: {
+    x: { type: "quantitative", domain: [-10, 10] },
+    y: { type: "quantitative", domain: [-10, 10] },
+  },
+  features: [
+    point({
+      size: 5, fill: "#4f46e5",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+    }),
+  ],
+}))

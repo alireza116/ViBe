@@ -1,0 +1,31 @@
+const bins = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1];
+const chart = Elicit({
+  width: 560, height: 240,
+  margins: { top: 16, right: 16, bottom: 28, left: 16 },
+  axes: { x: {}, y: false },
+  data: [],
+  schema: {
+    bin: { type: "categorical", domain: bins },
+  },
+  scales: { x: { type: "point" } },
+  features: [
+    dotStack({
+      id: "tokens",
+      channels: { x: { field: "bin" } },
+      edits: [
+        // Hover previews the drop; the click commits it. advance:false keeps the
+        // edit live so you can keep dropping tokens.
+        create({ pick: "probe", channels: ["x"], advance: false, when: when.noAlt }),
+        // The plane owns the pointer in probe mode, so removal picks the nearest.
+        remove({ pick: "nearest", when: when.alt }),
+      ],
+      constraints: [ count({ max: 20, strategy: "reject" }) ],
+    }),
+  ],
+});
+mount(chart);
+const out = document.createElement("div");
+out.style.cssText = "font:12px ui-monospace,monospace;color:#64748b";
+const show = () => { out.textContent = "committed tokens: " + chart.getData().length + " / 20"; };
+chart.on("change", show); show();
+mount(out);

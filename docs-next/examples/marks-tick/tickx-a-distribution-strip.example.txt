@@ -1,0 +1,19 @@
+mount(Elicit({
+  width: 400, height: 200,
+  margins: { top: 16, right: 16, bottom: 28, left: 16 },
+  data: [
+    { v: 12 }, { v: 18 }, { v: 21 }, { v: 34 }, { v: 39 },
+    { v: 41 }, { v: 55 }, { v: 58 }, { v: 63 }, { v: 71 }, { v: 84 },
+  ],
+  schema: {
+    v: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    tickX({
+      stroke: "#0d9488", strokeWidth: 2, inset: 10,
+      channels: {
+        x: { field: "v" },
+      },
+    }),
+  ],
+}))

@@ -1,0 +1,17 @@
+mount(Elicit({
+  width: 360, height: 260,
+  margins: { top: 16, right: 16, bottom: 28, left: 40 },
+  data: [ { cat: "A", n: 40 }, { cat: "B", n: 70 } ],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B"] },
+    n:   { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    text({ fontSize: 16, fill: "#0d9488", format: ".1f",
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n", edit: drag() },
+        text: { field: "n" },
+      } }),
+  ],
+}))

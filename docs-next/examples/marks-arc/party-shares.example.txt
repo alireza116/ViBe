@@ -1,0 +1,23 @@
+mount(Elicit({
+  width: 300, height: 280,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  axes: false,
+  data: [
+    { party: "D", share: 48 },
+    { party: "R", share: 45 },
+    { party: "O", share: 7 },
+  ],
+  schema: {
+    party: { type: "categorical" },
+    share: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    pie({
+      outerRadius: 100,
+      channels: {
+        angle: { field: "share" },
+        fill: { field: "party" },
+      },
+    }),
+  ],
+}));

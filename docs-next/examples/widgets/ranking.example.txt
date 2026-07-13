@@ -1,0 +1,4 @@
+mount(Elicit(widgets.ranking({
+  question: "Rank these priorities",
+  items: ["Cost", "Speed", "Quality", "Risk"],
+})));

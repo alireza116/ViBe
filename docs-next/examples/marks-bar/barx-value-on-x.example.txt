@@ -1,0 +1,21 @@
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 14, right: 16, bottom: 26, left: 60 },
+  data: [
+    { region: "North", sales: 42 }, { region: "South", sales: 68 },
+    { region: "East", sales: 30 },  { region: "West", sales: 54 },
+  ],
+  schema: {
+    region: { type: "categorical", domain: ["North", "South", "East", "West"] },
+    sales:  { type: "quantitative", domain: [0, 80] },
+  },
+  features: [
+    barX({
+      fill: "#0d9488",
+      channels: {
+        y: { field: "region" },
+        x: { field: "sales" },
+      },
+    }),
+  ],
+}))

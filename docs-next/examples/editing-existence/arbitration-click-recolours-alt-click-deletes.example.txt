@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 25, y: 40, group: "alpha" },
+    { x: 55, y: 65, group: "beta" },
+    { x: 80, y: 30, group: "gamma" },
+  ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    group: { type: "ordinal", domain: ["alpha", "beta", "gamma"] },
+  },
+  features: [
+    point({
+      size: 10,
+      channels: {
+        x: { field: "x", edit: drag() },
+        y: { field: "y", edit: drag() },
+        fill: { field: "group", edit: cycle({ when: when.noAlt }) },
+      },
+      edits: [ remove({ when: when.alt }) ],
+    }),
+  ],
+}))

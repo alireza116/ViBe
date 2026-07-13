@@ -1,0 +1,31 @@
+mount(Elicit({
+  width: 360, height: 260,
+  margins: { top: 16, right: 16, bottom: 28, left: 80 },
+  data: [
+    { item: "A", rank: 1 },
+    { item: "B", rank: 2 },
+    { item: "C", rank: 3 },
+  ],
+  schema: {
+    item: { type: "categorical", domain: ["A", "B", "C"] },
+    rank: { type: "ordinal", domain: [1, 2, 3] },
+  },
+  features: [
+    point({
+      fill: "#0d9488", size: 9,
+      channels: {
+        x: { value: 40 },
+        y: { field: "rank", edit: rank() },
+      },
+    }),
+    text({
+      fontSize: 13,
+      channels: {
+        x: { value: 56 },
+        y: { field: "rank" },
+        text: { field: "item" },
+        textAnchor: { value: "start" },
+      },
+    }),
+  ],
+}));

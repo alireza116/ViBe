@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  guides: [ guides.rule({ y: 25, label: "even split (25)" }) ],
+  data: ["A", "B", "C", "D"].map((c) => ({ x: c, y: 25 })),
+  // Invariants on the DATA — they gate every edit, from every mark.
+  constraints: [
+    clamp({ field: "y", min: 0 }),
+    maintainSum({ field: "y", targetSum: 100 }),
+  ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    bar({
+      fill: "#6366f1",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y", edit: drag({ guide: true }) },
+      },
+    }),
+  ],
+}))

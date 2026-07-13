@@ -1,0 +1,18 @@
+const cats = ["A","B","C","D","E"];
+mount(Elicit({
+  width: 480, height: 300,
+  responsive: "scale",
+  margins: { top: 16, right: 12, bottom: 28, left: 34 },
+  data: cats.map((c, i) => ({ cat: c, value: [30, 80, 45, 60, 20][i] })),
+  schema: {
+    cat:   { type: "categorical", domain: cats },
+    value: { type: "quantitative", domain: [0, 100] },
+  },
+  scales: { x: { type: "band" } },
+  features: [
+    barY({ fill: "#4f46e5", channels: {
+      x: { field: "cat" },
+      y: { field: "value", edit: drag() },
+    } }),
+  ],
+}));

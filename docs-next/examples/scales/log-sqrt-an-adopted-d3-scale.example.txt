@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 380, height: 250,
+  margins: { top: 14, right: 14, bottom: 30, left: 40 },
+  schema: {
+    t: { type: "quantitative", domain: [1, 1000] },
+    w: { type: "quantitative", domain: [0, 100] },
+    g: { type: "categorical",  domain: ["a", "b", "c"] },
+  },
+  data: [
+    { t: 2, w: 20, g: "a" }, { t: 20, w: 55, g: "b" },
+    { t: 120, w: 40, g: "c" }, { t: 700, w: 80, g: "a" },
+  ],
+  features: [
+    point({
+      stroke: "#1f2733",
+      channels: {
+        x:    { field: "t", scale: "log" },
+        y:    { field: "w", edit: drag() },
+        size: { field: "w", scale: { type: "sqrt", range: [5, 16] } },
+        fill: { field: "g", scale: d3.scaleOrdinal(d3.schemeTableau10) },
+      },
+    }),
+  ],
+}))

@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
+const vibeEntry = path.join(repoRoot, 'src/index.js');
+const rawLoader = path.join(__dirname, 'loaders/raw-string-loader.cjs');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -11,14 +13,26 @@ const nextConfig = {
   turbopack: {
     root: repoRoot,
     resolveAlias: {
-      '@vibe': path.join(repoRoot, 'src/index.js'),
+      // Relative alias — absolute paths break Turbopack ("server relative imports").
+      '@vibe': '../src/index.js',
+    },
+    rules: {
+      '*.example.txt': {
+        loaders: [rawLoader],
+        as: '*.js',
+      },
     },
   },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@vibe': path.join(repoRoot, 'src/index.js'),
+      '@vibe': vibeEntry,
     };
+    // Plain text chart bodies — never parsed as JS (avoids dev HMR / import.meta in eval strings).
+    config.module.rules.unshift({
+      test: /\.example\.txt$/,
+      type: 'asset/source',
+    });
     return config;
   },
   transpilePackages: [],

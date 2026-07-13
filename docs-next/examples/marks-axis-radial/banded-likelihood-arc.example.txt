@@ -1,0 +1,25 @@
+mount(Elicit({
+  width: 360, height: 210,
+  margins: { top: 36, right: 64, bottom: 16, left: 64 },
+  axes: false,
+  overflow: "visible",   // long labels spill into the margin
+  data: [{ chance: "TOSSUP" }],
+  schema: {
+    chance: {
+      type: "ordinal",
+      domain: ["VERY LIKELY D", "LIKELY D", "LEANING D", "TOSSUP",
+               "LEANING R", "LIKELY R", "VERY LIKELY R"],
+    },
+  },
+  features: [
+    axisRadial({
+      orient: "top", radius: 110, bands: true, bandWidth: 28,
+      labelOffset: 16, fontSize: 8,
+      channels: {
+        angle: { field: "chance", scale: { range: [180, 0] } },
+        // RdBu is red→blue natively; reverse for the D→R (blue→red) reading.
+        fill: { field: "chance", scale: { scheme: "RdBu", reverse: true } },
+      },
+    }),
+  ],
+}));

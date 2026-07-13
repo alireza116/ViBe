@@ -32,6 +32,12 @@ export function DocPageView({ page, examples }: Props) {
                   </div>
                 );
               }
+              if (mod.Component) {
+                const Example = mod.Component;
+                return (
+                  <Example key={key} codeMode={sec.codeMode} />
+                );
+              }
               return (
                 <ExampleLive
                   key={key}

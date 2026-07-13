@@ -12,6 +12,7 @@ export type {
   CodeMode,
   ExampleMeta,
   ExampleModule,
+  ExampleComponentProps,
   ApiEntry,
   NavGroup,
   NavPage,

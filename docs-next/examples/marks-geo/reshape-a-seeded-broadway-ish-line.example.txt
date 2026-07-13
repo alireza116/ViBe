@@ -1,0 +1,27 @@
+mount(Elicit({
+  width: 520, height: 360,
+  margins: { top: 8, right: 8, bottom: 8, left: 8 },
+  projection: { type: "mercator", domain: vancouver, inset: 6 },
+  data: [{
+    coordinates: [
+      [-123.185, 49.264],
+      [-123.155, 49.263],
+      [-123.120, 49.263],
+      [-123.080, 49.262],
+      [-123.050, 49.261],
+    ],
+  }],
+  schema: {
+    coordinates: { type: "categorical" },
+  },
+  features: [
+    geoBasemap({ geojson: vancouver, fill: "#e8eef5", stroke: "#64748b", strokeWidth: 0.8 }),
+    geoLine({
+      stroke: "#b91c1c", strokeWidth: 2.5, handleSize: 6,
+      channels: {
+        coordinates: { field: "coordinates", scale: null },
+      },
+      edits: [edit.geo.dragVertex()],
+    }),
+  ],
+}));

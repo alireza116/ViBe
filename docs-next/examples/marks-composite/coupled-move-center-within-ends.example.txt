@@ -1,0 +1,54 @@
+mount(Elicit({
+  width: 380, height: 280,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { g: "A", mean: 50, lo: 35, hi: 65 },
+    { g: "B", mean: 62, lo: 55, hi: 72 },
+  ],
+  schema: {
+    g:    { type: "categorical",  domain: ["A", "B"] },
+    lo:   { type: "quantitative", domain: [0, 100] },
+    mean: { type: "quantitative", domain: [0, 100] },
+    hi:   { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    composite({
+      id: "errorbar",
+      // Invariant on the DATA: the centre stays within the ends. A cap drag and a
+      // dot drag are different marks, but one rule gates both.
+      constraints: [
+        defineConstraint(({ active }) => active
+          ? { hi: Math.max(active.hi, active.mean), lo: Math.min(active.lo, active.mean) }
+          : undefined),
+      ],
+      parts: [
+        ruleX({
+          stroke: "#64748b", strokeWidth: 1.5,
+          channels: { x: { field: "g" }, y1: { field: "lo" }, y2: { field: "hi" } },
+        }),
+        point({
+          fill: "steelblue", size: 6,
+          channels: {
+            x: { field: "g" },
+            // Coupled move: the dot shifts lo/hi by the mean's delta.
+            y: { field: "mean",
+                 edit: edit.custom((d, e, ctx) => {
+                   const s = ctx.channels[0].scale;
+                   const mean = s.invertValue(ctx.pointer.y);
+                   const delta = mean - d.mean;
+                   return { ...d, mean, lo: d.lo + delta, hi: d.hi + delta };
+                 }) },
+          },
+        }),
+        tick({
+          stroke: "#334155", strokeWidth: 2,
+          channels: { x: { field: "g" }, y: { field: "lo", edit: drag() } },
+        }),
+        tick({
+          stroke: "#334155", strokeWidth: 2,
+          channels: { x: { field: "g" }, y: { field: "hi", edit: drag() } },
+        }),
+      ],
+    }),
+  ],
+}))

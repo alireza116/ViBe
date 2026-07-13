@@ -1,0 +1,33 @@
+const editable = vancouver.features
+  .filter(f => ["Kitsilano", "Fairview", "Mount Pleasant", "Downtown"].includes(f.properties.name))
+  .map(f => ({
+    name: f.properties.name,
+    geometry: f.geometry,
+    fill: "A",
+  }));
+
+mount(Elicit({
+  width: 520, height: 360,
+  margins: { top: 8, right: 8, bottom: 8, left: 8 },
+  projection: { type: "mercator", domain: vancouver, inset: 6 },
+  data: editable,
+  schema: {
+    name: { type: "categorical" },
+    fill: { type: "categorical", domain: ["A", "B", "C"] },
+    geometry: { type: "categorical" },
+  },
+  features: [
+    geoBasemap({ geojson: vancouver, fill: "#f1f5f9", stroke: "#94a3b8", strokeWidth: 0.7 }),
+    geoPolygon({
+      stroke: "#0f172a", strokeWidth: 1.2, fillOpacity: 0.75,
+      channels: {
+        geometry: { field: "geometry", scale: null },
+        fill: {
+          field: "fill",
+          scale: { scheme: "tableau10" },
+          edit: cycle(),
+        },
+      },
+    }),
+  ],
+}));

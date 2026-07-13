@@ -1,0 +1,27 @@
+mount(Elicit({
+  width: 400, height: 260,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { x1: 0, x2: 2, n: 4 },
+    { x1: 2, x2: 4, n: 12 },
+    { x1: 4, x2: 6, n: 18 },
+    { x1: 6, x2: 8, n: 9 },
+    { x1: 8, x2: 10, n: 3 },
+  ],
+  schema: {
+    x1: { type: "quantitative", domain: [0, 10] },
+    x2: { type: "quantitative", domain: [0, 10] },
+    n:  { type: "quantitative", domain: [0, 24] },
+  },
+  constraints: [clamp({ min: 0, max: 24, field: "n" })],
+  features: [
+    rectY({
+      fill: "#0d9488", fillOpacity: 0.75, stroke: "#0f766e",
+      channels: {
+        x1: { field: "x1" },
+        x2: { field: "x2" },
+        y:  { field: "n", edit: drag({ guide: true }) },
+      },
+    }),
+  ],
+}))

@@ -1,0 +1,20 @@
+mount(Elicit({
+  width: 420, height: 280,
+  margins: { top: 16, right: 18, bottom: 48, left: 44 },
+  data: [
+    { cat: "Apples", v: 6 },
+    { cat: "Pears", v: 9 },
+    { cat: "Plums", v: 4 },
+  ],
+  schema: {
+    cat: { type: "categorical", domain: ["Apples", "Pears", "Plums"] },
+    v:   { type: "quantitative", domain: [0, 12] },
+  },
+  axes: false,
+  features: [
+    axisY(),
+    axisX({ edit: edit.axis.categories() }),
+    bar({ fill: "#2563eb",
+      channels: { x: { field: "cat" }, y: { field: "v" } } }),
+  ],
+}))

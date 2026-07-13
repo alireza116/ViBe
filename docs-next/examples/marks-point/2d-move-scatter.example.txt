@@ -1,0 +1,20 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 20, y: 30 }, { x: 50, y: 62 }, { x: 78, y: 40 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      fill: "#2563eb", stroke: "#1f2733", strokeWidth: 1, opacity: 0.85,
+      size: 9,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+      edits: [ drag({ channels: ["x", "y"] }) ],
+    }),
+  ],
+}))

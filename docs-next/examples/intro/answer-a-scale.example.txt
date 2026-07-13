@@ -1,0 +1,13 @@
+mount(Elicit({
+  ...widgets.likert({
+    question: "This tool is easy to use",
+    options: [
+      "Strongly disagree",
+      "Disagree",
+      "Neutral",
+      "Agree",
+      "Strongly agree",
+    ],
+  }),
+  responsive: "reflow",
+}));

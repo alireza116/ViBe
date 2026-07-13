@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  guides: [
+    guides.region({ y: [40, 60], fill: "#0d9488", opacity: 0.14 }),
+    guides.rule({ y: 50, label: "target 50" }),
+  ],
+  data: [{ x: 20, y: 30 }, { x: 50, y: 55 }, { x: 80, y: 70 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      fill: "#0d9488",
+      size: 9,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+      edits: [ drag({ channels: ["x", "y"] }) ],
+    }),
+  ],
+}))

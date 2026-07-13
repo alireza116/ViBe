@@ -1,0 +1,4 @@
+mount(Elicit(widgets.slider({
+  question: "How likely is it? (%)",
+  domain: [0, 100], step: 5, value: 40,
+})));

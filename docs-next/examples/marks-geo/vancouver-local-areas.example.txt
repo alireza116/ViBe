@@ -1,0 +1,18 @@
+// docs inject `vancouver`; your app loads GeoJSON then passes it in:
+// const vancouver = await fetch("data/vancouver-neighborhoods.json").then(r => r.json());
+
+mount(Elicit({
+  width: 520, height: 360,
+  margins: { top: 8, right: 8, bottom: 8, left: 8 },
+  projection: { type: "mercator", domain: vancouver, inset: 6 },
+  data: [],
+  schema: {},
+  features: [
+    geoBasemap({
+      geojson: vancouver,
+      fill: "#e8eef5",
+      stroke: "#64748b",
+      strokeWidth: 0.8,
+    }),
+  ],
+}));

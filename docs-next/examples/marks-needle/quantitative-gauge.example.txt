@@ -1,0 +1,37 @@
+mount(Elicit({
+  width: 320, height: 200,
+  margins: { top: 24, right: 16, bottom: 16, left: 16 },
+  axes: false,
+  data: [{ n: 62 }],
+  schema: { n: { type: "quantitative", domain: [0, 100] } },
+  features: [
+    composite({
+      id: "gauge",
+      parts: [
+        axisRadial({
+          orient: "top", radius: 100, ticks: 5,
+          channels: { angle: { field: "n", scale: { range: [180, 0] } } },
+        }),
+        needle({
+          orient: "top", length: 90, fill: "#1d4ed8",
+          channels: {
+            angle: {
+              field: "n",
+              scale: { range: [180, 0] },
+              edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+            },
+          },
+        }),
+        text({
+          fontSize: 22, dy: 28,
+          format: ".0f",
+          channels: {
+            text: { field: "n" },
+            textAnchor: { value: "middle" },
+            lineAnchor: { value: "middle" },
+          },
+        }),
+      ],
+    }),
+  ],
+}));

@@ -1,0 +1,61 @@
+const prompt = (text, y = -18) => guides.custom(() => [{
+  type: "text", x: 0, y, text,
+  textAnchor: "start", fontSize: 13, fill: "#0f172a",
+}]);
+
+const crosshair = ({ x, y }) => guides.custom((ctx) => {
+  const cx = ctx.width / 2, cy = ctx.height / 2;
+  const t = (px, py, text, anchor) => ({
+    type: "text", x: px, y: py, text, textAnchor: anchor,
+    fontSize: 12, fill: "#334155",
+  });
+  const lineH = 14;
+  const side = (px, extreme, anchor) => {
+    const lines = [...String(x).split(/\s+/), "(" + extreme + ")"];
+    const top = cy - ((lines.length - 1) * lineH) / 2;
+    return lines.map((word, i) => t(px, top + i * lineH + 4, word, anchor));
+  };
+  return [
+    { type: "line", x1: 0, y1: cy, x2: ctx.width, y2: cy,
+      stroke: "#cbd5e1", strokeWidth: 1, background: true },
+    { type: "line", x1: cx, y1: 0, x2: cx, y2: ctx.height,
+      stroke: "#cbd5e1", strokeWidth: 1, background: true },
+    ...side(ctx.width + 10, "high", "start"),
+    ...side(-10, "low", "end"),
+    t(cx, -8, y + " (high)", "middle"),
+    t(cx, ctx.height + 20, y + " (low)", "middle"),
+  ];
+});
+
+const chart = Elicit({
+  width: 460, height: 400,
+  margins: { top: 56, right: 92, bottom: 52, left: 92 },
+  axes: false,
+  data: [{ r: 0, spread: 0 }],
+  schema: {
+    r:      { type: "quantitative", domain: [-1, 1], default: 0 },
+    spread: { type: "quantitative", domain: [0, 1], default: 0 },
+  },
+  guides: [
+    prompt("What is the relationship?", -32),
+    crosshair({ x: "Exercise amount", y: "Body weight" }),
+  ],
+  features: [
+    cone({
+      id: "lineCone",
+      channels: {
+        angle: {
+          field: "r",
+          scale: { range: [-45, 45] },
+          edit: rotate({ pick: "probe", stage: 0 }),
+        },
+        spread: {
+          field: "spread",
+          scale: { range: [0, 45] },
+          edit: rotate({ pick: "probe", stage: 1, relativeTo: "angle" }),
+        },
+      },
+    }),
+  ],
+});
+mount(chart);

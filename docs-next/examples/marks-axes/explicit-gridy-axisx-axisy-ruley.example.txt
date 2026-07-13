@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 380, height: 280,
+  margins: { top: 16, right: 16, bottom: 30, left: 36 },
+  axes: false,   // no auto axes; we place our own
+  data: [{ x: 15, y: 30 }, { x: 40, y: 62 }, { x: 65, y: 44 }, { x: 88, y: 74 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    gridY({ ticks: 5 }),
+    ruleY({ y: 50, stroke: "#e4572e", strokeDasharray: "4 3" }),
+    point({
+      fill: "#4f46e5",
+      size: 8,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+    }),
+    axisX({ title: "x", ticks: 5 }),
+    axisY({ title: "y", ticks: 5 }),
+  ],
+}))

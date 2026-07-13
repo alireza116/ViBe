@@ -1,0 +1,31 @@
+mount(Elicit({
+  width: 280, height: 280,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  axes: false,
+  data: [{ n: 0.35 }],
+  schema: { n: { type: "quantitative", domain: [0, 1] } },
+  features: [
+    axisRadial({
+      arc: "full", radius: 95, ticks: 8,
+      channels: { angle: { field: "n", scale: { range: [-180, 180] } } },
+    }),
+    needle({
+      arc: "full", length: 80, fill: "#0f172a",
+      channels: {
+        angle: {
+          field: "n",
+          scale: { range: [-180, 180] },
+          edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+        },
+      },
+    }),
+    text({
+      fontSize: 18, format: ".0%",
+      channels: {
+        text: { field: "n" },
+        textAnchor: { value: "middle" },
+        lineAnchor: { value: "middle" },
+      },
+    }),
+  ],
+}));

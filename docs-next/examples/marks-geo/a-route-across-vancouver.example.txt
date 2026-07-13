@@ -1,0 +1,40 @@
+mount(Elicit({
+  width: 520, height: 360,
+  margins: { top: 8, right: 8, bottom: 8, left: 8 },
+  projection: { type: "mercator", domain: vancouver, inset: 6 },
+  data: [
+    { stop: 1, lon: -123.1850, lat: 49.2720, place: "Kitsilano" },
+    { stop: 2, lon: -123.1480, lat: 49.2660, place: "Fairview" },
+    { stop: 3, lon: -123.1150, lat: 49.2640, place: "Mount Pleasant" },
+    { stop: 4, lon: -123.1000, lat: 49.2790, place: "Strathcona" },
+    { stop: 5, lon: -123.1207, lat: 49.2870, place: "Downtown" },
+  ],
+  schema: {
+    stop:  { type: "quantitative" },
+    lon:   { type: "quantitative", domain: [-123.27, -123.02] },
+    lat:   { type: "quantitative", domain: [49.20, 49.32] },
+    place: { type: "categorical" },
+  },
+  features: [
+    geoBasemap({ geojson: vancouver, fill: "#eef2f7", stroke: "#94a3b8", strokeWidth: 0.7 }),
+
+    // The connector: lon/lat channels -> one path across the rows, in `stop` order.
+    geoLine({
+      stroke: "#b91c1c", strokeWidth: 2, order: "stop", curve: "linear",
+      channels: {
+        lon: { field: "lon" },
+        lat: { field: "lat" },
+      },
+    }),
+
+    // The stops: their own feature, so a drag lands on one dot.
+    geoPoint({
+      size: 6, fill: "#b91c1c", stroke: "#fff", strokeWidth: 1.5,
+      channels: {
+        lon: { field: "lon" },
+        lat: { field: "lat" },
+      },
+      edits: [edit.geo.drag(), edit.geo.create({ defaults: { place: "new stop" } })],
+    }),
+  ],
+}));

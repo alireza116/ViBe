@@ -1,0 +1,32 @@
+const chart = Elicit({
+  width: 360, height: 320,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  axes: false,
+  data: [{ r: 0, spread: 0 }],
+  schema: {
+    r:      { type: "quantitative", domain: [-1, 1] },
+    spread: { type: "quantitative", domain: [0, 1] },
+  },
+  features: [
+    cone({
+      id: "belief",
+      channels: {
+        angle: { field: "r", scale: { range: [-45, 45] },
+                 edit: rotate({ pick: "probe", stage: 0 }) },
+        spread: { field: "spread", scale: { range: [0, 45] },
+                  edit: rotate({ pick: "probe", stage: 1, relativeTo: "angle" }) },
+      },
+      samples: 60, wedge: true,
+    }),
+  ],
+});
+mount(chart);
+const out = document.createElement("div");
+out.style.cssText = "font:12px ui-monospace,monospace;margin-top:6px;color:#64748b";
+const show = () => {
+  const d = chart.getData()[0] || {};
+  out.textContent = "stage " + chart.getStage() +
+    "  ·  committed r=" + (d.r ?? 0).toFixed(2) + " spread=" + (d.spread ?? 0).toFixed(2);
+};
+chart.on("change", show); chart.on("stage", show); show();
+mount(out);

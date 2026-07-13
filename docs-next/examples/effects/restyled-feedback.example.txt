@@ -1,0 +1,28 @@
+mount(Elicit({
+  width: 340, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  effects: {
+    grab: "brightness(1.08)",
+    select: {
+      color: "#4f46e5",
+      ring: { dash: "1 3", width: 1.5, opacity: 0.5 },
+      highlight: { width: 4, opacity: 1, pad: 8 },
+    },
+  },
+  data: [{ x: 25, y: 35 }, { x: 55, y: 68 }, { x: 78, y: 30 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      fill: "#ffffff", stroke: "#334155", strokeWidth: 2,
+      size: 10,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+      edits: [ drag({ channels: ["x", "y"], pick: "nearest", threshold: 45, guide: true }) ],
+    }),
+  ],
+}))

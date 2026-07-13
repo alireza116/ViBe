@@ -1,0 +1,18 @@
+mount(Elicit({
+  width: 300, height: 190,
+  margins: { top: 30, right: 24, bottom: 16, left: 24 },
+  axes: false,
+  overflow: "visible",
+  data: [{ p: 0.5 }],
+  schema: { p: { type: "quantitative", domain: [0, 1] } },
+  features: [
+    axisRadial({
+      orient: "top", radius: 95,
+      tickValues: [0, 0.25, 0.5, 0.75, 1],
+      tickFormat: ".0%",
+      labelFill: "#2563eb", fontSize: 11,
+      stroke: "#93c5fd", tickSize: 8,
+      channels: { angle: { field: "p", scale: { range: [180, 0] } } },
+    }),
+  ],
+}));

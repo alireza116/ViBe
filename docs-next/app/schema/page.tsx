@@ -1,11 +1,11 @@
 import { DocPageView } from '../../components/DocPageView';
 import page from '../../content/schema';
-import { meta as ex0Meta, code as ex0Code } from '../../examples/schema/elicit-from-nothing';
-import { meta as ex1Meta, code as ex1Code } from '../../examples/schema/beliefs-over-time';
+import Ex0, { meta as ex0Meta, code as ex0Code } from '../../examples/schema/elicit-from-nothing';
+import Ex1, { meta as ex1Meta, code as ex1Code } from '../../examples/schema/beliefs-over-time';
 
 const examples = {
-  'schema/elicit-from-nothing': { meta: ex0Meta, code: ex0Code },
-  'schema/beliefs-over-time': { meta: ex1Meta, code: ex1Code },
+  'schema/elicit-from-nothing': { meta: ex0Meta, code: ex0Code, Component: Ex0 },
+  'schema/beliefs-over-time': { meta: ex1Meta, code: ex1Code, Component: Ex1 },
 };
 
 export default function Page() {

@@ -1,0 +1,23 @@
+mount(Elicit({
+  width: 360, height: 240,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { cat: "A", n: 0.42 },
+    { cat: "B", n: 0.75 },
+    { cat: "C", n: 0.18 },
+  ],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C"] },
+    n:   { type: "quantitative", domain: [0, 1] },
+  },
+  features: [
+    barY({ fill: "#0d9488",
+      channels: { x: { field: "cat" }, y: { field: "n" } } }),
+    text({ fontSize: 12, dy: -6, lineAnchor: "bottom",
+      format: format.percent(".0%"),
+      channels: {
+        x: { field: "cat" }, y: { field: "n" },
+        text: { field: "n" },
+      } }),
+  ],
+}))

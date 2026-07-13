@@ -1,0 +1,20 @@
+mount(Elicit({
+  width: 360, height: 220,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { x: 3, y: 5, label: "double-click" },
+    { x: 7, y: 3, label: "me too" },
+  ],
+  schema: {
+    x: { type: "quantitative", domain: [0, 10] },
+    y: { type: "quantitative", domain: [0, 10] },
+    label: { type: "categorical" },
+  },
+  features: [
+    text({ fontSize: 14, fill: "#7b2d8b",
+      channels: {
+        x: { field: "x" }, y: { field: "y" },
+        text: { field: "label", edit: editText() },
+      } }),
+  ],
+}))

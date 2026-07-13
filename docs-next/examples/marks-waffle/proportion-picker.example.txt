@@ -1,0 +1,23 @@
+mount(Elicit({
+  width: 220, height: 300,
+  margins: { top: 16, right: 12, bottom: 24, left: 34 },
+  data: [{ cat: "belief", value: 0.4 }],
+  onChange: (d) => console.log("proportion:", d[0].value.toFixed(2)),
+  schema: {
+    cat:   { type: "categorical", domain: ["belief"] },
+    value: { type: "quantitative", domain: [0, 1] },
+  },
+  scales: { x: { type: "band" } },
+  features: [
+    waffleY({
+      fill: "#0ea5e9",
+      unit: 1/50,
+      channels: {
+        x: { field: "cat" },
+        y: { field: "value", edit: waffleFill() },
+      },
+      // click sets the count to the clicked cell too
+      edits: [ waffleFill({ channels: ["y"], gesture: "click" }) ],
+    }),
+  ],
+}));

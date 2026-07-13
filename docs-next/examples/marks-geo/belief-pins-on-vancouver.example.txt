@@ -1,0 +1,25 @@
+mount(Elicit({
+  width: 520, height: 360,
+  margins: { top: 8, right: 8, bottom: 8, left: 8 },
+  projection: { type: "mercator", domain: vancouver, inset: 6 },
+  data: [
+    { lon: -123.1207, lat: 49.2827, label: "Downtown" },
+    { lon: -123.1560, lat: 49.2680, label: "Kits" },
+  ],
+  schema: {
+    lon: { type: "quantitative", domain: [-123.27, -123.02] },
+    lat: { type: "quantitative", domain: [49.20, 49.32] },
+    label: { type: "categorical" },
+  },
+  features: [
+    geoBasemap({ geojson: vancouver, fill: "#e8eef5", stroke: "#64748b", strokeWidth: 0.8 }),
+    geoPoint({
+      size: 8, fill: "#1d4ed8", stroke: "#fff", strokeWidth: 1.5,
+      channels: {
+        lon: { field: "lon" },
+        lat: { field: "lat" },
+      },
+      edits: [edit.geo.drag(), edit.geo.create()],
+    }),
+  ],
+}));

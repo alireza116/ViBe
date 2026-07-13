@@ -1,0 +1,13 @@
+mount(Elicit({
+  width: 300, height: 180,
+  margins: { top: 28, right: 20, bottom: 20, left: 20 },
+  axes: false,
+  data: [{ n: 50 }],
+  schema: { n: { type: "quantitative", domain: [0, 100] } },
+  features: [
+    axisRadial({
+      orient: "top", radius: 90, ticks: 6, title: "score",
+      channels: { angle: { field: "n", scale: { range: [180, 0] } } },
+    }),
+  ],
+}));

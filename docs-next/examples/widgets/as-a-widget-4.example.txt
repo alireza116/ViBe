@@ -1,0 +1,14 @@
+const chart = Elicit(widgets.lineCone({
+  question: "What is the relationship?",
+  x: "Exercise amount", y: "Body weight",
+}));
+mount(chart);
+const out = document.createElement("div");
+out.style.cssText = "font:12px ui-monospace,monospace;color:#64748b";
+const show = () => {
+  const d = chart.getData()[0];
+  out.textContent = "stage " + chart.getStage() +
+    "  ·  r=" + d.r.toFixed(2) + "  spread=" + d.spread.toFixed(2);
+};
+chart.on("change", show); chart.on("stage", show); show();
+mount(out);

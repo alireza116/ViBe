@@ -1,0 +1,38 @@
+mount(Elicit({
+  width: 400, height: 300,
+  margins: { top: 16, right: 16, bottom: 32, left: 40 },
+  schema: {
+    x: { type: "quantitative", domain: [0, 10] },
+    y: { type: "quantitative", domain: [0, 10] },
+    // A schema `default` populates a field on a row an edit MINTS — so every
+    // point you add is tagged "yours" without create() saying a word about it.
+    source: { type: "categorical", domain: ["observed", "yours"],
+              default: "yours" },
+  },
+  data: [
+    { x: 1.2, y: 2.4, source: "observed" },
+    { x: 2.6, y: 3.1, source: "observed" },
+    { x: 3.4, y: 4.6, source: "observed" },
+    { x: 4.1, y: 4.2, source: "observed" },
+    { x: 5.3, y: 6.0, source: "observed" },
+  ],
+  // The observed rows are given, not elicited.
+  lock: "seed",
+  axes: { x: { grid: true }, y: { grid: true } },
+  features: [
+    point({
+      size: 7,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        fill: { field: "source",
+                scale: { range: ["#94a3b8", "#4f46e5"] } },
+      },
+      edits: [
+        create({ when: when.noAlt }),     // click empty space -> add
+        drag({ channels: ["x", "y"] }),   // drag one of yours in 2D
+        remove({ when: when.alt }),       // alt-click -> gone
+      ],
+    }),
+  ],
+}))

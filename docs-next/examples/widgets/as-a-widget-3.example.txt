@@ -1,0 +1,5 @@
+mount(Elicit(widgets.matrix({
+  question: "Rate each aspect",
+  questions: ["Speed","Cost","Support"],
+  options: ["Poor","OK","Good","Great"],
+})));

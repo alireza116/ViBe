@@ -1,0 +1,38 @@
+mount(Elicit({
+  width: 520, height: 360,
+  margins: { top: 8, right: 8, bottom: 8, left: 8 },
+  projection: { type: "mercator", domain: vancouver, inset: 6 },
+  data: [
+    { lon: -123.1207, lat: 49.2827, place: "Downtown" },
+    { lon: -123.1560, lat: 49.2680, place: "Kitsilano" },
+    { lon: -123.1000, lat: 49.2630, place: "Mt Pleasant" },
+  ],
+  schema: {
+    lon:   { type: "quantitative", domain: [-123.27, -123.02] },
+    lat:   { type: "quantitative", domain: [49.20, 49.32] },
+    place: { type: "categorical" },
+  },
+  features: [
+    geoBasemap({ geojson: vancouver, fill: "#eef2f7", stroke: "#94a3b8", strokeWidth: 0.7 }),
+
+    geoPoint({
+      size: 6, fill: "#0f766e", stroke: "#fff", strokeWidth: 1.5,
+      channels: {
+        lon: { field: "lon" },
+        lat: { field: "lat" },
+      },
+      edits: [edit.geo.drag(), edit.geo.create({ defaults: { place: "new place" } })],
+    }),
+
+    // The label: same rows, positioned by the same projection, nudged above the dot.
+    geoText({
+      dy: -12, fontSize: 12, fill: "#0f172a",
+      channels: {
+        lon:  { field: "lon" },
+        lat:  { field: "lat" },
+        text: { field: "place" },
+      },
+      edits: [editText({ channel: "text" })],
+    }),
+  ],
+}));

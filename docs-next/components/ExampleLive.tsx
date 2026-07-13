@@ -96,6 +96,37 @@ function formatEvalError(err: unknown): string {
   return String(err);
 }
 
+/** Coerce imported chart body to a plain string; strip dev HMR preamble/suffix if present. */
+function normalizeExampleCode(code: unknown): string {
+  const raw =
+    typeof code === 'string'
+      ? code
+      : code != null &&
+          typeof code === 'object' &&
+          'default' in code &&
+          typeof (code as { default: unknown }).default === 'string'
+        ? (code as { default: string }).default
+        : String(code ?? '');
+
+  if (!raw.includes('import.meta') && !raw.includes('__webpack')) return raw;
+
+  // Dev bundles sometimes wrap the chart body in a hot-reload IIFE — keep only the harness script.
+  const cut =
+    raw.search(/\n\s*import\.meta\b/) >= 0
+      ? raw.search(/\n\s*import\.meta\b/)
+      : raw.search(/\n\s*__webpack/) >= 0
+        ? raw.search(/\n\s*__webpack/)
+        : raw.search(/\$RefreshHelpers\$/) >= 0
+          ? raw.search(/\$RefreshHelpers\$/)
+          : -1;
+  if (cut >= 0) return raw.slice(0, cut).trimEnd();
+
+  const mountIdx = raw.search(/\bmount\s*\(/);
+  if (mountIdx > 0) return raw.slice(mountIdx).trimEnd();
+
+  return raw;
+}
+
 /**
  * Isolated from chart/error state so parent re-renders (after debounce eval)
  * do not remount the editor and jump the caret.
@@ -176,8 +207,9 @@ export function ExampleLive({
   tall,
   codeMode = 'editable',
 }: Props) {
-  const [source, setSource] = useState(initialCode);
-  const [evalCode, setEvalCode] = useState(initialCode);
+  const baseCode = useMemo(() => normalizeExampleCode(initialCode), [initialCode]);
+  const [source, setSource] = useState(baseCode);
+  const [evalCode, setEvalCode] = useState(baseCode);
   const [editorKey, setEditorKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [elicited, setElicited] = useState<ElicitEl | null>(null);
@@ -194,11 +226,11 @@ export function ExampleLive({
   const showCode = isEditable || codeMode === 'readonly' || codeOpen;
 
   useEffect(() => {
-    setSource(initialCode);
-    setEvalCode(initialCode);
+    setSource(baseCode);
+    setEvalCode(baseCode);
     setEditorKey((k) => k + 1);
     setCodeOpen(codeMode === 'readonly');
-  }, [initialCode, codeMode]);
+  }, [baseCode, codeMode]);
 
   const onDraftChange = useCallback((value: string) => {
     if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
@@ -219,10 +251,10 @@ export function ExampleLive({
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    setSource(initialCode);
-    setEvalCode(initialCode);
+    setSource(baseCode);
+    setEvalCode(baseCode);
     setEditorKey((k) => k + 1);
-  }, [initialCode]);
+  }, [baseCode]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -237,16 +269,17 @@ export function ExampleLive({
     setFluid(false);
     setResultWidth(undefined);
 
-    let active: ElicitEl | null = null;
+    // Mutable box so assignments inside `mount` (called via new Function) stay visible to TS.
+    const mounted: { el: ElicitEl | null } = { el: null };
     const mount = (node: HTMLElement) => {
       chart.appendChild(node);
       if (
-        !active &&
+        !mounted.el &&
         node &&
         typeof (node as ElicitEl).getData === 'function' &&
         typeof (node as ElicitEl).on === 'function'
       ) {
-        active = node as ElicitEl;
+        mounted.el = node as ElicitEl;
       }
       return node;
     };
@@ -258,23 +291,23 @@ export function ExampleLive({
       const run = new Function(...names, 'mount', evalCode);
       run(...vals, mount);
       if (cancelled) {
-        active?.destroy?.();
+        mounted.el?.destroy?.();
         chart.replaceChildren();
         return;
       }
-      activeRef.current = active;
+      activeRef.current = mounted.el;
       setError(null);
-      setElicited(active);
-      if (active) {
-        if (active.style.width && active.style.width.endsWith('px')) {
-          setResultWidth(active.style.width);
+      setElicited(mounted.el);
+      if (mounted.el) {
+        if (mounted.el.style.width && mounted.el.style.width.endsWith('px')) {
+          setResultWidth(mounted.el.style.width);
         } else {
           setFluid(true);
         }
       }
     } catch (err) {
       if (cancelled) return;
-      active?.destroy?.();
+      mounted.el?.destroy?.();
       chart.replaceChildren();
       activeRef.current = null;
       setElicited(null);

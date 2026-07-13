@@ -1,0 +1,27 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 30, y: 30 }, { x: 70, y: 70 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      fill: "#2563eb",
+      size: 8,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+      edits: [
+        // default gesture: "drag" — pass { gesture: "click" } to change it
+        custom((datum, event, ctx) => ({
+          ...datum,
+          y: ctx.scales.y.invertValue(ctx.pointer.y),
+          touched: true, // becomes data; omit if you only want to rewrite y
+        })),
+      ],
+    }),
+  ],
+}))

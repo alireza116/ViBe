@@ -1,0 +1,23 @@
+mount(Elicit({
+  width: 360, height: 260,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { gdp: 3, life: 6, name: "Ada" },
+    { gdp: 6, life: 8, name: "Grace" },
+    { gdp: 8, life: 4, name: "Alan" },
+  ],
+  schema: {
+    gdp:  { type: "quantitative", domain: [0, 10] },
+    life: { type: "quantitative", domain: [0, 10] },
+    name: { type: "categorical", domain: ["Ada", "Grace", "Alan"] },
+  },
+  features: [
+    point({ fill: "#4f46e5",
+      channels: { x: { field: "gdp" }, y: { field: "life" } } }),
+    text({ fontSize: 12, dy: -10, lineAnchor: "bottom",
+      channels: {
+        x: { field: "gdp" }, y: { field: "life" },
+        text: { field: "name" },
+      } }),
+  ],
+}))

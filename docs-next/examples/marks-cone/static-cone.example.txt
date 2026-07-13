@@ -1,0 +1,19 @@
+mount(Elicit({
+  width: 300, height: 280,
+  margins: { top: 16, right: 16, bottom: 16, left: 16 },
+  axes: false,
+  data: [{ r: 0.6, spread: 0.25 }],
+  schema: {
+    r:      { type: "quantitative", domain: [-1, 1] },
+    spread: { type: "quantitative", domain: [0, 1] },
+  },
+  features: [
+    cone({
+      channels: {
+        angle: { field: "r", scale: { range: [-45, 45] } },
+        spread: { field: "spread", scale: { range: [0, 45] } },
+      },
+      samples: 80, wedge: true, stroke: "#d33",
+    }),
+  ],
+}));

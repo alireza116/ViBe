@@ -1,0 +1,14 @@
+mount(Elicit({
+  width: 360, height: 300,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  schema: {
+    x: { type: "quantitative", domain: [-10, 10] },
+    y: { type: "quantitative", domain: [-10, 10] },
+    intercept: { type: "quantitative" },
+    slope:     { type: "quantitative" },
+  },
+  data: [{ intercept: 2, slope: 0.5 }],
+  features: [
+    trend(),
+  ],
+}));

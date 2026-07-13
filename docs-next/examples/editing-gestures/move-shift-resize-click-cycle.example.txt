@@ -1,0 +1,30 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 24, y: 70, mag: 5, team: "A" },
+    { x: 55, y: 34, mag: 9, team: "B" },
+    { x: 80, y: 60, mag: 12, team: "C" },
+  ],
+  schema: {
+    x:    { type: "quantitative", domain: [0, 100] },
+    y:    { type: "quantitative", domain: [0, 100] },
+    mag:  { domain: [0, 14] },
+    team: { domain: ["A", "B", "C"] },
+  },
+  features: [
+    point({
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        size: { field: "mag" },
+        fill: { field: "team", edit: cycle() },
+      },
+      edits: [
+        drag({ channels: ["x", "y"], when: when.noShift }),  // plain drag = move
+        resize({ channel: "size", when: when.shift }),        // shift-drag = resize
+      ],
+      constraints: [ clamp({ field: "mag", min: 1, max: 14 }) ],
+    }),
+  ],
+}))

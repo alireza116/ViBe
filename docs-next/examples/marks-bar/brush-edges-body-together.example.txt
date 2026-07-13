@@ -1,0 +1,28 @@
+mount(Elicit({
+  width: 380, height: 220,
+  margins: { top: 14, right: 16, bottom: 26, left: 60 },
+  data: [
+    { person: "Ada",   start: 1830, end: 1852 },
+    { person: "Grace", start: 1930, end: 1992 },
+    { person: "Alan",  start: 1931, end: 1954 },
+  ],
+  schema: {
+    person: { type: "categorical", domain: ["Ada", "Grace", "Alan"] },
+    start:  { type: "quantitative", domain: [1820, 2000] },
+    end:    { type: "quantitative", domain: [1840, 2000] },
+  },
+  features: [
+    barX({
+      fill: "#2563eb",
+      channels: {
+        y: { field: "person" },
+        x1: { field: "start" },
+        x2: { field: "end" },
+      },
+      edits: [
+        brushSpan({ channels: ["x1", "x2"], threshold: 40,
+                    edgeInset: 10, guide: true }),
+      ],
+    }),
+  ],
+}))

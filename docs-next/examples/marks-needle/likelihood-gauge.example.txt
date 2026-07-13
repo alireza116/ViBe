@@ -1,0 +1,46 @@
+mount(Elicit({
+  width: 360, height: 220,
+  margins: { top: 40, right: 70, bottom: 20, left: 70 },
+  axes: false,
+  // Let the long band labels ("VERY LIKELY D" …) spill into the margin instead of
+  // being clipped by the plot edge.
+  overflow: "visible",
+  data: [{ chance: "LEANING D" }],
+  schema: {
+    chance: {
+      type: "ordinal",
+      domain: ["VERY LIKELY D", "LIKELY D", "LEANING D", "TOSSUP",
+               "LEANING R", "LIKELY R", "VERY LIKELY R"],
+    },
+  },
+  features: [
+    axisRadial({
+      orient: "top", radius: 110, bands: true, bandWidth: 22,
+      tickSize: 0, labelOffset: 18, fontSize: 8,
+      channels: {
+        angle: { field: "chance", scale: { range: [180, 0] } },
+        // ColorBrewer RdBu is red→blue; reverse so D (left) is blue and R (right)
+        // is red — a proper 7-class diverging categorical palette.
+        fill: { field: "chance", scale: { scheme: "RdBu", reverse: true } },
+      },
+    }),
+    needle({
+      orient: "top", length: 95, fill: "#b91c1c",
+      channels: {
+        angle: {
+          field: "chance",
+          scale: { range: [180, 0] },
+          edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+        },
+      },
+    }),
+    text({
+      fontSize: 14, dy: 32,
+      channels: {
+        text: { field: "chance" },
+        textAnchor: { value: "middle" },
+        lineAnchor: { value: "middle" },
+      },
+    }),
+  ],
+}));

@@ -1,0 +1,22 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: "A", y: 20 }, { x: "B", y: 45 },
+    { x: "C", y: 30 }, { x: "D", y: 60 },
+  ],
+  schema: {
+    x: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    bar({
+      fill: "#2563eb",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y",
+             edit: drag({ pick: "nearest", threshold: 40, guide: true }) },
+      },
+    }),
+  ],
+}))

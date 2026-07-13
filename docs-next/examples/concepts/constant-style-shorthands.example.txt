@@ -1,0 +1,22 @@
+mount(Elicit({
+  width: 340, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 12, y: 40 }, { x: 30, y: 22 }, { x: 48, y: 55 },
+    { x: 66, y: 33 }, { x: 80, y: 68 }, { x: 22, y: 60 },
+  ],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 80] },
+  },
+  features: [
+    point({
+      fill: "#fde68a", stroke: "#b45309", strokeWidth: 2, opacity: 0.85,
+      size: 9,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+    }),
+  ],
+}))

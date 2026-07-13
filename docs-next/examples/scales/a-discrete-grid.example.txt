@@ -1,0 +1,23 @@
+mount(Elicit({
+  width: 360, height: 300,
+  schema: {
+    x:     { type: "categorical", domain: ["A", "B", "C"] },
+    y:     { type: "ordinal",     domain: ["Low", "Mid", "High"] },
+    group: { type: "categorical", domain: ["alpha", "beta", "gamma"] },
+  },
+  data: [
+    { x: "A", y: "Low", group: "alpha" },
+    { x: "B", y: "Mid", group: "beta" },
+    { x: "C", y: "High", group: "gamma" },
+  ],
+  features: [
+    point({
+      size: 12,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        fill: { field: "group" },
+      },
+    }),
+  ],
+}))

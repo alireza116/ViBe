@@ -1,0 +1,20 @@
+mount(Elicit({
+  width: 420, height: 300,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 10] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    lineY({
+      stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom", series: "s",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+      edits: [ edit.line.draw({ along: "x", value: "y", series: "s", samples: 8 }) ],
+    }),
+  ],
+}))

@@ -1,0 +1,47 @@
+mount(Elicit({
+  width: 420, height: 280,
+  margins: { top: 16, right: 16, bottom: 36, left: 40 },
+  data: [
+    { g: "A", layer: 1, belief: 35 },
+    { g: "B", layer: 1, belief: 62 },
+    { g: "C", layer: 1, belief: 48 },
+    { g: "A", layer: 2, belief: 70 },
+    { g: "B", layer: 2, belief: 44 },
+    { g: "C", layer: 2, belief: 81 },
+  ],
+  schema: {
+    g:      { type: "categorical", domain: ["A", "B", "C"] },
+    layer:  { type: "quantitative", domain: [0.5, 2.5] },
+    belief: { type: "quantitative", domain: [0, 100] },
+  },
+  axes: {
+    x: { title: "group" },
+    y: { title: "layer", ticks: 2 },
+  },
+  features: [
+    // A mini radial axis rings each pivot, so every needle shows the 0→100 span
+    // it encodes. Same x/y channels as the needle → one ring per row.
+    axisRadial({
+      radius: 22, ticks: 0, tickSize: 0, labelOffset: 6, fontSize: 7,
+      start: 180, end: 0, stroke: "#cbd5e1",
+      channels: {
+        x: { field: "g" },
+        y: { field: "layer" },
+        angle: { field: "belief", scale: { range: [180, 0] } },
+      },
+    }),
+    needle({
+      length: 24, hubSize: 3, baseWidth: 6,
+      channels: {
+        x: { field: "g" },
+        y: { field: "layer" },
+        angle: {
+          field: "belief",
+          scale: { range: [180, 0] },
+          edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+        },
+        fill: { field: "g" },
+      },
+    }),
+  ],
+}));

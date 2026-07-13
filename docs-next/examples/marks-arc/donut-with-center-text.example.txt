@@ -1,0 +1,32 @@
+mount(Elicit({
+  width: 300, height: 280,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  axes: false,
+  data: [
+    { party: "D", share: 48, label: "48%" },
+    { party: "R", share: 45, label: "" },
+    { party: "O", share: 7, label: "" },
+  ],
+  schema: {
+    party: { type: "categorical" },
+    share: { type: "quantitative", domain: [0, 100] },
+    label: { type: "categorical" },
+  },
+  features: [
+    donut({
+      outerRadius: 100, innerRadius: 55,
+      channels: {
+        angle: { field: "share" },
+        fill: { field: "party" },
+      },
+    }),
+    text({
+      fontSize: 22,
+      channels: {
+        text: { value: "100%" },
+        textAnchor: { value: "middle" },
+        lineAnchor: { value: "middle" },
+      },
+    }),
+  ],
+}));

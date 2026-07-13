@@ -1,0 +1,22 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 16, right: 16, bottom: 30, left: 36 },
+  schema: {
+    when:   { type: "temporal", domain: ["2020-01-01", "2026-01-01"] },
+    belief: { type: "quantitative", domain: [0, 1], default: 0.5 },
+  },
+  axes: { x: { title: "when" }, y: { title: "belief" } },
+  data: [],
+  features: [
+    point({
+      size: 7, fill: "#0d9488", stroke: "#0f5c53", strokeWidth: 1,
+      channels: {
+        x: { field: "when" }, y: { field: "belief" },
+      },
+      edits: [
+        create({ trigger: "dblclick" }),
+        drag({ channels: ["x", "y"] }),
+      ],
+    }),
+  ],
+}))

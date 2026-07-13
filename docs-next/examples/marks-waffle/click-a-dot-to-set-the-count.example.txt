@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 240, height: 300,
+  margins: { top: 16, right: 12, bottom: 24, left: 34 },
+  data: [{ cat: "count", value: 45 }],
+  onChange: (d) => console.log("count:", d[0].value),
+  schema: {
+    cat:   { type: "categorical", domain: ["count"] },
+    value: { type: "quantitative", domain: [0, 100] },
+  },
+  scales: { x: { type: "band" } },
+  features: [
+    waffleY({
+      fill: "#16a34a",
+      shape: "circle",
+      unit: 5,
+      gap: 0,
+      channels: {
+        x: { field: "cat" },
+        y: { field: "value", edit: waffleFill() },   // drag to fill
+      },
+      edits: [ waffleFill({ channels: ["y"], gesture: "click" }) ], // click to set
+    }),
+  ],
+}));

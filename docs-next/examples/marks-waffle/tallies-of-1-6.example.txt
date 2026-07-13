@@ -1,0 +1,23 @@
+const cats = ["A","B","C","D"];
+mount(Elicit({
+  width: 460, height: 260,
+  margins: { top: 16, right: 12, bottom: 28, left: 28 },
+  data: [
+    { cat: "A", value: 1 }, { cat: "B", value: 3 },
+    { cat: "C", value: 6 }, { cat: "D", value: 2 },
+  ],
+  schema: {
+    cat:   { type: "categorical", domain: cats },
+    value: { type: "quantitative", domain: [0, 6] },
+  },
+  scales: { x: { type: "band" } },
+  features: [
+    waffleY({
+      fill: "#d97706",
+      shape: "circle",
+      unit: 1,
+      gap: 0,
+      channels: { x: { field: "cat" }, y: { field: "value" } },
+    }),
+  ],
+}));

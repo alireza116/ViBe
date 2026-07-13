@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 16, right: 16, bottom: 30, left: 36 },
+  schema: {
+    age:    { type: "quantitative", domain: [0, 100] },
+    belief: { type: "quantitative", domain: [0, 1], default: 0.5 },
+    class:  { type: "categorical",  domain: ["A", "B", "C"] },
+  },
+  axes: { x: { title: "age" }, y: { title: "belief" } },
+  data: [],   // start from nothing
+  onChange: (d) => console.log("elicited", d),
+  features: [
+    point({
+      size: 7, stroke: "#1f2733", strokeWidth: 1,
+      channels: {
+        x: { field: "age" }, y: { field: "belief" },
+        fill: { field: "class" },
+      },
+      edits: [
+        create({ trigger: "dblclick" }),
+        drag({ channels: ["x", "y"] }),
+        cycle({ channel: "fill", gesture: "click" }),
+      ],
+    }),
+  ],
+}))

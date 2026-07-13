@@ -1,0 +1,19 @@
+const cats = ["A","B","C","D"];
+mount(Elicit({
+  width: 420, height: 240,
+  margins: { top: 16, right: 16, bottom: 28, left: 16 },
+  axes: { x: {}, y: false },
+  data: [{ bin: "A" }, { bin: "B" }, { bin: "B" }],
+  schema: {
+    bin: { type: "categorical", domain: cats },
+  },
+  scales: { x: { type: "band" } },
+  features: [
+    dotStack({
+      channels: { x: { field: "bin" } },
+      edits: [ create({ trigger: "click", channels: ["x"] }), remove() ],
+      constraints: [ unique({ field: "bin", max: 5, strategy: "reject" }) ],
+      label: true,
+    }),
+  ],
+}));

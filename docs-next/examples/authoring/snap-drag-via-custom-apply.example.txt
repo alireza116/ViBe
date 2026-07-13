@@ -1,0 +1,27 @@
+const snapDrag = edit.makeEdit({
+  type: "snapDrag",
+  gesture: "drag",
+  channels: ["y"],
+  apply: (ctx) => {
+    const ch = ctx.channels[0];
+    const v = edit.invertChannel(ch, ctx.pointer);
+    if (v === undefined || !ctx.datum) return undefined;
+    return { ...ctx.datum, [ch.field]: Math.round(v / 10) * 10 };
+  },
+});
+mount(Elicit({
+  width: 360, height: 240,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [ { cat: "A", n: 40 } ],
+  schema: {
+    cat: { type: "categorical", domain: ["A"] },
+    n: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      fill: "#2563eb", size: 10,
+      channels: { x: { field: "cat" }, y: { field: "n" } },
+      edits: [ snapDrag ],
+    }),
+  ],
+}));

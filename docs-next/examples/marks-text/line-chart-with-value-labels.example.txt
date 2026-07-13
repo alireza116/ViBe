@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 400, height: 260,
+  margins: { top: 20, right: 16, bottom: 28, left: 34 },
+  data: [
+    { t: 0, n: 40 }, { t: 1, n: 62 }, { t: 2, n: 48 },
+    { t: 3, n: 78 }, { t: 4, n: 60 }, { t: 5, n: 84 },
+  ],
+  schema: {
+    t: { type: "quantitative", domain: [0, 5] },
+    n: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    lineY({
+      stroke: "#4f46e5", strokeWidth: 2.5, curve: "catmullRom",
+      channels: { x: { field: "t" }, y: { field: "n" } },
+    }),
+    text({
+      fontSize: 11, dy: -10, lineAnchor: "bottom",
+      fill: "#4f46e5", format: ".0f",
+      channels: {
+        x: { field: "t" }, y: { field: "n" },
+        text: { field: "n" },
+      },
+    }),
+  ],
+}))

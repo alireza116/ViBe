@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 380, height: 300,
+  margins: { top: 16, right: 16, bottom: 30, left: 44 },
+  axes: {
+    x: { ticks: 4, title: "Funnel step" },
+    y: { grid: true, tickFormat: ".0%", title: "Conversion" },
+  },
+  data: [
+    { step: "Visit", rate: 1.0 }, { step: "Signup", rate: 0.62 },
+    { step: "Active", rate: 0.41 }, { step: "Paid", rate: 0.18 },
+  ],
+  schema: {
+    step: { type: "categorical", domain: ["Visit", "Signup", "Active", "Paid"] },
+    rate: { type: "quantitative", domain: [0, 1] },
+  },
+  features: [
+    bar({
+      channels: {
+        x: { field: "step" },
+        y: { field: "rate" },
+      },
+    }),
+  ],
+}))

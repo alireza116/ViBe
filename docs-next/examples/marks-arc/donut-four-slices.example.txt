@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 300, height: 280,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  axes: false,
+  data: [
+    { cat: "A", v: 20 },
+    { cat: "B", v: 20 },
+    { cat: "C", v: 20 },
+    { cat: "D", v: 40 },
+  ],
+  schema: {
+    cat: { type: "categorical" },
+    v: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    donut({
+      outerRadius: 100, innerRadius: 50,
+      edit: edit.arc.edge(),
+      handleSize: 6,
+      channels: {
+        angle: { field: "v" },
+        fill: { field: "cat", scale: { scheme: "tableau10" } },
+      },
+    }),
+  ],
+}));

@@ -1,0 +1,24 @@
+const chart = Elicit({
+  width: 380, height: 130,
+  margins: { top: 20, right: 24, bottom: 34, left: 24 },
+  axes: { x: {}, y: false },
+  data: [{ v: 20 }],
+  schema: {
+    v: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      id: "belief",
+      size: 9, fill: "#2563eb",
+      channels: { x: { field: "v",
+                       edit: drag({ pick: "probe", advance: false }) },},
+      constraints: [ clamp({ min: 0, max: 100, field: "v" }) ],
+    }),
+  ],
+});
+mount(chart);
+const out = document.createElement("div");
+out.style.cssText = "font:12px ui-monospace,monospace;color:#64748b";
+const show = () => { out.textContent = "committed: " + chart.getData()[0].v.toFixed(0); };
+chart.on("change", show); show();
+mount(out);

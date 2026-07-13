@@ -1,0 +1,5 @@
+mount(Elicit(widgets.multipleChoice({
+  question: "Which apply?",
+  options: ["Fast","Cheap","Reliable","Simple"],
+  max: 2,
+})));

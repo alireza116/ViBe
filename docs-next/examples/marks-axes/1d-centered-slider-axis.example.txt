@@ -1,0 +1,21 @@
+mount(Elicit({
+  width: 360, height: 200,
+  margins: { top: 16, right: 20, bottom: 24, left: 20 },
+  axes: {
+    x: { transform: ({ height }) => ({ y: height / 2 }), ticks: 5, title: "Belief (0-100)" },
+    y: false,   // drop the default y axis
+  },
+  data: [{ v: 20 }, { v: 55 }, { v: 80 }],
+  schema: {
+    v: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      size: 8, fill: "#0d9488",
+      channels: {
+        x: { field: "v" },
+      },
+      edits: [ drag({ channels: ["x"] }) ],
+    }),
+  ],
+}))

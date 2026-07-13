@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react';
+
 export type ApiOption = {
   name: string;
   type?: string;
@@ -21,13 +23,23 @@ export type ExampleMeta = {
   try?: string;
 };
 
+/** How ExampleLive presents the source snippet. Default: editable. */
+export type CodeMode = 'editable' | 'collapsed' | 'readonly';
+
+export type ExampleComponentProps = {
+  codeMode?: CodeMode;
+  tall?: boolean;
+};
+
 export type ExampleModule = {
   meta: ExampleMeta;
   code: string;
+  /**
+   * Optional React wrapper from a migrated `.tsx` example.
+   * DocPageView prefers this when present.
+   */
+  Component?: ComponentType<ExampleComponentProps>;
 };
-
-/** How ExampleLive presents the source snippet. Default: editable. */
-export type CodeMode = 'editable' | 'collapsed' | 'readonly';
 
 export type DocSection = {
   id: string;

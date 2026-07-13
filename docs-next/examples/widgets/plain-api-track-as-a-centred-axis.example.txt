@@ -1,0 +1,39 @@
+const prompt = (text) => guides.custom(() => [{
+  type: "text", x: 0, y: -18, text,
+  textAnchor: "start", fontSize: 13, fill: "#0f172a",
+}]);
+
+mount(Elicit({
+  width: 560, height: 120,
+  margins: { top: 34, right: 40, bottom: 40, left: 40 },
+  // Centred 1-D axis: spine = track, end ticks = caps + labels.
+  axes: {
+    x: {
+      transform: ({ height }) => ({ y: height / 2 }),
+      tickValues: [0, 100],
+      tickSize: 7,
+      stroke: "#cbd5e1",
+      fill: "#334155",
+      fontSize: 12,
+    },
+    y: false,
+  },
+  data: [{ value: 40 }],
+  schema: { value: { type: "quantitative", domain: [0, 100] } },
+  constraints: [
+    clamp({ min: 0, max: 100, field: "value" }),
+    snap({ field: "value", step: 5, origin: 0 }),
+  ],
+  guides: [ prompt("How likely is it? (%)") ],
+  features: [
+    point({
+      id: "slider",
+      size: 9,
+      fill: "#2563eb",
+      channels: {
+        x: { field: "value",
+             edit: drag({ pick: "probe", advance: false }) },
+      },
+    }),
+  ],
+}));

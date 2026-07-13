@@ -1,0 +1,3 @@
+mount(Elicit(widgets.region({
+  question: "Where do you expect the outcome?",
+})));

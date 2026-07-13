@@ -1,0 +1,21 @@
+mount(Elicit({
+  width: 400, height: 260,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { t: 1, n: 20 }, { t: 2, n: 45 }, { t: 3, n: 35 },
+    { t: 4, n: 60 }, { t: 5, n: 50 },
+  ],
+  schema: {
+    t: { type: "quantitative", domain: [1, 5] },
+    n: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    areaY({
+      fill: "#2563eb", stroke: "#2563eb",
+      channels: {
+        x: { field: "t" },
+        y: { field: "n", edit: drag() },
+      },
+    }),
+  ],
+}));

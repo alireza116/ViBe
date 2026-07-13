@@ -1,0 +1,21 @@
+mount(Elicit({
+  width: 340, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  schema: {
+    cat: { type: "categorical",  domain: ["A", "B", "C", "D"] },
+    n:   { type: "quantitative", domain: [0, 60] },
+  },
+  data: [
+    { cat: "A", n: 34 }, { cat: "B", n: 58 },
+    { cat: "C", n: 22 }, { cat: "D", n: 47 },
+  ],
+  features: [
+    bar({
+      fill: "#4f46e5",
+      channels: {
+        x: { field: "cat" },              // categorical + bar -> band
+        y: { field: "n", edit: drag() },  // quantitative      -> linear
+      },
+    }),
+  ],
+}))

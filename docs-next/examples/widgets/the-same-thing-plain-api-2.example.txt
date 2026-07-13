@@ -1,0 +1,56 @@
+const options = ["Fast","Cheap","Reliable","Simple"];
+const radius = 11;
+
+const prompt = (text) => guides.custom(() => [{
+  type: "text", x: 0, y: -18, text,
+  textAnchor: "start", fontSize: 13, fill: "#0f172a",
+}]);
+
+const optionRings = () => guides.custom((ctx) => {
+  const cats = ctx.scales.x.domainConfig || [];
+  const cy = ctx.height / 2;
+  const cxOf = (c) => ctx.scales.x.encode(c);
+  const nodes = [];
+  for (let i = 0; i < cats.length - 1; i++) {
+    nodes.push({
+      type: "line",
+      x1: cxOf(cats[i]) + radius, y1: cy,
+      x2: cxOf(cats[i + 1]) - radius, y2: cy,
+      stroke: "#e2e8f0", strokeWidth: 3, background: true,
+    });
+  }
+  for (const c of cats) {
+    nodes.push({
+      type: "circle", cx: cxOf(c), cy, r: radius,
+      fill: "none", stroke: "#cbd5e1", strokeWidth: 1.5,
+    });
+    nodes.push({
+      type: "text", x: cxOf(c), y: cy + 30, text: String(c),
+      textAnchor: "middle", fontSize: 12, fill: "#334155",
+    });
+  }
+  return nodes;
+});
+
+mount(Elicit({
+  width: 560, height: 130,
+  margins: { top: 34, right: 60, bottom: 44, left: 60 },
+  axes: false,
+  data: [],
+  schema: { choice: { type: "categorical", domain: options } },
+  scales: { x: { type: "band" } },
+  constraints: [
+    unique({ field: "choice", strategy: "reject" }),
+    count({ max: 2, strategy: "reject" }),
+  ],
+  guides: [ prompt("Which apply?"), optionRings() ],
+  features: [
+    point({
+      id: "choice",
+      size: radius - 3,
+      fill: "#2563eb",
+      channels: { x: { field: "choice" } },
+      edits: [ toggle({ pick: "probe", channels: ["x"], advance: false }) ],
+    }),
+  ],
+}));

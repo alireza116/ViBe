@@ -1,0 +1,23 @@
+mount(Elicit({
+  width: 240, height: 280,
+  margins: { top: 16, right: 28, bottom: 16, left: 16 },
+  axes: false,
+  data: [{ n: 62 }],
+  schema: { n: { type: "quantitative", domain: [0, 100] } },
+  features: [
+    axisRadial({
+      orient: "right", radius: 100, ticks: 5,
+      channels: { angle: { field: "n", scale: { range: [-90, 90] } } },
+    }),
+    needle({
+      orient: "right", length: 90, fill: "#1d4ed8",
+      channels: {
+        angle: {
+          field: "n",
+          scale: { range: [-90, 90] },
+          edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+        },
+      },
+    }),
+  ],
+}));

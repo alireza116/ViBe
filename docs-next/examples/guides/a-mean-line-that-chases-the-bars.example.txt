@@ -1,0 +1,36 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  guides: [
+    // A literal: a fixed reference.
+    guides.rule({ y: 50, label: "target 50" }),
+    // A function of the context: recomputed from the live rows every render.
+    guides.region({
+      y: ({ data }) => [d3.min(data, (d) => d.y), d3.max(data, (d) => d.y)],
+      fill: "#6366f1", opacity: 0.10,
+    }),
+    guides.rule({
+      y: ({ data }) => d3.mean(data, (d) => d.y),
+      label: "mean",
+      stroke: "#e4572e",
+    }),
+  ],
+  schema: {
+    x: { type: "categorical",  domain: ["A", "B", "C", "D"] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  data: [
+    { x: "A", y: 30 }, { x: "B", y: 55 },
+    { x: "C", y: 45 }, { x: "D", y: 70 },
+  ],
+  constraints: [ clamp({ field: "y", min: 0, max: 100 }) ],
+  features: [
+    bar({
+      fill: "#6366f1",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y", edit: drag() },
+      },
+    }),
+  ],
+}))

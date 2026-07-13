@@ -1,0 +1,22 @@
+mount(Elicit({
+  width: 400, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 0, y: 40 }, { x: 1, y: 62 }, { x: 2, y: 48 },
+    { x: 3, y: 78 }, { x: 4, y: 60 }, { x: 5, y: 84 },
+  ],
+  schema: {
+    s: { type: "categorical" },  // the series key; declared so create() mints it
+    x: { type: "quantitative", domain: [0, 5] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    lineY({
+      stroke: "#4f46e5", strokeWidth: 3, curve: "catmullRom",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+    }),
+  ],
+}))

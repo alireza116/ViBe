@@ -1,0 +1,29 @@
+mount(Elicit({
+  width: 400, height: 320,
+  data: [
+    { x: "A", y: "Low", group: "alpha" },
+    { x: "B", y: "Mid", group: "beta" },
+    { x: "C", y: "High", group: "gamma" },
+  ],
+  constraints: [ unique({ field: ["x", "y"], max: 1 }) ],
+  schema: {
+    x:     { domain: ["A", "B", "C"] },
+    y:     { domain: ["Low", "Mid", "High"] },
+    group: { type: "ordinal", domain: ["alpha", "beta", "gamma"] },
+  },
+  features: [
+    point({
+      size: 12,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        fill: { field: "group" },
+      },
+      edits: [
+        drag({ channels: ["x", "y"] }),
+        create({ defaults: { group: "alpha" } }),
+        remove({ when: when.alt }),
+      ],
+    }),
+  ],
+}))

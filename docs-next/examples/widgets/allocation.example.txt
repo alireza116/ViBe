@@ -1,0 +1,5 @@
+mount(Elicit(widgets.allocation({
+  question: "Allocate 100 points",
+  categories: ["A", "B", "C", "D"],
+  targetSum: 100,
+})));

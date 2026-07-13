@@ -1,0 +1,30 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { g: "A", value: 40 }, { g: "B", value: 62 },
+    { g: "C", value: 48 }, { g: "D", value: 75 },
+  ],
+  schema: {
+    g:     { type: "categorical" },
+    value: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    composite({
+      id: "lollipop",
+      parts: [
+        ruleX({
+          stroke: "#94a3b8", strokeWidth: 2,
+          channels: { x: { field: "g" }, y2: { field: "value" } },
+        }),
+        point({
+          fill: "steelblue", size: 7,
+          channels: {
+            x: { field: "g" },
+            y: { field: "value", edit: drag() },
+          },
+        }),
+      ],
+    }),
+  ],
+}))

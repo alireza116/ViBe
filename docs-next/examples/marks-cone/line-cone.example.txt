@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 360, height: 320,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  axes: false,
+  data: [{ r: 0, spread: 0 }],
+  onChange: (d) => console.log(d[0]),
+  schema: {
+    r:      { type: "quantitative", domain: [-1, 1] },
+    spread: { type: "quantitative", domain: [0, 1] },
+  },
+  features: [
+    cone({
+      channels: {
+        // Schema owns the domain (r units); the scale owns the range (degrees).
+        angle: { field: "r", scale: { range: [-45, 45] },
+                 edit: rotate({ pick: "probe", stage: 0 }) },
+        spread: { field: "spread", scale: { range: [0, 45] },
+                  edit: rotate({ pick: "probe", stage: 1,
+                                 relativeTo: "angle" }) },
+      },
+      samples: 60, wedge: true,
+    }),
+  ],
+}));

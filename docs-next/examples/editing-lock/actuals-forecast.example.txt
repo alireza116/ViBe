@@ -1,0 +1,27 @@
+mount(Elicit({
+  width: 400, height: 260,
+  margins: { top: 16, right: 16, bottom: 30, left: 44 },
+  schema: {
+    q:    { type: "categorical",  domain: ["Q1", "Q2", "Q3", "Q4"] },
+    n:    { type: "quantitative", domain: [0, 100] },
+    kind: { type: "categorical",  domain: ["actual", "forecast"] },
+  },
+  data: [
+    { q: "Q1", n: 42, kind: "actual" },
+    { q: "Q2", n: 55, kind: "actual" },
+    { q: "Q3", n: 50, kind: "forecast" },
+    { q: "Q4", n: 50, kind: "forecast" },
+  ],
+  // The lock is a property of the row, so it reads straight off the data.
+  lock: (d) => d.kind === "actual",
+  features: [
+    barY({
+      channels: {
+        x: { field: "q" },
+        y: { field: "n", edit: drag({ guide: true }) },
+        fill: { field: "kind",
+                scale: { range: ["#94a3b8", "#4f46e5"] } },
+      },
+    }),
+  ],
+}))

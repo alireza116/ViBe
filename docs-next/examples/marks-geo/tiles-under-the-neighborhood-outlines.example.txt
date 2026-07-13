@@ -1,0 +1,39 @@
+mount(Elicit({
+  width: 520, height: 360,
+  margins: { top: 8, right: 8, bottom: 8, left: 8 },
+  projection: { type: "mercator", domain: vancouver, inset: 6 },
+  data: [{ name: "study area", west: -123.140, south: 49.275, east: -123.100, north: 49.290 }],
+  schema: {
+    name:  { type: "categorical" },
+    west:  { type: "quantitative", domain: [-123.27, -123.02] },
+    south: { type: "quantitative", domain: [49.20, 49.32] },
+    east:  { type: "quantitative", domain: [-123.27, -123.02] },
+    north: { type: "quantitative", domain: [49.20, 49.32] },
+  },
+  features: [
+    // A lighter, less busy basemap than OSM standard. Any {z}/{x}/{y} server works.
+    geoTile({
+      url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+      subdomains: ["a", "b", "c"],
+      opacity: 0.85,
+      attribution: "© OpenStreetMap · © CARTO",
+    }),
+
+    // Vector boundaries on top of the imagery.
+    geoBasemap({ geojson: vancouver, fill: "none", stroke: "#1e293b", strokeWidth: 0.8 }),
+
+    geoRect({
+      fill: "rgba(37, 99, 235, 0.18)", stroke: "#1d4ed8", strokeWidth: 1.5,
+      channels: {
+        west:  { field: "west" },
+        south: { field: "south" },
+        east:  { field: "east" },
+        north: { field: "north" },
+      },
+      edits: [
+        edit.geo.brush({ edgeInset: 10 }),
+        edit.geo.createRect({ width: 0.024, height: 0.014, defaults: { name: "new area" } }),
+      ],
+    }),
+  ],
+}));
