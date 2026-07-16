@@ -111,9 +111,14 @@ function constraintGuide(constraint, gctx) {
         case 'clamp': return clampGuide(constraint.options, gctx);
         case 'maintainSum': return maintainSumGuide(constraint.options, gctx);
         case 'snap': return snapGuide(constraint.options, gctx);
-        // count / unique are CARDINALITY rules (how many data / per category), not
-        // value bounds — there is no line on a value axis to draw, so they render
-        // no guide by design. A custom constraint can still supply meta.guide above.
+        // No guide, by design, for the rest:
+        //   count / unique  cardinality rules (how many rows / per category), not
+        //                   value bounds — there's no line on a value axis to draw.
+        //   ordering / monotonic / spacing
+        //                   their bound is the NEIGHBOUR's current value, which is
+        //                   already on screen: the other handle, or the next point.
+        //                   Drawing a line on top of a mark you can see says nothing.
+        // A custom constraint can still supply its own drawer via meta.guide above.
         default: return [];
     }
 }

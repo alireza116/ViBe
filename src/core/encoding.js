@@ -39,6 +39,10 @@ export const DEFAULT_PALETTE = [
 ];
 // Default two-stop ramp for a continuous colour channel.
 export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
+// Default three-stop ramp for a DIVERGING colour channel: two hues meeting at a
+// near-white neutral, so the pivot reads as "neither side" and distance from it
+// reads in either direction. (ColorBrewer RdBu's ends — colour-blind safe.)
+export const DEFAULT_DIVERGING = ['#2166ac', '#f7f7f7', '#b2182b'];
 
 // Default glyph range for the `symbol` channel — neutral unicode SHAPES (like
 // Observable Plot's symbol channel), so a symbol channel always renders something
@@ -140,8 +144,11 @@ export function schemeRange(scheme, type, count) {
     if (CATEGORICAL_SCHEMES[key]) return [...CATEGORICAL_SCHEMES[key]];
     const interp = RAMP_SCHEMES[key];
     if (!interp) return null;
-    // A continuous colour channel wants a two-stop ramp for createScale; a discrete
-    // one wants one swatch per category.
+    // A continuous colour channel wants a ramp for createScale; a discrete one wants
+    // one swatch per category. A diverging scale needs the ramp's MIDPOINT too —
+    // that's the colour its pivot takes, and on a Brewer diverging scheme it's the
+    // neutral the two hues meet at.
+    if (type === 'diverging') return [interp(0), interp(0.5), interp(1)];
     if (type === 'sequential') return [interp(0), interp(1)];
     const n = Math.max(2, count || 2);
     const discrete = DISCRETE_RAMP_SCHEMES[key];
@@ -290,7 +297,10 @@ export function channelRange(channelName, type, dims) {
     // as its base channel, so fillOpacity/strokeOpacity and fill/stroke behave
     // like opacity when driven by a field.
     if (OPACITY_CHANNELS.has(channelName)) return [0.15, 1];
-    if (COLOR_CHANNELS.has(channelName)) return type === 'sequential' ? DEFAULT_RAMP : DEFAULT_PALETTE;
+    if (COLOR_CHANNELS.has(channelName)) {
+        if (type === 'diverging') return DEFAULT_DIVERGING;
+        return type === 'sequential' ? DEFAULT_RAMP : DEFAULT_PALETTE;
+    }
     // Symbol channel: a glyph palette (author overrides with scale.range/scheme).
     if (SYMBOL_CHANNELS.has(channelName)) return [...DEFAULT_SYMBOLS];
     return [0, 1];

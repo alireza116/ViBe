@@ -6,8 +6,8 @@ export type Datum = Record<string, any>;
 // holds the data type. A scale type is named by `scale` (a string, or the `type`
 // of a ScaleSpec). See scaleTypeFor in core/encoding.js for the routing.
 export type ScaleType =
-  | 'linear' | 'log' | 'pow' | 'sqrt' | 'time'
-  | 'band' | 'point' | 'ordinal' | 'sequential';
+  | 'linear' | 'log' | 'symlog' | 'pow' | 'sqrt' | 'time'
+  | 'band' | 'point' | 'ordinal' | 'sequential' | 'diverging';
 
 // A field's MEASUREMENT type in the dataset schema (what the data means), as
 // opposed to a ScaleType (how a channel draws it). scaleTypeFor translates one to
@@ -34,7 +34,13 @@ export interface ScaleSpec {
   nice?: boolean;      // continuous
   clamp?: boolean;     // continuous
   base?: number;       // log
+  constant?: number;   // symlog — the width of the linear region around zero
   exponent?: number;   // pow
+  // diverging — the DATA value the ramp's midpoint sits on (the neutral colour).
+  // Defaults to 0 when the domain straddles it, else the domain's midpoint. Each
+  // side is scaled independently, so the pivot keeps its colour on a lopsided
+  // domain rather than drifting to the middle of the range.
+  pivot?: number;
 }
 
 // One field of the elicited-dataset schema. Declares the field's measurement

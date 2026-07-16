@@ -5,4 +5,8 @@ export { maintainSum, normalize } from './maintainSum.js';
 export { count } from './count.js';
 export { unique } from './unique.js';
 export { snap } from './snap.js';
+// Shape rules: what an elicited row / curve is allowed to look like.
+export { ordering } from './ordering.js';
+export { monotonic } from './monotonic.js';
+export { spacing } from './spacing.js';
 
