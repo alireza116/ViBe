@@ -46,6 +46,16 @@ export function makeEdit(spec) {
         // Write target: absent -> the dataset (a datum or array); 'domain' -> the
         // schema (edit.axis.*). Read as a capability flag by the engine's commit path.
         target: spec.target || undefined,
+        // How this edit changes the dataset's SHAPE, declared so the engine can
+        // resolve `activeIndex` (the datum a constraint repairs around) without
+        // knowing what edit it's running:
+        //   'append' -> the gesture minted a row; the active one is the last.
+        //   'delete' -> the gesture dropped a row; no datum is active.
+        //   null     -> the row at `index` is the active one (the common case).
+        // An edit that mints AND drops (toggle), or appends many rows at once
+        // (newSeries/draw), leaves this null: "the touched datum" is genuinely
+        // ambiguous, and null means "resolve nothing around it".
+        cardinality: spec.cardinality || null,
         apply: spec.apply
     };
 }

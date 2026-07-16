@@ -16,40 +16,37 @@ import { axisOf } from './encoding.js';
 // it in this exact form — wrapping `import.meta` in a JSDoc cast hides it from the
 // transform, leaving `env` undefined and every guard silently dead.
 const DEV = !!(import.meta.env && import.meta.env.DEV);
+// Scope goes in the name: `edit.line.draw()` expects a line mark, `edit.arc.edge()`
+// an arc, and so on. Each scope names the mark capability that makes it work; a
+// mismatch is a silent no-op at runtime (the edit's `when` gate never fires), so
+// warn once per feature+edit. One table, not one function per family — a new
+// mark family adds a row here, not a new guard.
+/** @type {Record<string, { flag: string, expects: string }>} */
+const SCOPE_CAPABILITY = {
+    line: { flag: 'supportsSeries', expects: 'a line mark (line/area)' },
+    geo: { flag: 'supportsGeo', expects: 'a geo* mark (geoPoint, geoLine, …)' },
+    arc: { flag: 'supportsArc', expects: 'an arc mark (arc/pie/donut)' },
+    waffle: { flag: 'supportsWaffle', expects: 'a waffle mark' },
+    axis: { flag: 'isAxis', expects: 'an axis mark (axisX/axisY/axisRadial)' },
+};
+
 /** @type {Set<string>} */
 const warnedScope = new Set();
 /**
  * @param {any} feature
  * @param {import('../types').Edit[]} edits
  */
-function warnLineScopeMismatch(feature, edits) {
+function warnScopeMismatch(feature, edits) {
     for (const e of edits) {
-        if (e.scope !== 'line' || feature.supportsSeries) continue;
-        const key = `${feature.id}:${e.type}`;
+        if (!e.scope) continue;
+        const cap = SCOPE_CAPABILITY[e.scope];
+        if (!cap || feature[cap.flag]) continue;
+        const key = `${feature.id}:${e.scope}.${e.type}`;
         if (warnedScope.has(key)) continue;
         warnedScope.add(key);
         console.warn(
-            `[vibe] edit.line.${e.type}() is attached to a mark without series support ` +
-            `(feature "${feature.id}"). Line-scoped edits expect a line mark; it may not behave.`
-        );
-    }
-}
-
-/** @type {Set<string>} */
-const warnedGeoScope = new Set();
-/**
- * @param {any} feature
- * @param {import('../types').Edit[]} edits
- */
-function warnGeoScopeMismatch(feature, edits) {
-    for (const e of edits) {
-        if (e.scope !== 'geo' || feature.supportsGeo) continue;
-        const key = `${feature.id}:${e.type}`;
-        if (warnedGeoScope.has(key)) continue;
-        warnedGeoScope.add(key);
-        console.warn(
-            `[vibe] edit.geo.${e.type}() is attached to a mark without geo support ` +
-            `(feature "${feature.id}"). Geo-scoped edits expect a geo* mark; it may not behave.`
+            `[vibe] edit.${e.scope}.${e.type}() is attached to a mark without ${e.scope} support ` +
+            `(feature "${feature.id}"). ${e.scope}-scoped edits expect ${cap.expects}; it may not behave.`
         );
     }
 }
@@ -355,8 +352,7 @@ export function Elicit(spec) {
             const nodes = feature.build(currentData, scales, innerWidth, innerHeight);
             featureNodes[feature.id] = nodes;
 
-            if (DEV) warnLineScopeMismatch(feature, collectEdits(feature));
-            if (DEV) warnGeoScopeMismatch(feature, collectEdits(feature));
+            if (DEV) warnScopeMismatch(feature, collectEdits(feature));
             if (DEV) warnMisplacedEdits(feature);
 
             // A feature with an ACTIVE direct-pick edit is interactive on its marks,
@@ -514,9 +510,11 @@ export function Elicit(spec) {
             : currentData.map((d, i) => (i === index ? result : d));
 
         // Which datum the gesture touched, for invariants that resolve a violation
-        // relative to it (create -> the appended one; a delete -> none; else `index`).
-        const activeIndex = edit.type === 'create' ? newData.length - 1
-            : (edit.type === 'remove' || edit.type === 'removeSeries') ? null
+        // relative to it. Read from the edit's DECLARED cardinality (see makeEdit),
+        // never from its type — a custom append/delete edit gets the same treatment
+        // as the built-in create/remove without the engine knowing either exists.
+        const activeIndex = edit.cardinality === 'append' ? newData.length - 1
+            : edit.cardinality === 'delete' ? null
                 : index;
 
         // Data-layer invariants: the dataset's first (they hold for every edit from

@@ -19,9 +19,9 @@ import vancouver from './data/vancouver.js';
 // ---- dependency surface (namespace spread → self-maintaining) ---------------
 // Universal edits (drag, create, remove, resize, cycle, custom) are spread bare so
 // examples read `edit: drag()`. The scoped edit namespaces — `line`, `axis`, `arc`,
-// `geo` — stay under `edit.*.*` so their scope shows in the example AND so they don't
-// shadow the same-named MARKS (plot.axis / plot.arc / the line mark). The internal
-// `nextSeriesKey` is excluded too.
+// `geo`, `waffle` — stay under `edit.*.*` so their scope shows in the example AND so
+// they don't shadow the same-named MARKS (plot.axis / plot.arc / plot.waffle / the
+// line mark). The internal `nextSeriesKey` is excluded too.
 //
 // Spread order matters: `constraints.custom` is an alias of `defineConstraint`, and
 // would overwrite `edit.custom` if constraints landed last — the gestures page's
@@ -30,6 +30,7 @@ import vancouver from './data/vancouver.js';
 // `define` / `defineConstraint` or `constraints.custom`.
 const {
     line: _editLine, axis: _editAxis, arc: _editArc, geo: _editGeo,
+    waffle: _editWaffle,
     nextSeriesKey: _nsk, when: _editWhen, ...universalEdits
 } = vibe.edit;
 const depObj = {

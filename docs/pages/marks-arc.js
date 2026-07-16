@@ -4,9 +4,9 @@ export default {
     title: 'Arc · Pie · Donut',
     lead:
         'Data-driven <b>pie</b> and <b>donut</b> slices. Each row’s magnitude (the ' +
-        '<code class="inline">angle</code> field) is stacked and normalized to a circle ' +
+        '<code class="inline">value</code> field) is stacked and normalized to a circle ' +
         '(or partial arc). Shares path math with <code class="inline">axisRadial</code>. ' +
-        'Wire <code class="inline">edit: edit.arc.edge()</code> to <b>drag a slice boundary</b> ' +
+        'Wire <code class="inline">edits: [edit.arc.edge()]</code> to <b>drag a slice boundary</b> ' +
         'and redistribute the two adjacent shares (the total stays fixed).',
     api: [
         {
@@ -22,11 +22,11 @@ export default {
                 { name: 'innerRadius', type: 'number', default: '0', desc: 'Inner radius; &gt;0 makes a donut. <code class="inline">donut()</code> defaults this.' },
                 { name: 'padAngle', type: 'number', default: '0', desc: 'Gap between slices in degrees.' },
                 { name: 'arc / start / end', type: '…', default: "'full'", desc: 'Angular span of the whole pie.' },
-                { name: 'edit', type: 'Edit | Edit[]', default: '—', desc: 'Boundary editing — usually <code class="inline">edit.arc.edge()</code>. Draws a grab handle on every boundary (a full circle also gets a seam handle).' },
+                { name: 'edits', type: 'Edit[]', default: '—', desc: 'Boundary editing — usually <code class="inline">[edit.arc.edge()]</code>. Draws a grab handle on every boundary (a full circle also gets a seam handle).' },
                 { name: 'handles / handleSize', type: 'boolean / number', default: 'true / 5', desc: '<code class="inline">handles: false</code> keeps the edge grabbable but hides the dot.' },
             ],
             channels: [
-                { name: 'angle', type: 'magnitude field', desc: 'Slice size in data units; layout normalizes by the sum of rows.' },
+                { name: 'value', type: 'magnitude field', desc: 'Slice size in data units; layout normalizes by the sum of rows. Named <code class="inline">value</code>, not <code class="inline">angle</code>: it is a quantity the layout turns into a sweep, where <code class="inline">angle</code> elsewhere means a rotation.' },
                 { name: 'fill', type: 'ordinal | const', desc: 'Slice colour.' },
                 { name: 'x / y', type: 'linear', desc: 'Optional centre.' },
             ],
@@ -60,7 +60,7 @@ export default {
     pie({
       outerRadius: 100,
       channels: {
-        angle: { field: "share" },
+        value: { field: "share" },
         fill: { field: "party" },
       },
     }),
@@ -96,7 +96,7 @@ export default {
     donut({
       outerRadius: 100, innerRadius: 55,
       channels: {
-        angle: { field: "share" },
+        value: { field: "share" },
         fill: { field: "party" },
       },
     }),
@@ -144,9 +144,9 @@ export default {
   features: [
     pie({
       outerRadius: 100,
-      edit: edit.arc.edge(),
+      edits: [edit.arc.edge()],
       channels: {
-        angle: { field: "share" },
+        value: { field: "share" },
         fill: { field: "party" },
       },
     }),
@@ -175,10 +175,10 @@ export default {
   features: [
     donut({
       outerRadius: 100, innerRadius: 50,
-      edit: edit.arc.edge(),
+      edits: [edit.arc.edge()],
       handleSize: 6,
       channels: {
-        angle: { field: "v" },
+        value: { field: "v" },
         fill: { field: "cat", scale: { scheme: "tableau10" } },
       },
     }),

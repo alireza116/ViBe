@@ -1,6 +1,6 @@
 // @ts-check
-import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { isBand, bandwidthOf, bandStartOf, baselineOf } from '../core/scales.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
 
 // bar: a rectangular mark that composes across orientations. The band axis is
 // the categorical/position axis (sets the bar's position + thickness) and the
@@ -91,9 +91,11 @@ function buildBar(options, forcedOrientation) {
     // mark (not per datum) — the missing form (baseline+value) stays the default.
     const hasXSpan = !!(channels.x1 && channels.x2);
     const hasYSpan = !!(channels.y1 && channels.y2);
-    const seriesField = stack === true
-        ? (opts.series || (channels.fill && channels.fill.field) || null)
-        : (typeof stack === 'string' ? stack : null);
+    // `stack: 'field'` names the series outright; `stack: true` infers it the same
+    // way every series-grouping mark does.
+    const seriesField = typeof stack === 'string' ? stack
+        : stack === true ? seriesFieldOf(opts, channels)
+            : null;
     const doStack = !!stack && !hasXSpan && !hasYSpan;
 
     return {
@@ -139,7 +141,7 @@ function buildBar(options, forcedOrientation) {
                     // Category on y (band geometry), value/length on x. The value
                     // axis resolves through encodeChannel like every other mark; the
                     // band axis keeps its interval geometry (start + thickness).
-                    const bandStart = yScale ? yScale(d[yKey]) : 0;
+                    const bandStart = bandStartOf(yScale, d[yKey], 0);
                     const thickness = bandwidthOf(yScale, 20);
                     const baseline = baselineOf(xScale);
                     let lo, hi;
@@ -175,7 +177,7 @@ function buildBar(options, forcedOrientation) {
 
                 // Vertical: category on x (band geometry), value/length on y. Value
                 // via encodeChannel (as every mark); band axis keeps its interval.
-                const bandStart = xScale ? xScale(d[xKey]) : 0;
+                const bandStart = bandStartOf(xScale, d[xKey], 0);
                 const thickness = bandwidthOf(xScale, 20);
                 const baseline = baselineOf(yScale);
                 let lo, hi;

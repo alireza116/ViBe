@@ -205,6 +205,60 @@ async function main() {
         check('lock: the free years in that same stroke were repainted',
             repainted.length > 0 && repainted.every((d) => Math.abs(d.deaths - 55000) < 3000));
 
+        // ---- Arc: the `value` magnitude channel + boundary drag --------------
+        // The magnitude channel is `value` (not `angle` — that means rotation
+        // everywhere else), and the mark takes `edits: [...]` like every other mark.
+        // Both are load-bearing renames: if either failed to land, the pie draws
+        // with no slices or the handles never appear, so assert the geometry.
+        console.log('\nArc: value channel + edge drag (docs/marks/arc.html)');
+        await page.goto(`${BASE}/docs/marks/arc.html`, { waitUntil: 'networkidle' });
+        await page.waitForSelector('#edit svg path');
+
+        const sliceCount = await page.$$eval('#edit svg path', (ps) => ps.length);
+        check('arc: value channel drives slices', sliceCount >= 3, `${sliceCount} slice paths`);
+        const handleCount = await page.$$eval('#edit svg circle', (cs) => cs.length);
+        check('arc: edits:[edit.arc.edge()] emits boundary handles', handleCount >= 2, `${handleCount} handles`);
+
+        const sharesOf = (sec) => page.$eval(`${sec} .data-body`, (el) =>
+            [...el.textContent.matchAll(/share:\s*(-?\d+(?:\.\d+)?)/g)].map((m) => Number(m[1])));
+        const before = await sharesOf('#edit');
+        const sumBefore = before.reduce((a, b) => a + b, 0);
+
+        // Drag the first boundary handle AROUND the ring. Two things this has to get
+        // right: scroll the chart into view first (the arc sits far down the page, and
+        // raw viewport coordinates would land on nothing), and move along the ring
+        // rather than straight — the edit reads the pointer's ANGLE about the pivot,
+        // so a radial drag is a no-op by design.
+        // The section holds several examples; drive the first chart's first handle.
+        const handle = page.locator('#edit svg').first().locator('circle').first();
+        await handle.scrollIntoViewIfNeeded();
+        const box = await handle.boundingBox();
+        const svgBox = await page.locator('#edit svg').first().boundingBox();
+        const pivot = { x: svgBox.x + svgBox.width / 2, y: svgBox.y + svgBox.height / 2 };
+        const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        const spin = (deg) => {
+            const a = (deg * Math.PI) / 180;
+            const dx = start.x - pivot.x, dy = start.y - pivot.y;
+            return {
+                x: pivot.x + dx * Math.cos(a) - dy * Math.sin(a),
+                y: pivot.y + dx * Math.sin(a) + dy * Math.cos(a)
+            };
+        };
+        await page.mouse.move(start.x, start.y);
+        await page.mouse.down();
+        for (let i = 1; i <= 12; i++) {
+            const p = spin((18 * i) / 12);
+            await page.mouse.move(p.x, p.y);
+        }
+        await page.mouse.up();
+        await page.waitForTimeout(120);
+        const after = await sharesOf('#edit');
+        const sumAfter = after.reduce((a, b) => a + b, 0);
+        check('arc: dragging a boundary changes the shares',
+            JSON.stringify(before) !== JSON.stringify(after), `${before} -> ${after}`);
+        check('arc: the pair-shift holds the total fixed',
+            Math.abs(sumAfter - sumBefore) < 0.01, `${sumBefore} -> ${sumAfter}`);
+
         check('no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     } finally {
         await browser.close();

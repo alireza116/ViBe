@@ -1,5 +1,5 @@
 // @ts-check
-import { isBand, bandwidthOf, baselineOf, rangeExtent } from '../core/scales.js';
+import { isBand, bandwidthOf, bandStartOf, baselineOf, rangeExtent } from '../core/scales.js';
 import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 
 // rect: the generalized bar. A bar fixes ONE axis to a categorical band (position
@@ -54,7 +54,7 @@ function resolveExtent(axis, channels, scales, scale, datum, key, forcedValue, f
     }
     // 3. BAND — a categorical axis (skipped when this axis is forced to value).
     if (!forcedValue && isBand(scale)) {
-        const start = scale ? scale(datum[key]) : 0;
+        const start = bandStartOf(scale, datum[key], 0);
         const thickness = bandwidthOf(scale, 20);
         return { lo: start, hi: start + thickness, band: true };
     }

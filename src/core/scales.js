@@ -236,6 +236,30 @@ export function bandwidthOf(scale, fallback) {
 }
 
 /**
+ * Leading pixel edge of a value's slot — the companion to `bandwidthOf`, which
+ * gives the slot's thickness. `positionOnScale`/`encode` deliberately return a
+ * band's CENTRE (that's where a mark sits), so a mark that draws the band as a
+ * rectangle needs its start. That's the one geometry question encodeChannel
+ * can't answer, and hand-rolling `scale(d[key])` for it is how the "four ways to
+ * place a mark" drift started — ask here instead.
+ *   band  -> the category's interval start
+ *   point -> the tick itself (no width to offset from)
+ *   other -> encode(value), i.e. the position IS the edge
+ * @param {any} scale
+ * @param {any} value
+ * @param {any} [fallback]
+ * @returns {any}
+ */
+export function bandStartOf(scale, value, fallback) {
+    if (!scale) return fallback;
+    if (scale.kind === 'band' || scale.kind === 'point') {
+        const p = scale(value);
+        return p == null ? fallback : p;
+    }
+    return positionOnScale(scale, value, fallback);
+}
+
+/**
  * The pixel span a mark occupies ALONG a (possibly categorical) axis — the
  * inverse concern of `bandwidthOf`: not "how thick" but "from where to where".
  * Mark-agnostic so any mark that spans a band (a tick across its category, and

@@ -200,11 +200,14 @@ export interface Edit {
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
   pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' | 'brushRect' | 'probe' | (string & {});
-  // null = universal (any mark); 'line' = needs a series-grouping mark; 'axis' /
-  // 'arc' = belongs on that mark kind (the scope shows in the name, e.g.
-  // edit.line.*, edit.axis.*, edit.arc.*). The engine dev-warns when a 'line' edit
-  // is attached to a mark without series support.
-  scope: 'line' | 'axis' | 'arc' | 'geo' | null;
+  // null = universal (any mark). Otherwise the mark FAMILY this edit needs, which
+  // is also where it lives in the API (the scope shows in the name: edit.line.*,
+  // edit.arc.*, edit.waffle.*, edit.geo.*, edit.axis.*). Each scope names a mark
+  // capability flag — supportsSeries / supportsArc / supportsWaffle / supportsGeo /
+  // isAxis — and the engine dev-warns when the mark it's attached to lacks it,
+  // instead of leaving you a silently dead gesture. See SCOPE_CAPABILITY in
+  // core/elicit.js.
+  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | null;
   threshold: number;
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
@@ -230,6 +233,16 @@ export interface Edit {
   // chart). A capability flag, read like the array-vs-datum classification — not
   // an interaction-mode branch. Used by the editable-axis edits (edit.axis.*).
   target?: 'domain';
+  // How this edit changes the dataset's SHAPE. The engine reads it to resolve
+  // `activeIndex` — the datum a constraint repairs around — WITHOUT knowing which
+  // edit is running, the same way `target` classifies the write destination:
+  //   'append' -> a row was minted; the active one is the last.
+  //   'delete' -> a row was dropped; no datum is active.
+  //   null/absent -> the row at `index` is the active one (the common case).
+  // Declare 'append' on a custom minting edit to get create()'s treatment. An edit
+  // that both mints and drops (toggle), or appends many rows at once (newSeries,
+  // draw), leaves this null: "the touched datum" has no single answer there.
+  cardinality?: 'append' | 'delete' | null;
   apply: (ctx: EditContext) => any;
 }
 

@@ -15,7 +15,7 @@ mount(Elicit({
     pie({
       outerRadius: 100,
       channels: {
-        angle: { field: "share" },
+        value: { field: "share" },
         fill: { field: "party" },
       },
     }),

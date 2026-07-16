@@ -8,11 +8,14 @@ import * as vibe from '@vibe';
 import * as d3 from 'd3';
 import vancouver from '../data/vancouver.js';
 
+// The scoped namespaces are held back so they don't shadow the same-named MARKS
+// spread from vibe.plot (axis / arc / waffle / line).
 const {
   line: _editLine,
   axis: _editAxis,
   arc: _editArc,
   geo: _editGeo,
+  waffle: _editWaffle,
   nextSeriesKey: _nsk,
   when: _editWhen,
   ...universalEdits

@@ -16,9 +16,9 @@ mount(Elicit({
       gap: 0,
       channels: {
         x: { field: "cat" },
-        y: { field: "value", edit: waffleFill() },   // drag to fill
+        y: { field: "value", edit: edit.waffle.fill() },   // drag to fill
       },
-      edits: [ waffleFill({ channels: ["y"], gesture: "click" }) ], // click to set
+      edits: [ edit.waffle.fill({ channels: ["y"], gesture: "click" }) ], // click to set
     }),
   ],
 }));

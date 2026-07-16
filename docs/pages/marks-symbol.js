@@ -113,7 +113,7 @@ export default {
             examples: [
                 {
                     title: 'Fruit basket',
-                    blurb: 'Each category\'s cells render its emoji; waffleFill drags the count.',
+                    blurb: 'Each category\'s cells render its emoji; edit.waffle.fill drags the count.',
                     try: '<b>Drag</b> up a column to change its count.',
                     code:
 `mount(Elicit({
@@ -132,7 +132,7 @@ export default {
     waffleY({
       channels: {
         x: { field: "fruit" },
-        y: { field: "n", edit: waffleFill() },
+        y: { field: "n", edit: edit.waffle.fill() },
         symbol: { field: "fruit", scale: { range: ["🍎","🍌","🍒"] } },
       },
       constraints: [ snap({ step: 1 }) ],

@@ -12,7 +12,9 @@
 //     pick      'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' |
 //               'brushRect' | 'probe' | string — how the gesture selects its target
 //               (see edit/drivers). Custom picks register via registerDriver.
-//     scope     null (universal) | 'line' (needs a series-grouping mark)
+//     scope     null (universal) | the mark family it needs: 'line' | 'arc' |
+//               'waffle' | 'geo' | 'axis'. Each names a mark capability the engine
+//               checks, so a misplaced edit warns instead of silently no-op'ing.
 //     constrain constraint(s) applied on this edit's commit (sugar)
 //     guide     true to self-draw this edit's guide (constraint bounds / snap ring)
 //     stage     active only in this stage of a multi-step elicitation; null = always
@@ -29,8 +31,6 @@
 
 export { drag, dragSpan, brushSpan, brushRect, resize, rotate, cycle, create, toggle, remove, editText, legend, custom, rank } from './basic.js';
 
-// waffleFill: the cell-native fill edit for the waffle mark (scope is in the name).
-export { waffleFill } from './waffle.js';
 export { when } from './when.js';
 // Authoring kit — public so custom edits / marks can reuse the same primitives.
 export { makeEdit, nextSeriesKey, invertChannel, recenterSpan, markCenter, schemaDefaults } from './shared.js';
@@ -55,11 +55,18 @@ import { edge as arcEdge } from './arc.js';
 // drag a slice boundary to redistribute the two adjacent rows (total preserved).
 export const arc = { edge: arcEdge };
 
+import { fill as waffleFill } from './waffle.js';
+
+// Waffle-scoped edit: fill up to the exact cell under the pointer. Reads the grid
+// geometry only a waffle stamps, so the scope is in the name like line/arc/geo.
+export const waffle = { fill: waffleFill };
+
 import {
     drag as geoDrag,
     create as geoCreate,
     draw as geoDraw,
     dragVertex as geoDragVertex,
+    removeVertex as geoRemoveVertex,
     brush as geoBrush,
     createRect as geoCreateRect,
 } from './geo.js';
@@ -70,6 +77,7 @@ export const geo = {
     create: geoCreate,
     draw: geoDraw,
     dragVertex: geoDragVertex,
+    removeVertex: geoRemoveVertex,
     brush: geoBrush,
     createRect: geoCreateRect,
 };

@@ -6,7 +6,7 @@
 // only the vertical pixel, round it to a whole row, and ignore the column. The
 // result is a fill that lands above or below the cell you pointed at.
 //
-// `waffleFill` instead reads the grid geometry the waffle stamps on every cell
+// `edit.waffle.fill` instead reads the grid geometry the waffle stamps on every cell
 // node (`node.grid`) and resolves the pointer to the exact cell under it — row
 // AND column — then sets the value to that cell's COUNT: `value = dlo + count *
 // unit`. So a click (or drag) fills every cell up to and INCLUDING the one you
@@ -35,18 +35,24 @@ function countAt(pointer, grid) {
 }
 
 /**
- * waffleFill — fill a waffle up to (and including) the cell under the pointer.
- * Works for both `gesture: 'drag'` (fill as you drag) and `gesture: 'click'`
- * (fill on a single tap). No-op on any mark that doesn't stamp `node.grid`.
+ * edit.waffle.fill — fill a waffle up to (and including) the cell under the
+ * pointer. Works for both `gesture: 'drag'` (fill as you drag) and
+ * `gesture: 'click'` (fill on a single tap).
+ *
+ * Scoped to the waffle mark: it reads `node.grid`, which only a waffle stamps,
+ * so on any other mark it can only no-op. `scope: 'waffle'` is what lets the
+ * engine say so out loud (see SCOPE_CAPABILITY in core/elicit.js) instead of
+ * leaving you with a dead gesture and no error.
  * @param {any} [options]
  * @returns {import('../types').Edit}
  */
-export function waffleFill(options = {}) {
+export function fill(options = {}) {
     const { channel, channels, ...rest } = options;
     return makeEdit({
-        type: 'waffleFill',
+        type: 'fill',
         gesture: 'drag',
         channels: channels || (channel ? [channel] : null),
+        scope: 'waffle',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const grid = ctx.node && ctx.node.grid;

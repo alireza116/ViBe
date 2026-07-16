@@ -64,6 +64,7 @@ function classifyZone(feature, scales, datum, channelNames, px, py, edgeInset) {
 export const brushDriver = {
     name: 'brush',
     wants: (e) => e.pick === 'brush',
+    selects: true,
     onEvent({ feature, event, edits, marks, data, scales, session, runEdit }) {
         const edit = edits[0];
         const threshold = pickThreshold(edit);

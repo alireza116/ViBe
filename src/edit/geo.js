@@ -63,6 +63,7 @@ export function create(options = {}) {
         channels: null,
         pick: 'plane',
         scope: 'geo',
+        cardinality: 'append',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const ll = invertPoint(projectionOf(ctx), ctx.pointer);
@@ -106,6 +107,47 @@ export function dragVertex(options = {}) {
             const prev = ctx.datum[coordsKey];
             if (!Array.isArray(prev) || !prev[vi]) return undefined;
             const next = prev.map((c, i) => (i === vi ? [ll.lon, ll.lat] : c.slice()));
+            return { ...ctx.datum, [coordsKey]: next };
+        },
+    });
+}
+
+/**
+ * removeVertex — drop one vertex from a geoLine's coordinates list: the inverse of
+ * `dragVertex` (and of the vertex-appending `draw`), so a drawn path can be
+ * simplified as well as reshaped. Same target contract as `dragVertex` — the
+ * touched node carries `channel: 'vertex'` and `vertexIndex`.
+ *
+ * Defaults to a plain click. When `dragVertex` already lives on the same handle,
+ * that's fine (drag and click are different gestures); pair with a modifier if a
+ * sibling CLICK edit shares the mark: `removeVertex({ when: when.alt })`.
+ *
+ * A line needs two vertices to exist, so a removal that would leave fewer is
+ * rejected (returns undefined) rather than silently degenerating the row — use
+ * the ordinary `remove` to delete the whole line.
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function removeVertex(options = {}) {
+    const { min = 2, ...rest } = options;
+    return makeEdit({
+        type: 'removeVertex',
+        gesture: 'click',
+        channels: null,
+        pick: 'direct',
+        scope: 'geo',
+        when: (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.channel === 'vertex'),
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            if (!ctx.datum || !ctx.node) return undefined;
+            const vi = ctx.node.vertexIndex;
+            if (vi == null) return undefined;
+            const coordsKey = (ctx.markChannels.coordinates && ctx.markChannels.coordinates.field)
+                || 'coordinates';
+            const prev = ctx.datum[coordsKey];
+            if (!Array.isArray(prev) || !prev[vi]) return undefined;
+            if (prev.length <= min) return undefined; // would degenerate the line
+            const next = prev.filter((_, i) => i !== vi).map((c) => c.slice());
             return { ...ctx.datum, [coordsKey]: next };
         },
     });
@@ -316,6 +358,7 @@ export function createRect(options = {}) {
         channels: null,
         pick: 'plane',
         scope: 'geo',
+        cardinality: 'append',
         // Clicking an existing box means "grab it", not "make another".
         when: (/** @type {import('../types').EditContext} */ ctx) => !overExistingRect(ctx, edgeInset),
         ...rest,

@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
 
 // area: a filled path under a series (the distributional sibling of line). Same
 // grouping / ordering knobs as line; emits one filled `path` per series plus
@@ -33,10 +33,7 @@ function buildArea(options, forcedValueAxis) {
 
     const xKey = (channels.x && channels.x.field) || 'x';
     const yKey = (channels.y && channels.y.field) || 'y';
-    const seriesField = opts.series || opts.z
-        || (channels.fill && channels.fill.field)
-        || (channels.stroke && channels.stroke.field)
-        || null;
+    const seriesField = seriesFieldOf(opts, channels);
 
     return {
         id,

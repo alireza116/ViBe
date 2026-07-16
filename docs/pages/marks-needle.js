@@ -17,12 +17,12 @@ export default {
             name: 'needle(options)',
             summary: 'Import from <code class="inline">vibe.plot</code>. One needle (+ hub) per datum.',
             signatures: [
-                'needle({ channels, length, hubSize, baseWidth, orient, arc, start, end, id }) → Feature',
+                'needle({ channels, length, handleSize, baseWidth, orient, arc, start, end, id }) → Feature',
             ],
             options: [
                 { name: 'channels', type: 'object', default: '{}', desc: 'Must include <code class="inline">angle</code>. Optional <code class="inline">x</code>/<code class="inline">y</code> place the pivot (default: plot centre).' },
                 { name: 'length', type: 'number', default: '40% of min(w,h)', desc: 'Needle length in px. Or drive via the <code class="inline">size</code> channel.' },
-                { name: 'hubSize', type: 'number', default: '5', desc: 'Pivot circle radius in px.' },
+                { name: 'handleSize', type: 'number', default: '5', desc: 'Pivot circle radius in px.' },
                 { name: 'baseWidth', type: 'number', default: '10', desc: 'Width of the needle base in px.' },
                 { name: 'orient', type: "'top' | 'right' | 'bottom' | 'left'", default: "'top'", desc: 'Semicircle facing that side. <code class="inline">top</code> = NYT / speedometer (range <code class="inline">[180, 0]</code>). Match with <code class="inline">scale.range</code>.' },
                 { name: 'arc', type: "'semi' | 'full'", default: "'semi'", desc: '<code class="inline">full</code> → <code class="inline">[-180, 180]</code>. Otherwise same as <code class="inline">orient</code> (default top).' },
@@ -163,7 +163,7 @@ export default {
       },
     }),
     needle({
-      length: 24, hubSize: 3, baseWidth: 6,
+      length: 24, handleSize: 3, baseWidth: 6,
       channels: {
         x: { field: "g" },
         y: { field: "layer" },

@@ -14,10 +14,10 @@ mount(Elicit({
       unit: 1/50,
       channels: {
         x: { field: "cat" },
-        y: { field: "value", edit: waffleFill() },
+        y: { field: "value", edit: edit.waffle.fill() },
       },
       // click sets the count to the clicked cell too
-      edits: [ waffleFill({ channels: ["y"], gesture: "click" }) ],
+      edits: [ edit.waffle.fill({ channels: ["y"], gesture: "click" }) ],
     }),
   ],
 }));

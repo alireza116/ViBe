@@ -3,7 +3,7 @@ import type { DocPage } from '../lib/types';
 const page: DocPage = {
   "route": "/marks/arc",
   "title": "Arc · Pie · Donut",
-  "lead": "Data-driven <b>pie</b> and <b>donut</b> slices. Each row’s magnitude (the <code class=\"inline\">angle</code> field) is stacked and normalized to a circle (or partial arc). Shares path math with <code class=\"inline\">axisRadial</code>. Wire <code class=\"inline\">edit: edit.arc.edge()</code> to <b>drag a slice boundary</b> and redistribute the two adjacent shares (the total stays fixed).",
+  "lead": "Data-driven <b>pie</b> and <b>donut</b> slices. Each row’s magnitude (the <code class=\"inline\">value</code> field) is stacked and normalized to a circle (or partial arc). Shares path math with <code class=\"inline\">axisRadial</code>. Wire <code class=\"inline\">edits: [edit.arc.edge()]</code> to <b>drag a slice boundary</b> and redistribute the two adjacent shares (the total stays fixed).",
   "api": [
     {
       "name": "arc(options) · pie(options) · donut(options)",
@@ -39,7 +39,7 @@ const page: DocPage = {
           "desc": "Angular span of the whole pie."
         },
         {
-          "name": "edit",
+          "name": "edits",
           "type": "Edit | Edit[]",
           "default": "—",
           "desc": "Boundary editing — usually <code class=\"inline\">edit.arc.edge()</code>. Draws a grab handle on every boundary (a full circle also gets a seam handle)."
@@ -53,7 +53,7 @@ const page: DocPage = {
       ],
       "channels": [
         {
-          "name": "angle",
+          "name": "value",
           "type": "magnitude field",
           "desc": "Slice size in data units; layout normalizes by the sum of rows."
         },

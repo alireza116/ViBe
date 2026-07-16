@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
 
 // line: a connected-path mark over an ordered set of points. It is deliberately
 // GENERAL — a you-draw-it curve, a multi-series line chart, a connected scatter
@@ -54,11 +54,7 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
     const xKey = (channels.x && channels.x.field) || 'x';
     const yKey = (channels.y && channels.y.field) || 'y';
 
-    // Grouping field: explicit `series`/`z`, else the field behind `stroke`
-    // (Plot's `z` default) so a coloured line chart groups without extra config.
-    const seriesField = opts.series || opts.z
-        || (channels.stroke && channels.stroke.field)
-        || null;
+    const seriesField = seriesFieldOf(opts, channels);
 
     return {
         id,

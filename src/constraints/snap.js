@@ -9,8 +9,9 @@ import { defineConstraint } from './define.js';
 // value in the edit's apply(), then this invariant snaps it — pure data, no
 // pixels. `field` names the data field it governs (default 'y', the value axis).
 //
-// It draws no guide (the switch in edit/guide.js has no snap case); a snapped
-// value is a cardinality-style rule whose boundaries aren't a single line.
+// Its guide (edit/guide.js) is a tick per stop along the value axis: a snap has no
+// single boundary line to draw, but it does have a grid, and showing it is what
+// tells you WHY the handle you're dragging keeps landing between your fingers.
 
 /**
  * @param {{ step?: number, origin?: number, field?: string }} [options]

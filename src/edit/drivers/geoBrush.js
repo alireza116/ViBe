@@ -104,6 +104,7 @@ function boundsFields(feature) {
 export const geoBrushDriver = {
     name: 'geoBrush',
     wants: (e) => e.pick === 'geoBrush',
+    selects: true,
     onEvent({ feature, event, edits, marks, data, scales, session, runEdit }) {
         const edit = edits[0];
         const edgeInset = edgeInsetOf(edit);

@@ -24,7 +24,7 @@ export default {
                 'waffleY({ channels, unit, multiple, shape, showEmpty, emptyFill, gap, edits, constraints, id }) → Feature',
             ],
             options: [
-                { name: 'channels', type: 'object', default: '{}', desc: 'One band (category) axis and one linear (value) axis; put <code class="inline">edit: waffleFill()</code> on the value channel — it fills up to the exact cell under the pointer, for both drag and click.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'One band (category) axis and one linear (value) axis; put <code class="inline">edit: edit.waffle.fill()</code> on the value channel — it fills up to the exact cell under the pointer, for both drag and click.' },
                 { name: 'unit', type: 'number', default: '1', desc: 'The quantity <b>one cell</b> represents. <code class="inline">value / unit</code> cells fill; raise it for large counts, lower it (&gt;0) for fine fractions.' },
                 { name: 'multiple', type: 'number', default: 'auto', desc: 'Cells across the band. Defaults to whatever makes cells square given the band width and scale; each row then spans <code class="inline">multiple · unit</code>.' },
                 { name: 'shape', type: "'rect' | 'circle'", default: "'rect'", desc: 'Cell shape — square cells or dots.' },
@@ -78,11 +78,11 @@ mount(Elicit({
         {
             id: 'proportion',
             title: 'Picking a proportion',
-            intro: 'One category on a 0–1 axis; each cell is 1/50, so 50 cells fill the block. waffleFill() fills up to the exact cell under the pointer — click or drag — so the value is always a whole number of cells.',
+            intro: 'One category on a 0–1 axis; each cell is 1/50, so 50 cells fill the block. edit.waffle.fill() fills up to the exact cell under the pointer — click or drag — so the value is always a whole number of cells.',
             examples: [
                 {
                     title: 'Proportion picker',
-                    blurb: 'click or drag; unit = 1/50 makes 50 countable cells, waffleFill lands exactly on the cell you point at.',
+                    blurb: 'click or drag; unit = 1/50 makes 50 countable cells, edit.waffle.fill lands exactly on the cell you point at.',
                     try: 'click a cell, or drag up/down.',
                     code:
 `mount(Elicit({
@@ -101,10 +101,10 @@ mount(Elicit({
       unit: 1/50,
       channels: {
         x: { field: "cat" },
-        y: { field: "value", edit: waffleFill() },
+        y: { field: "value", edit: edit.waffle.fill() },
       },
       // click sets the count to the clicked cell too
-      edits: [ waffleFill({ channels: ["y"], gesture: "click" }) ],
+      edits: [ edit.waffle.fill({ channels: ["y"], gesture: "click" }) ],
     }),
   ],
 }));`,
@@ -142,9 +142,9 @@ mount(Elicit({
       gap: 0,
       channels: {
         x: { field: "cat" },
-        y: { field: "value", edit: waffleFill() },   // drag to fill
+        y: { field: "value", edit: edit.waffle.fill() },   // drag to fill
       },
-      edits: [ waffleFill({ channels: ["y"], gesture: "click" }) ], // click to set
+      edits: [ edit.waffle.fill({ channels: ["y"], gesture: "click" }) ], // click to set
     }),
   ],
 }));`,

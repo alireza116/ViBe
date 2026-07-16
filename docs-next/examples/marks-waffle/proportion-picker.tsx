@@ -6,7 +6,7 @@ import type { CodeMode, ExampleMeta } from '../../lib/types';
 
 export const meta: ExampleMeta = {
   title: "Proportion picker",
-  blurb: "click or drag; unit = 1/50 makes 50 countable cells, waffleFill lands exactly on the cell you point at.",
+  blurb: "click or drag; unit = 1/50 makes 50 countable cells, edit.waffle.fill lands exactly on the cell you point at.",
   try: "click a cell, or drag up/down.",
 };
 

@@ -15,10 +15,10 @@ mount(Elicit({
   features: [
     donut({
       outerRadius: 100, innerRadius: 50,
-      edit: edit.arc.edge(),
+      edits: [edit.arc.edge()],
       handleSize: 6,
       channels: {
-        angle: { field: "v" },
+        value: { field: "v" },
         fill: { field: "cat", scale: { scheme: "tableau10" } },
       },
     }),
