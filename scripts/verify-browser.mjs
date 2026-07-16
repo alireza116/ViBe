@@ -323,6 +323,40 @@ async function main() {
             Math.abs(undone[0].y - beforeDrag[0].y) < 0.01,
             `${afterDrag[0].y} -> ${undone[0].y}, expected ${beforeDrag[0].y}`);
 
+        // ---- Uncertainty band: area span mode + the ordering invariant ------
+        // The whole stack composing: a y1/y2 pair fills between the fields, both
+        // edges are grabbable, and a dataset invariant holds the edge you grabbed
+        // while pushing the other — which only a real drag can show.
+        console.log('\nUncertainty band (docs/marks/area.html)');
+        await page.goto(`${BASE}/docs/marks/area.html`, { waitUntil: 'networkidle' });
+        await page.waitForSelector('#band svg path.mark-line');
+
+        const bandEl = '#band .chart > div';
+        const bandRows = () => page.$eval(bandEl, (e) => e.getData());
+        const bandHandles = await page.$$eval('#band svg circle', (cs) => cs.length);
+        check('band: both edges get handles', bandHandles === 8, `${bandHandles} handles for 4 rows x lo/hi`);
+
+        const bandBefore = await bandRows();
+        check('band: seeded lo <= hi', bandBefore.every((/** @type {any} */ d) => d.lo <= d.hi));
+
+        // Drag one row's LOW edge up past its high edge.
+        const lowEdge = page.locator('#band svg circle').first();
+        await lowEdge.scrollIntoViewIfNeeded();
+        const lb = await lowEdge.boundingBox();
+        await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height / 2 - 150, { steps: 10 });
+        await page.mouse.up();
+        await page.waitForTimeout(120);
+        const bandAfter = await bandRows();
+        check('band: the dragged edge moved', bandAfter[0].lo !== bandBefore[0].lo,
+            `${bandBefore[0].lo} -> ${bandAfter[0].lo}`);
+        check('band: ordering held (lo <= hi) by carrying the other edge',
+            bandAfter[0].lo <= bandAfter[0].hi,
+            `lo ${bandAfter[0].lo}, hi ${bandAfter[0].hi}`);
+        check('band: ordering left the other rows alone',
+            bandAfter[1].lo === bandBefore[1].lo && bandAfter[1].hi === bandBefore[1].hi);
+
         check('no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     } finally {
         await browser.close();
