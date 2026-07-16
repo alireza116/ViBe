@@ -68,6 +68,8 @@ export class D3Renderer {
         this._bindPlaneGestures(plane, pointer, onEvent, planeOnTop);
 
         const drag = this._makeDrag(onEvent, effects.grab);
+        // Keyboard access rides along with drag: same nodes, same edits.
+        const keys = this._makeKeyboard(onEvent);
         // A mark-scoped click (routed to the mark's click edits, e.g. cycle /
         // remove). d3.drag suppresses the click after a real drag, so this only
         // fires on a click without movement — drag moves, click edits.
@@ -100,20 +102,20 @@ export class D3Renderer {
         // Connecting paths (line marks) sit above guide regions but BELOW the
         // handle dots, so the dots stay grabbable on top of the line. Editable
         // paths (needle / pie) also get drag wiring here.
-        this._drawPaths(g, allPaths, { drag, markClick });
+        this._drawPaths(g, allPaths, { drag, markClick, keys });
 
         this._drawMarks(g,
             allRects.filter((/** @type {any} */ n) => !n.guide),
             allCircles.filter((/** @type {any} */ n) => !n.guide),
-            { drag, markClick });
+            { drag, markClick, keys });
 
         this._drawGuideCircles(g, allCircles.filter((/** @type {any} */ n) => n.guide));
-        this._drawLines(g, allLines.filter((/** @type {any} */ n) => !n.background), { drag, markClick });
+        this._drawLines(g, allLines.filter((/** @type {any} */ n) => !n.background), { drag, markClick, keys });
         // Foreground text splits by role: an editable text MARK (its feature has a
         // direct-pick edit) gets the interactive draw (drag + click + retype); guide
         // labels and inert label marks stay non-interactive.
         const fgTexts = allTexts.filter((/** @type {any} */ n) => !n.background);
-        this._drawTextMarks(g, fgTexts.filter((/** @type {any} */ n) => n.editable), { drag, markClick });
+        this._drawTextMarks(g, fgTexts.filter((/** @type {any} */ n) => n.editable), { drag, markClick, keys });
         this._drawLabels(g, fgTexts.filter((/** @type {any} */ n) => !n.editable));
 
         // In plane-on-top (proximity) mode the plane must sit above the marks and
@@ -259,6 +261,48 @@ export class D3Renderer {
     }
 
     /**
+     * Keyboard access to a mark, attached wherever `drag` is. A pointer is not the
+     * only way to mean "this value, please": tab to a mark and arrow-key it.
+     *
+     * The renderer owns the keyboard lifecycle here for the same reason it owns
+     * editText's inline input — it keeps the engine ignorant of the mode. It emits a
+     * `nudge`, a semantic "one step this way", NOT a pixel delta: how far a step goes
+     * is a question only the scale can answer (a fixed pixel nudge is a no-op on a
+     * band axis until it happens to cross an edge), and the engine resolves it into
+     * the ordinary drag every edit already understands.
+     *
+     * Only `editable` nodes take focus: a node with no direct-pick edit has nothing
+     * a keypress could do, so putting it in the tab order would be a dead stop for
+     * anyone tabbing through.
+     * @param {(e: any) => void} onEvent
+     * @returns {(sel: any) => void}
+     */
+    _makeKeyboard(onEvent) {
+        /** @type {Record<string, [-1 | 0 | 1, -1 | 0 | 1]>} */
+        const ARROWS = {
+            // [dx, dy] in PIXEL space — ArrowUp is negative y, which is why it reads
+            // as "up" on screen and (on a conventional y axis) as "more".
+            ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+        };
+        return (/** @type {any} */ sel) => {
+            sel
+                .attr('tabindex', (/** @type {any} */ d) => (d.editable ? 0 : null))
+                .attr('role', (/** @type {any} */ d) => (d.editable ? 'button' : null))
+                .on('keydown', (/** @type {any} */ event, /** @type {any} */ d) => {
+                    if (!d || !d.editable) return;
+                    const arrow = ARROWS[event.key];
+                    if (!arrow) return;
+                    event.preventDefault();  // don't scroll the page out from under it
+                    const [dx, dy] = arrow;
+                    onEvent({
+                        type: 'nudge', node: d, dx, dy,
+                        coarse: !!event.shiftKey, rawEvent: event,
+                    });
+                });
+        };
+    }
+
+    /**
      * The drag behaviour attached to every interactive mark. clickDistance lets a
      * press that moves < N px still count as a click (d3 otherwise suppresses the
      * click on any movement), so mark-click editors fire reliably alongside drag.
@@ -277,14 +321,25 @@ export class D3Renderer {
         const filter = (grab && grab.filter != null)
             ? grab.filter
             : (grab === undefined ? DEFAULT_EFFECTS.grab.filter : null);
+        // dragstart/dragend bracket the stroke. No edit declares them as a `gesture`
+        // (they match nothing in dispatch), but they tell the engine where one
+        // continuous gesture begins and ends — which is what lets undo step back a
+        // whole drag instead of one pointermove at a time. The plane drag already
+        // emits the same three; this makes the mark drag's lifecycle match it.
         return d3.drag()
             .clickDistance(4)
-            .on('start', function() { if (filter) d3.select(this).style('filter', filter); })
+            .on('start', function(event, d) {
+                if (filter) d3.select(this).style('filter', filter);
+                onEvent({ type: 'dragstart', x: event.x, y: event.y, node: d, rawEvent: event.sourceEvent });
+            })
             .on('drag', function(event, d) {
                 // event.x/event.y are relative to the SVG scene group.
                 onEvent({ type: 'drag', x: event.x, y: event.y, node: d, rawEvent: event.sourceEvent });
             })
-            .on('end', function() { if (filter) d3.select(this).style('filter', null); });
+            .on('end', function(event, d) {
+                if (filter) d3.select(this).style('filter', null);
+                onEvent({ type: 'dragend', x: event.x, y: event.y, node: d, rawEvent: event.sourceEvent });
+            });
     }
 
     // -- style + geometry primitives -----------------------------------------
@@ -425,9 +480,9 @@ export class D3Renderer {
      * @param {any} g
      * @param {any[]} markRects
      * @param {any[]} markCircles
-     * @param {{ drag: any, markClick: (e: any, d: any) => void }} io
+     * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
      */
-    _drawMarks(g, markRects, markCircles, { drag, markClick }) {
+    _drawMarks(g, markRects, markCircles, { drag, markClick, keys }) {
         // A mark may opt OUT of the pointer (pointerEvents: 'none') — a ghost/affordance
         // node, or a glyph part that must not swallow the plane's hover/click. Without
         // this a decorative circle would eat the gesture the plane driver needs, the
@@ -437,7 +492,8 @@ export class D3Renderer {
             .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
             .style('cursor', (/** @type {any} */ d) => d.editable ? 'ns-resize' : 'default')
             .on('click', markClick)
-            .call(drag);
+            .call(drag)
+            .call(keys);
         this._geomRect(rectSel);
         this._applyStyle(rectSel, { fill: 'black' });
 
@@ -446,7 +502,8 @@ export class D3Renderer {
             .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
             .style('cursor', (/** @type {any} */ d) => d.editable ? 'move' : 'default')
             .on('click', markClick)
-            .call(drag);
+            .call(drag)
+            .call(keys);
         this._geomCircle(circleSel);
         this._applyStyle(circleSel, { fill: 'black' });
     }
@@ -460,15 +517,16 @@ export class D3Renderer {
      *     interactive cursor; d3.drag is inert on the rest.
      * @param {any} g
      * @param {any[]} lines
-     * @param {{ drag: any, markClick: (e: any, d: any) => void }} io
+     * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
      */
-    _drawLines(g, lines, { drag, markClick }) {
+    _drawLines(g, lines, { drag, markClick, keys }) {
         const sel = g.selectAll('line.mark').data(lines).join('line')
             .attr('class', 'mark')
             .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
             .style('cursor', (/** @type {any} */ d) => d.editable ? (d.cursor || 'move') : 'default')
             .on('click', markClick)
-            .call(drag);
+            .call(drag)
+            .call(keys);
         this._geomLine(sel);
         this._applyStyle(sel, { stroke: 'black', strokeWidth: 1, opacity: 1 });
     }
@@ -480,7 +538,7 @@ export class D3Renderer {
      * gets the same click + drag wiring as other marks.
      * @param {any} g
      * @param {any[]} paths
-     * @param {{ drag: any, markClick: (e: any, d: any) => void }} [io]
+     * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} [io]
      */
     _drawPaths(g, paths, io) {
         const sel = g.selectAll('path.mark-line').data(paths).join('path')
@@ -495,7 +553,7 @@ export class D3Renderer {
             });
         this._applyStyle(sel, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 });
         if (io) {
-            sel.on('click', io.markClick).call(io.drag);
+            sel.on('click', io.markClick).call(io.drag).call(io.keys);
         }
     }
 
@@ -505,9 +563,9 @@ export class D3Renderer {
      * Double-click opens an inline editor for content editing (see _editText).
      * @param {any} g
      * @param {any[]} texts
-     * @param {{ drag: any, markClick: (e: any, d: any) => void }} io
+     * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
      */
-    _drawTextMarks(g, texts, { drag, markClick }) {
+    _drawTextMarks(g, texts, { drag, markClick, keys }) {
         const sel = g.selectAll('text.mark').data(texts).join('text')
             .attr('class', 'mark')
             .style('pointer-events', (/** @type {any} */ d) => d.pointerEvents || 'auto')
@@ -520,7 +578,8 @@ export class D3Renderer {
                 event.stopPropagation();
                 this._editText(event, d);
             })
-            .call(drag);
+            .call(drag)
+            .call(keys);
         this._geomText(sel, 'middle');
         this._applyStyle(sel, { fill: 'black', opacity: 1 });
     }

@@ -259,6 +259,70 @@ async function main() {
         check('arc: the pair-shift holds the total fixed',
             Math.abs(sumAfter - sumBefore) < 0.01, `${sumBefore} -> ${sumAfter}`);
 
+        // ---- Keyboard editing + undo/redo ---------------------------------
+        // Both are gesture-shaped and only prove out under real input: the nudge has
+        // to step from where the datum's VALUE is (a bar's node centre is halfway up
+        // the bar, so anchoring there teleports it), and undo has to treat a whole
+        // drag as one entry however many commits it made along the way.
+        console.log('\nKeyboard editing + undo (docs/marks/bar.html)');
+        await page.goto(`${BASE}/docs/marks/bar.html`, { waitUntil: 'networkidle' });
+        await page.waitForSelector('#editing svg rect.mark');
+
+        const barEl = '#editing .chart > div';
+        const barRows = () => page.$eval(barEl, (e) => e.getData());
+        const barY = async (i) => (await barRows())[i].y;
+        const history = () => page.$eval(barEl, (e) => ({ undo: e.canUndo(), redo: e.canRedo() }));
+
+        const bar0 = page.locator('#editing svg rect.mark').first();
+        await bar0.scrollIntoViewIfNeeded();
+        check('keyboard: an editable mark is focusable',
+            (await bar0.getAttribute('tabindex')) === '0');
+        check('keyboard: history starts empty', (await history()).undo === false);
+
+        const y0 = await barY(0);
+        await bar0.focus();
+        for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+        await page.waitForTimeout(80);
+        const y1 = await barY(0);
+        // Domain [0,100], so a 1% step is one unit per press — and it goes UP.
+        check('keyboard: ArrowUp steps the value up from its current value',
+            Math.abs(y1 - (y0 + 3)) < 0.01, `${y0} -> ${y1}`);
+
+        await page.keyboard.down('Shift');
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.up('Shift');
+        await page.waitForTimeout(80);
+        check('keyboard: Shift takes a coarse step',
+            Math.abs((await barY(0)) - (y1 - 10)) < 0.01, `${y1} -> ${await barY(0)}`);
+
+        // Each press is its own undo entry; the others are untouched.
+        await page.$eval(barEl, (e) => e.undo());
+        check('undo: steps back one keypress', Math.abs((await barY(0)) - y1) < 0.01);
+        for (let i = 0; i < 3; i++) await page.$eval(barEl, (e) => e.undo());
+        check('undo: unwinds to the seeded value', Math.abs((await barY(0)) - y0) < 0.01,
+            `${await barY(0)} vs ${y0}`);
+        check('undo: bottoms out', (await history()).undo === false);
+        check('redo: available after undo', (await history()).redo === true);
+        await page.$eval(barEl, (e) => e.redo());
+        check('redo: replays the keypress', Math.abs((await barY(0)) - (y0 + 1)) < 0.01);
+
+        // A DRAG is one entry, however many commits it made.
+        const dragBox = await bar0.boundingBox();
+        const beforeDrag = await barRows();
+        await page.mouse.move(dragBox.x + dragBox.width / 2, dragBox.y + 6);
+        await page.mouse.down();
+        for (let k = 1; k <= 12; k++) await page.mouse.move(dragBox.x + dragBox.width / 2, dragBox.y + 6 + k * 5);
+        await page.mouse.up();
+        await page.waitForTimeout(120);
+        const afterDrag = await barRows();
+        check('drag: moved the value', afterDrag[0].y !== beforeDrag[0].y,
+            `${beforeDrag[0].y} -> ${afterDrag[0].y}`);
+        await page.$eval(barEl, (e) => e.undo());
+        const undone = await barRows();
+        check('undo: a whole drag is ONE entry (not one per pointermove)',
+            Math.abs(undone[0].y - beforeDrag[0].y) < 0.01,
+            `${afterDrag[0].y} -> ${undone[0].y}, expected ${beforeDrag[0].y}`);
+
         check('no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     } finally {
         await browser.close();

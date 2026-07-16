@@ -111,7 +111,8 @@ export function resolveMarkNode(ctx) {
 
 /**
  * Centre of a scene node: circles / needles carry cx/cy; rects carry
- * x/y/width/height; paths may stamp cx/cy for angular edits about a pivot.
+ * x/y/width/height; paths may stamp cx/cy for angular edits about a pivot; a text
+ * mark carries a bare x/y anchor.
  * @param {any} node
  * @returns {{ cx: number, cy: number } | null}
  */
@@ -121,7 +122,56 @@ export function markCenter(node) {
     if (node.x != null && node.width != null) {
         return { cx: node.x + node.width / 2, cy: node.y + (node.height || 0) / 2 };
     }
+    // A bare x/y node (text): its anchor IS its position.
+    if (node.x != null && node.y != null) return { cx: node.x, cy: node.y };
     return null;
+}
+
+// One keyboard step along a continuous axis, as a fraction of its pixel range.
+// Arbitrary by nature (there is no "natural" step on a continuous scale), so it's
+// named rather than sprinkled: fine enough to place a value, coarse enough that
+// crossing the axis doesn't take a hundred presses. A `snap` constraint quantizes
+// the result on commit, which is how a stepped field gets exact stops for free.
+const NUDGE_FRACTION = 0.01;
+const NUDGE_FRACTION_COARSE = 0.1;
+
+/**
+ * Where the pointer would be if you nudged it one step along `scale` — the pixel a
+ * keyboard press stands in for, so an arrow key drives the SAME edit a drag does
+ * (the edit still just inverts a pointer through a scale; it never learns there was
+ * a keyboard).
+ *
+ * The step has to be asked of the scale, which is why this can't live in the
+ * renderer: on a discrete axis a step is "the next category" (a fixed pixel nudge
+ * would do nothing at all until it happened to cross a band edge), and on a
+ * continuous one it's a fraction of the range.
+ * @param {any} scale the axis scale (may be null / non-invertible)
+ * @param {number} at current pixel position on that axis
+ * @param {-1 | 0 | 1} dir step direction in PIXEL space
+ * @param {boolean} [coarse] a bigger step (Shift)
+ * @returns {number} the new pixel position (unchanged when it can't step)
+ */
+export function nudgeTarget(scale, at, dir, coarse = false) {
+    if (!scale || !dir || !scale.invertible) return at;
+
+    if (scale.kind === 'band' || scale.kind === 'point') {
+        const domain = scale.domain();
+        if (domain.length < 2) return at;
+        const current = scale.invertValue(at);
+        const i = domain.indexOf(current);
+        if (i < 0) return at;
+        // A domain isn't always drawn low-to-high (a reversed range, or y's inverted
+        // pixels), so ask the scale which way its categories actually run before
+        // deciding which one "one step right/down" means.
+        const ascends = scale.encode(domain[domain.length - 1]) > scale.encode(domain[0]);
+        const next = i + (ascends ? dir : -dir);
+        if (next < 0 || next >= domain.length) return at;
+        return scale.encode(domain[next]);
+    }
+
+    const [lo, hi] = rangeExtent(scale);
+    const step = (hi - lo) * (coarse ? NUDGE_FRACTION_COARSE : NUDGE_FRACTION);
+    return Math.max(lo, Math.min(hi, at + dir * step));
 }
 
 // Compare two domain positions numerically (a Date sorts by its timestamp), so a

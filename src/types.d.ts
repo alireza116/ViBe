@@ -660,7 +660,16 @@ export interface ElicitElement extends HTMLDivElement {
   // (edit.axis.*) reshaped. The caller's original spec.schema is never mutated.
   getSchema(): Schema;
   // Replace the dataset and re-render. Bypasses constraints (trusted seed/reset).
+  // Also clears the undo history: a reseed is a new starting point, not an edit.
   setData(data: Datum[]): void;
+  // Step back / forward one GESTURE. A drag is one entry however many commits it
+  // made along the way; a click or a typed commit is its own. Both restore the
+  // dataset AND the schema (an axis edit reshapes a domain) and fire 'change'.
+  // Return whether they moved, so a caller can drive a button's disabled state.
+  undo(): boolean;
+  redo(): boolean;
+  canUndo(): boolean;
+  canRedo(): boolean;
   // Subscribe to committed changes ('change': (data)) or stage advances
   // ('stage': (stageIndex, stageLabel?)). Returns an unsubscribe function.
   on(type: 'change' | 'stage', cb: (...args: any[]) => void): () => void;

@@ -4,6 +4,8 @@ import { resolveScales } from './resolve.js';
 import { createProjection } from './projection.js';
 import { resolveLock, lockConstraint, isNodeLocked } from './lock.js';
 import { collectEdits, resolveChannels, warnMisplacedEdits } from '../edit/route.js';
+import { markCenter, nudgeTarget } from '../edit/shared.js';
+import { encodeChannel } from '../plot/mark.js';
 import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
 import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
@@ -256,6 +258,74 @@ export function Elicit(spec) {
     // `.on('change' | 'stage', cb)`.
     /** @type {{ change: Set<Function>, stage: Set<Function> }} */
     const listeners = { change: new Set(), stage: new Set() };
+
+    // ---- Undo history --------------------------------------------------------
+    // An elicitation is someone's belief being drafted, so "take that back" is a
+    // primitive, not a nicety. A snapshot store rather than inverse operations:
+    // an edit's apply() is already a pure data -> data function, so the state
+    // before it IS the undo, and no edit has to describe how to reverse itself.
+    //
+    // The unit is a GESTURE, not a commit. A drag commits on every pointermove, so
+    // per-commit history would make undo replay the drag backwards one pixel at a
+    // time. Instead a transaction opens at dragstart and closes at dragend (both
+    // renderers emit them for mark and plane drags alike), and the first commit
+    // inside it records the pre-gesture state — once. A click or a typed commit is
+    // its own transaction.
+    //
+    // Snapshots carry the schema and the chart size too, because edit.axis.* writes
+    // the schema's domain and can grow the chart: undoing a category-add has to put
+    // the domain, the rows AND the size back.
+    const MAX_HISTORY = 100;
+    /** @type {any[]} */
+    let past = [];
+    /** @type {any[]} */
+    let future = [];
+    /** @type {{ before: any, recorded: boolean } | null} */
+    let txn = null;
+
+    const snapshot = () => ({
+        data: structuredClone(dataset),
+        schema: structuredClone(schema),
+        width: curW,
+        height: curH,
+    });
+
+    /** @param {any} snap */
+    const restoreSnapshot = (snap) => {
+        dataset = structuredClone(snap.data);
+        // Replace the schema's CONTENTS: `schema` is captured by closures (and read
+        // by resolveScales each render), so rebinding the name would strand them.
+        for (const k of Object.keys(schema)) delete schema[k];
+        Object.assign(schema, structuredClone(snap.schema));
+        if (snap.width !== curW || snap.height !== curH) {
+            applyResize({ width: snap.width, height: snap.height });
+        }
+        ui.preview = null;
+    };
+
+    // Open a transaction if none is open. Cheap: the snapshot is only kept if
+    // something actually commits inside it.
+    const beginTxn = () => { if (!txn) txn = { before: snapshot(), recorded: false }; };
+    const endTxn = () => { txn = null; };
+
+    // Called by every commit path. Records the pre-gesture state the first time a
+    // transaction changes anything, and drops the redo stack — a new edit after an
+    // undo forks the history, so the old future is gone.
+    const recordHistory = () => {
+        if (!txn) beginTxn();
+        if (!txn || txn.recorded) return;
+        past.push(txn.before);
+        if (past.length > MAX_HISTORY) past.shift();
+        future = [];
+        txn.recorded = true;
+    };
+
+    // Notify a committed change. One place, so undo/redo tell the caller exactly
+    // what an edit does.
+    const notifyChange = () => {
+        if (spec.onChange) spec.onChange(dataset);
+        for (const cb of listeners.change) cb(structuredClone(dataset));
+    };
 
     // The most recently built scene nodes per feature, so plane-pick edits can
     // hit-test against exact mark geometry and guides can look marks up by index.
@@ -553,10 +623,10 @@ export function Elicit(spec) {
         if (proposed && !Array.isArray(proposed) && proposed.__domain) {
             return commitDomainEdit(proposed.__domain);
         }
+        recordHistory();
         dataset = /** @type {any[]} */ (proposed);
         ui.preview = null;
-        if (spec.onChange) spec.onChange(dataset);
-        for (const cb of listeners.change) cb(structuredClone(dataset));
+        notifyChange();
         return true;
     };
 
@@ -568,6 +638,7 @@ export function Elicit(spec) {
     // schema, so axis/grid/guides/marks all reflow.
     /** @param {import('../types').DomainEditResult} result @returns {boolean} */
     const commitDomainEdit = (result) => {
+        recordHistory();
         for (const [field, domain] of Object.entries(result.domains || {})) {
             const prev = schema[field];
             schema[field] = { ...(prev || { type: inferMeasureOfDomain(domain) }), domain };
@@ -575,8 +646,7 @@ export function Elicit(spec) {
         if (Array.isArray(result.data)) dataset = result.data;
         if (result.resize) applyResize(result.resize);
         ui.preview = null;
-        if (spec.onChange) spec.onChange(dataset);
-        for (const cb of listeners.change) cb(structuredClone(dataset));
+        notifyChange();
         return true;
     };
 
@@ -717,6 +787,48 @@ export function Elicit(spec) {
     const handleEvent = (event) => {
         let shouldRender = false;
 
+        // A keyboard nudge is INPUT NORMALIZATION, not an interaction mode: the
+        // renderer reports "one step this way" and we resolve it into the pixel a
+        // pointer would have been at, so it arrives as an ordinary `drag`. Every
+        // direct-pick drag edit becomes keyboard-drivable with no new edit, no new
+        // driver, and nothing downstream learning that keyboards exist.
+        if (event.type === 'nudge') {
+            // Step from where the datum's CURRENT VALUE sits, which is not the same
+            // as where the node sits: a bar's centre is halfway up the bar, so
+            // nudging from it would first teleport the value to the middle of
+            // itself. encodeChannel answers "where is this datum on this axis" the
+            // same way the mark drew it — the node centre is only the fallback for
+            // a mark with nothing positional on that axis.
+            const node = event.node;
+            const from = markCenter(node);
+            if (!from) return;
+            const feature = features.find((f) => f.id === node.featureId);
+            const channels = (feature && feature.channels) || {};
+            const datum = node.index != null ? dataset[node.index] : node.data;
+            const atX = datum ? encodeChannel(scales, channels, 'x', datum, from.cx) : from.cx;
+            const atY = datum ? encodeChannel(scales, channels, 'y', datum, from.cy) : from.cy;
+            event = {
+                type: 'drag',
+                node,
+                x: nudgeTarget(scales.x, atX, event.dx, event.coarse),
+                y: nudgeTarget(scales.y, atY, event.dy, event.coarse),
+                // One press = one complete gesture (there is no dragend coming), so
+                // it closes its own undo transaction below.
+                nudge: true,
+                rawEvent: event.rawEvent,
+            };
+        }
+
+        // Undo transaction boundaries. A stroke is one unit of "take that back":
+        // dragstart opens it and dragend closes it, so the many commits a drag makes
+        // in between collapse into a single history entry. Any other gesture (click,
+        // dblclick, a typed commit) is a transaction of its own — begin it here and
+        // close it below, so it can't absorb the next one.
+        // dragstart always starts a fresh one, so a stroke whose dragend never
+        // arrived can't leak its stale "before" into the next gesture.
+        if (event.type === 'dragstart') { endTxn(); beginTxn(); }
+        else if (!txn) beginTxn();
+
         if (event.node) {
             // Dispatch to the touched mark's feature (direct pick).
             const feature = features.find(f => f.id === event.node.featureId);
@@ -727,6 +839,12 @@ export function Elicit(spec) {
                 if (dispatchPlaneEdits(feature, event)) shouldRender = true;
             });
         }
+
+        // Keep the transaction open only for the duration of a stroke. A nudge's
+        // synthetic drag is a complete gesture on its own, so it closes too —
+        // otherwise it would stay open and swallow whatever gesture came next.
+        if (event.type === 'dragend' || event.nudge
+            || (event.type !== 'dragstart' && event.type !== 'drag')) endTxn();
 
         if (shouldRender) {
             update();
@@ -751,7 +869,38 @@ export function Elicit(spec) {
         dataset = structuredClone(data);
         seedCount = dataset.length;
         ui.preview = null;
+        // A reseed is a new starting point, not an edit: there is nothing sensible
+        // to undo BACK to (and undoing past it would resurrect rows the caller
+        // replaced, under a lock that no longer covers them).
+        past = [];
+        future = [];
+        endTxn();
         update();
+    };
+
+    // Undo / redo one GESTURE (see the history store above). Both return whether
+    // they moved, so a caller can drive a button's disabled state; both fire the
+    // ordinary `change` notification, because as far as anything downstream is
+    // concerned the data just changed.
+    el.canUndo = () => past.length > 0;
+    el.canRedo = () => future.length > 0;
+    el.undo = () => {
+        if (!past.length) return false;
+        future.push(snapshot());
+        restoreSnapshot(/** @type {any} */(past.pop()));
+        endTxn();
+        notifyChange();
+        update();
+        return true;
+    };
+    el.redo = () => {
+        if (!future.length) return false;
+        past.push(snapshot());
+        restoreSnapshot(/** @type {any} */(future.pop()));
+        endTxn();
+        notifyChange();
+        update();
+        return true;
     };
     // Subscribe to committed changes; returns an unsubscribe function.
     el.on = (/** @type {'change' | 'stage'} */ type, /** @type {Function} */ cb) => {
