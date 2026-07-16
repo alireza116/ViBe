@@ -16,10 +16,10 @@ mount(Elicit({
   },
   features: [
     face({
-      features: {
-        mouthCurve: "curve", mouthOpen: "open", mouthAsym: "smirk",
-        eyeScale: "aperture", eyeSquint: "squint",
-        browHeight: "browH", browTilt: "browT",
+      channels: {
+        mouthCurve: { field: "curve" }, mouthOpen: { field: "open" }, mouthAsym: { field: "smirk" },
+        eyeScale: { field: "aperture" }, eyeSquint: { field: "squint" },
+        browHeight: { field: "browH" }, browTilt: { field: "browT" },
       },
     }),
   ],

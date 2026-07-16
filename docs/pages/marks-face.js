@@ -15,10 +15,9 @@ export default {
                 '<code class="inline">trend</code>): the parts derive from the params, and the bound ones ' +
                 'are their own drag targets — grab the feature itself, no floating handles. Its centre is ' +
                 'placed by the x/y channels when present, else parked at the plot centre.',
-            signature: 'face({ features, valence, arousal, size, handles, channels, edits, constraints, id }) → Feature',
+            signature: 'face({ channels, size, handles, edits, constraints, id }) → Feature',
             options: [
-                { name: 'features', type: 'object', default: 'emotion preset', desc: 'Map of <b>param → field</b> — the params to bind (and make editable). Omit for the emotion preset (mouthCurve ← valence, eyeScale ← arousal).' },
-                { name: 'valence / arousal', type: 'string', default: "'valence' / 'arousal'", desc: 'Rename the two preset fields without writing a full <code class="inline">features</code> map.' },
+                { name: 'channels', type: 'FaceChannels', default: 'emotion preset', desc: 'The channel map. The <b>seven face params are channels</b> — bind a field with <code class="inline">mouthCurve: { field: \'joy\' }</code> (editable), or pin a constant with <code class="inline">{ value: 0.8 }</code>. Bind none for the emotion preset (mouthCurve ← valence, eyeScale ← arousal); binding any one replaces it.' },
                 { name: 'size', type: 'number', default: 'min(w,h)·0.35', desc: 'Face radius in px. Set it when drawing many faces so they don\'t overlap.' },
                 { name: 'handles', type: 'boolean', default: 'true', desc: 'Show the small eyelid/lip grab dots (squint & open). false keeps them grabbable but invisible.' },
                 { name: 'channels.x / .y', type: 'ChannelSpec', default: '—', desc: 'Optional: place the face centre in a plot (small-multiples, or an emotion-space scatter).' },
@@ -69,8 +68,9 @@ export default {
             id: 'expressive',
             title: 'Turn on more expressions',
             intro:
-                'Bind any subset of the seven params with a <code class="inline">features</code> map — each ' +
-                'binding both drives the geometry and makes that feature draggable. Unbound params stay ' +
+                'Bind any subset of the seven params in <code class="inline">channels</code>, each a plain ' +
+                '<code class="inline">{ field }</code> — the binding both drives the geometry and makes that ' +
+                'feature draggable. Unbound params stay ' +
                 'neutral. Here every param is live: mouth (↕ curve, ↔ smirk), eyes (↕ aperture), the eyelid ' +
                 'dot (↓ squint), the lip dot (↓ open), and the brows (↕ height, ↔ tilt).',
             examples: [
@@ -97,10 +97,10 @@ export default {
   },
   features: [
     face({
-      features: {
-        mouthCurve: "curve", mouthOpen: "open", mouthAsym: "smirk",
-        eyeScale: "aperture", eyeSquint: "squint",
-        browHeight: "browH", browTilt: "browT",
+      channels: {
+        mouthCurve: { field: "curve" }, mouthOpen: { field: "open" }, mouthAsym: { field: "smirk" },
+        eyeScale: { field: "aperture" }, eyeSquint: { field: "squint" },
+        browHeight: { field: "browH" }, browTilt: { field: "browT" },
       },
     }),
   ],

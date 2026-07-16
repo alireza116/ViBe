@@ -11,12 +11,24 @@
 //     features: [ face() ],            // preset: mouth = valence, eyes = arousal
 //   })
 //
-// ── Opt-in features (the `features` map) ─────────────────────────────────────
-// A face has seven independent PARAMETERS; each maps to a data field and is only
-// EDITABLE when you bind it. Unbound params render at neutral (0.5), so a partial
-// face is still a whole face. `face()` binds the two emotion params; pass
-// `features: { mouthCurve: 'joy', browTilt: 'anger', eyeScale: 'shock', … }` for a
-// full Chernoff glyph.
+// ── Parameters are CHANNELS ──────────────────────────────────────────────────
+// A face has seven independent PARAMETERS, and each is a non-positional channel
+// declared exactly like `fill`/`size`/`x` — there is no bespoke `features` map.
+// Bind a field with `{ field }` (the param becomes EDITABLE, drag it to write the
+// field back); pin a fixed expression with a constant `{ value }` (rendered but not
+// elicited). An unbound param renders at neutral (0.5), so a partial face is still
+// a whole face.
+//
+//   face()                                   // emotion preset (see below)
+//   face({ channels: {                       // a full Chernoff glyph
+//     mouthCurve: { field: 'joy' },
+//     browTilt:   { field: 'anger' },
+//     eyeScale:   { field: 'shock' },
+//   } })
+//
+// Zero-config `face()` applies the emotion preset (mouthCurve ← valence, eyeScale
+// ← arousal). Binding ANY param channel REPLACES the preset outright, so an unbound
+// preset default never references a field the schema lacks.
 //
 //   PARAM        FEATURE / MEANING                         low  ↔  high
 //   mouthCurve   mouth curvature   deep frown ∩ ↔ deep smile U
@@ -46,6 +58,12 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 
 /** @param {number} x @returns {number} */
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+// The seven facial parameters, each a non-positional channel. If the author binds
+// none of them, the emotion preset (mouthCurve ← valence, eyeScale ← arousal) fills
+// in; binding any one replaces the preset.
+/** @type {string[]} */
+const FACE_PARAMS = ['mouthCurve', 'mouthOpen', 'mouthAsym', 'eyeScale', 'eyeSquint', 'browHeight', 'browTilt'];
 
 /** An SVG path for a circle / ellipse centred at (cx, cy). */
 const ellipsePath = (/** @type {number} */ cx, /** @type {number} */ cy, /** @type {number} */ rx, /** @type {number} */ ry) =>
@@ -92,26 +110,15 @@ export function face(options = {}) {
     } = opts;
     const sizeOpt = options.size;
 
-    // Resolve the param -> field bindings. An explicit `features` map replaces the
-    // preset (only its params are editable); otherwise the emotion preset binds
-    // mouthCurve/eyeScale, renamable via the `valence`/`arousal` options.
-    /** @type {Record<string, { field: string }>} */
-    let featureMap;
-    if (options.features) {
-        featureMap = {};
-        for (const [param, v] of Object.entries(options.features)) {
-            featureMap[param] = typeof v === 'string' ? { field: v } : /** @type {any} */ (v);
-        }
-    } else {
-        featureMap = {
-            mouthCurve: { field: typeof options.valence === 'string' ? options.valence : 'valence' },
-            eyeScale: { field: typeof options.arousal === 'string' ? options.arousal : 'arousal' },
-        };
-    }
+    // The params are ordinary channels (declared in `channels`, or via the x/y
+    // shorthands opts already merged). If the author bound none of the seven, apply
+    // the emotion preset; binding any one replaces it, so an unbound preset default
+    // never points at a field the schema lacks.
     /** @type {Record<string, any>} */
     const channels = { ...opts.channels };
-    for (const [param, spec] of Object.entries(featureMap)) {
-        if (!channels[param]) channels[param] = spec;
+    if (!FACE_PARAMS.some((p) => channels[p])) {
+        channels.mouthCurve = { field: 'valence' };
+        channels.eyeScale = { field: 'arousal' };
     }
 
     const faceEdit = makeEdit({
@@ -145,7 +152,9 @@ export function face(options = {}) {
             // back the linear invert when a scale is somehow missing.
             /** @param {string} param @param {number} pxAt0 @param {number} pxAt1 */
             const axisSpec = (param, pxAt0, pxAt1) => {
-                if (!channels[param]) return undefined;
+                // Editable only when bound to a FIELD — a constant `{ value }` param
+                // is rendered but not elicited (nothing to write back).
+                if (!channels[param] || channels[param].field === undefined) return undefined;
                 const scale = scales[param];
                 const dom = scale && scale.domainConfig;
                 return {

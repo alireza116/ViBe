@@ -8,19 +8,13 @@ const page: DocPage = {
     {
       "name": "face(options)",
       "summary": "Import from <code class=\"inline\">vibe.plot</code>. A single-datum glyph (like <code class=\"inline\">trend</code>): the parts derive from the params, and the bound ones are their own drag targets — grab the feature itself, no floating handles. Its centre is placed by the x/y channels when present, else parked at the plot centre.",
-      "signature": "face({ features, valence, arousal, size, handles, channels, edits, constraints, id }) → Feature",
+      "signature": "face({ channels, size, handles, edits, constraints, id }) → Feature",
       "options": [
         {
-          "name": "features",
-          "type": "object",
+          "name": "channels",
+          "type": "FaceChannels",
           "default": "emotion preset",
-          "desc": "Map of <b>param → field</b> — the params to bind (and make editable). Omit for the emotion preset (mouthCurve ← valence, eyeScale ← arousal)."
-        },
-        {
-          "name": "valence / arousal",
-          "type": "string",
-          "default": "'valence' / 'arousal'",
-          "desc": "Rename the two preset fields without writing a full <code class=\"inline\">features</code> map."
+          "desc": "The channel map. The <b>seven face params are channels</b> — bind a field with <code class=\"inline\">mouthCurve: { field: 'joy' }</code> (editable), or pin a constant with <code class=\"inline\">{ value: 0.8 }</code>. Bind none and you get the emotion preset (mouthCurve ← valence, eyeScale ← arousal); binding any one replaces it."
         },
         {
           "name": "size",
@@ -104,7 +98,7 @@ const page: DocPage = {
     {
       "id": "expressive",
       "title": "Turn on more expressions",
-      "intro": "Bind any subset of the seven params with a <code class=\"inline\">features</code> map — each binding both drives the geometry and makes that feature draggable. Unbound params stay neutral. Here every param is live: mouth (↕ curve, ↔ smirk), eyes (↕ aperture), the eyelid dot (↓ squint), the lip dot (↓ open), and the brows (↕ height, ↔ tilt).",
+      "intro": "Bind any subset of the seven params in <code class=\"inline\">channels</code>, each as a plain <code class=\"inline\">{ field }</code> — the binding both drives the geometry and makes that feature draggable. Unbound params stay neutral. Here every param is live: mouth (↕ curve, ↔ smirk), eyes (↕ aperture), the eyelid dot (↓ squint), the lip dot (↓ open), and the brows (↕ height, ↔ tilt).",
       "examples": [
         "marks-face/full-chernoff-face"
       ]

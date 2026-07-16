@@ -354,28 +354,31 @@ export interface MarkOptions {
   [key: string]: any;
 }
 
-// A face's parameter names — each maps to a data field and is only editable when
-// bound (via `features`). Unbound params render at neutral (0.5).
+// A face's parameter names. Each is a non-positional CHANNEL (declared like
+// `fill`/`size`): bind a field with `{ field }` to make it editable, or pin a
+// constant with `{ value }`. Unbound params render at neutral (0.5).
 export type FaceParam =
   | 'mouthCurve' | 'mouthOpen' | 'mouthAsym'
   | 'eyeScale' | 'eyeSquint'
   | 'browHeight' | 'browTilt';
 
+// A face's channel map: the ordinary positional/style channels plus the seven face
+// params, each a linear [0,1] channel resolved and inverted the same way.
+export type FaceChannels = Channels & Partial<Record<FaceParam, ChannelSpec>>;
+
 // Options for a FACE mark (an emotion glyph): a single-datum, PARAMETRIC face whose
 // features encode data FIELDS and are DIRECTLY MANIPULATED to write them back (grab
-// the mouth, an eye, a brow). Bind params with `features` (param -> field); a feature
-// carrying two params is a 2-D drag (mouth: ↕ curve, ↔ asym; brow: ↕ height, ↔ tilt),
-// and the two "pull" params (eye squint, mouth open) get a small eyelid/lip dot.
-// Omit `features` for the emotion preset (mouthCurve ← valence, eyeScale ← arousal).
-// The centre is placed by the x/y channels when present, else the plot centre.
+// the mouth, an eye, a brow). The seven params are CHANNELS — bind them in
+// `channels` (param -> `{ field }`), exactly like every other mark; there is no
+// bespoke `features` map. A feature carrying two params is a 2-D drag (mouth: ↕
+// curve, ↔ asym; brow: ↕ height, ↔ tilt), and the two "pull" params (eye squint,
+// mouth open) get a small eyelid/lip dot. Bind NO param for the emotion preset
+// (mouthCurve ← valence, eyeScale ← arousal); binding any one replaces it. The
+// centre is placed by the x/y channels when present, else the plot centre.
 // See plot/face.js.
 export interface FaceOptions extends MarkOptions {
-  // Param -> field bindings; the bound params are the editable ones. Replaces the
-  // preset when given. A value is a field name (string) or `{ field }`.
-  features?: Partial<Record<FaceParam, string | { field: string }>>;
-  // Rename the emotion preset's fields without a full `features` map.
-  valence?: string; // -> mouthCurve. Default 'valence'.
-  arousal?: string; // -> eyeScale.  Default 'arousal'.
+  // The channel map, including the seven face params as `{ field }` / `{ value }`.
+  channels?: FaceChannels;
   // Face radius in px. Default min(width, height) * 0.35.
   size?: number;
   // Eyelid/lip grab-dot radius in px. Default 5.

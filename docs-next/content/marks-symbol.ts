@@ -49,6 +49,14 @@ const page: DocPage = {
       ]
     },
     {
+      "id": "constant",
+      "title": "One fixed glyph — no mapping",
+      "intro": "You don't need a scale to use a glyph. The <code class=\"inline\">symbol: '⚽'</code> shorthand pins one glyph on every point — it desugars to a constant channel and skips the scale, exactly like <code class=\"inline\">fill: 'red'</code>. Here the elicited value is <code class=\"inline\">goals</code>: the balls are pure identity, and you drag one up or down to set that stage's total.",
+      "examples": [
+        "marks-symbol/world-cup-goals"
+      ]
+    },
+    {
       "id": "tokens",
       "title": "Emoji tokens — drop and remove",
       "intro": "A constant <code class=\"inline\">symbol</code> shorthand makes every token the same glyph. Because the glyph is just how the token draws, <code class=\"inline\">create</code> / <code class=\"inline\">remove</code> work unchanged — a ⭐ star-rating counter.",
