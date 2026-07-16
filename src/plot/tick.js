@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandSpan } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions } from './mark.js';
 
 // tick: a thin line-segment mark (Observable Plot's tick). It marks a VALUE on
 // one axis (the linear/continuous axis) and SPANS the other axis — a category
@@ -19,7 +19,33 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 //
 // The span across the band is customizable with `inset` (px shrink each end) or
 // an explicit `length` (px, centred) — see bandSpan in core/scales.js, a
-// mark-agnostic helper other marks can reuse.
+// mark-agnostic helper other marks can reuse. When `length` is set AND the span
+// axis has a channel (e.g. a scatter tick with both x and y), the segment is
+// centred on that channel's encoded position — not on the plot's mid-extent —
+// so a short tick sits on the datum instead of floating at the chart centre.
+
+/**
+ * Pixel span for the non-value axis.
+ * @param {'x' | 'y'} spanAxis
+ * @param {any} scale
+ * @param {Record<string, any>} channels
+ * @param {import('../types').ScaleMap} scales
+ * @param {any} datum
+ * @param {string} key
+ * @param {number} fullLength
+ * @param {number} inset
+ * @param {number | undefined} length
+ * @returns {[number, number]}
+ */
+function resolveSpan(spanAxis, scale, channels, scales, datum, key, fullLength, inset, length) {
+    // A fixed-length tick with a positional channel on the span axis: centre on
+    // the datum (scatter / composite glyph), not on the band or plot midpoint.
+    if (length != null && channels[spanAxis]) {
+        const center = encodeChannel(scales, channels, spanAxis, datum, fullLength / 2);
+        return [center - length / 2, center + length / 2];
+    }
+    return bandSpan(scale, datum[key], fullLength, { inset, length });
+}
 
 /**
  * @param {any} options
@@ -79,10 +105,12 @@ function buildTick(options, forcedValueAxis) {
                     strokeWidth: 2
                 });
 
+                const angle = encodeAngle(scales, channels, d, 0);
+
                 if (valueAxis === 'x') {
                     // Vertical tick: value on x (linear), span the y band.
                     const valuePos = encodeChannel(scales, channels, 'x', d, width / 2);
-                    const [y1, y2] = bandSpan(yScale, d[yKey], height, { inset, length });
+                    const [y1, y2] = resolveSpan('y', yScale, channels, scales, d, yKey, height, inset, length);
                     return {
                         type: 'line',
                         x1: valuePos,
@@ -93,13 +121,14 @@ function buildTick(options, forcedValueAxis) {
                         data: d,
                         index: i,
                         bandAxis: 'y', // proximity measures distance along y (rows)
-                        cursor: 'ew-resize'
+                        cursor: 'ew-resize',
+                        ...(angle ? { angle } : {}),
                     };
                 }
 
                 // Horizontal tick: value on y (linear), span the x band.
                 const valuePos = encodeChannel(scales, channels, 'y', d, height / 2);
-                const [x1, x2] = bandSpan(xScale, d[xKey], width, { inset, length });
+                const [x1, x2] = resolveSpan('x', xScale, channels, scales, d, xKey, width, inset, length);
                 return {
                     type: 'line',
                     x1,
@@ -110,7 +139,8 @@ function buildTick(options, forcedValueAxis) {
                     data: d,
                     index: i,
                     bandAxis: 'x', // proximity measures distance along x (columns)
-                    cursor: 'ns-resize'
+                    cursor: 'ns-resize',
+                    ...(angle ? { angle } : {}),
                 };
             });
         }

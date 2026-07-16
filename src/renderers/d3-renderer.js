@@ -1,6 +1,7 @@
 // @ts-check
 import * as d3 from 'd3';
 import { DEFAULT_EFFECTS } from '../core/effects.js';
+import { markCenter } from '../edit/shared.js';
 
 // Curve name -> d3 curve factory for line-mark paths. Mirrors Observable Plot's
 // `curve` option; unknown names fall back to a straight polyline.
@@ -360,19 +361,35 @@ export class D3Renderer {
         return sel;
     }
 
+    /**
+     * SVG transform for a node that carries math-degree `angle` (0° = +x, CCW).
+     * SVG's rotate() is clockwise in y-down space, so we negate. Pivot is the
+     * mark's own centre (rect bbox, line midpoint, text anchor, …).
+     * @param {any} d
+     * @returns {string | null}
+     */
+    _angleTransform(d) {
+        if (d == null || d.angle == null || d.angle === 0) return null;
+        const c = markCenter(d);
+        if (!c) return null;
+        return `rotate(${-d.angle} ${c.cx} ${c.cy})`;
+    }
+
     /** @param {any} sel */
     _geomRect(sel) {
         sel.attr('x', (/** @type {any} */ d) => d.x)
             .attr('y', (/** @type {any} */ d) => d.y)
             .attr('width', (/** @type {any} */ d) => d.width)
-            .attr('height', (/** @type {any} */ d) => Math.max(0, d.height)); // no negative height
+            .attr('height', (/** @type {any} */ d) => Math.max(0, d.height)) // no negative height
+            .attr('transform', (/** @type {any} */ d) => this._angleTransform(d));
     }
 
     /** @param {any} sel */
     _geomCircle(sel) {
         sel.attr('cx', (/** @type {any} */ d) => d.cx)
             .attr('cy', (/** @type {any} */ d) => d.cy)
-            .attr('r', (/** @type {any} */ d) => Math.max(0, d.r != null ? d.r : 5));
+            .attr('r', (/** @type {any} */ d) => Math.max(0, d.r != null ? d.r : 5))
+            .attr('transform', (/** @type {any} */ d) => this._angleTransform(d));
     }
 
     /** @param {any} sel */
@@ -380,7 +397,8 @@ export class D3Renderer {
         sel.attr('x1', (/** @type {any} */ d) => d.x1)
             .attr('x2', (/** @type {any} */ d) => d.x2)
             .attr('y1', (/** @type {any} */ d) => d.y1)
-            .attr('y2', (/** @type {any} */ d) => d.y2);
+            .attr('y2', (/** @type {any} */ d) => d.y2)
+            .attr('transform', (/** @type {any} */ d) => this._angleTransform(d));
     }
 
     /**
@@ -395,9 +413,8 @@ export class D3Renderer {
             // tick labels leave this unset and keep the SVG default.
             .attr('dominant-baseline', (/** @type {any} */ d) => d.dominantBaseline || null)
             .attr('font-size', (/** @type {any} */ d) => (d.fontSize != null ? d.fontSize : 10))
-            // A rotated label (text mark's `angle`, in degrees) spins about its own
-            // anchor point so the pivot stays put as the value changes.
-            .attr('transform', (/** @type {any} */ d) => (d.angle ? `rotate(${d.angle} ${d.x} ${d.y})` : null))
+            // Math degrees on the node; _angleTransform converts to SVG rotate.
+            .attr('transform', (/** @type {any} */ d) => this._angleTransform(d))
             .text((/** @type {any} */ d) => d.text);
     }
 
@@ -428,6 +445,7 @@ export class D3Renderer {
             .attr('y', (/** @type {any} */ d) => d.y)
             .attr('width', (/** @type {any} */ d) => d.width)
             .attr('height', (/** @type {any} */ d) => d.height)
+            .attr('transform', (/** @type {any} */ d) => this._angleTransform(d))
             // Tiles are photographic: let the browser smooth them when a fitted
             // (fractional) zoom scales them off their native 256px.
             .attr('preserveAspectRatio', 'none')

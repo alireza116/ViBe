@@ -18,7 +18,7 @@ export { composite } from './composite.js';
 export { axis, axisX, axisY, grid, gridX, gridY } from './axis.js';
 // Shared mark foundation — for authoring new marks (channel resolution + the
 // standard style surface). See mark.js.
-export { encodeChannel, resolveStyle, normalizeMarkOptions, STANDARD_STYLE_CHANNELS } from './mark.js';
+export { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, STANDARD_STYLE_CHANNELS } from './mark.js';
 export {
     polarToXY, arcPath, arcSpine, arcSpan, angularBand, needleTriangle, degToRad,
     ORIENT_SPAN,

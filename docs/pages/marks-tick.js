@@ -23,7 +23,7 @@ export default {
             options: [
                 { name: 'channels', type: 'object', default: '{}', desc: 'One band axis (span) + one linear axis (the marked value). See <b>Channels</b>.' },
                 { name: 'inset', type: 'number', default: '0', desc: 'Pixels to shrink each end of the span.' },
-                { name: 'length', type: 'number', default: '—', desc: 'Explicit centered span length in pixels (overrides the full band span).' },
+                { name: 'length', type: 'number', default: '—', desc: 'Explicit centered span length in pixels. On a band axis it centres in the band; when the span axis also has a channel (e.g. scatter x+y), it centres on that channel’s encoded position so a short tick sits on the datum.' },
                 { name: 'edits', type: 'Edit[]', default: '—', desc: 'Mark-level edits; per-channel edits live in the channels map.' },
                 { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark.' },
                 { name: 'stroke, strokeWidth, …', type: 'style', default: "stroke:'steelblue'", desc: 'Style shorthands / channels.' },

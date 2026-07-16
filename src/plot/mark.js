@@ -88,7 +88,11 @@ export const STANDARD_STYLE_CHANNELS = Object.keys(STYLE_DEFAULTS);
 // channel — it stays off this list.)
 const SHORTHANDS = [
     ...STANDARD_STYLE_CHANNELS,
-    'size', 'symbol', 'text', 'fontSize', 'textAnchor', 'lineAnchor', 'dx', 'dy'
+    'size', 'symbol', 'text', 'fontSize', 'textAnchor', 'lineAnchor', 'dx', 'dy',
+    // Orientation in math degrees (0° = +x, CCW). Constant form is a visual-space
+    // shorthand; a scaled field goes through the angle channel's scale so rotate()
+    // is an exact inverse. Not a style channel — marks that care read it themselves.
+    'angle',
 ];
 
 /**
@@ -129,6 +133,32 @@ export function encodeChannel(scales, channels, channel, datum, fallback) {
     const scale = scales[channel];
     if (!scale) return fallback;
     return scale.encode(raw, fallback);
+}
+
+/**
+ * Resolve the `angle` channel to math degrees (0° = +x, CCW, y-up — the same
+ * convention as needle / pointerDegrees). Scaled when an angle scale exists so
+ * `rotate()` is an exact inverse; otherwise raw (a `{ value }` constant or the
+ * field's literal degrees). Marks stamp the result on `FeatureNode.angle`; the
+ * renderer converts to SVG with `rotate(-deg cx cy)`.
+ * @param {import('../types').ScaleMap} scales
+ * @param {Record<string, any>} channels
+ * @param {import('../types').Datum | null} datum
+ * @param {number} [fallback=0]
+ * @returns {number}
+ */
+export function encodeAngle(scales, channels, datum, fallback = 0) {
+    if (!channels || !channels.angle) return fallback;
+    // scales is an index signature — angle is optional.
+    const angleScale = /** @type {any} */ (scales)['angle'];
+    if (angleScale) return encodeChannel(scales, channels, 'angle', datum, fallback);
+    const spec = channels.angle;
+    if (spec.field != null) {
+        const v = datum ? datum[spec.field] : undefined;
+        return v == null ? fallback : +v;
+    }
+    if (spec.value !== undefined) return +spec.value;
+    return fallback;
 }
 
 /**

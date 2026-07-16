@@ -4,13 +4,16 @@ export default {
     title: 'Composite',
     lead:
         'A <b>composite</b> mark is a glyph: a named <b>group of ordinary marks</b> over ' +
-        'the chart’s one dataset. Each part encodes some columns of the same rows; a part ' +
-        'whose channel carries an <code class="inline">edit</code> is a handle. Drag a ' +
-        'handle and it writes its field; on the next render every other part re-derives ' +
-        'from the changed rows — the same reactive model the guide layer uses. ' +
+        'the chart’s one dataset. Group-level <code class="inline">channels</code> (and ' +
+        'style / <code class="inline">angle</code> shorthands) <b>trickle into every part</b> ' +
+        'at desugar time — declare a shared orientation or position once; a part’s own ' +
+        'channel for the same name wins; inherited <code class="inline">edit</code>s attach ' +
+        'to the <b>last</b> part only (visuals first, handles last). Each part encodes some ' +
+        'columns of the same rows; a part whose channel carries an ' +
+        '<code class="inline">edit</code> is a handle. Drag a handle and it writes its field; ' +
+        'on the next render every other part re-derives from the changed rows. ' +
         'Composite is a <b>desugaring</b>, not a new kind of feature: it returns its parts ' +
-        'as plain features and <code class="inline">Elicit</code> flattens them, exactly as ' +
-        'the <code class="inline">axes</code> convenience desugars into axis marks. ' +
+        'as plain features and <code class="inline">Elicit</code> flattens them. ' +
         'Because each handle is its own mark, dragging one <i>cannot</i> move another — ' +
         'dispatch already routes a gesture to the feature owning the node you touched.',
     api: [
@@ -22,17 +25,19 @@ export default {
                 'which <code class="inline">Elicit</code> flattens into its ' +
                 '<code class="inline">features</code> list.',
             signature:
-                'composite({ parts, constraints, discreteScale, id }) → Feature[]',
+                'composite({ parts, channels, constraints, discreteScale, id }) → Feature[]',
             options: [
-                { name: 'parts', type: 'Mark[]', default: '[]', desc: 'The sub-marks, in z-order (visual parts first, handles last). Ordinary mark instances — a <code class="inline">ruleX</code> whisker, a <code class="inline">point</code> dot, a <code class="inline">tick</code> cap. A part with an <code class="inline">edit</code> on a channel is a handle; a part without one is inert and the engine makes it <code class="inline">pointerEvents:"none"</code> so it can’t swallow a sibling’s drag.' },
+                { name: 'parts', type: 'Mark[]', default: '[]', desc: 'The sub-marks, in z-order (visual parts first, handles last). Each part is an ordinary mark with its <b>own</b> <code class="inline">channels</code> / style shorthands (arm geometry, per-part stroke, a tip’s <code class="inline">size</code>). A part with an <code class="inline">edit</code> is a handle; a part without one is inert and the engine makes it <code class="inline">pointerEvents:"none"</code> so it can’t swallow a sibling’s drag.' },
+                { name: 'channels', type: 'object', default: '{}', desc: 'Shared channel map merged into every part. Use it for glyph-wide bindings (<code class="inline">x</code>/<code class="inline">y</code>/<code class="inline">angle</code>/<code class="inline">fill</code>). A part’s own channel for the same name <b>wins</b> (shallow replace). Inherited <code class="inline">edit</code>s land on the last part only.' },
+                { name: 'fill, angle, …', type: 'shorthand', default: '—', desc: 'Constant shorthands desugared into <b>group</b> channels (shared by every part unless a part overrides). Parts keep their own shorthands too — e.g. group <code class="inline">angle</code>, per-part <code class="inline">stroke</code>.' },
                 { name: 'constraints', type: 'Constraint[]', default: '—', desc: 'Group-level data invariants. Promoted into the <b>dataset’s</b> constraint set, so they gate and repair every edit — including one made through a different part. See <b>Constraints</b>.' },
                 { name: 'discreteScale', type: "'band' | 'point'", default: "'band'", desc: 'Stamped onto any part that doesn’t declare its own. A glyph usually sits in a band slot.' },
                 { name: 'id', type: 'string', default: "'composite'", desc: 'Prefix for the parts’ generated ids (<code class="inline">id/0</code>, <code class="inline">id/1</code>, …), so each part keeps a stable identity across renders.' },
             ],
             returns:
-                'An <b>array of features</b> — the parts, with ids assigned and the group’s ' +
-                'constraints attached. Nothing about the glyph reaches the engine: it sees ' +
-                'four ordinary marks reading the one dataset.',
+                'An <b>array of features</b> — the parts, with ids assigned, group channels ' +
+                'merged in, and the group’s constraints attached. Nothing about the glyph ' +
+                'reaches the engine: it sees ordinary marks reading the one dataset.',
         },
     ],
     sections: [
@@ -206,6 +211,118 @@ export default {
         tick({
           stroke: "#334155", strokeWidth: 2,
           channels: { x: { field: "g" }, y: { field: "hi", edit: drag() } },
+        }),
+      ],
+    }),
+  ],
+}))`,
+                },
+            ],
+        },
+        {
+            id: 'plus',
+            title: 'Group channels + per-part channels',
+            intro:
+                'Two layers of binding. <b>Group</b> <code class="inline">channels</code> ' +
+                '(here <code class="inline">x</code>, <code class="inline">y</code>, ' +
+                '<code class="inline">angle</code>) trickle into every part so the glyph ' +
+                'shares one position and one orientation. <b>Each part</b> still declares ' +
+                'its own channels and shorthands — arm length, stroke colour, a hub’s ' +
+                '<code class="inline">fill</code> / <code class="inline">size</code>. A part ' +
+                'key wins on conflict. Inherited <code class="inline">edit</code>s attach to ' +
+                'the last part only, so one <code class="inline">rotate()</code> spins the ' +
+                'whole glyph without double-applying.',
+            examples: [
+                {
+                    title: 'Shared x/y/angle; per-part stroke on crossing ticks',
+                    blurb:
+                        'A + from tickY (horizontal) + tickX (vertical). Group channels bind ' +
+                        'position and angle once; each tick keeps its own stroke / length. ' +
+                        'The last part holds the inherited rotate() edit.',
+                    try: '<b>Drag</b> the darker (vertical) arm of a + to spin it.',
+                    code:
+`mount(Elicit({
+  width: 380, height: 280,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 25, y: 35, theta: -15 },
+    { x: 55, y: 60, theta: 40 },
+    { x: 78, y: 28, theta: 75 },
+    { x: 40, y: 78, theta: -50 },
+  ],
+  schema: {
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    theta: { type: "quantitative", domain: [-180, 180] },
+  },
+  features: [
+    composite({
+      id: "plus",
+      discreteScale: "point",
+      // Glyph-wide: every part inherits these (unless it overrides).
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        angle: {
+          field: "theta",
+          scale: { range: [-180, 180] },
+          edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+        },
+      },
+      parts: [
+        // Horizontal arm — own stroke/length; inherits x/y/angle (edit stripped).
+        tickY({ length: 28, stroke: "#93c5fd", strokeWidth: 5 }),
+        // Vertical arm — own stroke; last part keeps the inherited rotate().
+        tickX({ length: 28, stroke: "#1d4ed8", strokeWidth: 5 }),
+      ],
+    }),
+  ],
+}))`,
+                },
+                {
+                    title: 'Same group angle; hub point with its own fill/size',
+                    blurb:
+                        'Add a square hub as a third part. It inherits x/y/angle from the ' +
+                        'group but sets its own shape, fill, and size — part channels win ' +
+                        'for those names. rotate() still lives on the last part.',
+                    try: '<b>Drag</b> the hub (last part) to spin the whole glyph.',
+                    code:
+`mount(Elicit({
+  width: 380, height: 280,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 30, y: 40, theta: 20 },
+    { x: 60, y: 65, theta: -35 },
+    { x: 75, y: 25, theta: 55 },
+  ],
+  schema: {
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    theta: { type: "quantitative", domain: [-180, 180] },
+  },
+  features: [
+    composite({
+      id: "crosshair",
+      discreteScale: "point",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        angle: {
+          field: "theta",
+          scale: { range: [-180, 180] },
+          edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+        },
+      },
+      parts: [
+        tickY({ length: 32, stroke: "#94a3b8", strokeWidth: 3 }),
+        tickX({ length: 32, stroke: "#94a3b8", strokeWidth: 3 }),
+        // Hub: own shape/fill/size; inherits x/y/angle; keeps rotate() (last).
+        point({
+          shape: "square",
+          size: 6,
+          fill: "#fbbf24",
+          stroke: "#92400e",
+          strokeWidth: 1,
         }),
       ],
     }),

@@ -3,18 +3,24 @@ import type { DocPage } from '../lib/types';
 const page: DocPage = {
   "route": "/marks/point",
   "title": "Point",
-  "lead": "<code class=\"inline\">point</code> is the channel-driven circle: every channel — x, y, size, fill/color, stroke — resolves through the global scales, so one mark is a full scatter.",
+  "lead": "<code class=\"inline\">point</code> is the channel-driven scatter mark: every channel — x, y, size, fill, stroke, angle — resolves through the global scales. Default shape is a circle; <code class=\"inline\">shape: 'square'</code> emits a centred rect (side <code class=\"inline\">2 × size</code>) that can rotate about its centre.",
   "api": [
     {
       "name": "point(options)",
-      "summary": "Import from <code class=\"inline\">vibe.plot</code>. A circle per datum; every channel — positional or not — resolves through the global scales.",
-      "signature": "point({ channels, edits, constraints, id }) → Feature",
+      "summary": "Import from <code class=\"inline\">vibe.plot</code>. A circle or square per datum; every channel — positional or not — resolves through the global scales.",
+      "signature": "point({ channels, shape, edits, constraints, id }) → Feature",
       "options": [
         {
           "name": "channels",
           "type": "object",
           "default": "{}",
           "desc": "Channel map — see <b>Channels</b>."
+        },
+        {
+          "name": "shape",
+          "type": "'circle' | 'square'",
+          "default": "'circle'",
+          "desc": "Glyph shape. A square is a centred rect with side <code class=\"inline\">2 × size</code>, so an <code class=\"inline\">angle</code> channel can spin it."
         },
         {
           "name": "edits",
@@ -29,10 +35,10 @@ const page: DocPage = {
           "desc": "Data invariants. Sugar — promoted to the dataset, so they hold for every edit from every mark."
         },
         {
-          "name": "fill, stroke, …",
+          "name": "fill, stroke, size, angle, …",
           "type": "style",
           "default": "fill: 'steelblue'",
-          "desc": "Style shorthands / channels."
+          "desc": "Shorthands / channels."
         }
       ],
       "channels": [
@@ -49,7 +55,12 @@ const page: DocPage = {
         {
           "name": "size",
           "type": "linear",
-          "desc": "The dot radius (default 5). Pair with <code class=\"inline\">edit: resize()</code> to drag the radius."
+          "desc": "The circle radius / half square side (default 5). Pair with <code class=\"inline\">edit: resize()</code> to drag the radius."
+        },
+        {
+          "name": "angle",
+          "type": "linear",
+          "desc": "Orientation in math degrees (0° = +x, CCW). Pair with <code class=\"inline\">edit: rotate({ pivot: 'mark', fold: false, pick: 'direct' })</code>. Circles are rotation-invariant; squares and symbols rotate."
         },
         {
           "name": "fill / color",
@@ -62,7 +73,7 @@ const page: DocPage = {
           "desc": "Standard style surface."
         }
       ],
-      "returns": "A <b>feature</b> emitting one <code class=\"inline\">circle</code> per datum."
+      "returns": "A <b>feature</b> emitting one <code class=\"inline\">circle</code> or <code class=\"inline\">rect</code> per datum."
     }
   ],
   "sections": [
@@ -81,6 +92,15 @@ const page: DocPage = {
       "intro": "When both x and y carry a drag, a gesture inverts the pointer through both positional scales.",
       "examples": [
         "marks-point/2d-move-scatter"
+      ]
+    },
+    {
+      "id": "angle",
+      "title": "Rotating squares and ticks",
+      "intro": "An <code class=\"inline\">angle</code> channel orients a mark about its centre. Degrees are math convention (0° = +x, counterclockwise); <code class=\"inline\">rotate()</code> inverts the pointer through the same scale. Squares use <code class=\"inline\">point({ shape: 'square' })</code>; short <code class=\"inline\">tickX</code> / <code class=\"inline\">tickY</code> segments (with <code class=\"inline\">length</code>) rotate the same way — useful for directional markers on a scatter.",
+      "examples": [
+        "marks-point/scatter-of-rotatable-squares",
+        "marks-point/scatter-of-rotatable-ticks"
       ]
     }
   ]

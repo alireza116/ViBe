@@ -319,18 +319,21 @@ export interface Channels extends StyleChannels {
   // holds the category — the glyph is its encoding). Non-positional, non-invertible.
   symbol?: ChannelSpec;
   // Text mark channels: the label string, its size/anchors/offsets (read RAW,
-  // not scaled — constant forms are shorthands), and rotation in degrees
-  // (scaled when a scale is declared, so rotate() is an exact inverse; else raw).
-  // `format` is a mark-level option (string | fn), not a channel — see MarkOptions.
-  // Also the primary channel of needle / axisRadial / cone (degrees via scale.range;
-  // default range [180, 0] = left→right through the top). For arc/pie, the field is
-  // the slice magnitude (layout stacks and normalizes; the scale is not used for placement).
+  // not scaled — constant forms are shorthands). `format` is a mark-level option
+  // (string | fn), not a channel — see MarkOptions.
   text?: ChannelSpec;
   fontSize?: ChannelSpec;
   textAnchor?: ChannelSpec;   // horizontal: 'start' | 'middle' | 'end'
   lineAnchor?: ChannelSpec;   // vertical: 'top' | 'middle' | 'bottom'
   dx?: ChannelSpec;           // horizontal pixel offset
   dy?: ChannelSpec;           // vertical pixel offset
+  // Orientation in math degrees (0° = +x, CCW, y-up). Scaled when a scale is
+  // declared so rotate() is an exact inverse; else raw. Marks that emit geometry
+  // (point/rect/tick/text/…) stamp it on FeatureNode.angle; the renderer applies
+  // SVG rotate(-deg) about the mark centre. Also the primary channel of needle /
+  // axisRadial / cone (default range [180, 0] = left→right through the top).
+  // Arc/pie slice magnitude is `value`, not `angle` — a slice's share is a quantity
+  // the layout turns into a sweep, not an orientation.
   angle?: ChannelSpec;
   [channel: string]: ChannelSpec | undefined;
 }
@@ -360,6 +363,8 @@ export interface MarkOptions {
   lineAnchor?: 'top' | 'middle' | 'bottom' | string;
   dx?: number;
   dy?: number;
+  // Orientation shorthand (math degrees) — desugars to channels.angle.
+  angle?: number;
   // Text-mark display formatter: a d3-format string or `(value) => string`.
   // Display-only — the underlying field stays the raw value. See `vibe.format`.
   format?: string | ((v: any) => string);
@@ -410,15 +415,33 @@ export interface FaceOptions extends MarkOptions {
 // the shared dataset. Each part encodes some columns; a part carrying an `edit`
 // on a channel is a handle. `composite` returns the parts as an array of features
 // (Elicit flattens it) — it is a desugaring, not a new kind of feature.
+//
+// Group-level `channels` (and style/angle shorthands) merge into every part at
+// desugar time; a part's own channel for the same name wins. Inherited `edit`s
+// attach to the last part only (visuals first, handles last) so one dataset does
+// not get the same edit applied twice.
 export interface CompositeOptions {
   // The sub-marks, in z-order: visual parts first, handles last.
   parts?: any[];
   id?: string;
+  // Shared channel map inherited by every part (part keys win). Typical for a
+  // glyph-wide `angle`, `x`/`y`, or `fill`.
+  channels?: Channels;
+  // Constant shorthands desugared into group channels (same list as MarkOptions).
+  fill?: any;
+  stroke?: any;
+  strokeWidth?: number;
+  opacity?: number;
+  fillOpacity?: number;
+  strokeOpacity?: number;
+  size?: number;
+  angle?: number;
   // Stamped onto any part that doesn't declare its own (a glyph usually sits in a
   // band slot). See plot/composite.js.
   discreteScale?: 'band' | 'point';
   // Group-level data invariants; promoted to the dataset like any mark's.
   constraints?: Constraint[];
+  [key: string]: any;
 }
 
 export interface FeatureNode {
@@ -460,11 +483,13 @@ export interface FeatureNode {
   fontSize?: number;
   textAnchor?: string;
   // Text mark: vertical anchor ('top'|'middle'|'bottom') and the SVG
-  // dominant-baseline the mark derived from it; rotation in degrees (rendered
-  // as a rotate() transform about x,y); `editText` opts the node into the
-  // renderer's inline content editor on dblclick.
+  // dominant-baseline the mark derived from it; `editText` opts the node into
+  // the renderer's inline content editor on dblclick.
   lineAnchor?: string;
   dominantBaseline?: string;
+  // Orientation in math degrees (0° = +x, CCW). Any geometry node may carry it;
+  // the renderer applies SVG rotate(-deg) about markCenter. Marks that bake
+  // orientation into path geometry (needle) omit this to avoid double-rotating.
   angle?: number;
   editText?: boolean;
   data?: Datum;

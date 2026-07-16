@@ -3,18 +3,30 @@ import type { DocPage } from '../lib/types';
 const page: DocPage = {
   "route": "/marks/composite",
   "title": "Composite",
-  "lead": "A <b>composite</b> mark is a glyph: a named <b>group of ordinary marks</b> over the chart’s one dataset. Each part encodes some columns of the same rows; a part whose channel carries an <code class=\"inline\">edit</code> is a handle. Drag a handle and it writes its field; on the next render every other part re-derives from the changed rows — the same reactive model the guide layer uses. Composite is a <b>desugaring</b>, not a new kind of feature: it returns its parts as plain features and <code class=\"inline\">Elicit</code> flattens them, exactly as the <code class=\"inline\">axes</code> convenience desugars into axis marks. Because each handle is its own mark, dragging one <i>cannot</i> move another — dispatch already routes a gesture to the feature owning the node you touched.",
+  "lead": "A <b>composite</b> mark is a glyph: a named <b>group of ordinary marks</b> over the chart’s one dataset. Group-level <code class=\"inline\">channels</code> (and style / <code class=\"inline\">angle</code> shorthands) <b>trickle into every part</b> at desugar time — declare a shared orientation or position once; a part’s own channel for the same name wins; inherited <code class=\"inline\">edit</code>s attach to the <b>last</b> part only (visuals first, handles last). Each part still has its <b>own</b> channels and shorthands (arm geometry, per-part stroke, a hub’s fill). Composite is a <b>desugaring</b>, not a new kind of feature: it returns its parts as plain features and <code class=\"inline\">Elicit</code> flattens them. Because each handle is its own mark, dragging one <i>cannot</i> move another — dispatch already routes a gesture to the feature owning the node you touched.",
   "api": [
     {
       "name": "composite(options)",
       "summary": "A glyph: a group of marks over the shared dataset. Import from <code class=\"inline\">vibe.plot</code>. Returns an <b>array of features</b>, which <code class=\"inline\">Elicit</code> flattens into its <code class=\"inline\">features</code> list.",
-      "signature": "composite({ parts, constraints, discreteScale, id }) → Feature[]",
+      "signature": "composite({ parts, channels, constraints, discreteScale, id }) → Feature[]",
       "options": [
         {
           "name": "parts",
           "type": "Mark[]",
           "default": "[]",
-          "desc": "The sub-marks, in z-order (visual parts first, handles last). Ordinary mark instances — a <code class=\"inline\">ruleX</code> whisker, a <code class=\"inline\">point</code> dot, a <code class=\"inline\">tick</code> cap. A part with an <code class=\"inline\">edit</code> on a channel is a handle; a part without one is inert and the engine makes it <code class=\"inline\">pointerEvents:\"none\"</code> so it can’t swallow a sibling’s drag."
+          "desc": "The sub-marks, in z-order (visual parts first, handles last). Each part is an ordinary mark with its <b>own</b> <code class=\"inline\">channels</code> / style shorthands (arm geometry, per-part stroke, a tip’s <code class=\"inline\">size</code>). A part with an <code class=\"inline\">edit</code> is a handle; a part without one is inert and the engine makes it <code class=\"inline\">pointerEvents:\"none\"</code> so it can’t swallow a sibling’s drag."
+        },
+        {
+          "name": "channels",
+          "type": "object",
+          "default": "{}",
+          "desc": "Shared channel map merged into every part. Use it for glyph-wide bindings (<code class=\"inline\">x</code>/<code class=\"inline\">y</code>/<code class=\"inline\">angle</code>/<code class=\"inline\">fill</code>). A part’s own channel for the same name <b>wins</b> (shallow replace). Inherited <code class=\"inline\">edit</code>s land on the last part only."
+        },
+        {
+          "name": "fill, angle, …",
+          "type": "shorthand",
+          "default": "—",
+          "desc": "Constant shorthands desugared into <b>group</b> channels (shared by every part unless a part overrides). Parts keep their own shorthands too — e.g. group <code class=\"inline\">angle</code>, per-part <code class=\"inline\">stroke</code>."
         },
         {
           "name": "constraints",
@@ -35,7 +47,7 @@ const page: DocPage = {
           "desc": "Prefix for the parts’ generated ids (<code class=\"inline\">id/0</code>, <code class=\"inline\">id/1</code>, …), so each part keeps a stable identity across renders."
         }
       ],
-      "returns": "An <b>array of features</b> — the parts, with ids assigned and the group’s constraints attached. Nothing about the glyph reaches the engine: it sees four ordinary marks reading the one dataset."
+      "returns": "An <b>array of features</b> — the parts, with ids assigned, group channels merged in, and the group’s constraints attached. Nothing about the glyph reaches the engine: it sees ordinary marks reading the one dataset."
     }
   ],
   "sections": [
@@ -54,6 +66,15 @@ const page: DocPage = {
       "examples": [
         "marks-composite/independent-handles-per-field",
         "marks-composite/coupled-move-center-within-ends"
+      ]
+    },
+    {
+      "id": "plus",
+      "title": "Group channels + per-part channels",
+      "intro": "Two layers of binding. <b>Group</b> <code class=\"inline\">channels</code> (here <code class=\"inline\">x</code>, <code class=\"inline\">y</code>, <code class=\"inline\">angle</code>) trickle into every part so the glyph shares one position and one orientation. <b>Each part</b> still declares its own channels and shorthands — arm length, stroke colour, a hub’s <code class=\"inline\">fill</code> / <code class=\"inline\">size</code>. A part key wins on conflict. Inherited <code class=\"inline\">edit</code>s attach to the last part only, so one <code class=\"inline\">rotate()</code> spins the whole glyph without double-applying.",
+      "examples": [
+        "marks-composite/composite-channels-trickle-down",
+        "marks-composite/hub-point-own-fill-size"
       ]
     }
   ]

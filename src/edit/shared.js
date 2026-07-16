@@ -122,6 +122,10 @@ export function markCenter(node) {
     if (node.x != null && node.width != null) {
         return { cx: node.x + node.width / 2, cy: node.y + (node.height || 0) / 2 };
     }
+    // A line segment (tick / rule): midpoint of the two endpoints.
+    if (node.x1 != null && node.y1 != null && node.x2 != null && node.y2 != null) {
+        return { cx: (node.x1 + node.x2) / 2, cy: (node.y1 + node.y2) / 2 };
+    }
     // A bare x/y node (text): its anchor IS its position.
     if (node.x != null && node.y != null) return { cx: node.x, cy: node.y };
     return null;
