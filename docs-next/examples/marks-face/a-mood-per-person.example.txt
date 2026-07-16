@@ -1,0 +1,18 @@
+mount(Elicit({
+  width: 540, height: 260,
+  margins: { top: 16, right: 20, bottom: 34, left: 20 },
+  axes: { x: {}, y: false },
+  data: [
+    { who: "Ana", valence: 0.6, arousal: 0.4 },
+    { who: "Ben", valence: -0.5, arousal: -0.2 },
+    { who: "Cy",  valence: 0.1, arousal: 0.8 },
+  ],
+  schema: {
+    who:     { type: "categorical", domain: ["Ana", "Ben", "Cy"] },
+    valence: { type: "quantitative", domain: [-1, 1] },
+    arousal: { type: "quantitative", domain: [-1, 1] },
+  },
+  features: [
+    face({ size: 46, channels: { x: { field: "who" } } }),
+  ],
+}))

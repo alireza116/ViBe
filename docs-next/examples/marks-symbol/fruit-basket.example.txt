@@ -1,0 +1,23 @@
+mount(Elicit({
+  width: 380, height: 280,
+  margins: { top: 16, right: 16, bottom: 30, left: 30 },
+  data: [
+    { fruit: "apples",   n: 6 },
+    { fruit: "bananas",  n: 4 },
+    { fruit: "cherries", n: 9 },
+  ],
+  schema: {
+    fruit: { type: "categorical", domain: ["apples","bananas","cherries"] },
+    n:     { type: "quantitative", domain: [0, 12] },
+  },
+  features: [
+    waffleY({
+      channels: {
+        x: { field: "fruit" },
+        y: { field: "n", edit: waffleFill() },
+        symbol: { field: "fruit", scale: { range: ["🍎","🍌","🍒"] } },
+      },
+      constraints: [ snap({ step: 1 }) ],
+    }),
+  ],
+}))

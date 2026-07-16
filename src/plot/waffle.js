@@ -24,8 +24,10 @@
 // domain top) are drawn too so the whole block is one direct-pick drag target —
 // dragging *up* into them raises the count. `showEmpty: false` keeps them as
 // targets but paints them transparent; `emptyFill` sets their colour. `shape`
-// picks 'rect' (default) or 'circle' cells. Pair with a `snap` constraint whose
-// step equals `unit` to land on whole cells.
+// picks 'rect' (default), 'circle', or 'symbol' cells — and a `symbol` channel
+// (category -> glyph) turns each cell into that glyph automatically (an emoji
+// waffle). Pair with a `snap` constraint whose step equals `unit` to land on
+// whole cells.
 //
 // Interactions: use `waffleFill()` on the value channel — it maps the pointer to
 // the exact cell under it (row + column) and fills up to and INCLUDING that cell,
@@ -36,7 +38,7 @@
 // level for tap-to-set alongside drag-to-fill.
 
 import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
 
 /** @param {any} scale @returns {[number, number]} */
 function domainExtent(scale) {
@@ -102,6 +104,11 @@ function buildWaffle(options, forcedOrientation) {
             currentData.forEach((/** @type {any} */ d, i) => {
                 const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
                 const vertical = orientation !== 'horizontal';
+                // A `symbol` channel (or shape:'symbol') fills the block with glyph
+                // cells — an emoji waffle (🍎🍎🍎 for a count of 3). Every cell of a
+                // datum shares its glyph; empty cells stay faint but grabbable.
+                const glyph = shape === 'symbol' ? (resolveSymbol(scales, channels, d) || '·')
+                    : resolveSymbol(scales, channels, d);
 
                 // Band (category) geometry vs value (length) geometry — the same
                 // split bar makes. `bandStart`/`thickness` place the block across
@@ -188,6 +195,24 @@ function buildWaffle(options, forcedOrientation) {
                     const valueNear = baseline + valueDir * row * cellSize;       // edge closer to baseline
                     const valueFar = baseline + valueDir * (row + 1) * cellSize;  // edge further out
                     const valueTop = Math.min(valueNear, valueFar);              // smaller pixel
+
+                    // Glyph cell: a text node at the cell centre, sized to the cell.
+                    // Empty cells fade (but keep pointer events, as the drag track).
+                    if (glyph !== undefined) {
+                        const bandCenter = bandPos + cellSize / 2;
+                        const valCenter = (valueNear + valueFar) / 2;
+                        /** @type {Record<string, any>} */
+                        const extra = { ...style, data: d, index: i, grid };
+                        if (!isFilled) extra.opacity = showEmpty ? 0.2 : 0;
+                        nodes.push(symbolNode(
+                            glyph,
+                            vertical ? bandCenter : valCenter,
+                            vertical ? valCenter : bandCenter,
+                            drawSize / 2,
+                            extra
+                        ));
+                        continue;
+                    }
 
                     if (shape === 'circle') {
                         const r = drawSize / 2;

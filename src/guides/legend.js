@@ -41,15 +41,27 @@ export function legend(options = {}) {
                 const row = Math.floor(i / cols);
                 const sx = ox + col * pitch;
                 const sy = oy + row * (size + gap);
-                const fill = typeof scale.encode === 'function'
+                const encoded = typeof scale.encode === 'function'
                     ? scale.encode(value)
                     : (typeof scale === 'function' ? scale(value) : value);
-                nodes.push({
-                    type: 'rect',
-                    x: sx, y: sy, width: size, height: size,
-                    fill, stroke: '#374151', strokeWidth: 1,
-                    pointerEvents: 'none', guide: true
-                });
+                // A `symbol` channel encodes to a GLYPH, not a colour — draw the
+                // swatch as the glyph itself (a glyph picker) rather than a colour chip.
+                if (channel === 'symbol') {
+                    nodes.push({
+                        type: 'text',
+                        x: sx + size / 2, y: sy + size / 2,
+                        text: String(encoded),
+                        fontSize: size, textAnchor: 'middle', dominantBaseline: 'central',
+                        pointerEvents: 'none', guide: true
+                    });
+                } else {
+                    nodes.push({
+                        type: 'rect',
+                        x: sx, y: sy, width: size, height: size,
+                        fill: encoded, stroke: '#374151', strokeWidth: 1,
+                        pointerEvents: 'none', guide: true
+                    });
+                }
                 nodes.push({
                     type: 'text',
                     x: sx + size + 4, y: sy + size * 0.75,

@@ -26,7 +26,7 @@
 // mark in this codebase follows.
 
 import { isDiscrete } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
 
 /**
  * The discrete slots along the category axis — the ghost/label layer iterates
@@ -145,14 +145,23 @@ function buildDotStack(options, forcedAxis) {
                 const n = seen.get(key) || 0;
                 seen.set(key, n + 1);
                 const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
-                nodes.push({
-                    type: 'circle',
-                    ...placeAt(d, n),
-                    r,
-                    ...style,
-                    data: d,
-                    index: i
-                });
+                const pos = placeAt(d, n);
+                // A `symbol` channel renders each token as a glyph (an emoji token
+                // stack) instead of a circle; the ghost rings above stay circles as
+                // the drop affordance. Token radius `r` sets the glyph size.
+                const glyph = resolveSymbol(scales, channels, d);
+                if (glyph !== undefined) {
+                    nodes.push(symbolNode(glyph, pos.cx, pos.cy, r, { ...style, data: d, index: i }));
+                } else {
+                    nodes.push({
+                        type: 'circle',
+                        ...pos,
+                        r,
+                        ...style,
+                        data: d,
+                        index: i
+                    });
+                }
             });
 
             // Optional per-slot count label above the column.

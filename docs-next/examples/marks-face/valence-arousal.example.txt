@@ -1,0 +1,10 @@
+mount(Elicit({
+  width: 320, height: 320,
+  margins: { top: 12, right: 12, bottom: 12, left: 12 },
+  data: [ { valence: 0.3, arousal: 0.1 } ],
+  schema: {
+    valence: { type: "quantitative", domain: [-1, 1] },
+    arousal: { type: "quantitative", domain: [-1, 1] },
+  },
+  features: [ face() ],
+}))

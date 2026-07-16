@@ -25,6 +25,8 @@ export const SITE = [
             { path: 'marks/area.html', title: 'Area' },
             { path: 'marks/tick.html', title: 'Tick' },
             { path: 'marks/point.html', title: 'Point & Dot' },
+            { path: 'marks/symbol.html', title: 'Symbol & Emoji' },
+            { path: 'marks/face.html', title: 'Face (emotion)' },
             { path: 'marks/text.html', title: 'Text' },
             { path: 'marks/line.html', title: 'Line' },
             { path: 'marks/composite.html', title: 'Composite' },

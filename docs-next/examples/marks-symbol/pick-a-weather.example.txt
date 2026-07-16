@@ -1,0 +1,16 @@
+mount(Elicit({
+  width: 360, height: 220,
+  margins: { top: 60, right: 16, bottom: 20, left: 16 },
+  data: [ { sky: "cloudy" } ],
+  schema: { sky: { type: "ordinal", domain: ["sunny","partly","cloudy","rain","storm"] } },
+  features: [
+    point({
+      size: 40,
+      channels: {
+        symbol: { field: "sky", scale: { scheme: "weather" } },
+      },
+      edits: [ legend({ channel: "symbol", x: 8, y: 8, size: 22, labelWidth: 8 }) ],
+    }),
+  ],
+  guides: [ guides.legend({ channel: "symbol", x: 8, y: 8, size: 22, labelWidth: 8 }) ],
+}))

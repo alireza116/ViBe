@@ -20,6 +20,8 @@ export const SITE: NavGroup[] = [
       { href: '/marks/area', title: 'Area' },
       { href: '/marks/tick', title: 'Tick' },
       { href: '/marks/point', title: 'Point & Dot' },
+      { href: '/marks/symbol', title: 'Symbol & Emoji' },
+      { href: '/marks/face', title: 'Face (emotion)' },
       { href: '/marks/text', title: 'Text' },
       { href: '/marks/line', title: 'Line' },
       { href: '/marks/composite', title: 'Composite' },

@@ -292,6 +292,13 @@ export interface Channels extends StyleChannels {
   y2?: ChannelSpec;
   // Circle radius in px. Constant form is the `size` shorthand, not resolveStyle.
   size?: ChannelSpec;
+  // Categorical glyph channel: a category -> an emoji / unicode shape through an
+  // ordinal scale, exactly like `fill` maps a category -> a colour. A shape mark
+  // (point / dotStack / waffle) renders the glyph as text in place of its
+  // circle/rect. Supply the glyphs with `scale: { range: ['😢','😐','😊'] }` or a
+  // named `scale: { scheme: 'faces' }`; edit it with cycle()/legend() (the field
+  // holds the category — the glyph is its encoding). Non-positional, non-invertible.
+  symbol?: ChannelSpec;
   // Text mark channels: the label string, its size/anchors/offsets (read RAW,
   // not scaled — constant forms are shorthands), and rotation in degrees
   // (scaled when a scale is declared, so rotate() is an exact inverse; else raw).
@@ -345,6 +352,36 @@ export interface MarkOptions {
   // is the canonical home.
   constraints?: Constraint[];
   [key: string]: any;
+}
+
+// A face's parameter names — each maps to a data field and is only editable when
+// bound (via `features`). Unbound params render at neutral (0.5).
+export type FaceParam =
+  | 'mouthCurve' | 'mouthOpen' | 'mouthAsym'
+  | 'eyeScale' | 'eyeSquint'
+  | 'browHeight' | 'browTilt';
+
+// Options for a FACE mark (an emotion glyph): a single-datum, PARAMETRIC face whose
+// features encode data FIELDS and are DIRECTLY MANIPULATED to write them back (grab
+// the mouth, an eye, a brow). Bind params with `features` (param -> field); a feature
+// carrying two params is a 2-D drag (mouth: ↕ curve, ↔ asym; brow: ↕ height, ↔ tilt),
+// and the two "pull" params (eye squint, mouth open) get a small eyelid/lip dot.
+// Omit `features` for the emotion preset (mouthCurve ← valence, eyeScale ← arousal).
+// The centre is placed by the x/y channels when present, else the plot centre.
+// See plot/face.js.
+export interface FaceOptions extends MarkOptions {
+  // Param -> field bindings; the bound params are the editable ones. Replaces the
+  // preset when given. A value is a field name (string) or `{ field }`.
+  features?: Partial<Record<FaceParam, string | { field: string }>>;
+  // Rename the emotion preset's fields without a full `features` map.
+  valence?: string; // -> mouthCurve. Default 'valence'.
+  arousal?: string; // -> eyeScale.  Default 'arousal'.
+  // Face radius in px. Default min(width, height) * 0.35.
+  size?: number;
+  // Eyelid/lip grab-dot radius in px. Default 5.
+  handleSize?: number;
+  // Show the eyelid/lip dots (squint & open), or keep them grabbable but invisible.
+  handles?: boolean;
 }
 
 // Options for a COMPOSITE mark (a glyph): a named GROUP of ordinary marks over

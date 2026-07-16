@@ -40,6 +40,25 @@ export const DEFAULT_PALETTE = [
 // Default two-stop ramp for a continuous colour channel.
 export const DEFAULT_RAMP = ['#e6f0ff', '#08519c'];
 
+// Default glyph range for the `symbol` channel — neutral unicode SHAPES (like
+// Observable Plot's symbol channel), so a symbol channel always renders something
+// before an author supplies emoji. Override with `scale: { range: ['😢', …] }` or a
+// named `scheme` (see SYMBOL_SCHEMES). Emoji are a special case of a symbol range.
+export const DEFAULT_SYMBOLS = ['●', '■', '▲', '◆', '★', '✚', '▼', '◀', '▶', '⬟'];
+
+// Named symbol/emoji schemes — the "emoji is a special case" shortcut, so an author
+// writes `scale: { scheme: 'faces' }` instead of listing the glyphs. Ordered
+// low → high so they line up with an ordinal domain sorted the same way.
+/** @type {Record<string, readonly string[]>} */
+const SYMBOL_SCHEMES = {
+    faces: ['😞', '😐', '🙂'],
+    faces5: ['😢', '🙁', '😐', '🙂', '😄'],
+    hearts: ['🖤', '💛', '❤️'],
+    weather: ['☀️', '⛅', '☁️', '🌧️', '⛈️'],
+    arrows: ['⬇️', '↘️', '➡️', '↗️', '⬆️'],
+    shapes: DEFAULT_SYMBOLS,
+};
+
 // Named colour schemes. Categorical entries are ready-made palettes (d3-scale-
 // chromatic scheme arrays); ramp entries are interpolators sampled to N swatches.
 // Keys are lowercase so authors write `scheme: 'tableau10'` / `scheme: 'RdBu'`
@@ -115,6 +134,9 @@ const DISCRETE_RAMP_SCHEMES = {
 export function schemeRange(scheme, type, count) {
     if (!scheme || typeof scheme !== 'string') return null;
     const key = scheme.toLowerCase();
+    // Symbol/emoji schemes are ready-made glyph palettes (an ordinal scale recycles
+    // them if the domain is longer), same shape as a categorical colour scheme.
+    if (SYMBOL_SCHEMES[key]) return [...SYMBOL_SCHEMES[key]];
     if (CATEGORICAL_SCHEMES[key]) return [...CATEGORICAL_SCHEMES[key]];
     const interp = RAMP_SCHEMES[key];
     if (!interp) return null;
@@ -137,6 +159,11 @@ export function schemeRange(scheme, type, count) {
 // symmetric with the base `opacity` channel.
 const COLOR_CHANNELS = new Set(['fill', 'stroke']);
 const OPACITY_CHANNELS = new Set(['opacity', 'fillOpacity', 'strokeOpacity']);
+// The `symbol` channel maps a category -> a glyph (emoji / unicode shape) through
+// an ordinal scale, exactly as `fill` maps a category -> a colour. It is
+// non-positional and non-invertible (a glyph isn't a coordinate a drag inverts),
+// so it never enters AXIS_OF / visualForChannel — it's edited with cycle/legend.
+const SYMBOL_CHANNELS = new Set(['symbol']);
 
 // Position family: x1/x2 and y1/y2 are SPAN ENDPOINTS on the x/y axis, not their
 // own axes (Observable Plot's model — a bar's x1/x2 are both "x" units). The one
@@ -195,6 +222,10 @@ export function scaleTypeFor(channelName, measure, discrete = 'band') {
     const continuous = measure === 'quantitative' || measure === 'temporal';
     // Colour family: continuous data -> a ramp, discrete -> a palette.
     if (COLOR_CHANNELS.has(channelName)) return continuous ? 'sequential' : 'ordinal';
+    // Symbol family: always an ordinal category -> glyph map. (Binning a
+    // quantitative field into glyph buckets is out of scope for v1 — declare the
+    // field categorical/ordinal to drive it.)
+    if (SYMBOL_CHANNELS.has(channelName)) return 'ordinal';
     // positional / size / opacity: dates -> time, numbers -> linear, categories ->
     // the mark's discrete scale (band|point).
     if (measure === 'temporal') return 'time';
@@ -260,6 +291,8 @@ export function channelRange(channelName, type, dims) {
     // like opacity when driven by a field.
     if (OPACITY_CHANNELS.has(channelName)) return [0.15, 1];
     if (COLOR_CHANNELS.has(channelName)) return type === 'sequential' ? DEFAULT_RAMP : DEFAULT_PALETTE;
+    // Symbol channel: a glyph palette (author overrides with scale.range/scheme).
+    if (SYMBOL_CHANNELS.has(channelName)) return [...DEFAULT_SYMBOLS];
     return [0, 1];
 }
 

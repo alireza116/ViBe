@@ -71,7 +71,7 @@ export const STANDARD_STYLE_CHANNELS = Object.keys(STYLE_DEFAULTS);
 // channel — it stays off this list.)
 const SHORTHANDS = [
     ...STANDARD_STYLE_CHANNELS,
-    'size', 'text', 'fontSize', 'textAnchor', 'lineAnchor', 'dx', 'dy'
+    'size', 'symbol', 'text', 'fontSize', 'textAnchor', 'lineAnchor', 'dx', 'dy'
 ];
 
 /**
@@ -112,6 +112,47 @@ export function encodeChannel(scales, channels, channel, datum, fallback) {
     const scale = scales[channel];
     if (!scale) return fallback;
     return scale.encode(raw, fallback);
+}
+
+/**
+ * Resolve a datum's glyph on the `symbol` channel, or `undefined` when the mark
+ * declares no symbol channel (or the datum's category maps to nothing). A glyph is
+ * a category -> string map through the channel's ordinal scale — the same path
+ * `fill` takes to a colour — so a shape mark can render it as a text node in place
+ * of its circle/rect. Returns a string glyph or undefined.
+ * @param {import('../types').ScaleMap} scales
+ * @param {Record<string, any>} channels
+ * @param {import('../types').Datum} datum
+ * @returns {string | undefined}
+ */
+export function resolveSymbol(scales, channels, datum) {
+    if (!channels || !channels.symbol) return undefined;
+    const glyph = encodeChannel(scales, channels, 'symbol', datum, undefined);
+    return (glyph == null || glyph === '') ? undefined : String(glyph);
+}
+
+/**
+ * Build a `text` scene node for a glyph centred at (cx, cy), sized so its box is
+ * roughly the diameter of a circle of radius `size`. Shared by every shape mark
+ * that can render a `symbol` (point / dotStack / waffle), so a glyph token looks
+ * the same everywhere. `extra` carries the caller's style/data/index/pointer opts.
+ * @param {string} glyph
+ * @param {number} cx @param {number} cy
+ * @param {number} size the radius the mark would have used for a circle, in px
+ * @param {Record<string, any>} [extra]
+ * @returns {import('../types').FeatureNode}
+ */
+export function symbolNode(glyph, cx, cy, size, extra = {}) {
+    return {
+        type: 'text',
+        x: cx,
+        y: cy,
+        text: glyph,
+        fontSize: Math.max(1, size * 2),
+        textAnchor: 'middle',
+        dominantBaseline: 'central',
+        ...extra,
+    };
 }
 
 /**

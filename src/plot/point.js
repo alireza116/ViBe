@@ -22,7 +22,7 @@
 // A missing positional channel parks the dot at the centre of that dimension —
 // symmetric across x and y, so 1D-along-x and 1D-along-y are the same code path.
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
 
 /**
  * @param {any} [options]
@@ -57,11 +57,21 @@ export function point(options = {}) {
         build: (currentData, scales, width, height) => {
             return currentData.map((d, i) => {
                 const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
+                const cx = encodeChannel(scales, channels, 'x', d, width / 2);
+                const cy = encodeChannel(scales, channels, 'y', d, height / 2);
+                const size = encodeChannel(scales, channels, 'size', d, 5);
+                // A `symbol` channel turns the dot into a glyph (emoji / unicode
+                // shape) — the same category->encoding path, rendered as text. `size`
+                // still sets its px extent so a glyph point and a circle point match.
+                const glyph = resolveSymbol(scales, channels, d);
+                if (glyph !== undefined) {
+                    return symbolNode(glyph, cx, cy, size, { ...style, data: d, index: i });
+                }
                 return {
                     type: 'circle',
-                    cx: encodeChannel(scales, channels, 'x', d, width / 2),
-                    cy: encodeChannel(scales, channels, 'y', d, height / 2),
-                    r: encodeChannel(scales, channels, 'size', d, 5),
+                    cx,
+                    cy,
+                    r: size,
                     ...style,
                     data: d,
                     index: i

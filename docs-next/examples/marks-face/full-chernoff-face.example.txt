@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 340, height: 340,
+  margins: { top: 12, right: 12, bottom: 12, left: 12 },
+  data: [ {
+    curve: 0.7, open: 0.2, smirk: 0.5,
+    aperture: 0.6, squint: 0.2, browH: 0.5, browT: 0.4,
+  } ],
+  schema: {
+    curve:    { type: "quantitative", domain: [0, 1] },
+    open:     { type: "quantitative", domain: [0, 1] },
+    smirk:    { type: "quantitative", domain: [0, 1] },
+    aperture: { type: "quantitative", domain: [0, 1] },
+    squint:   { type: "quantitative", domain: [0, 1] },
+    browH:    { type: "quantitative", domain: [0, 1] },
+    browT:    { type: "quantitative", domain: [0, 1] },
+  },
+  features: [
+    face({
+      features: {
+        mouthCurve: "curve", mouthOpen: "open", mouthAsym: "smirk",
+        eyeScale: "aperture", eyeSquint: "squint",
+        browHeight: "browH", browTilt: "browT",
+      },
+    }),
+  ],
+}))

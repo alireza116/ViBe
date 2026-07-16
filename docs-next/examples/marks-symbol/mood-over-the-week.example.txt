@@ -1,0 +1,27 @@
+mount(Elicit({
+  width: 380, height: 250,
+  margins: { top: 16, right: 16, bottom: 30, left: 64 },
+  data: [
+    { day: "Mon", mood: "ok" },   { day: "Tue", mood: "good" },
+    { day: "Wed", mood: "bad" },  { day: "Thu", mood: "good" },
+    { day: "Fri", mood: "great" },
+  ],
+  schema: {
+    day:  { type: "categorical", domain: ["Mon","Tue","Wed","Thu","Fri"] },
+    mood: { type: "ordinal", domain: ["bad","ok","good","great"] },
+  },
+  features: [
+    point({
+      size: 15,
+      channels: {
+        x: { field: "day" },
+        y: { field: "mood" },
+        symbol: {
+          field: "mood",
+          scale: { range: ["😢","😐","🙂","😄"] },
+          edit: cycle(),
+        },
+      },
+    }),
+  ],
+}))

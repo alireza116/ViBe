@@ -16,7 +16,7 @@ y: { field: "n", edit: drag() }
 //   ── encode: n → pixel ──┘  └─ edit: drag pixel → n
 ```
 
-Note what the channel does *not* carry. A field's **data type** and its **domain** describe the data, not one mark's view of it, so they are declared once on the spec's `schema`. The **scale** is then derived: a categorical field on a bar's x is a band (a bar needs the interval), on a dot's x it is a point (a dot wants the tick). Name a scale explicitly only when you want something else — `scale: "log"`, `scale: { type: "sqrt", range: [4, 20] }`, or a live `d3.scaleBand().padding(0.3)`, which is adopted as you built it. For a colour channel, set the palette with `scale: { scheme: "tableau10" }` (categorical) or `scale: { scheme: "RdBu" }` (a ColorBrewer diverging / sequential set — discrete for ordinal domains, a two-stop ramp for continuous; add `reverse: true` to flip direction), or a raw `scale: { range: [...] }`.
+Note what the channel does *not* carry. A field's **data type** and its **domain** describe the data, not one mark's view of it, so they are declared once on the spec's `schema`. The **scale** is then derived: a categorical field on a bar's x is a band (a bar needs the interval), on a dot's x it is a point (a dot wants the tick). Name a scale explicitly only when you want something else — `scale: "log"`, `scale: { type: "sqrt", range: [4, 20] }`, or a live `d3.scaleBand().padding(0.3)`, which is adopted as you built it. For a colour channel, set the palette with `scale: { scheme: "tableau10" }` (categorical) or `scale: { scheme: "RdBu" }` (a ColorBrewer diverging / sequential set — discrete for ordinal domains, a two-stop ramp for continuous; add `reverse: true` to flip direction), or a raw `scale: { range: [...] }`. The **`symbol`** channel is the same idea for glyphs: a category → an emoji / unicode shape through an ordinal scale, so any shape mark (`point`, `dotStack`, `waffle`) can draw a glyph in place of its circle/rect. Give it glyphs with `scale: { range: ["😢","😐","😊"] }` or a named `scale: { scheme: "faces" }`; edit the underlying category with `cycle()` / `legend()`.
 
 ---
 
@@ -35,7 +35,8 @@ VibeJS is layered for extensibility:
 2. **Abstract scene graph (`src/core/scene.js`)** — a flat, layout-calculated collection of abstract nodes (`circle`, `rect`, `line`, `path`, `text`), independent of the DOM or any renderer.
 
 3. **Marks (`vibe.plot.*`)** — pure data-to-geometry factories on a shared foundation (`src/plot/mark.js`): every mark resolves its channels through `encodeChannel` and the standard style surface (`fill`, `stroke`, `strokeWidth`, `opacity`, …) the same way. Marks compose across scale types and orientations.
-   - `point` → `circle` (scatter; x/y/size/fill/stroke channels).
+   - `point` → `circle` (scatter; x/y/size/fill/stroke channels). Add a `symbol` channel and it draws a glyph (emoji / unicode shape) per datum instead of a circle.
+   - `face` → an expressive, parametric emotion glyph (Chernoff-style): a datum's fields are encoded into a face with seven params (mouth curve/open/asym, eye scale/squint, brow height/tilt), each editable by **directly manipulating the feature** — grab the mouth and pull it into a smile, drag an eye wider, tilt a brow (2-D drags where a feature carries two params; small eyelid/lip dots for squint & open). Bind params with a `features` map (`{ mouthCurve: 'valence', … }`); `face()` is the two-field emotion preset. A single-datum glyph like `trend`; its centre is placed by x/y when present, so a plot of faces is a small-multiple or an emotion-space scatter.
    - `bar` / `barY` / `barX` → `rect` (band axis = category + thickness, linear axis = value — or an explicit start/end span via x1/x2 or y1/y2; orientation auto-detected).
    - `rect` / `rectX` / `rectY` → the generalized bar: each axis independently resolves a **span** (x1/x2, y1/y2), a **band**, or a baseline→value length, so a rectangle can span both axes (heatmap cells, 2-D regions, binned histograms). `brushRect()` adds composable 2-D editing — grab an **edge** to resize a side, a **corner** for two extents, the **body** to move; `resize` (`'both'`/`'x'`/`'y'`/`'none'`) and `move` (bool) make it opt-in.
    - `tick` / `tickX` / `tickY` → `line` (a bar's zero-thickness sibling).
@@ -98,7 +99,7 @@ vibe-js/
 │   │   ├── effects.js      # Interaction-feedback layer (grab / select)
 │   │   └── scene.js        # Abstract scene graph
 │   ├── plot/               # Marks (mark.js = shared channel/style foundation)
-│   │   ├── point.js · bar.js · rect.js · tick.js · text.js · line.js · rule.js · composite.js · axis.js
+│   │   ├── point.js · face.js · bar.js · rect.js · tick.js · text.js · line.js · rule.js · composite.js · axis.js
 │   │   ├── geo.js · needle.js · axisRadial.js · arc.js · polar.js
 │   │   ├── dotStack.js · waffle.js · cone.js · trend.js
 │   ├── edit/               # The edit model
