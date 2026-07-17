@@ -4,34 +4,26 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SITE } from "../lib/nav";
-import type { DocPage } from "../lib/types";
 
 type Anchor = { id: string; title: string };
 
 type Props = {
   children: React.ReactNode;
-  /**
-   * Active page metadata for in-page anchors — legacy `content/*.ts` routes
-   * only. An MDX route passes nothing and the anchors are read from the DOM
-   * instead, since its sections live inside the compiled page.
-   */
-  page?: Pick<DocPage, "api" | "sections">;
 };
 
-export function DocShell({ children, page }: Props) {
+export function DocShell({ children }: Props) {
   const pathname = usePathname() || "/";
   const active = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
 
-  // An MDX page's sections are <Section> elements in its own tree, so the shell
-  // can't know them at render time — it reads them back after mount. ApiReference
-  // emits <section id="api"> too, so this picks up the API anchor in document
-  // order for free. Sub-anchors appear a frame after paint; that's the trade for
-  // keeping <Section> the single source of truth, with no codegen step.
-  const [found, setFound] = useState<Anchor[]>([]);
+  // A page's sections are <Section> elements inside its own MDX tree, so the
+  // shell can't know them at render time — it reads them back after mount.
+  // ApiReference emits <section id="api"> too, so the API anchor comes along in
+  // document order for free. Sub-anchors appear a frame after paint; that's the
+  // trade for keeping <Section> the single source of truth, with no codegen.
+  const [anchors, setAnchors] = useState<Anchor[]>([]);
   useEffect(() => {
-    if (page) return; // legacy route: the data is authoritative
     const nodes = document.querySelectorAll("main section[id]");
-    setFound(
+    setAnchors(
       Array.from(nodes).map((n) => ({
         id: n.id,
         title:
@@ -40,14 +32,8 @@ export function DocShell({ children, page }: Props) {
             : n.querySelector("h2")?.textContent?.trim() || n.id,
       }))
     );
-  }, [pathname, page]);
+  }, [pathname]);
 
-  const anchors: Anchor[] = page
-    ? [
-        ...(page.api?.length ? [{ id: "api", title: "API reference" }] : []),
-        ...(page.sections ?? []).map((s) => ({ id: s.id, title: s.title })),
-      ]
-    : found;
   const showAnchors =
     anchors.length > 1 || anchors.some((a) => a.id === "api");
 

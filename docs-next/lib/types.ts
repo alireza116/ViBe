@@ -1,12 +1,10 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 /**
- * Prose that may still arrive as an HTML string from a legacy `content/*.ts`
- * page, or as JSX from a migrated `api.tsx` / `page.mdx`. Transitional: once
- * every route is MDX, this narrows to ReactNode and the string branches in
- * ApiReference / ExampleLive go away.
+ * Rendered prose. JSX, not an HTML string — pages author it as markdown in
+ * `app/**\/page.mdx` and reference tables as JSX in the sibling `api.tsx`.
  */
-export type Prose = string | ReactNode;
+export type Prose = ReactNode;
 
 export type ApiOption = {
   name: string;
@@ -34,37 +32,10 @@ export type ExampleMeta = {
 /** How ExampleLive presents the source snippet. Default: editable. */
 export type CodeMode = 'editable' | 'collapsed' | 'readonly';
 
-export type ExampleComponentProps = {
-  codeMode?: CodeMode;
-  tall?: boolean;
-};
-
+/** A live example: the raw chart body plus the prose that frames it. */
 export type ExampleModule = {
   meta: ExampleMeta;
   code: string;
-  /**
-   * Optional React wrapper from a migrated `.tsx` example.
-   * DocPageView prefers this when present.
-   */
-  Component?: ComponentType<ExampleComponentProps>;
-};
-
-export type DocSection = {
-  id: string;
-  title: string;
-  intro?: string;
-  /** Keys into the page's examples map, e.g. "constraints/bars-that-compensate" */
-  examples: string[];
-  /** Presentation for examples in this section. Default: editable. */
-  codeMode?: CodeMode;
-};
-
-export type DocPage = {
-  route: string;
-  title: string;
-  lead?: string;
-  api?: ApiEntry[];
-  sections: DocSection[];
 };
 
 export type NavPage = { href: string; title: string };

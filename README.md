@@ -265,14 +265,33 @@ npm run build:docs        # docs site
 
 A Next App Router site with **live-editable** examples (`react-live` editor + Reset to default), and the project's only documentation — the older harness-based `docs/` tree was retired in favour of it.
 
-Content lives in `docs-next/content/<key>.ts` (one `DocPage`: route, lead, `api`, `sections`). Each example is a pair under `docs-next/examples/<key>/`: `<slug>.example.txt` holds the raw chart code (a `mount(Elicit({…}))` body, loaded as a string), and `<slug>.tsx` wraps it with its `meta` for `ExampleLive`. A route in `docs-next/app/` imports the content plus its examples; `docs-next/lib/nav.ts` is the sidebar. `@vibe` aliases `src/index.js`, so every example on the site runs against the source.
+**Everything for a page lives in its route folder.** `docs-next/app/marks/bar/` holds `page.mdx` (the prose, as markdown), `api.tsx` (the reference table, as JSX), and `_examples/*.example.txt` (the chart bodies — a bare `mount(Elicit({…}))` script each). The page imports its examples directly:
+
+```mdx
+import verticalBar from './_examples/a-vertical-bar-chart.example.txt';
+
+<Section id="basics" title="Band × value">
+
+The band axis slots the bars; the linear axis sets their length from a baseline.
+
+<Example code={verticalBar} title="A vertical bar chart" blurb="x band, y value." />
+
+</Section>
+```
+
+`_examples/` is a Next private folder, so it never becomes a route. The `.txt` extension is deliberate: it stops the bundler parsing a chart body as a module, which would inject dev HMR / `import.meta` into the string the editor evals. `docs-next/lib/nav.ts` is the sidebar; a page's in-page anchors are read from its `<Section>` ids. `@vibe` aliases `src/index.js`, so every example on the site runs against the source.
+
+Two rules worth knowing before editing the docs UI:
+
+- **Section ids are load-bearing.** `verify:browser` roots assertions at them with descendant selectors (`#band .chart > div`), so the id must stay on an element that *contains* the examples. That's why `<Section>` exists and why the MDX pipeline runs with **no remark/rehype plugins** — `rehype-slug` would move ids onto the `<h2>` and silently break ~20 checks.
+- **Prose is JSX, not HTML strings.** `dangerouslySetInnerHTML` appears exactly once (the `getData()` panel, which formats its own HTML). Don't reintroduce it: rendering markup from a string is what made a whole class of "tags printed on screen" bugs invisible.
 
 The docs are also the **test suite**. `npm run verify:browser` boots this site, evaluates every example, and drives real gestures against them — see below.
 
 **Reuse in another Next app** (e.g. a lab site): import the docs UI from the package export, or copy `docs-next/`:
 
 ```javascript
-import { DocShell, ExampleLive, SITE, createVibeScope } from "vibe-js/docs-ui";
+import { DocShell, ExampleLive, Section, SITE, createVibeScope } from "vibe-js/docs-ui";
 ```
 
 Chart surfaces are client components (`'use client'`); the lab page that embeds them must be a client boundary too.

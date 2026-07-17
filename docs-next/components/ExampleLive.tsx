@@ -91,16 +91,10 @@ function DataPanel({ chart }: { chart: ElicitEl | null }) {
 }
 
 /**
- * `Try: …` affordance under a chart. The hint keeps its own markup (`.try b` in
- * docs.css colours a <b> specifically), so a legacy HTML string and JSX from a
- * migrated page both land in the same single <span class="try">.
+ * `Try: …` affordance under a chart. The hint is JSX so it keeps its own markup
+ * — `.try b` in docs.css colours a <b> specifically.
  */
 function TryHint({ hint }: { hint: Prose }) {
-  if (typeof hint === 'string') {
-    return (
-      <span className="try" dangerouslySetInnerHTML={{ __html: `Try: ${hint}` }} />
-    );
-  }
   return <span className="try">Try: {hint}</span>;
 }
 

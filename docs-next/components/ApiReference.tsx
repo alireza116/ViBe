@@ -1,7 +1,6 @@
 'use client';
 
 import type { ApiEntry, ApiOption } from '../lib/types';
-import { proseProps } from '../lib/prose';
 
 function OptionsTable({
   label,
@@ -51,7 +50,7 @@ function OptionsTable({
                       </td>
                     );
                   }
-                  return <td key={key} {...proseProps(r.desc ?? '')} />;
+                  return <td key={key}>{r.desc}</td>;
                 })}
               </tr>
             ))}
@@ -73,7 +72,7 @@ export function ApiReference({ entries }: { entries: ApiEntry[] }) {
           <div className="api-entry" key={entry.name ?? i}>
             {entry.name ? <h3 className="api-heading">{entry.name}</h3> : null}
             {entry.summary ? (
-              <p className="api-summary" {...proseProps(entry.summary)} />
+              <p className="api-summary">{entry.summary}</p>
             ) : null}
             {sigs.length ? (
               <pre className="code sig">
@@ -99,7 +98,7 @@ export function ApiReference({ entries }: { entries: ApiEntry[] }) {
             {entry.returns ? (
               <>
                 <div className="api-label">Returns / emits</div>
-                <p className="api-returns" {...proseProps(entry.returns)} />
+                <p className="api-returns">{entry.returns}</p>
               </>
             ) : null}
           </div>
