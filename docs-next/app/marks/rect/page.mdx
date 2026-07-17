@@ -1,0 +1,97 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import regionBoxes from './_examples/region-boxes.example.txt';
+import preBinnedCounts from './_examples/pre-binned-counts.example.txt';
+import editableBinHeights from './_examples/editable-bin-heights.example.txt';
+import full2DEdgesCornersBody from './_examples/full-2-d-edges-corners-body.example.txt';
+import resizeXOnly from './_examples/resize-x-only.example.txt';
+import moveOnly from './_examples/move-only.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Rect
+
+<Lead>The generalized **bar**: each axis independently resolves its extent as a **span** (x1/x2, y1/y2), a categorical **band**, or a baseline→value length — so a rectangle can span BOTH axes at once (Observable Plot’s rect: heatmap cells, 2-D regions, binned histograms, annotation boxes). `rect` spans both axes; `rectX` / `rectY` force one axis to a baseline→value length. Prefer `bar` when one axis is a category band and the other a value (classic elicitation bars); use `rect` when both axes are spans/bands, and pair it with `brushRect()` for edge/corner/body editing.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basics" title="A 2-D rectangle (both axes are spans)">
+
+Give both axes explicit endpoints and each datum draws a rectangle spanning x1→x2 and y1→y2.
+
+<Example
+  code={regionBoxes}
+  title="Region boxes"
+  blurb="x1/x2 and y1/y2 place each rect; fill by a field."
+/>
+
+</Section>
+
+<Section id="histogram" title="Binned histogram (rectY)">
+
+A histogram is a vertical rect whose **x** is a quantitative bin span (x1/x2) and whose **y** is a count from the baseline — that is exactly `rectY`. Data must already be binned (one row per bin); there is no binning transform. Prefer `barY` when bins are categorical labels instead of numeric edges.
+
+<Example
+  code={preBinnedCounts}
+  title="Pre-binned counts"
+  blurb="x1/x2 place each bin on a shared quantitative x; y is the count."
+/>
+
+<Example
+  code={editableBinHeights}
+  title="Editable bin heights"
+  blurb="Drag on y to reshape the belief distribution; clamp keeps counts ≥ 0."
+  try={(
+    <>
+      <b>Drag</b> a bin’s top edge to change its count.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="editing" title="Composable 2-D editing (brushRect)">
+
+brushRect() edits all four extents. It is OPT-IN and composable: grab an EDGE to resize one side, a CORNER to resize two extents, the BODY to move the whole rect. `resize` ('both' | 'x' | 'y' | 'none') picks which axes resize; `move` (bool) toggles body-drag — so you can ship resize-one-axis, move-only, or resize-only.
+
+<Example
+  code={full2DEdgesCornersBody}
+  title="Full 2-D: edges, corners, body"
+  blurb="Default brushRect(): every direction live."
+  try={(
+    <>
+      <b>Drag</b> an edge to resize a side, a corner to resize two extents, or the body to move.
+    </>
+  )}
+/>
+
+<Example
+  code={resizeXOnly}
+  title="Resize x only"
+  blurb={"brushRect({ resize: \"x\" }) — only the vertical edges resize; body still moves."}
+  try={(
+    <>
+      <b>Drag</b> a left/right edge to resize width; the body to move.
+    </>
+  )}
+/>
+
+<Example
+  code={moveOnly}
+  title="Move only"
+  blurb={"brushRect({ resize: \"none\" }) — no edges grab; the whole rect translates."}
+  try={(
+    <>
+      <b>Drag</b> anywhere in the rect to move it (edges do nothing).
+    </>
+  )}
+/>
+
+</Section>

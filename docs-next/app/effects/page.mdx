@@ -1,0 +1,53 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import proximitySelect from './_examples/proximity-select.example.txt';
+import restyledFeedback from './_examples/restyled-feedback.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Interaction effects
+
+<Lead>Feedback for interaction state (grabbing, proximity-selecting) lives in its own layer, never on a mark’s paint channels — so it can’t clobber your fill/stroke. Customize it through `effects`: a `grab` filter while dragging, and a `select` overlay (ring + highlight) for the proximity target.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="default" title="The default select effect">
+
+A pick: "nearest" drag. The select effect draws the snap-zone ring and a highlight outline around the targeted dot — without touching the stroke you set.
+
+<Example
+  code={proximitySelect}
+  title="Proximity select"
+  blurb="Move near a dot to select it; drag from empty space to grab the nearest."
+  try={(
+    <>
+      <b>Move</b> near a dot to select it · <b>Drag</b> from empty space to grab the nearest.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="custom" title="Customized effects">
+
+The same edit, restyled through effects: \{ grab, select: \{ color, ring, highlight \} \}. The mark’s own stroke stays intact throughout.
+
+<Example
+  code={restyledFeedback}
+  title="Restyled feedback"
+  blurb="Indigo ring, thicker outline, softer grab — paint channels untouched."
+  try={(
+    <>
+      <b>Move</b> / <b>drag</b> — indigo ring, thicker outline, softer grab.
+    </>
+  )}
+/>
+
+</Section>

@@ -2,18 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SITE } from "../lib/nav";
-import type { DocPage } from "../lib/types";
+
+type Anchor = { id: string; title: string };
 
 type Props = {
   children: React.ReactNode;
-  /** Active page metadata for in-page anchors. */
-  page?: Pick<DocPage, "api" | "sections">;
 };
 
-export function DocShell({ children, page }: Props) {
+export function DocShell({ children }: Props) {
   const pathname = usePathname() || "/";
   const active = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
+
+  // A page's sections are <Section> elements inside its own MDX tree, so the
+  // shell can't know them at render time — it reads them back after mount.
+  // ApiReference emits <section id="api"> too, so the API anchor comes along in
+  // document order for free. Sub-anchors appear a frame after paint; that's the
+  // trade for keeping <Section> the single source of truth, with no codegen.
+  const [anchors, setAnchors] = useState<Anchor[]>([]);
+  useEffect(() => {
+    const nodes = document.querySelectorAll("main section[id]");
+    setAnchors(
+      Array.from(nodes).map((n) => ({
+        id: n.id,
+        title:
+          n.id === "api"
+            ? "API reference"
+            : n.querySelector("h2")?.textContent?.trim() || n.id,
+      }))
+    );
+  }, [pathname]);
+
+  const showAnchors =
+    anchors.length > 1 || anchors.some((a) => a.id === "api");
 
   return (
     <div className="layout">
@@ -35,16 +57,11 @@ export function DocShell({ children, page }: Props) {
                   >
                     {p.title}
                   </Link>
-                  {isActive &&
-                  page &&
-                  (page.api?.length || (page.sections?.length ?? 0) > 1) ? (
+                  {isActive && showAnchors ? (
                     <div className="anchors">
-                      {page.api?.length ? (
-                        <a href="#api">API reference</a>
-                      ) : null}
-                      {page.sections?.map((s) => (
-                        <a key={s.id} href={`#${s.id}`}>
-                          {s.title}
+                      {anchors.map((a) => (
+                        <a key={a.id} href={`#${a.id}`}>
+                          {a.title}
                         </a>
                       ))}
                     </div>

@@ -1,0 +1,93 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import aVerticalBarChart from './_examples/a-vertical-bar-chart.example.txt';
+import colourByAField from './_examples/colour-by-a-field.example.txt';
+import barxValueOnX from './_examples/barx-value-on-x.example.txt';
+import yearsActivePerPerson from './_examples/years-active-per-person.example.txt';
+import brushEdgesBodyTogether from './_examples/brush-edges-body-together.example.txt';
+import dragAValue from './_examples/drag-a-value.example.txt';
+import nearestPickSelfDrawnGuide from './_examples/nearest-pick-self-drawn-guide.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Bar
+
+<Lead>A rectangular mark: one axis is a categorical **band** (the position), the other a linear **value** drawn as length from a baseline (or an explicit start/end span via x1/x2 or y1/y2). `bar` auto-detects orientation from which axis is a band; `barY` forces vertical, `barX` horizontal. For rectangles that span **both** axes (heatmap cells, 2-D regions), use `rect` + `brushRect()` instead.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basics" title="Band × value">
+
+The band axis slots the bars; the linear axis sets their length from a baseline.
+
+<Example
+  code={aVerticalBarChart}
+  title="A vertical bar chart"
+  blurb="x band of categories, y linear value."
+/>
+
+<Example
+  code={colourByAField}
+  title="Colour by a field"
+  blurb={'fill: { field: "kind" } tints each bar through the ordinal palette.'}
+/>
+
+</Section>
+
+<Section id="orientation" title="Horizontal bars (barX)">
+
+Put the band on y and the value on x and the bars run horizontally. barX forces this orientation; bar would infer it from the band axis.
+
+<Example
+  code={barxValueOnX}
+  title="barX — value on x"
+  blurb="y is the category band, x the linear value drawn rightward from the baseline."
+/>
+
+</Section>
+
+<Section id="span" title="Explicit spans (x1/x2, y1/y2)">
+
+Instead of one value drawn from the baseline, give the value axis two explicit endpoints — x1/x2 for barX, y1/y2 for barY — for a span that doesn’t start at zero (a Gantt-style range per category). x1/x2 share the same resolved scale as x (likewise y1/y2 with y), so only one needs an explicit type/domain.
+
+<Example
+  code={yearsActivePerPerson}
+  title="Years active per person"
+  blurb="barX with x1/x2 spans; y is the category band."
+/>
+
+<Example
+  code={brushEdgesBodyTogether}
+  title="Brush: edges + body together"
+  blurb="brushSpan() combines both: grab near an edge to resize just that end, grab the body to move the whole span. Drag an edge past the other and release — the fields re-sort (start stays ≤ end) with no visual jump."
+  try={<><b>Drag</b> an edge to resize it, the body to move the whole bar, or drag one edge past the other to see it flip.</>}
+/>
+
+</Section>
+
+<Section id="editing" title="Editing bars">
+
+Put edit: drag() on the value channel and a bar drags to rewrite its value. Thin bars are easier to grab with pick: "nearest" — grab from anywhere in the column.
+
+<Example
+  code={dragAValue}
+  title="Drag a value"
+  blurb="y carries edit: drag(). Dragging writes y back through the same scale."
+  try={<><b>Drag</b> a bar up or down.</>}
+/>
+
+<Example
+  code={nearestPickSelfDrawnGuide}
+  title="Nearest pick + self-drawn guide"
+  blurb={'pick: "nearest" grabs a bar from anywhere in its column; guide: true draws the snap ring.'}
+  try={<><b>Drag</b> from anywhere in a column to grab that bar.</>}
+/>
+
+</Section>

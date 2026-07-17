@@ -1,0 +1,53 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import editableArea from './_examples/editable-area.example.txt';
+import anEditableConfidenceBand from './_examples/an-editable-confidence-band.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Area
+
+<Lead>A filled path under a series — the distributional sibling of `line`. Same grouping / ordering knobs; optional handles so sweep and drag reuse the line edit machinery. `areaY` fills to the y baseline; `areaX` to the x baseline. Declare an endpoint **pair** instead (`y1` + `y2`) and it fills **between** them rather than down to the baseline — an **uncertainty band**, editable by both edges.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basics" title="Filled series">
+
+Drag handles to reshape the belief curve.
+
+<Example
+  code={editableArea}
+  title="Editable area"
+  blurb="areaY with drag on y handles."
+  try={(
+    <>
+      <b>Drag</b> a handle to reshape the area.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="band" title="Uncertainty band">
+
+Give the value axis an endpoint **pair** and the area fills between them — the shape of a confidence interval or a fan chart. Both edges get handles, so the interval is elicited by dragging its ends. Pair it with [ordering](/constraints#ordering) so the band cannot be turned inside-out: drag the low edge above the high one and the high edge is carried along, because the edge you grabbed is the one you meant.
+
+<Example
+  code={anEditableConfidenceBand}
+  title="An editable confidence band"
+  blurb="areaY with a y1/y2 pair; ordering keeps lo ≤ hi."
+  try={(
+    <>
+      <b>Drag</b> either edge — push the low edge past the high one and the band moves rather than turning inside-out.
+    </>
+  )}
+/>
+
+</Section>

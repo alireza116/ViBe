@@ -1,0 +1,71 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import valenceArousal from './_examples/valence-arousal.example.txt';
+import fullChernoffFace from './_examples/full-chernoff-face.example.txt';
+import aMoodPerPerson from './_examples/a-mood-per-person.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Face (emotion)
+
+<Lead>`face` encodes emotion — a datum's fields — into a face, and lets you **directly manipulate the features** to write them back: grab the mouth and pull it into a smile, drag an eye wider, tilt a brow. A face has seven parameters; each is only editable when you **bind it to a field**, so you turn on exactly the expressions you want to elicit.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="emotion" title="One face — drag to feel">
+
+The emotion preset binds `mouthCurve` to `valence` and `eyeScale` to `arousal`. Grab the mouth and pull it up to smile, or drag an eye to widen it — each gesture inverts through the field's scale, and the whole face re-derives.
+
+<Example
+  code={valenceArousal}
+  title="Valence × arousal"
+  blurb="The two-field emotion preset. The mouth and eyes are the drag targets themselves."
+  try={(
+    <>
+      <b>Drag the mouth</b> up/down (valence) or <b>drag an eye</b> up/down (arousal).
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="expressive" title="Turn on more expressions">
+
+Bind any subset of the seven params in `channels`, each as a plain `{ field }` — the binding both drives the geometry and makes that feature draggable. Unbound params stay neutral. Here every param is live: mouth (↕ curve, ↔ smirk), eyes (↕ aperture), the eyelid dot (↓ squint), the lip dot (↓ open), and the brows (↕ height, ↔ tilt).
+
+<Example
+  code={fullChernoffFace}
+  title="Full Chernoff face"
+  blurb="All seven parameters bound to fields; grab any feature to sculpt the expression."
+  try={(
+    <>
+      <b>Drag</b> the mouth, eyes, brows, or the eyelid / lip dots.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="multiples" title="Many faces in a plot">
+
+Give the face an `x` (or `y`) channel and it is placed like a `point` — one editable face per row. Set `x: { field: 'valence' }, y: { field: 'arousal' }` instead and the faces become an emotion-space scatter that moves as you edit them.
+
+<Example
+  code={aMoodPerPerson}
+  title="A mood per person"
+  blurb="Faces positioned along a categorical x; drag each one's mouth or eyes to set that person's emotion."
+  try={(
+    <>
+      <b>Drag</b> any face's mouth or an eye.
+    </>
+  )}
+/>
+
+</Section>

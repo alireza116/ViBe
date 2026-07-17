@@ -1,0 +1,62 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import gridlinesTicksFormatTitle from './_examples/gridlines-ticks-format-title.example.txt';
+import originCrossingAxes from './_examples/origin-crossing-axes.example.txt';
+import ex1dCenteredSliderAxis from './_examples/1d-centered-slider-axis.example.txt';
+import explicitGridyAxisxAxisyRuley from './_examples/explicit-gridy-axisx-axisy-ruley.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Axis, Grid & Rule
+
+<Lead>Axes and gridlines are composable marks. Configure them the easy way through the global `axes: {…}` convenience (ticks, formats, titles, hiding, free positioning), or add `axisX` / `axisY` / `gridY` / `ruleY` as explicit features for full control.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="global" title={"The global axes:{} convenience"}>
+
+Pass a per-channel config to shape ticks, formats and titles, or a transform to reposition an axis. axes: false drops them entirely.
+
+<Example
+  code={gridlinesTicksFormatTitle}
+  title="Gridlines, ticks, format & title"
+  blurb="y gets a grid and percent formatting; x a tick count and a title."
+/>
+
+<Example
+  code={originCrossingAxes}
+  title="Origin-crossing axes"
+  blurb="transform moves each axis to the zero line on the other scale."
+/>
+
+<Example
+  code={ex1dCenteredSliderAxis}
+  title="1D centered slider axis"
+  blurb="One point channel; the axis is pinned to the vertical center via transform, and y is dropped."
+  try={(
+    <>
+      <b>Drag</b> a dot along the axis.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="composable" title="Axis, grid & rule as marks">
+
+Turn the global axes off (axes: false) and add reference marks as features — they render in z-order with your data, so you control exactly what draws and where.
+
+<Example
+  code={explicitGridyAxisxAxisyRuley}
+  title="Explicit gridY + axisX/axisY + ruleY"
+  blurb="A gridline layer under the dots, a dashed rule at y = 50, and two titled axes — all as features."
+/>
+
+</Section>

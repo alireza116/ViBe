@@ -1,0 +1,179 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import vancouverLocalAreas from './_examples/vancouver-local-areas.example.txt';
+import pinsOnOpenstreetmap from './_examples/pins-on-openstreetmap.example.txt';
+import tilesUnderTheNeighborhoodOutlines from './_examples/tiles-under-the-neighborhood-outlines.example.txt';
+import beliefPinsOnVancouver from './_examples/belief-pins-on-vancouver.example.txt';
+import namedPinsYouCanRename from './_examples/named-pins-you-can-rename.example.txt';
+import cycleFillOnSelectedLocalAreas from './_examples/cycle-fill-on-selected-local-areas.example.txt';
+import drawAPathAcrossVancouver from './_examples/draw-a-path-across-vancouver.example.txt';
+import reshapeASeededBroadwayIshLine from './_examples/reshape-a-seeded-broadway-ish-line.example.txt';
+import aRouteAcrossVancouver from './_examples/a-route-across-vancouver.example.txt';
+import studyAreasOverTheCity from './_examples/study-areas-over-the-city.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Geo
+
+<Lead>Geographic marks for map elicitation. Set chart-level `projection` (Plot-style: `"mercator"`, `{ type, domain, … }`, or a live d3.geo* instance). Position uses **apply / invert** on that shared projection — not x/y scales. Provide basemap topology with `geoBasemap({ geojson })` (a GeoJSON FeatureCollection / Feature / Geometry). Editable overlays live on the **dataset**. Examples below use Vancouver’s 22 local areas (`vancouver` in the docs scope — replace with your own file).</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basemap" title="Providing basemap data">
+
+The basemap is chrome: pass GeoJSON into geoBasemap. Fit the projection with the same object as domain so the map fills the frame. Below, `vancouver` is the docs sample (22 local areas); your app would import or fetch its own.
+
+<Example
+  code={vancouverLocalAreas}
+  title="Vancouver local areas"
+  blurb={"Pass any FeatureCollection: geoBasemap({ geojson }). Fit with projection.domain. In your app: const map = await fetch(\"…/my-map.geojson\").then(r => r.json())."}
+/>
+
+</Section>
+
+<Section id="tiles" title="Real basemaps (OSM raster tiles)">
+
+For an actual map under your data — streets, water, labels — use `geoTile()`: the Leaflet model, a pyramid of 256px images from a tile server, laid on the plane behind the marks. **It requires `projection: "mercator"`** (unrotated). A tile is a pre-rendered picture baked in Web Mercator, so under any other projection it cannot be made to register with the data; the mark checks the projection's behaviour, draws nothing, and warns rather than showing you a misaligned map. Everything else is unchanged — the same lon/lat marks and the same edit.geo.* gestures ride on top, because they still go through the same projection. **Attribution is a licence condition** of every tile service and is drawn by default. Public OSM tiles are rate-limited and not meant for production traffic: point `url` at your own server or a paid provider when you ship.
+
+<Example
+  code={pinsOnOpenstreetmap}
+  title="Pins on OpenStreetMap"
+  blurb="geoTile() replaces geoBasemap entirely — no GeoJSON needed. The projection still needs a domain to know where to look; a bbox works when you have no topology to fit."
+  try={(
+    <>
+      <b>Click</b> to drop a pin; <b>drag</b> it. Lon/lat come back as data.
+    </>
+  )}
+/>
+
+<Example
+  code={tilesUnderTheNeighborhoodOutlines}
+  title="Tiles under the neighborhood outlines"
+  blurb={"Raster and vector chrome compose: geoTile() lays the imagery, geoBasemap() draws the boundaries over it (fill \"none\"), and the elicited marks sit on top of both. Dim the tiles with opacity so your data still reads."}
+  try={(
+    <>
+      <b>Drag</b> a study box; <b>click</b> open map to add one.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="points" title="Place / move points on the map">
+
+geoPoint overlays sit on the same projection. Click empty space to add; drag to move. Lon/lat come back through onChange / getData().
+
+<Example
+  code={beliefPinsOnVancouver}
+  title="Belief pins on Vancouver"
+  blurb="Seeded near Downtown & Kitsilano; click elsewhere to add more."
+  try={(
+    <>
+      <b>Click</b> to place a pin; <b>drag</b> an existing one.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="labels" title="Label and rename places">
+
+A label on a map is an ordinary **text** mark that happens to be positioned by the projection — so `geoText` is the only geo-specific part, and every text behaviour comes along free: `editText()` to retype the content, `cycle()` to advance a categorical label, `rotate()` on `angle`. Give it its own feature next to a geoPoint and the two read the same rows: drag the dot and the name follows. `dx`/`dy` nudge the glyph off the anchor without touching the lon/lat a drag writes.
+
+<Example
+  code={namedPinsYouCanRename}
+  title="Named pins you can rename"
+  blurb="geoPoint carries the drag; geoText carries the label. editText() opens an inline editor on double-click and writes the string back to the row."
+  try={(
+    <>
+      <b>Double-click</b> a name to retype it · <b>drag</b> a dot (the label follows) · <b>click</b> the map to add a pin.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="polygons" title="Recolor neighborhoods">
+
+Editable regions are dataset rows with a geometry field — a subset of the basemap features promoted into data. The basemap stays inert chrome underneath.
+
+<Example
+  code={cycleFillOnSelectedLocalAreas}
+  title="Cycle fill on selected local areas"
+  blurb="Kitsilano, Fairview, Mount Pleasant, Downtown — click to cycle category."
+  try={(
+    <>
+      <b>Click</b> a shaded neighborhood to cycle its colour.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="lines" title="Draw lines over the city">
+
+Author a route as [lon, lat] pairs on top of the neighborhoods. Vertex reshape uses edit.geo.dragVertex on a seeded line (keep draw and vertex-drag on separate charts — draw raises the plane above marks).
+
+<Example
+  code={drawAPathAcrossVancouver}
+  title="Draw a path across Vancouver"
+  try={(
+    <>
+      <b>Drag</b> across the map to sketch a route.
+    </>
+  )}
+/>
+
+<Example
+  code={reshapeASeededBroadwayIshLine}
+  title="Reshape a seeded Broadway-ish line"
+  blurb="Drag vertex handles on a pre-drawn path."
+  try={(
+    <>
+      <b>Drag</b> a vertex handle.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="connected" title="Connected scatter over the map">
+
+Give geoLine `lon`/`lat` channels instead of `coordinates` and it connects the dataset's **rows** into one path — the geographic sibling of the `path` mark. Points ride on a separate geoPoint feature, so dragging a stop reshapes the trail: the line re-derives from the same rows on the next render. Order defaults to `"sequence"` (array order); pass a field name to sort by it, or `series` to draw one trail per group.
+
+<Example
+  code={aRouteAcrossVancouver}
+  title="A route across Vancouver"
+  blurb="Five stops connected in `stop` order. The dots are a geoPoint mark with edit.geo.drag() — the trail follows because both marks read the same dataset."
+  try={(
+    <>
+      <b>Drag</b> a stop to reroute; <b>click</b> the map to append one.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="rects" title="Geographic rectangles">
+
+Boxes are axis-aligned in lon/lat (they may look slightly curved under Mercator). Grab an **edge** or **corner** to reshape, the **body** to move, and click empty space to mint another. The zone you grabbed is latched at dragstart by the `geoBrush` driver and held for the whole gesture, so a move never turns into a resize halfway through; the cursor tells you which zone you're in before you press.
+
+<Example
+  code={studyAreasOverTheCity}
+  title="Study areas over the city"
+  blurb={"edit.geo.brush() resizes + moves; edit.geo.createRect() mints a new box on a click in open space (clicking an existing box grabs it instead). Pass move:false for resize-only, or { edgeInset } to widen the grab band."}
+  try={(
+    <>
+      <b>Drag</b> a corner or edge to reshape · <b>drag</b> the middle to move · <b>click</b> empty map to add a box.
+    </>
+  )}
+/>
+
+</Section>

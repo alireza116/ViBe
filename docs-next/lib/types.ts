@@ -1,62 +1,41 @@
-import type { ComponentType } from 'react';
+import type { ReactNode } from 'react';
+
+/**
+ * Rendered prose. JSX, not an HTML string — pages author it as markdown in
+ * `app/**\/page.mdx` and reference tables as JSX in the sibling `api.tsx`.
+ */
+export type Prose = ReactNode;
 
 export type ApiOption = {
   name: string;
   type?: string;
   default?: string;
-  desc?: string;
+  desc?: Prose;
 };
 
 export type ApiEntry = {
   name?: string;
-  summary?: string;
+  summary?: Prose;
   signature?: string;
   signatures?: string[];
   options?: ApiOption[];
   channels?: ApiOption[];
-  returns?: string;
+  returns?: Prose;
 };
 
 export type ExampleMeta = {
   title: string;
   blurb?: string;
-  try?: string;
+  try?: Prose;
 };
 
 /** How ExampleLive presents the source snippet. Default: editable. */
 export type CodeMode = 'editable' | 'collapsed' | 'readonly';
 
-export type ExampleComponentProps = {
-  codeMode?: CodeMode;
-  tall?: boolean;
-};
-
+/** A live example: the raw chart body plus the prose that frames it. */
 export type ExampleModule = {
   meta: ExampleMeta;
   code: string;
-  /**
-   * Optional React wrapper from a migrated `.tsx` example.
-   * DocPageView prefers this when present.
-   */
-  Component?: ComponentType<ExampleComponentProps>;
-};
-
-export type DocSection = {
-  id: string;
-  title: string;
-  intro?: string;
-  /** Keys into the page's examples map, e.g. "constraints/bars-that-compensate" */
-  examples: string[];
-  /** Presentation for examples in this section. Default: editable. */
-  codeMode?: CodeMode;
-};
-
-export type DocPage = {
-  route: string;
-  title: string;
-  lead?: string;
-  api?: ApiEntry[];
-  sections: DocSection[];
 };
 
 export type NavPage = { href: string; title: string };

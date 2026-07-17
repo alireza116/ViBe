@@ -50,9 +50,7 @@ function OptionsTable({
                       </td>
                     );
                   }
-                  return (
-                    <td key={key} dangerouslySetInnerHTML={{ __html: r.desc ?? '' }} />
-                  );
+                  return <td key={key}>{r.desc}</td>;
                 })}
               </tr>
             ))}
@@ -74,7 +72,7 @@ export function ApiReference({ entries }: { entries: ApiEntry[] }) {
           <div className="api-entry" key={entry.name ?? i}>
             {entry.name ? <h3 className="api-heading">{entry.name}</h3> : null}
             {entry.summary ? (
-              <p className="api-summary" dangerouslySetInnerHTML={{ __html: entry.summary }} />
+              <p className="api-summary">{entry.summary}</p>
             ) : null}
             {sigs.length ? (
               <pre className="code sig">
@@ -100,7 +98,7 @@ export function ApiReference({ entries }: { entries: ApiEntry[] }) {
             {entry.returns ? (
               <>
                 <div className="api-label">Returns / emits</div>
-                <p className="api-returns" dangerouslySetInnerHTML={{ __html: entry.returns }} />
+                <p className="api-returns">{entry.returns}</p>
               </>
             ) : null}
           </div>

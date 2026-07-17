@@ -1,0 +1,31 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import twoStagePoint from './_examples/two-stage-point.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Stages
+
+<Lead>Multi-step elicitation: "first do X, then do Y". An edit may carry a numeric `stage`; it is active only when it equals the chart's current stage (edits with no stage are always active). This is a uniform gate applied to every edit — the same shape as gesture matching, not a new interaction mode — so stages compose with every mark and edit. Advance from the container: `nextStage()`, `setStage(n)`, `getStage()`, `on("stage", cb)`.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basics" title="Place, then size">
+
+Stage 0 drags the point along x (where); stage 1 resizes it (how confident). Only one edit is live at a time.
+
+<Example
+  code={twoStagePoint}
+  title="Two-stage point"
+  blurb="Same mark, two staged edits, a Next button."
+  try={"drag horizontally; press Next; drag outward to resize."}
+/>
+
+</Section>

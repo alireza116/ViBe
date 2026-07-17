@@ -1,0 +1,71 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import fruitCounts from './_examples/fruit-counts.example.txt';
+import proportionPicker from './_examples/proportion-picker.example.txt';
+import clickADotToSetTheCount from './_examples/click-a-dot-to-set-the-count.example.txt';
+import talliesOf16 from './_examples/tallies-of-1-6.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Waffle
+
+<Lead>Like a **bar**, a waffle shows a quantity for a category — but subdivides the block into a grid of **cells** where **one cell is a fixed quantity** (`unit`), so a reader can literally count amounts and a gesture can pick a proportion cell-by-cell. `value / unit` cells fill; cells sit `multiple` across the band, so each row spans `multiple · unit` and its band is read from the value scale — rows land on axis ticks and the filled height matches the value. Pair with `snap` (step = `unit`) to land drags on whole cells.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="counts" title="Counting quantities">
+
+A waffle over four categories — each cell is a fixed count (here 10), so amounts read exactly: count the cells and multiply by the unit. Rows land on the y-axis ticks.
+
+<Example
+  code={fruitCounts}
+  title="Fruit counts"
+  blurb="Static waffle; y domain 0–320, one cell = 10 fruit (32 cells tall), multiple auto-picked square."
+/>
+
+</Section>
+
+<Section id="proportion" title="Picking a proportion">
+
+One category on a 0–1 axis; each cell is 1/50, so 50 cells fill the block. edit.waffle.fill() fills up to the exact cell under the pointer — click or drag — so the value is always a whole number of cells.
+
+<Example
+  code={proportionPicker}
+  title="Proportion picker"
+  blurb="click or drag; unit = 1/50 makes 50 countable cells, edit.waffle.fill lands exactly on the cell you point at."
+  try={"click a cell, or drag up/down."}
+/>
+
+</Section>
+
+<Section id="shapes-and-click" title="Dots, click-to-set & hidden track">
+
+Cells can be circles (shape: "circle") — uniform squares that touch, packed to fill the band width and height. A click-gesture edit sets the count to the clicked cell in one tap, and showEmpty: false hides the track while keeping it grabbable.
+
+<Example
+  code={clickADotToSetTheCount}
+  title="Click a dot to set the count"
+  blurb="circle cells, one = 5; uniform dots pack tightly (gap: 0). Click any dot to fill up to and including it, or drag."
+  try={"click a dot, or drag up/down."}
+/>
+
+</Section>
+
+<Section id="small-counts" title="Small counts (unit = 1)">
+
+With unit: 1 each cell is exactly one item, so small counts read directly — one cell means one. The grid is only as wide as it needs to be (never wider than the band) and is centred, so a category of 1 shows a single cell.
+
+<Example
+  code={talliesOf16}
+  title="Tallies of 1–6"
+  blurb="one cell = one item; counts of 1, 3, 6, 2 — count the cells directly."
+/>
+
+</Section>

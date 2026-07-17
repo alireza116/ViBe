@@ -1,0 +1,53 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import snapDragViaCustomApply from './_examples/snap-drag-via-custom-apply.example.txt';
+import dragToReorder from './_examples/drag-to-reorder.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Authoring SDK
+
+<Lead>How to build new elicitation devices without forking the engine. Marks use `encodeChannel` / `resolveStyle`; edits use `makeEdit` + `invertChannel`; multi-event lifecycles register via `edit.registerDriver`. Attach edits on a channel (`y: { field, edit: drag() }`) or at mark level (`edits: [drag({ channels: ["x","y"] })]`) — never as a fake `channels.edit` key.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="custom-edit" title="A custom edit with makeEdit">
+
+Prefer makeEdit (or edit.custom) so defaults for pick/gesture/constrain stay consistent.
+
+<Example
+  code={snapDragViaCustomApply}
+  title="Snap-drag via custom apply"
+  blurb="Invert y, then round to the nearest 10."
+  try={(
+    <>
+      <b>Drag</b> the point — it lands on multiples of 10.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="rank" title="Rank / reorder">
+
+edit.rank() swaps rank slots along a discrete axis as you drag.
+
+<Example
+  code={dragToReorder}
+  title="Drag to reorder"
+  blurb="Point scale over ranks; drag swaps with the nearest slot."
+  try={(
+    <>
+      <b>Drag</b> a point to another rank.
+    </>
+  )}
+/>
+
+</Section>

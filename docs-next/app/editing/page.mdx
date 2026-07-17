@@ -1,0 +1,53 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import dragAValueBars from './_examples/drag-a-value-bars.example.txt';
+import nearestPickFromEmptySpace from './_examples/nearest-pick-from-empty-space.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Editing — the inverse of encoding
+
+<Lead>Attach an edit to a channel and a gesture writes that channel back to the data through the same scale. An edit is a small descriptor — `gesture` (drag / click / dblclick), `pick` (direct / nearest / plane), `when` (arbitration), `constrain`, and `guide`. Place it on a channel (`channels.y.edit`) or at mark level (`edits: [...]`).</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="drag" title="Drag a value">
+
+The canonical edit: drag() inverts the pointer on each positional channel it governs. On a bar’s y, a drag rewrites the value.
+
+<Example
+  code={dragAValueBars}
+  title="Drag a value (bars)"
+  blurb="y carries edit: drag(). The gesture → data path mirrors the data → height encoding."
+  try={(
+    <>
+      <b>Drag</b> a bar up or down.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="pick" title="Pick — how an edit finds its target">
+
+pick: "direct" uses the mark under the pointer; pick: "nearest" grabs the closest mark within a pixel threshold, so small marks are reachable from nearby empty space. guide: true self-draws the snap ring.
+
+<Example
+  code={nearestPickFromEmptySpace}
+  title="Nearest pick from empty space"
+  blurb="A 2D nearest drag: move near a dot to select it, drag from empty space to grab the closest."
+  try={(
+    <>
+      <b>Drag</b> from anywhere near a dot to grab it.
+    </>
+  )}
+/>
+
+</Section>

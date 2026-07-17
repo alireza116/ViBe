@@ -1,0 +1,73 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import partyShares from './_examples/party-shares.example.txt';
+import donutWithCenterText from './_examples/donut-with-center-text.example.txt';
+import dragAnyBoundary from './_examples/drag-any-boundary.example.txt';
+import donutFourSlices from './_examples/donut-four-slices.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Arc · Pie · Donut
+
+<Lead>Data-driven **pie** and **donut** slices. Each row’s magnitude (the `value` field) is stacked and normalized to a circle (or partial arc). Shares path math with `axisRadial`. Wire `edits: [edit.arc.edge()]` to **drag a slice boundary** and redistribute the two adjacent shares (the total stays fixed).</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="pie" title="Pie">
+
+Full circle, zero inner radius.
+
+<Example
+  code={partyShares}
+  title="Party shares"
+  blurb="Three slices from a shared total."
+/>
+
+</Section>
+
+<Section id="donut" title="Donut">
+
+Same layout with an inner hole — room for a center label.
+
+<Example
+  code={donutWithCenterText}
+  title="Donut with center text"
+  blurb="Static proportions; text is a sibling mark."
+/>
+
+</Section>
+
+<Section id="edit" title="Editable slice boundaries">
+
+Wire `edit.arc.edge()` and **every** boundary gets a draggable handle — including the seam where the last slice meets the first on a full circle, so _n_ slices give _n_ handles. Dragging a boundary moves value between exactly the two slices it separates: one grows by what the other loses, so the total is preserved.
+
+<Example
+  code={dragAnyBoundary}
+  title="Drag any boundary"
+  blurb="Each handle pair-shifts its two neighbors; the seam handle links the last and first slice."
+  try={(
+    <>
+      <b>Drag</b> a dot on any slice edge (including the seam at 9 o’clock).
+    </>
+  )}
+/>
+
+<Example
+  code={donutFourSlices}
+  title="Donut, four slices"
+  blurb="Four slices → four handles; drag the seam to trade the last and first slice."
+  try={(
+    <>
+      <b>Drag</b> any edge — the two adjacent slices rebalance.
+    </>
+  )}
+/>
+
+</Section>

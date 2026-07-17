@@ -1,0 +1,119 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import clickToAddAPoint from './_examples/click-to-add-a-point.example.txt';
+import existenceMoveOnOneMark from './_examples/existence-move-on-one-mark.example.txt';
+import arbitrationClickRecoloursAltClickDeletes from './_examples/arbitration-click-recolours-alt-click-deletes.example.txt';
+import clickToAddAnAnchor from './_examples/click-to-add-an-anchor.example.txt';
+import seedAWholeLineNewseries from './_examples/seed-a-whole-line-newseries.example.txt';
+import freehandDrawAPathAsYouDrag from './_examples/freehand-draw-a-path-as-you-drag.example.txt';
+import removeAWholeLine from './_examples/remove-a-whole-line.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Create · Remove · Anchors
+
+<Lead>Creating and deleting data are edits like any other. `create` is a plane gesture that inverts the pointer through the positional channels to mint a datum; `remove` deletes the target. For connected paths, `edit.line.anchor` adds one point to the nearest line, `edit.line.newSeries` seeds a whole line, `edit.line.draw` lays a line down as you drag, and `edit.line.removeSeries` deletes a whole line. Multiple edits on one gesture are arbitrated by `when`. **Declare a whole-dataset edit on exactly one mark.** A plane gesture carries no node, so it fans out to _every_ mark’s plane-pick edits — put `create` on two marks and one click appends two rows. (Direct-pick edits like `drag` are immune: they route to the mark you actually touched.) The engine warns in dev builds if you do this.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="create" title="Create — click to add">
+
+create is its own edit: a plane click inverts the pointer through the positional channels and appends a datum. Constraints still apply — count(max) caps the total.
+
+<Example
+  code={clickToAddAPoint}
+  title="Click to add a point"
+  blurb={"create({ defaults }) mints a datum at the pointer; count({ max }) caps the dataset."}
+  try={(
+    <>
+      <b>Click</b> empty space to add a point · <b>drag</b> to move it.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="existence" title="Create, remove & move together">
+
+Mark-level create (dblclick) + remove (Alt-click) + a move drag, all on one mark. When two edits share a gesture, when decides which claims the event.
+
+<Example
+  code={existenceMoveOnOneMark}
+  title="Existence + move on one mark"
+  blurb="dblclick adds, Alt-click removes, drag moves."
+  try={(
+    <>
+      <b>Double-click</b> to add · <b><kbd>Alt</kbd>+click</b> a dot to delete · <b>Drag</b> to move.
+    </>
+  )}
+/>
+
+<Example
+  code={arbitrationClickRecoloursAltClickDeletes}
+  title="Arbitration — click recolours, Alt-click deletes"
+  blurb="cycle and remove share the click gesture; when (noAlt vs alt) decides which one claims it."
+  try={(
+    <>
+      <b>Click</b> a dot to recolour · <b><kbd>Alt</kbd>+click</b> to delete · <b>Drag</b> to move.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="anchors" title="Anchors — building a connected path">
+
+On a line, edit.line.anchor() adds a point to the nearest series (or starts a new one from empty space), and edit.line.newSeries() seeds a whole line from sampled positions. Order is tracked so the path stays reproducible.
+
+<Example
+  code={clickToAddAnAnchor}
+  title="Click to add an anchor"
+  blurb={"edit.line.anchor({ into: \"nearest\" }) extends the connected path in click order — near or far, it stays one line (into: \"new\" starts a fresh one)."}
+  try={(
+    <>
+      <b>Drag</b> a point, or <b>click</b> empty space to add the next anchor.
+    </>
+  )}
+/>
+
+<Example
+  code={seedAWholeLineNewseries}
+  title="Seed a whole line (newSeries)"
+  blurb="Double-click drops six evenly-spaced anchors at the click value; then sweep to shape."
+  try={(
+    <>
+      <b>Double-click</b> to drop a line, then <b>sweep</b> to shape it.
+    </>
+  )}
+/>
+
+<Example
+  code={freehandDrawAPathAsYouDrag}
+  title="Freehand — draw a path as you drag"
+  blurb={"On an order:\"sequence\" line, draw samples the pointer by distance and appends points in creation order. It stays one path: a later drag over the line reshapes it, a drag in empty space extends the same line (in draw order) rather than starting a new one. (Pass into:\"new\" to start fresh lines.)"}
+  try={(
+    <>
+      <b>Press and drag</b> to draw a path · <b>drag over it</b> to reshape · <b>drag elsewhere</b> to keep extending the same line.
+    </>
+  )}
+/>
+
+<Example
+  code={removeAWholeLine}
+  title="Remove a whole line"
+  blurb="remove deletes one anchor; edit.line.removeSeries() deletes the whole line — click any point on a line to remove it. The delete counterpart to anchor / newSeries / draw."
+  try={(
+    <>
+      <b>Alt-click</b> a point to delete just that anchor · <b>click</b> a point to remove its entire line.
+    </>
+  )}
+/>
+
+</Section>

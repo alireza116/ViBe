@@ -1,0 +1,53 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import drawACurve from './_examples/draw-a-curve.example.txt';
+import twoLinesSweptIndependently from './_examples/two-lines-swept-independently.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Sweep (you-draw-it)
+
+<Lead>`edit.line.sweep()` is a drag that repaints each point’s value as the pointer crosses its column — the NYT “you draw it” interaction. It is sugar over `drag({ pick: "sweep", guide: true })`, and it is series-scoped: it locks onto the nearest line at drag-start and paints only that one.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="sweep" title="Sweep a single line">
+
+Press and drag horizontally; every point the pointer passes takes the pointer’s value.
+
+<Example
+  code={drawACurve}
+  title="Draw a curve"
+  blurb={"edit: drag({ pick: \"sweep\" }) on the value channel; the x positions stay fixed."}
+  try={(
+    <>
+      <b>Sweep</b> left-to-right across the chart.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="series" title="Series-scoped sweep">
+
+With multiple lines, a sweep locks onto the nearest line at drag-start and paints only it — the others hold. Grouping comes from the stroke field.
+
+<Example
+  code={twoLinesSweptIndependently}
+  title="Two lines, swept independently"
+  blurb="The sweep touches only the line it started nearest to."
+  try={(
+    <>
+      <b>Sweep</b> over one line to reshape it; the other stays put.
+    </>
+  )}
+/>
+
+</Section>

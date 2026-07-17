@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { Highlight, themes } from 'prism-react-renderer';
 import { Editor } from 'react-live';
-import type { CodeMode, ExampleMeta } from '../lib/types';
+import type { CodeMode, ExampleMeta, Prose } from '../lib/types';
 import { createVibeScope } from '../lib/vibeScope';
 
 const EVAL_DEBOUNCE_MS = 280;
@@ -88,6 +88,14 @@ function DataPanel({ chart }: { chart: ElicitEl | null }) {
       <pre className="data-body" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
+}
+
+/**
+ * `Try: …` affordance under a chart. The hint is JSX so it keeps its own markup
+ * — `.try b` in docs.css colours a <b> specifically.
+ */
+function TryHint({ hint }: { hint: Prose }) {
+  return <span className="try">Try: {hint}</span>;
 }
 
 function formatEvalError(err: unknown): string {
@@ -376,12 +384,7 @@ export function ExampleLive({
             >
               <div className="chart" ref={chartRef} />
               {error ? <pre className="live-error">⚠ {error}</pre> : null}
-              {!error && meta.try ? (
-                <span
-                  className="try"
-                  dangerouslySetInnerHTML={{ __html: `Try: ${meta.try}` }}
-                />
-              ) : null}
+              {!error && meta.try ? <TryHint hint={meta.try} /> : null}
             </div>
             <div className="visual-data">
               {!error ? <DataPanel chart={elicited} /> : null}
@@ -394,12 +397,7 @@ export function ExampleLive({
           >
             <div className="chart" ref={chartRef} />
             {error ? <pre className="live-error">⚠ {error}</pre> : null}
-            {!error && meta.try ? (
-              <span
-                className="try"
-                dangerouslySetInnerHTML={{ __html: `Try: ${meta.try}` }}
-              />
-            ) : null}
+            {!error && meta.try ? <TryHint hint={meta.try} /> : null}
             {!error ? <DataPanel chart={elicited} /> : null}
           </div>
         )}

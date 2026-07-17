@@ -1,0 +1,48 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import aBarMark from './_examples/a-bar-mark.example.txt';
+import theSameBarNowEditable from './_examples/the-same-bar-now-editable.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Overview
+
+<Lead>A chart is a declarative `Elicit(spec)`: a list of **marks**, each with **channels** that map data fields to visuals. Every example on these pages shows the **exact code that drew the chart beside it** — the snippet is run verbatim. This page is the 30-second API tour; the sidebar goes deep on each mark and feature.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="anatomy" title="A minimal chart">
+
+An Elicit spec is a renderer plus a list of features (marks). A mark binds channels (x, y, fill, size, …) to data fields through scales. That is the whole model: encode (data → visual) one way, edit (gesture → data) the other.
+
+<Example
+  code={aBarMark}
+  title="A bar mark"
+  blurb="x is a band of categories, y a linear value, fill a constant. This is a complete, static Elicit spec."
+/>
+
+</Section>
+
+<Section id="encode-edit" title="Encoding, and its inverse">
+
+Attach an edit to a channel and a gesture writes that channel back to the data through the same scale. The bar below is identical to the one above, except y now carries edit: drag() — so encoding (data → bar height) gains its inverse (drag → data).
+
+<Example
+  code={theSameBarNowEditable}
+  title="The same bar, now editable"
+  blurb="y carries edit: drag(). Dragging a bar writes its value back to the data."
+  try={(
+    <>
+      <b>Drag</b> a bar up or down.
+    </>
+  )}
+/>
+
+</Section>

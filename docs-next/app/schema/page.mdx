@@ -1,0 +1,53 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import elicitFromNothing from './_examples/elicit-from-nothing.example.txt';
+import beliefsOverTime from './_examples/beliefs-over-time.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Data schema
+
+<Lead>A `schema` declares the output dataset: each field’s measurement type (quantitative / categorical / ordinal / temporal), range, and creation default. It is the source of truth for a field’s scale, so a chart resolves scales, draws axes, and mints data with **zero starter data**.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="empty" title="An empty chart that knows its axes">
+
+No data — the axes come straight from the schema. Every created point carries all declared fields (from the pointer or the field’s default), so it is immediately editable.
+
+<Example
+  code={elicitFromNothing}
+  title="Elicit from nothing"
+  blurb="schema declares age / belief / class; create mints fully-formed data."
+  try={(
+    <>
+      <b>Double-click</b> to create · <b>drag</b> to move · <b>click</b> to cycle the class colour.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="temporal" title="A temporal axis — same story">
+
+type: "temporal" on a field. Dates place, drag, and invert like any continuous axis.
+
+<Example
+  code={beliefsOverTime}
+  title="Beliefs over time"
+  blurb="A temporal domain drives a time scale; created points carry real Dates."
+  try={(
+    <>
+      <b>Double-click</b> to record a belief at a point in time · <b>drag</b> to adjust.
+    </>
+  )}
+/>
+
+</Section>

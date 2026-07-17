@@ -1,0 +1,37 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import fieldDrivenColourOrdinalPalette from './_examples/field-driven-colour-ordinal-palette.example.txt';
+import constantStyleShorthands from './_examples/constant-style-shorthands.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Core concepts
+
+<Lead>**One dataset.** A chart elicits exactly one dataset — even a slider elicits a one-row dataset — so `data` lives on the `Elicit` spec, never on a mark. Each mark is a _view_ over those rows: it encodes some columns and, where a channel carries an `edit`, writes them back. Several marks over the same rows is the point, not a special case — they all re-derive from the committed data on the next render.<br /><br />**One schema.** What each field _is_ — and its **domain** — is declared once, on the spec’s `schema`. A mark never carries a domain, because a domain describes the data, not one mark’s view of it. The scale follows from the two: a categorical field on a bar’s x is a band; on a dot’s x it is a point.<br /><br />Every mark reads the same **channel** surface. A channel is a constant (`fill: "red"`) or a data field through a scale (`fill: { field: "kind" }`). No accessor functions — specs stay serializable. Encoding maps data → visual; an edit on a channel maps a gesture → data, back through the same scale.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="channels" title="A channel is a constant or a field">
+
+Constant channels take a raw value. Field channels name a data field and resolve it through a scale — a category through the ordinal palette, a number through a ramp. The same surface (x, y, fill, stroke, size, opacity, …) is available on every mark, plus top-level style shorthands.
+
+<Example
+  code={fieldDrivenColourOrdinalPalette}
+  title="Field-driven colour (ordinal palette)"
+  blurb={"channels: { fill: { field: \"kind\" } } — a category drives fill through the ordinal palette."}
+/>
+
+<Example
+  code={constantStyleShorthands}
+  title="Constant style shorthands"
+  blurb="stroke, strokeWidth, opacity as top-level shorthands on a point — a constant channel needs no scale."
+/>
+
+</Section>
