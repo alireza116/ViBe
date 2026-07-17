@@ -1,0 +1,28 @@
+mount(Elicit({
+  width: 420, height: 260,
+  margins: { top: 16, right: 16, bottom: 32, left: 42 },
+  schema: {
+    year: { type: "quantitative", domain: [2025, 2032] },
+    p:    { type: "quantitative", domain: [0, 1] },
+  },
+  data: [
+    { year: 2025, p: 0.05 }, { year: 2026, p: 0.12 },
+    { year: 2027, p: 0.20 }, { year: 2028, p: 0.34 },
+    { year: 2029, p: 0.45 }, { year: 2030, p: 0.60 },
+    { year: 2031, p: 0.72 }, { year: 2032, p: 0.80 },
+  ],
+  // "By when will it have happened?" — a cumulative probability cannot dip,
+  // because a dip is negative probability mass. The gesture has no idea; the
+  // dataset invariant does.
+  constraints: [
+    monotonic({ field: "p", along: "year" }),
+    clamp({ min: 0, max: 1, field: "p" }),
+  ],
+  features: [
+    lineY({
+      stroke: "#2563eb", handleSize: 5,
+      channels: { x: { field: "year" },
+                  y: { field: "p", edit: drag() } },
+    }),
+  ],
+}))

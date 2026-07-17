@@ -1,0 +1,35 @@
+mount(Elicit({
+  width: 440, height: 220,
+  margins: { top: 16, right: 24, bottom: 34, left: 88 },
+  schema: {
+    metric: { type: "categorical",  domain: ["Signups", "Revenue", "Churn", "Support load"] },
+    delta:  { type: "quantitative", domain: [-100, 1000] },
+  },
+  data: [
+    { metric: "Signups",      delta: 400 },
+    { metric: "Revenue",      delta: 25 },
+    { metric: "Churn",        delta: -60 },
+    { metric: "Support load", delta: 3 },
+  ],
+  features: [
+    point({
+      size: 9,
+      channels: {
+        y: { field: "metric" },
+        // symlog: the deltas span orders of magnitude AND cross zero, where
+        // plain `log` has no answer. `constant` sets how wide the linear
+        // region around zero is. Still continuous and invertible — it drags.
+        x: { field: "delta",
+             scale: { type: "symlog", constant: 10 },
+             edit: drag() },
+        // diverging: colour by distance from a PIVOT. Each side is scaled on
+        // its own, so 0 keeps the neutral colour even though the domain is
+        // lopsided (-100 vs 1000).
+        fill: { field: "delta",
+                scale: { type: "diverging", pivot: 0,
+                         range: ["#b2182b", "#f7f7f7", "#2166ac"] } },
+      },
+    }),
+    ruleX({ x: 0, stroke: "#94a3b8", strokeDasharray: "3 3" }),
+  ],
+}))

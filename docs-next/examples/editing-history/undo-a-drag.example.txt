@@ -1,0 +1,39 @@
+const chart = Elicit({
+  width: 420, height: 240,
+  margins: { top: 16, right: 16, bottom: 30, left: 40 },
+  schema: {
+    q: { type: "categorical",  domain: ["Q1", "Q2", "Q3", "Q4"] },
+    n: { type: "quantitative", domain: [0, 100] },
+  },
+  data: [
+    { q: "Q1", n: 40 }, { q: "Q2", n: 55 },
+    { q: "Q3", n: 35 }, { q: "Q4", n: 60 },
+  ],
+  features: [
+    barY({ channels: { x: { field: "q" },
+                       y: { field: "n", edit: drag() } } }),
+  ],
+});
+mount(chart);
+
+// Nothing here is special to undo: it is the ordinary element API.
+const controls = document.createElement("div");
+controls.style.cssText = "display:flex;gap:8px;margin-top:10px;font:12px system-ui";
+const undo = document.createElement("button");
+const redo = document.createElement("button");
+undo.textContent = "↶ Undo";
+redo.textContent = "↷ Redo";
+undo.onclick = () => chart.undo();
+redo.onclick = () => chart.redo();
+
+// canUndo / canRedo drive the buttons. `change` fires for edits AND for undo and
+// redo themselves — downstream, all three are just "the data changed".
+const sync = () => {
+  undo.disabled = !chart.canUndo();
+  redo.disabled = !chart.canRedo();
+};
+chart.on("change", sync);
+sync();
+
+controls.append(undo, redo);
+mount(controls);

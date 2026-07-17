@@ -24,6 +24,10 @@
     "title": "Drag · Resize · Cycle · Custom"
   },
   {
+    "route": "/editing/history",
+    "title": "History & keyboard"
+  },
+  {
     "route": "/editing/lock",
     "title": "Locked rows (read-only data)"
   },
