@@ -29,6 +29,53 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from
 const SINGLE = '__single__';
 
 /**
+ * Span mode puts TWO handles on ONE feature over ONE datum (one per edge), and
+ * direct-pick dispatch fans a gesture out to every direct edit on the feature —
+ * so an unguarded drag on the lo handle runs the hi edge's drag too and collapses
+ * the band onto the pointer. Each handle carries its `channel`, so claim each
+ * edge's edit for its own handle (the trend intercept/slope arbitration, applied
+ * for the author rather than asked of them). Untagged nodes are left alone: a
+ * mark-level edit spanning both edges still sees every gesture.
+ * @param {any} edit
+ * @param {string} name
+ * @returns {any}
+ */
+function claimEdge(edit, name) {
+    const inner = edit.when;
+    return {
+        ...edit,
+        when: (/** @type {import('../types').EditContext} */ ctx) => {
+            const ch = ctx.node && ctx.node.channel;
+            if (ch != null && ch !== name) return false;
+            return inner ? inner(ctx) : true;
+        }
+    };
+}
+
+/**
+ * Guard every edit that governs exactly one edge of the span pair, whether it was
+ * co-located on the channel or declared at mark level.
+ * @param {string[] | null} group the pair's channel names, or null outside span mode
+ * @param {any} channels
+ * @param {any[] | undefined} edits
+ * @returns {{ channels: any, edits: any[] | undefined }}
+ */
+function claimSpanEdges(group, channels, edits) {
+    if (!group) return { channels, edits };
+    /** @type {any} */
+    const guarded = { ...channels };
+    for (const ch of group) {
+        const spec = guarded[ch];
+        if (spec && spec.edit) guarded[ch] = { ...spec, edit: claimEdge(spec.edit, ch) };
+    }
+    const guardedEdits = edits && edits.map((e) => {
+        const names = (e.channels || []).filter((/** @type {string} */ n) => group.includes(n));
+        return names.length === 1 ? claimEdge(e, names[0]) : e;
+    });
+    return { channels: guarded, edits: guardedEdits };
+}
+
+/**
  * @param {any} options
  * @param {'x' | 'y' | null} forcedValueAxis
  * @returns {any}
@@ -36,9 +83,9 @@ const SINGLE = '__single__';
 function buildArea(options, forcedValueAxis) {
     const opts = normalizeMarkOptions(options);
     const {
-        channels = {},
+        channels: rawChannels = {},
         id,
-        edits,
+        edits: rawEdits,
         constraints,
         curve = 'linear',
         handles = true,
@@ -47,12 +94,14 @@ function buildArea(options, forcedValueAxis) {
         samples
     } = opts;
 
-    const xKey = (channels.x && channels.x.field) || 'x';
-    const yKey = (channels.y && channels.y.field) || 'y';
-    const seriesField = seriesFieldOf(opts, channels);
+    const xKey = (rawChannels.x && rawChannels.x.field) || 'x';
+    const yKey = (rawChannels.y && rawChannels.y.field) || 'y';
+    const seriesField = seriesFieldOf(opts, rawChannels);
     // Span mode is decided once per mark (not per datum), exactly as bar/rect do it.
-    const hasXSpan = !!(channels.x1 && channels.x2);
-    const hasYSpan = !!(channels.y1 && channels.y2);
+    const hasXSpan = !!(rawChannels.x1 && rawChannels.x2);
+    const hasYSpan = !!(rawChannels.y1 && rawChannels.y2);
+    const spanPair = hasYSpan ? ['y1', 'y2'] : hasXSpan ? ['x1', 'x2'] : null;
+    const { channels, edits } = claimSpanEdges(spanPair, rawChannels, rawEdits);
 
     return {
         id,
@@ -159,10 +208,9 @@ function buildArea(options, forcedValueAxis) {
 
                 // Handles. In span mode BOTH edges get one — an interval is edited by
                 // its ends, and a band whose lower edge had no handle would be a
-                // half-editable mark. Each carries the `channel` it belongs to, so a
-                // `when: ctx => ctx.node.channel === 'y1'` edit can tell them apart
-                // (the trend/face arbitration pattern) while a plain drag on y1/y2
-                // needs nothing extra.
+                // half-editable mark. Each carries the `channel` it belongs to, which
+                // is what claimSpanEdges' `when` guard reads to keep a drag on one
+                // edge from also running the other edge's edit.
                 const handleChannels = spanMode
                     ? (valueAxis === 'y' ? ['y1', 'y2'] : ['x1', 'x2'])
                     : [valueAxis];

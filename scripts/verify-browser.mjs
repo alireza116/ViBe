@@ -463,6 +463,24 @@ async function main() {
         check('band: ordering left the other rows alone',
             bandAfter[1].lo === bandBefore[1].lo && bandAfter[1].hi === bandBefore[1].hi);
 
+        // One handle is one edge. Both edges live on ONE feature over ONE datum, so
+        // an unguarded drag fans to the sibling edge's edit too and snaps the far
+        // handle onto the pointer — a small drag that never trips ordering is what
+        // tells the two apart.
+        const edgeSolo = page.locator('#band svg circle').nth(2); // row 1's low edge
+        const eb = await edgeSolo.boundingBox();
+        await page.mouse.move(eb.x + eb.width / 2, eb.y + eb.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(eb.x + eb.width / 2, eb.y + eb.height / 2 - 20, { steps: 5 });
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const bandSolo = await bandRows();
+        check('band: dragging the low edge moved it', bandSolo[1].lo > bandAfter[1].lo,
+            `${bandAfter[1].lo} -> ${bandSolo[1].lo}`);
+        check('band: dragging one edge left the OTHER edge of the same row alone',
+            bandSolo[1].hi === bandAfter[1].hi,
+            `hi ${bandAfter[1].hi} -> ${bandSolo[1].hi}`);
+
         // ---- Shape constraints --------------------------------------------
         // All three repair by pushing the rows/fields the gesture would have
         // violated, holding the one you actually grabbed. That choice is invisible
