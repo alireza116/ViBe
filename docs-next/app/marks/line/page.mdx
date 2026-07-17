@@ -1,0 +1,138 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import curveCatmullrom from './_examples/curve-catmullrom.example.txt';
+import sweepToDrawTheCurve from './_examples/sweep-to-draw-the-curve.example.txt';
+import aCleanLineStillSweepable from './_examples/a-clean-line-still-sweepable.example.txt';
+import twoSeriesSweptIndependently from './_examples/two-series-swept-independently.example.txt';
+import a2dPathYouCanReshape from './_examples/a-2d-path-you-can-reshape.example.txt';
+import doubleClickToSeedThenSweep from './_examples/double-click-to-seed-then-sweep.example.txt';
+import drawThenReshape from './_examples/draw-then-reshape.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Line
+
+<Lead>A connected path over an ordered set of points, with a draggable handle on each. It is deliberately general — a you-draw-it curve, a multi-series line chart, and a connected scatter are the same mark along four orthogonal knobs: **grouping** (`series`), **ordering** (`order`), **editing** (the edit on the handles), and **creation** (`anchor` / `newSeries` / `draw`). `lineY`/`lineX` fix the value axis; `connectedScatter`/`path` default to order: "sequence".</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basics" title="A line & its curve">
+
+lineY draws a value on y over a domain on x (the usual time series). curve sets the interpolation between handles.
+
+<Example
+  code={curveCatmullrom}
+  title={"curve: \"catmullRom\""}
+  blurb={"A smooth line through the points. Try \"linear\" or \"step\" for other shapes."}
+/>
+
+</Section>
+
+<Section id="you-draw-it" title="You-draw-it (sweep)">
+
+Put edit: drag(\{ pick: "sweep" \}) on the value channel and you get the NYT you-draw-it interaction: press and sweep horizontally to paint each point’s y as the pointer crosses its column. The x positions stay fixed.
+
+<Example
+  code={sweepToDrawTheCurve}
+  title="Sweep to draw the curve"
+  blurb="The value channel carries a sweep; guide: true shows the paint guide."
+  try={(
+    <>
+      <b>Sweep</b> left-to-right across the chart — or drag a single handle.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="handles" title="Hiding the handles">
+
+The per-point handles are optional. handles: false renders them invisible but keeps them for hit-testing, so the line stays fully editable — you just don’t see the dots. handleSize sizes them when shown.
+
+<Example
+  code={aCleanLineStillSweepable}
+  title="A clean line, still sweepable"
+  blurb="handles: false hides the dots; the sweep edit still works."
+  try={(
+    <>
+      <b>Sweep</b> across — no handles, but the line still responds.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="series" title="Multiple lines (series)">
+
+A stroke field groups points into separate lines (Observable Plot’s z), so one mark holds many series and each auto-colours from the ordinal palette. A sweep locks onto the nearest line at drag-start and paints only that one.
+
+<Example
+  code={twoSeriesSweptIndependently}
+  title="Two series, swept independently"
+  blurb={"stroke: { field: \"g\" } both groups and colours the lines."}
+  try={(
+    <>
+      <b>Sweep</b> over one line to reshape it; the other stays put.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="connected-scatter" title="Connected scatter (order: sequence)">
+
+With order: "sequence" the points connect in creation order, not by domain — a connected scatter / free 2D path. Both axes carry a drag, so each point moves in 2D and the links follow. edit.line.anchor() adds a point to the path — near the line or far, it extends the same single line in click order (so the path stays one sequence).
+
+<Example
+  code={a2dPathYouCanReshape}
+  title="A 2D path you can reshape"
+  blurb={"connectedScatter defaults to order: \"sequence\"; a 2D drag moves points, anchor extends the one path in click order."}
+  try={(
+    <>
+      <b>Drag</b> a point anywhere, or <b>click</b> empty space to add the next anchor.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="samples" title="Draw from scratch (samples)">
+
+newSeries seeds a whole line at once — one anchor per sampled domain position (the scale’s ticks by default, or a count / explicit list / time interval), flat at the click value. Double-click empty space to drop a fresh line, then sweep it.
+
+<Example
+  code={doubleClickToSeedThenSweep}
+  title="Double-click to seed, then sweep"
+  blurb={"edit.line.newSeries({ samples: 6 }) drops six evenly-spaced anchors at the click’s value."}
+  try={(
+    <>
+      <b>Double-click</b> to drop a line, then <b>sweep</b> to shape it.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="draw" title="Draw it in one drag (draw)">
+
+draw authors lines by dragging, and it is edit-aware. On a domain-ordered line a drag in empty space is you-draw-it from scratch — the pointer crossing each samples column lays that point down at the pointer value, so one stroke draws the curve. Start a later drag near the drawn line (within threshold) and it reshapes that line with a sweep instead of making a new one; start far away and it draws another. Pass into: "new" to always draw a fresh line.
+
+<Example
+  code={drawThenReshape}
+  title="Draw, then reshape"
+  blurb={"edit.line.draw({ samples: 8 }) on an empty line. First drag draws all eight points; a drag over the line reshapes it, a drag in empty space starts a new one."}
+  try={(
+    <>
+      <b>Press and drag</b> to draw · <b>drag over the line</b> to reshape · <b>drag elsewhere</b> for a new line.
+    </>
+  )}
+/>
+
+</Section>

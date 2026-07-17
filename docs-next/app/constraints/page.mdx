@@ -1,0 +1,137 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import barsThatCompensate from './_examples/bars-that-compensate.example.txt';
+import clampedDragWithAGuide from './_examples/clamped-drag-with-a-guide.example.txt';
+import oneBarPerCategory from './_examples/one-bar-per-category.example.txt';
+import compositeKeyABandBandGrid from './_examples/composite-key-a-band-band-grid.example.txt';
+import anIntervalThatStaysInOrder from './_examples/an-interval-that-stays-in-order.example.txt';
+import aCurveThatOnlyRises from './_examples/a-curve-that-only-rises.example.txt';
+import thresholdsThatStayApart from './_examples/thresholds-that-stay-apart.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Constraints
+
+<Lead>A constraint is a pure rule over **the dataset**. It holds no matter which edit fired it, or which _mark_ that edit was declared on — so an invariant written once gates a drag on a bar and a click on a dot alike. It can both **reject** a proposal and **repair** it (return the corrected rows), and because every mark reads those rows, a repair shows up everywhere on the next render. Declare it on the `Elicit` spec (`constraints: [...]`); declaring it on a mark is sugar — the engine promotes it to the dataset either way. `clamp` bounds a field, `maintainSum` fixes a total, `count` caps the size, and `unique` forbids duplicate keys. Three more keep a _shape_ honest: `ordering` holds fields of a row in order (lo ≤ mean ≤ hi), `monotonic` stops a cumulative curve dipping, and `spacing` keeps neighbours from collapsing onto each other.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="sum" title="maintainSum — a total held at 100">
+
+The sum rule is a dataset invariant, so it holds for every edit from every mark. Bars give way to keep the total at 100; guide: true draws the live bound.
+
+<Example
+  code={barsThatCompensate}
+  title="Bars that compensate"
+  blurb="maintainSum bounds the touched bar so the total stays 100; a rule guide marks the even split."
+  try={(
+    <>
+      <b>Drag</b> any bar — the others compensate.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="clamp" title="clamp — bound a field">
+
+clamp holds a field inside [min, max]. Pair it with a nearest pick and a self-drawn guide to make the bounds visible while dragging.
+
+<Example
+  code={clampedDragWithAGuide}
+  title="Clamped drag with a guide"
+  blurb="The y edit is clamped to 0–90; guide: true draws the bounds and the snap ring."
+  try={(
+    <>
+      <b>Drag</b> from anywhere in a column (clamped to 0–90).
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="unique" title="unique — one per key">
+
+unique forbids two data with the same key. A single field guards one axis; an array is a composite key — at most one mark per cell, for both create and move.
+
+<Example
+  code={oneBarPerCategory}
+  title="One bar per category"
+  blurb={"create mints wherever you click, but unique({ field: \"x\" }) rejects a filled slot."}
+  try={(
+    <>
+      <b>Click</b> an empty column to fill it · a filled column rejects.
+    </>
+  )}
+/>
+
+<Example
+  code={compositeKeyABandBandGrid}
+  title="Composite key — a band × band grid"
+  blurb={"unique({ field: [\"x\",\"y\"] }) allows at most one mark per (x, y) cell."}
+  try={(
+    <>
+      <b>Drag</b> to another cell · <b>Click</b> an empty cell to add · <b><kbd>Alt</kbd>+click</b> to delete.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="ordering" title="ordering — fields of a row, in order">
+
+The rule an interval glyph lives or dies by. An error bar’s caps and its mean are separate marks over separate fields of one row, and nothing stops you dragging the low cap above the high one — after which the glyph draws inside-out and the elicited “interval” says the opposite of what the person meant. Being a dataset invariant is what makes it hold whichever handle you grab.
+
+<Example
+  code={anIntervalThatStaysInOrder}
+  title="An interval that can’t invert"
+  blurb={"ordering({ fields: [\"lo\", \"mean\", \"hi\"] }) — one rule across three marks."}
+  try={(
+    <>
+      <b>Drag</b> the low cap up past the mean: the mean and the high cap are carried along rather than the cap sticking. The handle you grabbed is the one you meant.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="monotonic" title="monotonic — a curve that can’t go back on itself">
+
+A CDF, a survival function, a dose-response. Someone drawing one is not free to dip, but the gesture has no idea, so a you-draw-it stroke happily authors a dip. It repairs by pushing the rows the moved point would have crossed — rejecting instead would make the curve feel jammed against its own history.
+
+<Example
+  code={aCurveThatOnlyRises}
+  title="A curve that can only rise"
+  blurb={"monotonic({ field: \"p\", along: \"year\" }) — the rule behind every CDF."}
+  try={(
+    <>
+      <b>Drag</b> a middle point up hard: the points to its right rise to meet it, because “it reaches this level by here” says something about later years too. Drag it down and the left-hand points give way instead.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="spacing" title="spacing — neighbours that keep their distance">
+
+For elicitations where “distinct” is part of the claim: thresholds of a scale, breakpoints of a piecewise curve, tiers of a rubric. Two coincident points may be a genuine belief, but far more often they’re a slip of the hand that reads as one point and can never be separated again — the topmost one takes every subsequent grab.
+
+<Example
+  code={thresholdsThatStayApart}
+  title="Thresholds that stay apart"
+  blurb={"spacing({ field: \"at\", min: 8 }) — no two boundaries closer than 8 points."}
+  try={(
+    <>
+      <b>Drag</b> one threshold into its neighbour: it pushes rather than overlaps, and the shove carries down the line. Pushing apart preserves the order, so this field needs no <code className="inline">ordering</code> as well.
+    </>
+  )}
+/>
+
+</Section>

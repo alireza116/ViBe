@@ -1,0 +1,98 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import aLabelledScatter from './_examples/a-labelled-scatter.example.txt';
+import formattedNumericLabels from './_examples/formatted-numeric-labels.example.txt';
+import lineChartWithValueLabels from './_examples/line-chart-with-value-labels.example.txt';
+import dragToReposition from './_examples/drag-to-reposition.example.txt';
+import draggableNumericReadout from './_examples/draggable-numeric-readout.example.txt';
+import typeToEditContent from './_examples/type-to-edit-content.example.txt';
+import dragAndRetypeTogether from './_examples/drag-and-retype-together.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Text
+
+<Lead>A per-datum **label** (Observable Plot’s text). It places a string at a positional (x, y); `text`/`fontSize`/`textAnchor`/`lineAnchor`/`dx`/`dy` are read RAW (a field or a constant), `angle` is degrees, and `format` is a d3-format string or function (display-only). A text mark is editable like any other: drag to reposition, drag a value to update a numeric readout, `cycle()` a label, `rotate()` it, or `editText()` to retype its content.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basics" title="Labels from data">
+
+x/y position the label; text is its string. Offset and anchor keep it clear of the mark it labels.
+
+<Example
+  code={aLabelledScatter}
+  title="A labelled scatter"
+  blurb="point for the dots, text for the labels above them — dy + lineAnchor park the string above the point."
+/>
+
+<Example
+  code={formattedNumericLabels}
+  title="Formatted numeric labels"
+  blurb="format is display-only (a d3-format string or a helper from format.*). The field stays the raw number, so a later drag still inverts correctly."
+/>
+
+<Example
+  code={lineChartWithValueLabels}
+  title="Line chart with value labels"
+  blurb="lineY draws the series; text sits on the same (x, y) with dy above each point."
+/>
+
+</Section>
+
+<Section id="editing" title="Editing labels">
+
+A direct-pick edit makes a label interactive. Reuse the universal edits — nothing text-specific — or `editText()` to retype the content.
+
+<Example
+  code={dragToReposition}
+  title="Drag to reposition"
+  blurb={"Mark-level drag({ channels: [\"x\",\"y\"] }) moves the label; writes x/y back through the scales. (Do not put <code class=\"inline\">edit</code> as a channel key — attach it on a channel or via <code class=\"inline\">edits</code>.)"}
+  try={(
+    <>
+      <b>Drag</b> a label to move it.
+    </>
+  )}
+/>
+
+<Example
+  code={draggableNumericReadout}
+  title="Draggable numeric readout"
+  blurb="The label IS the value: text and y read the same field, and drag() on y rewrites it — so the number updates as you drag. format keeps the display tidy."
+  try={(
+    <>
+      <b>Drag</b> the number up or down.
+    </>
+  )}
+/>
+
+<Example
+  code={typeToEditContent}
+  title="Type to edit content"
+  blurb="editText() wires double-click-to-retype: an inline input opens, Enter commits, Esc cancels."
+  try={(
+    <>
+      <b>Double-click</b> a label, type, and press Enter.
+    </>
+  )}
+/>
+
+<Example
+  code={dragAndRetypeTogether}
+  title="Drag and retype together"
+  blurb="Mark-level drag plus editText on the text channel: drag repositions, double-click retypes."
+  try={(
+    <>
+      <b>Drag</b> to move; <b>double-click</b> to rename.
+    </>
+  )}
+/>
+
+</Section>

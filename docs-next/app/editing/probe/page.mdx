@@ -1,0 +1,53 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import lineThenCone from './_examples/line-then-cone.example.txt';
+import probeASingleValue from './_examples/probe-a-single-value.example.txt';
+import aTentativeToken from './_examples/a-tentative-token.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Probe
+
+<Lead>The **hover / click** flow, with no drag: the pointer **probes** a value — the mark follows the cursor as an uncommitted preview — and a click **settles** it. Give any edit `pick: "probe"` and it works this way, so the same primitive drives a correlation line, a slider knob, a Likert answer and a dot plot's tentative token. Add a `stage` and each click commits that stage's field and advances to the next — "set the line, now open the cone".</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="twostep" title="Two questions, two clicks">
+
+Stage 0 owns the angle, stage 1 owns the spread. The driver advances on each click; no app code, no buttons.
+
+<Example
+  code={lineThenCone}
+  title="Line, then cone"
+  blurb="Move to aim the line, click. Move to open the cone, click. Both are then frozen."
+  try={"move the mouse, click, move again, click."}
+/>
+
+</Section>
+
+<Section id="preview" title="The preview is the commit">
+
+A hover proposes; getData() still reports the last committed belief. The knob below tracks the pointer, but the readout only moves when you click.
+
+<Example
+  code={probeASingleValue}
+  title="Probe a single value"
+  blurb={"drag({ pick: \"probe\" }) — no dragging involved, just move and click."}
+  try={"move across the track, then click."}
+/>
+
+<Example
+  code={aTentativeToken}
+  title="A tentative token"
+  blurb={"create({ pick: \"probe\" }) shows the dot before it is real. Alt-click removes one."}
+  try={"hover a bin, click to drop; alt-click to take back."}
+/>
+
+</Section>

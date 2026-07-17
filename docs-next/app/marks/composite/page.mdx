@@ -1,0 +1,95 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import oneEditableFieldTheTip from './_examples/one-editable-field-the-tip.example.txt';
+import independentHandlesPerField from './_examples/independent-handles-per-field.example.txt';
+import coupledMoveCenterWithinEnds from './_examples/coupled-move-center-within-ends.example.txt';
+import compositeChannelsTrickleDown from './_examples/composite-channels-trickle-down.example.txt';
+import hubPointOwnFillSize from './_examples/hub-point-own-fill-size.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Composite
+
+<Lead>A **composite** mark is a glyph: a named **group of ordinary marks** over the chart’s one dataset. Group-level `channels` (and style / `angle` shorthands) **trickle into every part** at desugar time — declare a shared orientation or position once; a part’s own channel for the same name wins; inherited `edit`s attach to the **last** part only (visuals first, handles last). Each part still has its **own** channels and shorthands (arm geometry, per-part stroke, a hub’s fill). Composite is a **desugaring**, not a new kind of feature: it returns its parts as plain features and `Elicit` flattens them. Because each handle is its own mark, dragging one _cannot_ move another — dispatch already routes a gesture to the feature owning the node you touched.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="lollipop" title="Lollipop — drag the tip">
+
+A stem (a span rule from the baseline to the value) plus a draggable tip. Two marks: the `ruleX` draws the stem and carries no edit, so it is inert; the `point` is the handle and edits `value`. Drag a tip and its stem re-derives, because both marks read the same row.
+
+<Example
+  code={oneEditableFieldTheTip}
+  title="One editable field (the tip)"
+  blurb="The stem is a span ruleX (baseline → value); the tip point edits value."
+  try={(
+    <>
+      <b>Drag</b> a lollipop tip up or down.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="error-bar" title="Error bar — move the dot, resize the interval">
+
+Three editable fields on one row: `mean` (the dot), `lo` and `hi` (the caps). Each is a separate mark, so each edits a plain `y` channel and dragging a cap moves only that end — no handle arbitration to write. The whisker is a `ruleX` spanning lo..hi; it follows the caps because it reads the same rows.
+
+<Example
+  code={independentHandlesPerField}
+  title="Independent handles per field"
+  blurb="Each handle is its own mark. The whisker spans lo..hi and follows the caps."
+  try={(
+    <>
+      <b>Drag</b> the centre dot to move the mean, or a cap to move an end.
+    </>
+  )}
+/>
+
+<Example
+  code={coupledMoveCenterWithinEnds}
+  title="Coupled move + center-within-ends"
+  blurb={"Two behaviours, two layers. The dot uses a joint edit (edit.custom): its new value comes from the pointer and it shifts lo/hi by the same delta, so moving the centre carries the whole bar. The invariant \"centre stays within the ends\" is a CONSTRAINT — a pure data rule on the DATASET. Declared once on the group, it runs on every commit from every part, so a cap can never cross the centre no matter which handle you grabbed."}
+  try={(
+    <>
+      <b>Drag the dot</b> — the whole bar travels. <b>Drag a cap</b> past the dot — it stops at the centre.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="plus" title="Group channels + per-part channels">
+
+Two layers of binding. **Group** `channels` (here `x`, `y`, `angle`) trickle into every part so the glyph shares one position and one orientation. **Each part** still declares its own channels and shorthands — arm length, stroke colour, a hub’s `fill` / `size`. A part key wins on conflict. Inherited `edit`s attach to the last part only, so one `rotate()` spins the whole glyph without double-applying.
+
+<Example
+  code={compositeChannelsTrickleDown}
+  title="Shared x/y/angle; per-part stroke on crossing ticks"
+  blurb="A + from tickY (horizontal) + tickX (vertical). Group channels bind position and angle once; each tick keeps its own stroke / length. The last part holds the inherited rotate() edit."
+  try={(
+    <>
+      <b>Drag</b> the darker (vertical) arm of a + to spin it.
+    </>
+  )}
+/>
+
+<Example
+  code={hubPointOwnFillSize}
+  title="Same group angle; hub point with its own fill/size"
+  blurb="Add a square hub as a third part. It inherits x/y/angle from the group but sets its own shape, fill, and size — part channels win for those names. rotate() still lives on the last part."
+  try={(
+    <>
+      <b>Drag</b> the hub (last part) to spin the whole glyph.
+    </>
+  )}
+/>
+
+</Section>

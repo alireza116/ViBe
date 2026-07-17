@@ -1,0 +1,96 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import quantitativeGauge from './_examples/quantitative-gauge.example.txt';
+import rightFacingOrientRight from './_examples/right-facing-orient-right.example.txt';
+import smallNeedlesInAScatterOfPivots from './_examples/small-needles-in-a-scatter-of-pivots.example.txt';
+import quantitativeDial from './_examples/quantitative-dial.example.txt';
+import likelihoodGauge from './_examples/likelihood-gauge.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Needle
+
+<Lead>A pivoted **needle** (NYT-style gauge or software dial). It encodes a value on the `angle` channel — degrees via the channel’s scale — and draws a tapered pointer + hub. The default semicircle is **horizontal** (left → right through the top, like a speedometer). Use `orient` (`top`·`right`·`bottom`·`left`), `arc: "full"`, or explicit `start`/`end` — and keep `scale.range` in sync. Optional `x`/`y` place the pivot on categorical or linear axes (many small needles in one chart).</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="gauge" title="Semicircle gauge + center text">
+
+A composite of `axisRadial` (ticks), `needle`, and `text`. Default orient is top: 0 on the left, max on the right.
+
+<Example
+  code={quantitativeGauge}
+  title="Quantitative gauge"
+  blurb="Domain [0, 100] maps to [180°, 0°] (left → right). Drag the needle."
+  try={(
+    <>
+      <b>Drag</b> the needle left or right.
+    </>
+  )}
+/>
+
+<Example
+  code={rightFacingOrientRight}
+  title={"Right-facing (orient: \"right\")"}
+  blurb="Same data; arc on the right — set scale.range to [-90, 90]."
+/>
+
+</Section>
+
+<Section id="grid" title="Many needles on x × y">
+
+Each row is a pivot: `x` categorical, `y` quantitative, `angle` a third numeric belief. Drag any needle — direct-pick writes that row only.
+
+<Example
+  code={smallNeedlesInAScatterOfPivots}
+  title="Small needles in a scatter of pivots"
+  blurb="Group on x, layer on y, belief on angle. Cartesian axes frame the pivots."
+  try={(
+    <>
+      <b>Drag</b> any small needle to change that cell’s belief.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="dial" title="Full-circle dial">
+
+A knob: full 360° with `fold: false`.
+
+<Example
+  code={quantitativeDial}
+  title="Quantitative dial"
+  blurb="Rotate anywhere around the hub."
+  try={(
+    <>
+      <b>Drag</b> around the dial.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="categorical" title="Categorical needle">
+
+A discrete `angle` field uses a point scale — drag snaps to the nearest category. Colored bands come from `axisRadial({ bands: true })`.
+
+<Example
+  code={likelihoodGauge}
+  title="Likelihood gauge"
+  blurb="Seven ordered categories across a top-facing arc."
+  try={(
+    <>
+      <b>Drag</b> the needle across categories.
+    </>
+  )}
+/>
+
+</Section>

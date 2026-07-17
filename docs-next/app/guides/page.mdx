@@ -1,0 +1,53 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import aTargetBandWithARule from './_examples/a-target-band-with-a-rule.example.txt';
+import aMeanLineThatChasesTheBars from './_examples/a-mean-line-that-chases-the-bars.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Guides
+
+<Lead>A guide is a graphical mark that isn’t bound to a row the way a plot mark is: it draws an annotation. But it is still allowed to **depend on the data** — every guide option may be a literal _or_ a function of the guide context (`{ data, scales, features, ui, width, height, stage }`), so a mean line is one line of spec. Guides rebuild every render and never capture a gesture. `guides.rule` draws a reference line at a data value, `guides.region` shades a band between two values, and `guides.proximity` visualizes what a nearest-pick edit has selected. (An edit’s own constraint bounds draw automatically via `guide: true`.)</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="annotations" title="Rule & region">
+
+A shaded target band (region) and a reference line (rule) annotate a chart. They sit under the marks and follow the same scales, so they stay put as points move.
+
+<Example
+  code={aTargetBandWithARule}
+  title="A target band with a rule"
+  blurb="guides.region shades 40–60; guides.rule marks the midpoint. Drag the dots across them."
+  try={(
+    <>
+      <b>Drag</b> a dot in and out of the target band.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="live" title="Guides derived from the data">
+
+A guide option can be a function of the guide context, so an annotation can be computed from the rows it annotates. Here one rule is a fixed target and the other is the running **mean** — recomputed on every commit, because guides rebuild each render. The band tracks the spread the same way.
+
+<Example
+  code={aMeanLineThatChasesTheBars}
+  title="A mean line that chases the bars"
+  blurb={"guides.rule({ y: ({ data }) => d3.mean(data, (d) => d.y) }) — the annotation reads the dataset."}
+  try={(
+    <>
+      <b>Drag</b> a bar — the fixed target holds, the mean line and the band follow.
+    </>
+  )}
+/>
+
+</Section>

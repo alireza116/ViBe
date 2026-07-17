@@ -390,12 +390,7 @@ export function ExampleLive({
             >
               <div className="chart" ref={chartRef} />
               {error ? <pre className="live-error">⚠ {error}</pre> : null}
-              {!error && meta.try ? (
-                <span
-                  className="try"
-                  dangerouslySetInnerHTML={{ __html: `Try: ${meta.try}` }}
-                />
-              ) : null}
+              {!error && meta.try ? <TryHint hint={meta.try} /> : null}
             </div>
             <div className="visual-data">
               {!error ? <DataPanel chart={elicited} /> : null}

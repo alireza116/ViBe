@@ -1,0 +1,56 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import semiCircleAxis from './_examples/semi-circle-axis.example.txt';
+import bandedLikelihoodArc from './_examples/banded-likelihood-arc.example.txt';
+import percentTicksAtChosenValues from './_examples/percent-ticks-at-chosen-values.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Radial axis
+
+<Lead>A composable **radial axis**: arc spine, ticks, labels, and optional colored categorical bands. Sibling of `axisX`/`axisY`; reads the global `angle` scale. Default orient is `top` (left → right through the top). Inert by default — pair with `needle` for interaction.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="continuous" title="Continuous radial ticks">
+
+Spine + tick marks along a quantitative angle scale (top-facing by default).
+
+<Example
+  code={semiCircleAxis}
+  title="Semi-circle axis"
+  blurb="No needle — just the chrome. 0 on the left, 100 on the right."
+/>
+
+</Section>
+
+<Section id="bands" title="Colored categorical bands">
+
+Discrete domains get annular sectors, colored by an ordinal fill.
+
+<Example
+  code={bandedLikelihoodArc}
+  title="Banded likelihood arc"
+  blurb="Seven categories across a top-facing semicircle, colored by reversed RdBu (blue→red)."
+/>
+
+</Section>
+
+<Section id="ticks" title="Tick + label customization">
+
+Ticks reuse the same helpers as Cartesian axes: `ticks` (count), `tickValues` (explicit), and `tickFormat` (d3-format string or function). Style labels with `fontSize`/`labelFill` and the spine with `stroke`.
+
+<Example
+  code={percentTicksAtChosenValues}
+  title="Percent ticks at chosen values"
+  blurb="Explicit tickValues, a percent tickFormat, and a custom label colour."
+/>
+
+</Section>

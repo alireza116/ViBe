@@ -1,0 +1,235 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import asAWidget from './_examples/as-a-widget.example.txt';
+import theSameThingPlainApi from './_examples/the-same-thing-plain-api.example.txt';
+import asAWidgetPick2 from './_examples/as-a-widget-pick-2.example.txt';
+import theSameThingPlainApi2 from './_examples/the-same-thing-plain-api-2.example.txt';
+import asAWidget2 from './_examples/as-a-widget-2.example.txt';
+import plainApiTrackAsAGuide from './_examples/plain-api-track-as-a-guide.example.txt';
+import plainApiTrackAsACentredAxis from './_examples/plain-api-track-as-a-centred-axis.example.txt';
+import asAWidget3 from './_examples/as-a-widget-3.example.txt';
+import theSameThingPlainApi3 from './_examples/the-same-thing-plain-api-3.example.txt';
+import asAWidget4 from './_examples/as-a-widget-4.example.txt';
+import plainApiCrosshairAsAGuide from './_examples/plain-api-crosshair-as-a-guide.example.txt';
+import plainApiCrosshairAsCentredAxes from './_examples/plain-api-crosshair-as-centred-axes.example.txt';
+import plainApiAxesForTheFrameGuidesForLabels from './_examples/plain-api-axes-for-the-frame-guides-for-labels.example.txt';
+import overrideJustTheAnswerMark from './_examples/override-just-the-answer-mark.example.txt';
+import swapTheAffordanceGuide from './_examples/swap-the-affordance-guide.example.txt';
+import rethemeInTheGuideHelpers from './_examples/retheme-in-the-guide-helpers.example.txt';
+import ranking from './_examples/ranking.example.txt';
+import allocation from './_examples/allocation.example.txt';
+import region from './_examples/region.example.txt';
+import intervalCi from './_examples/interval-ci.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Widgets
+
+<Lead>Opinionated **survey instruments** — option rings, cell grids, tracks — each a pure recipe over the core API. They add no interaction surface: the look lives entirely in the [guide](/guides) layer, and the behaviour is a normal mark + a normal edit on the [probe](/editing/probe) driver + a normal constraint. Every example below is shown twice — once as the widget, once as a **self-contained** plain-API twin that draws the same look with inline `guides.custom` helpers, so you can see every line to change. Each factory returns an **ElicitSpec**: render with `Elicit(widgets.likert({…}))`.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="likert" title="Likert scale">
+
+A point on a band of options + create (probe) + count(\{ max: 1, replace \}). Hover to preview the answer, click to fill it.
+
+<Example
+  code={asAWidget}
+  title="As a widget"
+  blurb="Rings, track and labels come from the guide layer."
+  try={"hover across the scale, then click."}
+/>
+
+<Example
+  code={theSameThingPlainApi}
+  title="The same thing, plain API"
+  blurb="Same mark, edit, and constraint — rings/prompt defined inline as guides."
+  try={"same look, same interaction — change any line to customize."}
+/>
+
+</Section>
+
+<Section id="choice" title="Multiple choice">
+
+toggle() folds create and remove into one gesture: click an empty option to pick it, click your pick to take it back. count() caps the total.
+
+<Example
+  code={asAWidgetPick2}
+  title="As a widget (pick ≤ 2)"
+  blurb="The hover shows whether a click will pick or un-pick."
+  try={"pick two, then click one again."}
+/>
+
+<Example
+  code={theSameThingPlainApi2}
+  title="The same thing, plain API"
+  blurb="toggle + unique + count; rings defined inline."
+  try={"same look — swap max, options, or fill to customize."}
+/>
+
+</Section>
+
+<Section id="slider" title="Slider">
+
+A single knob that tracks the pointer and settles on click — drag(\{ pick: "probe" \}). snap() lands it on steps. The track can be a guide or a centred axisX — same instrument, two ways to draw the chrome.
+
+<Example
+  code={asAWidget2}
+  title="As a widget"
+  blurb="Track, end caps and value labels are guides."
+  try={"move across the track, then click."}
+/>
+
+<Example
+  code={plainApiTrackAsAGuide}
+  title="Plain API — track as a guide"
+  blurb="Hand-rolled sliderTrack via guides.custom (full control over caps and stroke)."
+  try={"same look as the widget."}
+/>
+
+<Example
+  code={plainApiTrackAsACentredAxis}
+  title="Plain API — track as a centred axis"
+  blurb="Same mark/edit/constraints. axisX with transform pins the spine to mid-height; tickValues at the domain ends are the labels; tickSize draws the end caps. Usually the simpler path when the chrome is an axis."
+  try={"same interaction — chrome comes from axes, not guides."}
+/>
+
+</Section>
+
+<Section id="matrix" title="Question matrix">
+
+Band y of questions × band x of options. toggle() on the (x, y) tuple names a cell; unique(\{ field: "question", replace \}) keeps one answer per row.
+
+<Example
+  code={asAWidget3}
+  title="As a widget"
+  blurb="The cell grid is a guide, so it never swallows the click."
+  try={"answer each row; click a row again elsewhere to change it."}
+/>
+
+<Example
+  code={theSameThingPlainApi3}
+  title="The same thing, plain API"
+  blurb="Two band axes + toggle + unique; cellGrid defined inline."
+  try={"same look — change pad, fills, or the accent."}
+/>
+
+</Section>
+
+<Section id="linecone" title="Line + Cone">
+
+The two-step correlation instrument: aim the line and click, open the cone and click. getData() → [\{ r, spread \}]. The crosshair frame can be a guide, or two centred axes with ticks only at the ends — same idea, axis usually simpler.
+
+<Example
+  code={asAWidget4}
+  title="As a widget"
+  blurb="Crosshair frame and high/low variable labels are guides."
+  try={"move, click, move, click."}
+/>
+
+<Example
+  code={plainApiCrosshairAsAGuide}
+  title="Plain API — crosshair as a guide"
+  blurb="Full control: multi-line side labels, exact placement. More code."
+  try={"same look and two-step flow as the widget."}
+/>
+
+<Example
+  code={plainApiCrosshairAsCentredAxes}
+  title="Plain API — crosshair as centred axes"
+  blurb="Declare frame scales x/y (not elicited). Centre each axis with transform; tickValues at the ends + tickFormat are the high/low labels. Tick data from the scale; drawing still goes through the renderer (no d3.axis)."
+  try={"same two-step flow — labels are end ticks."}
+/>
+
+<Example
+  code={plainApiAxesForTheFrameGuidesForLabels}
+  title="Plain API — axes for the frame, guides for labels"
+  blurb="Axes draw only the crossing spines (no ticks). Labels stay a small guide — useful when you want wrapped / multi-line copy the axis tickFormat cannot do."
+  try={"same flow; spines from axes, labels from a guide."}
+/>
+
+</Section>
+
+<Section id="styles" title="Customizing styles">
+
+The instrument look is just guides + mark paint. Change colours in the inline guide helpers, paint the answer mark differently, or replace the affordance entirely with your own `guides.custom`. Behaviour (edits / constraints) stays put.
+
+<Example
+  code={overrideJustTheAnswerMark}
+  title="Override just the answer mark"
+  blurb="Same rings as the Likert twin; only the committed answer is recoloured."
+  try={"click an option — amber dot in slate rings."}
+/>
+
+<Example
+  code={swapTheAffordanceGuide}
+  title="Swap the affordance guide"
+  blurb="Replace rings with your own ticks — same mark/edit/constraint, different clothing. Guide nodes never capture the pointer."
+  try={"click a tick — interaction unchanged, look is yours."}
+/>
+
+<Example
+  code={rethemeInTheGuideHelpers}
+  title="Retheme in the guide helpers"
+  blurb="Colours live in the inline guides and the mark fill — change them there. No shared palette required."
+  try={"hover and click — teal rings, teal answer."}
+/>
+
+</Section>
+
+<Section id="more" title="More instruments">
+
+Ranking, allocation, tokens, intervals, histograms, regions, thermometers, and labeled values — each a recipe over marks + edits + constraints.
+
+<Example
+  code={ranking}
+  title="Ranking"
+  blurb="Drag items to reorder (edit.rank under the hood)."
+  try={(
+    <>
+      <b>Drag</b> a dot up or down to swap ranks.
+    </>
+  )}
+/>
+
+<Example
+  code={allocation}
+  title="Allocation"
+  blurb="Bars that redistribute to keep a fixed sum."
+  try={(
+    <>
+      <b>Drag</b> a bar — siblings rebalance to 100.
+    </>
+  )}
+/>
+
+<Example
+  code={region}
+  title="Region"
+  blurb="rect + brushRect for a 2-D belief box."
+  try={(
+    <>
+      <b>Drag</b> edges, corners, or the body.
+    </>
+  )}
+/>
+
+<Example
+  code={intervalCi}
+  title="Interval / CI"
+  blurb="Drag the mean to translate the whole interval; drag a cap to resize one end."
+  try={(
+    <>
+      <b>Drag</b> the centre — lo/hi follow. <b>Drag</b> a cap — mean stays put.
+    </>
+  )}
+/>
+
+</Section>

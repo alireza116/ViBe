@@ -1,0 +1,77 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import rescaleInPlace from './_examples/rescale-in-place.example.txt';
+import growTheChartInstead from './_examples/grow-the-chart-instead.example.txt';
+import editTheCategoryList from './_examples/edit-the-category-list.example.txt';
+import growALikertScale from './_examples/grow-a-likert-scale.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Editable axes (domain)
+
+<Lead>An axis is normally inert. Give it an `edit` and it becomes interactive — but where a mark edit rewrites a **datum**, an axis edit rewrites the field's **domain** on the schema. A numeric axis is **dragged** to grow or shrink its range; a categorical axis gains **add / rename / remove** affordances. Because the domain lives on the schema and scales re-resolve every render, the grid, guides and marks follow along automatically. Read the new domain with `el.getSchema()` (the dataset is untouched, except that removing a category also deletes its rows).</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="numeric" title="Drag a numeric axis to rescale">
+
+axisX(\{ edit: edit.axis.scale() \}) grows a draggable handle at each end of the axis. Drag the max handle inward to widen the range (data compresses into the same chart), outward to tighten it. The min stays anchored; the dataset never changes.
+
+<Example
+  code={rescaleInPlace}
+  title="Rescale in place"
+  blurb="Dragging the end-handle rewrites x's schema domain; the grid follows."
+  try={(
+    <>
+      <b>Drag</b> the blue handle at either end of the x-axis.
+    </>
+  )}
+/>
+
+<Example
+  code={growTheChartInstead}
+  title="Grow the chart instead"
+  blurb="mode: 'grow' holds the data's scale constant and resizes the chart."
+  try={(
+    <>
+      <b>Drag</b> the x-axis max handle — the chart itself grows/shrinks.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="categorical" title="Add, rename & remove categories">
+
+axisX(\{ edit: edit.axis.categories() \}) turns each category label into a rename target (double-click to type), gives each an × to remove, and adds a ＋ at the end to append a new one. Renaming relabels matching rows; removing deletes them — schema and data stay in step.
+
+<Example
+  code={editTheCategoryList}
+  title="Edit the category list"
+  blurb="Double-click ＋ to add · double-click a label to rename · click × to remove."
+  try={(
+    <>
+      <b>Double-click</b> ＋ to add a bar · <b>double-click</b> a label to rename · <b>click</b> × to remove.
+    </>
+  )}
+/>
+
+<Example
+  code={growALikertScale}
+  title="Grow a Likert scale"
+  blurb="mode: 'grow' keeps each band the same width and grows the chart by a step per point added — extend a 5-point scale to 7 without cramming."
+  try={(
+    <>
+      <b>Double-click</b> ＋ to add points — the chart widens instead of the bars shrinking · <b>click</b> × to shrink it back.
+    </>
+  )}
+/>
+
+</Section>

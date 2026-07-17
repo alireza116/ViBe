@@ -1,0 +1,71 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import dragOutwardToGrow from './_examples/drag-outward-to-grow.example.txt';
+import moveShiftResizeClickCycle from './_examples/move-shift-resize-click-cycle.example.txt';
+import invertYYourself from './_examples/invert-y-yourself.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Drag · Resize · Cycle · Custom
+
+<Lead>Different channels take different gestures. `drag` moves a position, `resize` inverts a radius into a magnitude, `cycle` clicks through a category, and `custom` is the escape hatch for anything else. Several edits can share one mark, separated by `when`.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="resize" title="Resize a magnitude">
+
+size: \{ edit: resize() \} — the drag radius from the dot centre inverts to the value, mirroring how size encodes it. The stroke survives the resize.
+
+<Example
+  code={dragOutwardToGrow}
+  title="Drag outward to grow"
+  blurb="resize() maps the gesture radius back to the size field."
+  try={(
+    <>
+      <b>Drag</b> a dot outward or inward to grow/shrink it.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="multi" title="One mark, three gestures">
+
+Move, resize, and recolour on a single mark — separated by when. Plain drag moves, Shift-drag resizes, click cycles the category.
+
+<Example
+  code={moveShiftResizeClickCycle}
+  title="Move · Shift-resize · click-cycle"
+  blurb="when.noShift / when.shift split the drag; cycle() advances the fill category."
+  try={(
+    <>
+      <b>Drag</b> to move · <b><kbd>Shift</kbd>+drag</b> to resize · <b>Click</b> to recolour.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="custom" title="Custom — the escape hatch">
+
+custom(fn) wraps fn as apply. The edit still declares its gesture (default drag) — the engine only calls fn when that gesture fires. fn receives (datum, event, ctx): datum is the touched row, event the raw DOM event, ctx the EditContext (pointer, scales, data, … — see the Editing overview). Return a new datum (or array); every field you set is written into the belief store.
+
+<Example
+  code={invertYYourself}
+  title="Invert y yourself"
+  blurb="gesture defaults to drag. ctx.pointer is plot pixels; scales.y.invertValue maps them back to data. touched: true is just another field on the returned datum — it shows up in getData() because you put it there."
+  try={(
+    <>
+      <b>Drag</b> a dot — y follows the pointer; the data panel gains <code className="inline">touched: true</code>.
+    </>
+  )}
+/>
+
+</Section>

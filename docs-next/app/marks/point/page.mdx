@@ -1,0 +1,85 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import sequentialFillSizeFromANumber from './_examples/sequential-fill-size-from-a-number.example.txt';
+import constantStyleShorthands from './_examples/constant-style-shorthands.example.txt';
+import ex2dMoveScatter from './_examples/2d-move-scatter.example.txt';
+import scatterOfRotatableSquares from './_examples/scatter-of-rotatable-squares.example.txt';
+import scatterOfRotatableTicks from './_examples/scatter-of-rotatable-ticks.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Point
+
+<Lead>`point` is the channel-driven scatter mark: every channel — x, y, size, fill, stroke, angle — resolves through the global scales. Default shape is a circle; `shape: 'square'` emits a centred rect (side `2 × size`) that can rotate about its centre.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="channels" title="Channels: size, fill, colour">
+
+A numeric field can drive the radius (size) and a continuous colour ramp at once; a categorical field drives the ordinal palette. Constants and fields mix freely on the same mark.
+
+<Example
+  code={sequentialFillSizeFromANumber}
+  title="Sequential fill + size from a number"
+  blurb="A numeric field drives both the continuous colour ramp and the radius."
+/>
+
+<Example
+  code={constantStyleShorthands}
+  title="Constant style shorthands"
+  blurb="Outlined, semi-transparent dots via top-level stroke / strokeWidth / opacity."
+/>
+
+</Section>
+
+<Section id="editing" title="Moving points in 2D">
+
+When both x and y carry a drag, a gesture inverts the pointer through both positional scales.
+
+<Example
+  code={ex2dMoveScatter}
+  title="2D move (scatter)"
+  blurb="Both x and y carry edit: drag(), so a dot moves anywhere."
+  try={(
+    <>
+      <b>Drag</b> a dot anywhere.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="angle" title="Rotating squares and ticks">
+
+An `angle` channel orients a mark about its centre. Degrees are math convention (0° = +x, counterclockwise); `rotate()` inverts the pointer through the same scale. Squares use `point({ shape: 'square' })`; short `tickX` / `tickY` segments (with `length`) rotate the same way — useful for directional markers on a scatter.
+
+<Example
+  code={scatterOfRotatableSquares}
+  title="Scatter of rotatable squares"
+  blurb={"shape: 'square' plus angle with rotate({ pivot: 'mark', fold: false, pick: 'direct' })."}
+  try={(
+    <>
+      <b>Drag</b> a square to spin it.
+    </>
+  )}
+/>
+
+<Example
+  code={scatterOfRotatableTicks}
+  title="Scatter of rotatable ticks"
+  blurb="tickX with length centres a short vertical segment on (x, y); angle rotates it about that midpoint — a lean / direction marker."
+  try={(
+    <>
+      <b>Drag</b> a tick to spin it.
+    </>
+  )}
+/>
+
+</Section>

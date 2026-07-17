@@ -1,0 +1,71 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import scatterObservedPointsYours from './_examples/scatter-observed-points-yours.example.txt';
+import actualsForecast from './_examples/actuals-forecast.example.txt';
+import drawTheLineForTheMissingYears from './_examples/draw-the-line-for-the-missing-years.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Locked rows (read-only data)
+
+<Lead>Some of a chart’s rows are **given** rather than elicited: the record so far, the points you already measured, last quarter’s actuals. `lock` on the spec marks those rows read-only — no gesture can change or delete them — while every row an edit _adds_ stays free. It is the “here is what we know; you supply the rest” policy behind a you-draw-it chart.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="seed" title="Locked seed, free additions">
+
+lock: "seed" fixes exactly the rows you passed as `data`. Everything a `create` mints afterwards is ordinary, editable data — so a scatter plot can show what was observed and collect what you believe, in one dataset.
+
+<Example
+  code={scatterObservedPointsYours}
+  title="Scatter: observed points + yours"
+  blurb="The five grey points are the seed — try to drag one and nothing happens. Click to add your own, and those you can move and delete."
+  try={(
+    <>
+      <b>Click</b> empty space to add a point · <b>drag</b> one of yours · <b>Alt-click</b> one of yours to remove it. The grey points never move.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="predicate" title="Locking rows by what they are">
+
+A lock does not have to mean “seeded”. Give it a predicate and it reads the row: the quarters that already happened are actuals, the rest are your forecast — one dataset, one bar mark, two very different kinds of row.
+
+<Example
+  code={actualsForecast}
+  title="Actuals + forecast"
+  blurb={"lock: (d) => d.kind === \"actual\". The two grey bars are reported; only the forecast bars take a drag."}
+  try={(
+    <>
+      <b>Drag</b> Q3 / Q4 (blue). Q1 and Q2 are reported — they don’t budge.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="you-draw-it" title="You draw it">
+
+The New York Times’ “You Draw It” (2017): the record runs to 1990 and you draw the rest. Both halves are the same dataset, the same line mark, the same y field — the lock is the whole difference between them. Because the seeded line is locked, proximity picking cannot see it: a drag beside it does not grab a frozen line, it starts drawing.
+
+<Example
+  code={drawTheLineForTheMissingYears}
+  title="Draw the line for the missing years"
+  blurb={"edit.line.draw({ samples: years }) paints one point per year as the pointer crosses its column. Drag back over the record and it will not budge — the lock repairs those rows and keeps the rest of the stroke."}
+  try={(
+    <>
+      <b>Drag</b> left-to-right across the empty half to draw 1991–2016, then <b>drag again</b> to refine it. Then press <b>Show me how I did</b>.
+    </>
+  )}
+/>
+
+</Section>

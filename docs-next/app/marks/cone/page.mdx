@@ -1,0 +1,38 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import lineCone from './_examples/line-cone.example.txt';
+import staticCone from './_examples/static-cone.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Line + Cone
+
+<Lead>A correlation belief in two clicks. The single datum `{ r, spread }` is a relationship: **r** is the most-likely correlation — a line through the plot centre rotating from −45° to +45° as r goes −1 → +1 — and **spread** is the uncertainty, a fan of sample lines around it. Driven by `rotate` (the angular sibling of `resize`: a pointer angle inverted through the channel scale) on the [probe](/editing/probe) driver, so the line follows the mouse and a click sets it.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="twostep" title="Relationship, then uncertainty">
+
+Stage 0 rotates the mean line; a click commits r and advances. Stage 1 opens the cone; a click commits the spread. No buttons — the probe driver advances on each click.
+
+<Example
+  code={lineCone}
+  title="Line + Cone"
+  blurb="Move to aim, click to set. Move to open the cone, click to set that too."
+  try={"move the mouse, click, move again, click."}
+/>
+
+<Example
+  code={staticCone}
+  title="Static cone"
+  blurb="Without edits it is just a display of a belief — r = 0.6, envelope ±0.25."
+/>
+
+</Section>

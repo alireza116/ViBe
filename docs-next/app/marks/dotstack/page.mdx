@@ -1,0 +1,46 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import probabilityTokensOverBins from './_examples/probability-tokens-over-bins.example.txt';
+import tentativeDotOnHoverProbe from './_examples/tentative-dot-on-hover-probe.example.txt';
+import perSlotCapWithUnique from './_examples/per-slot-cap-with-unique.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Stacked dots
+
+<Lead>A **dot histogram** — the "drop tokens into slots" elicitation. Each datum is one token; tokens sharing a slot stack into a countable column. Click an empty slot to add a token (`create`), click a token to remove it (`remove`). The belief is just how many tokens sit in each slot — `data.filter(d => d.bin === b).length`.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="basics" title="Dropping tokens">
+
+Click to drop a token into the nearest slot; click a token to take it back. count() caps the budget.
+
+<Example
+  code={probabilityTokensOverBins}
+  title="Probability tokens over bins"
+  blurb="A discrete point scale of bins 0–1; 25-token budget."
+  try={"click the plane to add, click a dot to remove."}
+/>
+
+<Example
+  code={tentativeDotOnHoverProbe}
+  title="Tentative dot on hover (probe)"
+  blurb={"create({ pick: \"probe\" }) shows the token before it is real; the click commits it."}
+  try={"hover a bin — a dot appears but is not counted until you click. Alt-click removes."}
+/>
+
+<Example
+  code={perSlotCapWithUnique}
+  title="Per-slot cap with unique"
+  blurb={"unique({ field, max }) limits the height of any one column."}
+/>
+
+</Section>

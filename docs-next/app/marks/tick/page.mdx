@@ -1,0 +1,55 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import ticksOverABandAxis from './_examples/ticks-over-a-band-axis.example.txt';
+import dragAValueTicks from './_examples/drag-a-value-ticks.example.txt';
+import tickxADistributionStrip from './_examples/tickx-a-distribution-strip.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Tick
+
+<Lead>A tick is bar’s zero-thickness sibling: a thin line marking a value on the linear axis and spanning the other axis. Over a category band it reads as a value marker (like a bar without the fill); over a full continuous extent it reads as a rug / strip. `inset` shrinks each end, `length` fixes a centered length.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="value-marker" title="A value marker across bands">
+
+tickY marks a y value spanning each category’s band — the same channel/edit model as a bar, so it drags identically.
+
+<Example
+  code={ticksOverABandAxis}
+  title="Ticks over a band axis"
+  blurb="One tick per category, spanning the band at its y value."
+/>
+
+<Example
+  code={dragAValueTicks}
+  title="Drag a value (ticks)"
+  blurb={"Same y edit as a bar; pick: \"nearest\" grabs the tick from anywhere in its column."}
+  try={(
+    <>
+      <b>Drag</b> a tick up or down — from anywhere in its column.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="rug" title="A rug / strip plot">
+
+With no band on the other axis, a tick spans the full extent — a strip of marks at each datum’s position. inset trims the ends so the strip floats off the frame.
+
+<Example
+  code={tickxADistributionStrip}
+  title="tickX — a distribution strip"
+  blurb="Values along x, each drawn as a vertical mark spanning y. inset shortens them."
+/>
+
+</Section>

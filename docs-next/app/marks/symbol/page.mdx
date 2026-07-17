@@ -1,0 +1,107 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import moodOverTheWeek from './_examples/mood-over-the-week.example.txt';
+import worldCupGoals from './_examples/world-cup-goals.example.txt';
+import starTokens from './_examples/star-tokens.example.txt';
+import fruitBasket from './_examples/fruit-basket.example.txt';
+import pickAWeather from './_examples/pick-a-weather.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Symbol & Emoji
+
+<Lead>The `symbol` channel maps a category to a **glyph** — an emoji or a unicode shape — exactly the way `fill` maps a category to a colour. It is not a mark: any shape mark (`point`, `dotStack`, `waffle`) renders the glyph in place of its circle/rect. The elicited value is still the _category_; the glyph is its encoding, edited with `cycle()` / `legend()`.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="point" title="Emoji points — click to cycle">
+
+A mood scatter: the y position and the glyph both encode `mood`. A `cycle()` on the symbol channel advances the category on click — the face changes and the point hops to its new row, because an edit is the inverse of encoding.
+
+<Example
+  code={moodOverTheWeek}
+  title="Mood over the week"
+  blurb="symbol maps the ordinal mood to a face; cycle() advances it on click."
+  try={(
+    <>
+      <b>Click</b> a face to cycle its mood.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="constant" title="One fixed glyph — no mapping">
+
+You don't need a scale to use a glyph. The `symbol: '⚽'` shorthand pins one glyph on every point — it desugars to a constant channel and skips the scale, exactly like `fill: 'red'`. Here the elicited value is `goals`: the balls are pure identity, and you drag one up or down to set that stage's total.
+
+<Example
+  code={worldCupGoals}
+  title="World Cup goals"
+  blurb="A constant symbol: '⚽' — one glyph for every point, no scale. The elicited value is goals; drag a ball up or down to set it."
+  try={(
+    <>
+      <b>Drag</b> a ⚽ up or down to change that stage's goals.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="tokens" title="Emoji tokens — drop and remove">
+
+A constant `symbol` shorthand makes every token the same glyph. Because the glyph is just how the token draws, `create` / `remove` work unchanged — a ⭐ star-rating counter.
+
+<Example
+  code={starTokens}
+  title="Star tokens"
+  blurb="dotStack of ⭐ tokens; click a slot to add, click a star to remove."
+  try={(
+    <>
+      <b>Click</b> a column to add a ⭐, <b>click</b> a ⭐ to remove it.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="waffle" title="Emoji waffle — count in glyphs">
+
+A `symbol` channel turns every waffle cell into that category's glyph, so a quantity is literally countable in 🍎. Drag to fill; the empty cells stay faint but grabbable.
+
+<Example
+  code={fruitBasket}
+  title="Fruit basket"
+  blurb="Each category's cells render its emoji; edit.waffle.fill drags the count."
+  try={(
+    <>
+      <b>Drag</b> up a column to change its count.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="legend" title="A glyph legend / picker">
+
+Pair `guides.legend({ channel: 'symbol' })` with `legend()` for a glyph swatch row you click to set the category — the same as a colour legend, drawn with the glyphs themselves.
+
+<Example
+  code={pickAWeather}
+  title="Pick a weather"
+  blurb="A single-row belief whose glyph is set from the legend row."
+  try={(
+    <>
+      <b>Click</b> a glyph in the legend to set today's weather.
+    </>
+  )}
+/>
+
+</Section>

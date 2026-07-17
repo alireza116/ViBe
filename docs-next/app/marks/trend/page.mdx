@@ -1,0 +1,38 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import trendLine from './_examples/trend-line.example.txt';
+import bothHandlesAtOnce from './_examples/both-handles-at-once.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Trend line
+
+<Lead>An **intercept-then-slope** line. The single datum `{ intercept, slope }` is a linear belief; the mark draws `y = intercept + slope·x` across the plot (clipped to the plot rectangle) plus two handles — an **intercept** handle at `x = 0` that translates the line and a **slope** handle that rotates it about the anchor. By default the axes cross at the origin. Stage the two handles to elicit the level first, then the trend. Trend is the one mark whose `x`/`y` channels name the plot’s _axes_ rather than columns of its datum: declare them in the schema (typically spanning negatives so the intercept sits in the middle of the frame).</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="twostep" title="Intercept, then slope">
+
+Domains span both sides of zero so the intercept sits on the y-axis in the middle of the frame. Stage 0: drag the intercept handle to set the level. Stage 1: drag the slope handle to set the trend (rotating about the anchor).
+
+<Example
+  code={trendLine}
+  title="Trend line"
+  blurb="Axes cross at the origin automatically; the line runs edge-to-edge through the plot."
+  try={"drag the centre (intercept) dot; press Next; drag the right (slope) dot."}
+/>
+
+<Example
+  code={bothHandlesAtOnce}
+  title="Both handles at once"
+  blurb="Omit the stages (default null) to leave both handles always active."
+/>
+
+</Section>

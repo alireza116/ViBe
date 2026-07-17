@@ -1,0 +1,57 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import fillsTheParentWidth from './_examples/fills-the-parent-width.example.txt';
+import redrawsToTheParentWidth from './_examples/redraws-to-the-parent-width.example.txt';
+import exactPixels from './_examples/exact-pixels.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Responsive sizing
+
+<Lead>By default a chart is drawn at the exact `width` / `height` you give it (in pixels). The `responsive` option lets a chart fit its parent instead: `"scale"` wraps the SVG in a **viewBox** so the browser stretches it to the container (one draw, aspect ratio preserved), while `"reflow"` measures the parent and **redraws at native pixels** on resize (crisp text, the width tracks the container, the height stays the value you set). The `width` / `height` you pass are still the design size — the viewBox for `"scale"`, and the starting / aspect basis for `"reflow"`.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="scale" title="Scale (viewBox)">
+
+responsive: "scale" — the chart keeps its 480×300 aspect ratio but stretches to fill the column. Everything scales together (text and strokes included). Best when you want a chart to shrink/grow with its container and drift in aspect is fine.
+
+<Example
+  code={fillsTheParentWidth}
+  title="Fills the parent width"
+  blurb={"the same spec at responsive: \"scale\"; the SVG scales to this card via a viewBox."}
+/>
+
+</Section>
+
+<Section id="reflow" title="Reflow (ResizeObserver)">
+
+responsive: "reflow" — the chart measures this card and redraws at native pixels; the width tracks the container while the height stays 300. Resize the browser window and the bars re-lay-out crisply (no scaling blur). Call el.destroy() on unmount.
+
+<Example
+  code={redrawsToTheParentWidth}
+  title="Redraws to the parent width"
+  blurb={"responsive: \"reflow\"; drag a bar, then resize the window — layout recomputes."}
+  try={"resize the window; drag a bar."}
+/>
+
+</Section>
+
+<Section id="fixed" title="Fixed (default)">
+
+No responsive option (or responsive: "fixed") — the chart is exactly 320×240 pixels regardless of the container. Use it when a chart must be a precise size.
+
+<Example
+  code={exactPixels}
+  title="Exact pixels"
+  blurb="the default: a 320×240 chart that ignores the parent width."
+/>
+
+</Section>

@@ -1,0 +1,110 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import noScaleNamedAnywhere from './_examples/no-scale-named-anywhere.example.txt';
+import sequentialRampSize from './_examples/sequential-ramp-size.example.txt';
+import symlogAndADivergingRamp from './_examples/symlog-and-a-diverging-ramp.example.txt';
+import logSqrtAnAdoptedD3Scale from './_examples/log-sqrt-an-adopted-d3-scale.example.txt';
+import ordinalPalette from './_examples/ordinal-palette.example.txt';
+import aDiscreteGrid from './_examples/a-discrete-grid.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Scales & channels
+
+<Lead>Two different words, kept apart. A **data type** says what a field _is_ — `quantitative`, `categorical`, `ordinal`, `temporal` — and is declared once, on the [schema](/schema). A **scale type** says how a channel _draws_ it — `linear`, `log`, `band`, `ordinal`, … — and is normally **derived**: a categorical field on a bar’s x is a band (a bar needs the interval), on a dot’s x it is a point (a dot wants the tick). So you rarely name a scale at all. When you do, `scale` takes a name, a spec, or a live d3 scale. Every positional scale is invertible — that is what makes editing possible.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="derived" title="The scale is derived from the data type">
+
+Nothing below names a scale. The schema says `cat` is categorical and `n` is quantitative; the bar says it needs an interval for discrete data. Band and linear fall out. Swap `bar` for `point` and x becomes a point scale, with no other change.
+
+<Example
+  code={noScaleNamedAnywhere}
+  title="No scale named anywhere"
+  blurb="Data type (schema) + what the mark needs = the scale. Drag a bar to see it invert."
+  try={(
+    <>
+      <b>Drag</b> a bar.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="continuous" title="Continuous → colour & size">
+
+The same numeric field through a colour channel becomes a ramp, and through the size channel a radius. A size channel’s output `range` (radii, in px) is a property of the scale, so it rides on `scale`.
+
+<Example
+  code={sequentialRampSize}
+  title="Sequential ramp + size"
+  blurb={"fill: { field } → ramp, size: { field } → radius, from one numeric field."}
+/>
+
+</Section>
+
+<Section id="zero-crossing" title="Crossing zero — symlog & diverging">
+
+Elicited quantities are often _differences_: a revision, an error, a surprise. Those span orders of magnitude and go both ways, which breaks the usual two tools — `log` has nothing to say about 0 or −60, and a `sequential` ramp has no reference point. `symlog` is linear near zero and logarithmic beyond it; `diverging` colours by distance from a pivot, each side scaled on its own.
+
+<Example
+  code={symlogAndADivergingRamp}
+  title="symlog position, diverging colour"
+  blurb="A domain that crosses zero — where log has no answer and a sequential ramp has no reference."
+  try={(
+    <>
+      <b>Drag</b> a dot across zero: the position stays readable at ±3 and at ±400 alike, and the colour turns as it passes the pivot.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="override" title="Naming a scale: by name, by spec, by d3">
+
+A log x, a sqrt size range, and a d3 band with custom padding — three forms, one option. The d3 scale is adopted as built; because it is positional and named no range, it is given the plot’s pixel range. Its padding survives, and so does its invertibility: the drag works.
+
+<Example
+  code={logSqrtAnAdoptedD3Scale}
+  title="log · sqrt · an adopted d3 scale"
+  blurb="x is logarithmic, size ramps by sqrt, and the categorical fill uses a d3 ordinal scale."
+  try={(
+    <>
+      <b>Drag</b> a dot vertically — an adopted scale inverts like any other.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="categorical" title="Categorical → ordinal palette">
+
+A categorical field on a colour channel resolves through the ordinal palette — one hue per category.
+
+<Example
+  code={ordinalPalette}
+  title="Ordinal palette"
+  blurb={"fill: { field: \"kind\" } assigns palette colours across the category domain."}
+/>
+
+</Section>
+
+<Section id="categorical-position" title="Categorical position → point scale">
+
+When a positional channel is categorical, a dot resolves it to a point scale — the mark sits on the category’s tick. Two categorical axes make a discrete grid. Note `ordinal` vs `categorical` on `y`: an ordinal domain’s _order_ is meaningful.
+
+<Example
+  code={aDiscreteGrid}
+  title="A discrete grid"
+  blurb="Both positions are categories, so each dot lands on an (x, y) cell."
+/>
+
+</Section>
