@@ -30,19 +30,12 @@
     "LICENSE"
   ],
   "scripts": {
-    "dev": "vite",
-    "dev:docs-next": "next dev docs-next",
-    "build": "vite build",
+    "dev": "next dev docs-next",
+    "build:docs": "next build docs-next",
+    "start:docs": "next start docs-next",
     "build:lib": "vite build --config vite.lib.config.js",
-    "build:docs": "vite build",
-    "build:docs-next": "next build docs-next",
-    "start:docs-next": "next start docs-next",
-    "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "verify:browser": "node scripts/verify-browser.mjs",
-    "verify:docs-next": "node scripts/verify-docs-next.mjs",
-    "migrate:docs-next": "node scripts/migrate-docs-next.mjs",
-    "migrate:examples-to-tsx": "node scripts/migrate-examples-to-tsx.mjs"
+    "verify:browser": "node scripts/verify-browser.mjs"
   },
   "keywords": [],
   "author": "",

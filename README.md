@@ -30,7 +30,7 @@ VibeJS is layered for extensibility:
 
    **One dataset.** A chart elicits exactly one dataset — even a slider elicits a one-row dataset — so `data` lives on the spec, never on a mark. Each mark is a *view* over those rows: it encodes some columns, and where a channel carries an `edit`, it writes them back. Several marks over the same rows is the point, not a special case: a glyph is just marks that encode different columns of one row (see `composite`), and they all re-derive from the committed data on the next render.
 
-   **Locked rows (`lock`).** Some rows are *given* rather than elicited — the record so far, the points already measured, last quarter's actuals. `lock: "seed"` fixes the rows the chart was seeded with while leaving every row an edit *adds* free; `lock: (d) => d.year <= 1990` locks rows by what they are. A lock is a property of the data, so it sits on the spec beside `data` and `schema`, and it has two halves, both automatic: a **dataset invariant** run last on every commit (so it outranks every other repair — a gesture that spans locked and free rows keeps its changes to the free ones and snaps the locked ones back; deleting a locked row is rejected), and a **pointer** policy (a locked row's marks aren't grabbable, show no editable cursor, and are skipped by proximity picking — so `nearest` / `sweep` / `draw` never target one). That last part is what makes a you-draw-it chart work: because the seeded line is invisible to picking, a drag beside it doesn't grab a frozen line, it starts drawing. `setData` re-seeds the chart, so it re-takes a `"seed"` lock. See `docs/editing/lock.html`.
+   **Locked rows (`lock`).** Some rows are *given* rather than elicited — the record so far, the points already measured, last quarter's actuals. `lock: "seed"` fixes the rows the chart was seeded with while leaving every row an edit *adds* free; `lock: (d) => d.year <= 1990` locks rows by what they are. A lock is a property of the data, so it sits on the spec beside `data` and `schema`, and it has two halves, both automatic: a **dataset invariant** run last on every commit (so it outranks every other repair — a gesture that spans locked and free rows keeps its changes to the free ones and snaps the locked ones back; deleting a locked row is rejected), and a **pointer** policy (a locked row's marks aren't grabbable, show no editable cursor, and are skipped by proximity picking — so `nearest` / `sweep` / `draw` never target one). That last part is what makes a you-draw-it chart work: because the seeded line is invisible to picking, a drag beside it doesn't grab a frozen line, it starts drawing. `setData` re-seeds the chart, so it re-takes a `"seed"` lock. See the [Locked rows](docs-next/content/editing-lock.ts) docs page (`/editing/lock`).
 
 2. **Abstract scene graph (`src/core/scene.js`)** — a flat, layout-calculated collection of abstract nodes (`circle`, `rect`, `line`, `path`, `text`, `image`), independent of the DOM or any renderer.
 
@@ -84,7 +84,7 @@ VibeJS is layered for extensibility:
 
 **Keyboard.** A pointer isn't the only way to say what you believe. Any mark carrying a direct-pick edit is focusable, and the arrow keys drive that same edit (Shift for a coarser step) — the renderer reports "one step this way" and the engine resolves it against the channel's scale into the pixel a pointer would have been at, so a step means *the next category* on a band axis and a fraction of the range on a continuous one. No separate keyboard edit exists, and each press is its own undo entry. Pair it with `snap` and the keyboard lands on exact stops.
 
-**Sizing.** `width`/`height` are pixels by default (`responsive: "fixed"`). Set `responsive: "scale"` to wrap the SVG in a `viewBox` so the browser scales it to fill the parent (one draw, aspect ratio preserved), or `responsive: "reflow"` (alias `true`) to measure the parent and redraw at native pixels on resize (crisp text; width tracks the container, height stays the given value). A reflow chart wires a `ResizeObserver` — call `el.destroy()` when unmounting it. See `docs/sizing.html`.
+**Sizing.** `width`/`height` are pixels by default (`responsive: "fixed"`). Set `responsive: "scale"` to wrap the SVG in a `viewBox` so the browser scales it to fill the parent (one draw, aspect ratio preserved), or `responsive: "reflow"` (alias `true`) to measure the parent and redraw at native pixels on resize (crisp text; width tracks the container, height stays the given value). A reflow chart wires a `ResizeObserver` — call `el.destroy()` when unmounting it. See the [Responsive sizing](docs-next/content/sizing.ts) docs page (`/sizing`).
 
 ---
 
@@ -128,10 +128,9 @@ vibe-js/
 │   │   └── d3-renderer.js  # The default SVG renderer
 │   ├── types.d.ts          # Type contracts for the whole API
 │   └── index.js            # Public API aggregator
-├── index.html              # Landing page → docs/
-├── docs/                   # Classic HTML docs (+ playground.html) — kept for now
-├── docs-next/              # Next.js React docs (editable examples + playground)
-├── vite.config.js          # Classic docs site build → site/
+├── docs-next/              # The docs: Next.js site with editable examples
+├── scripts/
+│   └── verify-browser.mjs  # The regression gate: real Chromium over the docs
 ├── vite.lib.config.js      # Library build → dist/vibe.js
 └── package.json
 ```
@@ -240,50 +239,35 @@ import * as vibe from "vibe-js/dist";
 ```bash
 cd vibe-js
 npm install
-npm run dev            # classic Vite docs / playground (HTML harness)
-npm run dev:docs-next  # Next.js React docs (editable examples)
+npm run dev            # the docs, live (http://localhost:3000)
 npm run typecheck      # tsc --noEmit against types.d.ts
-npm run verify:browser
+npm run verify:browser # the regression gate: real Chromium over the docs
 ```
 
-### Builds (lib, classic docs, and Next docs are separate)
+### Builds (the library and the docs site are separate)
 
 | Command | Config | Output | What it is |
 |---|---|---|---|
+| `npm run dev` | `docs-next/` | http://localhost:3000 | The docs, live |
 | `npm run build:lib` | `vite.lib.config.js` | `dist/vibe.js` | Publishable ESM library (`d3` external) |
-| `npm run build` / `build:docs` | `vite.config.js` | `site/` | Classic static HTML docs |
-| `npm run build:docs-next` | `docs-next/` | `docs-next/.next/` | Next.js React docs |
-| `npm run start:docs-next` | — | — | Serve the Next docs production build |
-| `npm run preview` | `vite.config.js` | serves `site/` | Preview the classic docs build |
+| `npm run build:docs` | `docs-next/` | `docs-next/.next/` | The docs site |
+| `npm run start:docs` | — | — | Serve the docs production build |
+| `npm run typecheck` | `tsconfig.json` | — | `tsc --noEmit` against `src/types.d.ts` |
+| `npm run verify:browser` | `scripts/` | — | The regression gate (real Chromium over the docs) |
 
 ```bash
+npm run dev               # the docs, live
 npm run build:lib         # library → dist/
-npm run build:docs        # classic docs → site/
-npm run build:docs-next   # React docs (Next)
-npm run start:docs-next   # serve React docs
+npm run build:docs        # docs site
 ```
 
-### Classic docs (`docs/`)
+### Docs (`docs-next/`)
 
-Kept for now as the historical harness-based site:
+A Next App Router site with **live-editable** examples (`react-live` editor + Reset to default), and the project's only documentation — the older harness-based `docs/` tree was retired in favour of it.
 
-- `index.html` — landing page linking into the docs.
-- `docs/` — a page per mark and feature; examples are `code` strings run by `_harness.js`.
-- `docs/playground.html` — dropdown composition playground.
+Content lives in `docs-next/content/<key>.ts` (one `DocPage`: route, lead, `api`, `sections`). Each example is a pair under `docs-next/examples/<key>/`: `<slug>.example.txt` holds the raw chart code (a `mount(Elicit({…}))` body, loaded as a string), and `<slug>.tsx` wraps it with its `meta` for `ExampleLive`. A route in `docs-next/app/` imports the content plus its examples; `docs-next/lib/nav.ts` is the sidebar. `@vibe` aliases `src/index.js`, so every example on the site runs against the source.
 
-### Next.js docs (`docs-next/`) — preferred going forward
-
-React/Next App Router site with **live-editable** examples (`react-live` editor + Reset to default). Content lives in `docs-next/content/`; each example is a file under `docs-next/examples/` exporting `{ meta, code }`. The playground (`/playground`) loads curated presets into the same live editor.
-
-```bash
-npm run dev:docs-next      # http://localhost:3000
-```
-
-To re-generate content/examples/routes from the classic `docs/pages/*.js` modules:
-
-```bash
-npm run migrate:docs-next
-```
+The docs are also the **test suite**. `npm run verify:browser` boots this site, evaluates every example, and drives real gestures against them — see below.
 
 **Reuse in another Next app** (e.g. a lab site): import the docs UI from the package export, or copy `docs-next/`:
 

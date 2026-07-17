@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Live-example scope — mirrors docs/_harness.js.
+ * Live-example scope: what an example on the docs site can name without importing.
  * Universal edits are bare (`drag()`); scoped namespaces stay under `edit.*`.
  */
 import * as vibe from '@vibe';
