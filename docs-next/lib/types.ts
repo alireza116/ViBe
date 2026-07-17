@@ -1,26 +1,34 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
+
+/**
+ * Prose that may still arrive as an HTML string from a legacy `content/*.ts`
+ * page, or as JSX from a migrated `api.tsx` / `page.mdx`. Transitional: once
+ * every route is MDX, this narrows to ReactNode and the string branches in
+ * ApiReference / ExampleLive go away.
+ */
+export type Prose = string | ReactNode;
 
 export type ApiOption = {
   name: string;
   type?: string;
   default?: string;
-  desc?: string;
+  desc?: Prose;
 };
 
 export type ApiEntry = {
   name?: string;
-  summary?: string;
+  summary?: Prose;
   signature?: string;
   signatures?: string[];
   options?: ApiOption[];
   channels?: ApiOption[];
-  returns?: string;
+  returns?: Prose;
 };
 
 export type ExampleMeta = {
   title: string;
   blurb?: string;
-  try?: string;
+  try?: Prose;
 };
 
 /** How ExampleLive presents the source snippet. Default: editable. */
