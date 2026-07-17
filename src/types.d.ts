@@ -6,8 +6,8 @@ export type Datum = Record<string, any>;
 // holds the data type. A scale type is named by `scale` (a string, or the `type`
 // of a ScaleSpec). See scaleTypeFor in core/encoding.js for the routing.
 export type ScaleType =
-  | 'linear' | 'log' | 'pow' | 'sqrt' | 'time'
-  | 'band' | 'point' | 'ordinal' | 'sequential';
+  | 'linear' | 'log' | 'symlog' | 'pow' | 'sqrt' | 'time'
+  | 'band' | 'point' | 'ordinal' | 'sequential' | 'diverging';
 
 // A field's MEASUREMENT type in the dataset schema (what the data means), as
 // opposed to a ScaleType (how a channel draws it). scaleTypeFor translates one to
@@ -34,7 +34,13 @@ export interface ScaleSpec {
   nice?: boolean;      // continuous
   clamp?: boolean;     // continuous
   base?: number;       // log
+  constant?: number;   // symlog — the width of the linear region around zero
   exponent?: number;   // pow
+  // diverging — the DATA value the ramp's midpoint sits on (the neutral colour).
+  // Defaults to 0 when the domain straddles it, else the domain's midpoint. Each
+  // side is scaled independently, so the pivot keeps its colour on a lopsided
+  // domain rather than drifting to the middle of the range.
+  pivot?: number;
 }
 
 // One field of the elicited-dataset schema. Declares the field's measurement
@@ -200,11 +206,14 @@ export interface Edit {
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
   pick: 'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' | 'brushRect' | 'probe' | (string & {});
-  // null = universal (any mark); 'line' = needs a series-grouping mark; 'axis' /
-  // 'arc' = belongs on that mark kind (the scope shows in the name, e.g.
-  // edit.line.*, edit.axis.*, edit.arc.*). The engine dev-warns when a 'line' edit
-  // is attached to a mark without series support.
-  scope: 'line' | 'axis' | 'arc' | 'geo' | null;
+  // null = universal (any mark). Otherwise the mark FAMILY this edit needs, which
+  // is also where it lives in the API (the scope shows in the name: edit.line.*,
+  // edit.arc.*, edit.waffle.*, edit.geo.*, edit.axis.*). Each scope names a mark
+  // capability flag — supportsSeries / supportsArc / supportsWaffle / supportsGeo /
+  // isAxis — and the engine dev-warns when the mark it's attached to lacks it,
+  // instead of leaving you a silently dead gesture. See SCOPE_CAPABILITY in
+  // core/elicit.js.
+  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | null;
   threshold: number;
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
@@ -230,6 +239,16 @@ export interface Edit {
   // chart). A capability flag, read like the array-vs-datum classification — not
   // an interaction-mode branch. Used by the editable-axis edits (edit.axis.*).
   target?: 'domain';
+  // How this edit changes the dataset's SHAPE. The engine reads it to resolve
+  // `activeIndex` — the datum a constraint repairs around — WITHOUT knowing which
+  // edit is running, the same way `target` classifies the write destination:
+  //   'append' -> a row was minted; the active one is the last.
+  //   'delete' -> a row was dropped; no datum is active.
+  //   null/absent -> the row at `index` is the active one (the common case).
+  // Declare 'append' on a custom minting edit to get create()'s treatment. An edit
+  // that both mints and drops (toggle), or appends many rows at once (newSeries,
+  // draw), leaves this null: "the touched datum" has no single answer there.
+  cardinality?: 'append' | 'delete' | null;
   apply: (ctx: EditContext) => any;
 }
 
@@ -300,18 +319,21 @@ export interface Channels extends StyleChannels {
   // holds the category — the glyph is its encoding). Non-positional, non-invertible.
   symbol?: ChannelSpec;
   // Text mark channels: the label string, its size/anchors/offsets (read RAW,
-  // not scaled — constant forms are shorthands), and rotation in degrees
-  // (scaled when a scale is declared, so rotate() is an exact inverse; else raw).
-  // `format` is a mark-level option (string | fn), not a channel — see MarkOptions.
-  // Also the primary channel of needle / axisRadial / cone (degrees via scale.range;
-  // default range [180, 0] = left→right through the top). For arc/pie, the field is
-  // the slice magnitude (layout stacks and normalizes; the scale is not used for placement).
+  // not scaled — constant forms are shorthands). `format` is a mark-level option
+  // (string | fn), not a channel — see MarkOptions.
   text?: ChannelSpec;
   fontSize?: ChannelSpec;
   textAnchor?: ChannelSpec;   // horizontal: 'start' | 'middle' | 'end'
   lineAnchor?: ChannelSpec;   // vertical: 'top' | 'middle' | 'bottom'
   dx?: ChannelSpec;           // horizontal pixel offset
   dy?: ChannelSpec;           // vertical pixel offset
+  // Orientation in math degrees (0° = +x, CCW, y-up). Scaled when a scale is
+  // declared so rotate() is an exact inverse; else raw. Marks that emit geometry
+  // (point/rect/tick/text/…) stamp it on FeatureNode.angle; the renderer applies
+  // SVG rotate(-deg) about the mark centre. Also the primary channel of needle /
+  // axisRadial / cone (default range [180, 0] = left→right through the top).
+  // Arc/pie slice magnitude is `value`, not `angle` — a slice's share is a quantity
+  // the layout turns into a sweep, not an orientation.
   angle?: ChannelSpec;
   [channel: string]: ChannelSpec | undefined;
 }
@@ -341,6 +363,8 @@ export interface MarkOptions {
   lineAnchor?: 'top' | 'middle' | 'bottom' | string;
   dx?: number;
   dy?: number;
+  // Orientation shorthand (math degrees) — desugars to channels.angle.
+  angle?: number;
   // Text-mark display formatter: a d3-format string or `(value) => string`.
   // Display-only — the underlying field stays the raw value. See `vibe.format`.
   format?: string | ((v: any) => string);
@@ -391,15 +415,33 @@ export interface FaceOptions extends MarkOptions {
 // the shared dataset. Each part encodes some columns; a part carrying an `edit`
 // on a channel is a handle. `composite` returns the parts as an array of features
 // (Elicit flattens it) — it is a desugaring, not a new kind of feature.
+//
+// Group-level `channels` (and style/angle shorthands) merge into every part at
+// desugar time; a part's own channel for the same name wins. Inherited `edit`s
+// attach to the last part only (visuals first, handles last) so one dataset does
+// not get the same edit applied twice.
 export interface CompositeOptions {
   // The sub-marks, in z-order: visual parts first, handles last.
   parts?: any[];
   id?: string;
+  // Shared channel map inherited by every part (part keys win). Typical for a
+  // glyph-wide `angle`, `x`/`y`, or `fill`.
+  channels?: Channels;
+  // Constant shorthands desugared into group channels (same list as MarkOptions).
+  fill?: any;
+  stroke?: any;
+  strokeWidth?: number;
+  opacity?: number;
+  fillOpacity?: number;
+  strokeOpacity?: number;
+  size?: number;
+  angle?: number;
   // Stamped onto any part that doesn't declare its own (a glyph usually sits in a
   // band slot). See plot/composite.js.
   discreteScale?: 'band' | 'point';
   // Group-level data invariants; promoted to the dataset like any mark's.
   constraints?: Constraint[];
+  [key: string]: any;
 }
 
 export interface FeatureNode {
@@ -441,11 +483,13 @@ export interface FeatureNode {
   fontSize?: number;
   textAnchor?: string;
   // Text mark: vertical anchor ('top'|'middle'|'bottom') and the SVG
-  // dominant-baseline the mark derived from it; rotation in degrees (rendered
-  // as a rotate() transform about x,y); `editText` opts the node into the
-  // renderer's inline content editor on dblclick.
+  // dominant-baseline the mark derived from it; `editText` opts the node into
+  // the renderer's inline content editor on dblclick.
   lineAnchor?: string;
   dominantBaseline?: string;
+  // Orientation in math degrees (0° = +x, CCW). Any geometry node may carry it;
+  // the renderer applies SVG rotate(-deg) about markCenter. Marks that bake
+  // orientation into path geometry (needle) omit this to avoid double-rotating.
   angle?: number;
   editText?: boolean;
   data?: Datum;
@@ -647,7 +691,16 @@ export interface ElicitElement extends HTMLDivElement {
   // (edit.axis.*) reshaped. The caller's original spec.schema is never mutated.
   getSchema(): Schema;
   // Replace the dataset and re-render. Bypasses constraints (trusted seed/reset).
+  // Also clears the undo history: a reseed is a new starting point, not an edit.
   setData(data: Datum[]): void;
+  // Step back / forward one GESTURE. A drag is one entry however many commits it
+  // made along the way; a click or a typed commit is its own. Both restore the
+  // dataset AND the schema (an axis edit reshapes a domain) and fire 'change'.
+  // Return whether they moved, so a caller can drive a button's disabled state.
+  undo(): boolean;
+  redo(): boolean;
+  canUndo(): boolean;
+  canRedo(): boolean;
   // Subscribe to committed changes ('change': (data)) or stage advances
   // ('stage': (stageIndex, stageLabel?)). Returns an unsubscribe function.
   on(type: 'change' | 'stage', cb: (...args: any[]) => void): () => void;

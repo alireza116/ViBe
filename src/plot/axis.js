@@ -125,6 +125,10 @@ export function tickData(scale, opts = {}) {
  * @returns {any}
  */
 export function axis(options = {}) {
+    // No normalizeMarkOptions here, deliberately: an axis encodes no datum. It
+    // draws a SCALE (picked by `channel`), so it has no channel map and its
+    // stroke/fill/fontSize are chrome — plain options, like axisRadial's
+    // AXIS_CHROME set. There is nothing to desugar.
     const {
         channel = 'x',
         anchor = channel === 'x' ? 'bottom' : 'left',

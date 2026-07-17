@@ -1,0 +1,28 @@
+mount(Elicit({
+  width: 420, height: 260,
+  margins: { top: 16, right: 16, bottom: 32, left: 40 },
+  schema: {
+    effort: { type: "quantitative", domain: [0, 100] },
+    value:  { type: "quantitative", domain: [0, 100] },
+  },
+  data: [
+    { effort: 25, value: 70 },
+    { effort: 60, value: 45 },
+  ],
+  // The nudge runs the same edit, so the same invariants hold: arrow keys
+  // cannot push a point outside the bounds a drag couldn't either.
+  constraints: [
+    clamp({ min: 0, max: 100, field: "effort" }),
+    clamp({ min: 0, max: 100, field: "value" }),
+  ],
+  features: [
+    point({
+      size: 8, fill: "#2563eb",
+      channels: {
+        // A drag on both axes — so both axes take arrow keys, free of charge.
+        x: { field: "effort", edit: drag() },
+        y: { field: "value",  edit: drag() },
+      },
+    }),
+  ],
+}))

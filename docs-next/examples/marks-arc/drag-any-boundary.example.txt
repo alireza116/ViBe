@@ -14,9 +14,9 @@ mount(Elicit({
   features: [
     pie({
       outerRadius: 100,
-      edit: edit.arc.edge(),
+      edits: [edit.arc.edge()],
       channels: {
-        angle: { field: "share" },
+        value: { field: "share" },
         fill: { field: "party" },
       },
     }),

@@ -62,7 +62,19 @@ const page: DocPage = {
           "name": "ScaleSpec.type",
           "type": "ScaleType",
           "default": "derived",
-          "desc": "<code class=\"inline\">linear</code>, <code class=\"inline\">log</code>, <code class=\"inline\">pow</code>, <code class=\"inline\">sqrt</code>, <code class=\"inline\">time</code>, <code class=\"inline\">band</code>, <code class=\"inline\">point</code>, <code class=\"inline\">ordinal</code>, <code class=\"inline\">sequential</code>."
+          "desc": "<code class=\"inline\">linear</code>, <code class=\"inline\">log</code>, <code class=\"inline\">symlog</code>, <code class=\"inline\">pow</code>, <code class=\"inline\">sqrt</code>, <code class=\"inline\">time</code>, <code class=\"inline\">band</code>, <code class=\"inline\">point</code>, <code class=\"inline\">ordinal</code>, <code class=\"inline\">sequential</code>, <code class=\"inline\">diverging</code>."
+        },
+        {
+          "name": "ScaleSpec.constant",
+          "type": "number",
+          "default": "1",
+          "desc": "For <code class=\"inline\">symlog</code> — how wide the linear region around zero is. <code class=\"inline\">symlog</code> is <code class=\"inline\">log</code> for a domain that <b>crosses zero</b> or goes negative, where plain <code class=\"inline\">log</code> has no answer. It stays continuous and invertible, so it drags."
+        },
+        {
+          "name": "ScaleSpec.pivot",
+          "type": "number",
+          "default": "0, or the domain midpoint",
+          "desc": "For <code class=\"inline\">diverging</code> — the data value that takes the middle colour, with each side scaled independently so the pivot keeps its colour even on a lopsided domain like <code class=\"inline\">[-2, 10]</code>. Defaults to 0 when the domain straddles it. Like <code class=\"inline\">sequential</code>, it is a colour scale: not invertible, so it can’t carry an edit."
         },
         {
           "name": "ScaleSpec.range",
@@ -113,6 +125,14 @@ const page: DocPage = {
       "intro": "The same numeric field through a colour channel becomes a ramp, and through the size channel a radius. A size channel’s output <code class=\"inline\">range</code> (radii, in px) is a property of the scale, so it rides on <code class=\"inline\">scale</code>.",
       "examples": [
         "scales/sequential-ramp-size"
+      ]
+    },
+    {
+      "id": "zero-crossing",
+      "title": "Crossing zero — symlog & diverging",
+      "intro": "Elicited quantities are often <i>differences</i>: a revision, an error, a surprise. Those span orders of magnitude and go both ways, which breaks the usual two tools — <code class=\"inline\">log</code> has nothing to say about 0 or −60, and a <code class=\"inline\">sequential</code> ramp has no reference point. <code class=\"inline\">symlog</code> is linear near zero and logarithmic beyond it; <code class=\"inline\">diverging</code> colours by distance from a pivot, each side scaled on its own.",
+      "examples": [
+        "scales/symlog-and-a-diverging-ramp"
       ]
     },
     {

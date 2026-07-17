@@ -33,7 +33,7 @@
 //   textX — value on x, y parked at the vertical centre (a 1-D label along x)
 //   textY — value on y, x parked at the horizontal centre (a 1-D label along y)
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions } from './mark.js';
 import { resolveFormat } from '../format.js';
 
 /**
@@ -108,13 +108,10 @@ export function textNodeAt(scales, channels, d, i, px, py, opts = {}) {
     const dx = +rawChannel(channels, 'dx', d, 0) || 0;
     const dy = +rawChannel(channels, 'dy', d, 0) || 0;
 
-    // Angle: scaled to degrees when a scale is declared (so rotate() is an exact
-    // inverse), else the raw degrees value. (scales is an index signature, so read
-    // the optional angle scale via a cast.)
-    const angleScale = /** @type {any} */ (scales)['angle'];
-    const angle = angleScale
-        ? encodeChannel(scales, channels, 'angle', d, 0)
-        : rawChannel(channels, 'angle', d, 0);
+    // Angle: math degrees via the shared encodeAngle path (scaled when a scale
+    // exists so rotate() is an exact inverse; else raw). The renderer converts
+    // to SVG with rotate(-deg) about the label's anchor.
+    const angle = encodeAngle(scales, channels, d, 0);
 
     const lineAnchor = rawChannel(channels, 'lineAnchor', d, 'middle');
 

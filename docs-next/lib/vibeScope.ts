@@ -1,18 +1,21 @@
 'use client';
 
 /**
- * Live-example scope — mirrors docs/_harness.js.
+ * Live-example scope: what an example on the docs site can name without importing.
  * Universal edits are bare (`drag()`); scoped namespaces stay under `edit.*`.
  */
 import * as vibe from '@vibe';
 import * as d3 from 'd3';
 import vancouver from '../data/vancouver.js';
 
+// The scoped namespaces are held back so they don't shadow the same-named MARKS
+// spread from vibe.plot (axis / arc / waffle / line).
 const {
   line: _editLine,
   axis: _editAxis,
   arc: _editArc,
   geo: _editGeo,
+  waffle: _editWaffle,
   nextSeriesKey: _nsk,
   when: _editWhen,
   ...universalEdits

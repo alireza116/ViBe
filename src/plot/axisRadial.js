@@ -14,7 +14,7 @@
 
 import { positionOnScale, isDiscrete } from '../core/scales.js';
 import { DEFAULT_PALETTE } from '../core/encoding.js';
-import { encodeChannel, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, normalizeMarkOptions, AXIS_CHROME } from './mark.js';
 import { tickData } from './axis.js';
 import {
     arcSpan,
@@ -43,7 +43,9 @@ function anchorFor(x, cx, eps = 1) {
  * @returns {any}
  */
 export function axisRadial(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    // An axis's stroke/fontSize are chrome, not per-datum style, so they stay
+    // top-level options (AXIS_CHROME) while x/y/angle desugar as usual.
+    const opts = normalizeMarkOptions(options, { except: AXIS_CHROME });
     const {
         channels = {},
         id,
@@ -65,14 +67,10 @@ export function axisRadial(options = {}) {
         start,
         end,
         labelFill = '#374151',
+        stroke = '#6b7280',
+        strokeWidth = 1.25,
+        fontSize = 10,
     } = opts;
-    // Chrome style scalars are read from the RAW options: normalizeMarkOptions
-    // desugars style shorthands (stroke / strokeWidth / fontSize) into `channels`,
-    // but on an axis they're spine/label chrome, not per-datum style — mirror how
-    // the Cartesian axis reads them straight off `options`.
-    const stroke = options.stroke != null ? options.stroke : '#6b7280';
-    const strokeWidth = options.strokeWidth != null ? options.strokeWidth : 1.25;
-    const fontSize = options.fontSize != null ? options.fontSize : 10;
 
     const [spanStart, spanEnd] = arcSpan({ arc: arcOpt, orient, start, end });
     const xField = channels.x && channels.x.field;

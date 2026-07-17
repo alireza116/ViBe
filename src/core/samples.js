@@ -5,6 +5,7 @@
 // drawn line lands on the same nice values an axis would show — even when no axis
 // is rendered. Overridable with a count, explicit positions, or a time interval.
 import * as d3 from 'd3';
+import { isDiscrete } from './scales.js';
 
 // Named time intervals -> d3 interval, for `{ every: 'month' }` on a time domain.
 /** @type {Record<string, any>} */
@@ -24,10 +25,10 @@ const TIME_INTERVALS = {
  */
 export function resolveSamples(scale, samples) {
     if (!scale) return [];
-    const type = scale.type;
 
-    // Categorical domain: the categories ARE the samples.
-    if (type === 'band' || type === 'point' || type === 'ordinal') {
+    // Categorical domain: the categories ARE the samples. Read the capability
+    // flag, not `type` — an adopted d3.scaleBand() carries no type at all.
+    if (isDiscrete(scale) || scale.kind === 'discrete') {
         return [...scale.domain()];
     }
 
@@ -40,7 +41,8 @@ export function resolveSamples(scale, samples) {
     // Time interval -> ticks at that cadence.
     if (samples && typeof samples === 'object') {
         if (typeof samples.count === 'number') return evenly(scale, samples.count);
-        if (samples.every && type === 'time' && TIME_INTERVALS[samples.every]) {
+        if (samples.every && scale.temporal && TIME_INTERVALS[samples.every]
+            && typeof scale.ticks === 'function') {
             return scale.ticks(TIME_INTERVALS[samples.every]);
         }
     }
@@ -63,7 +65,7 @@ function evenly(scale, n) {
     const domain = scale.domain();
     const lo = Number(domain[0]);
     const hi = Number(domain[domain.length - 1]);
-    const isTime = scale.type === 'time';
+    const isTime = !!scale.temporal;
     if (n <= 1) return [domain[0]];
     const out = [];
     for (let i = 0; i < n; i++) {

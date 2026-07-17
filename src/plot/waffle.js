@@ -29,15 +29,16 @@
 // waffle). Pair with a `snap` constraint whose step equals `unit` to land on
 // whole cells.
 //
-// Interactions: use `waffleFill()` on the value channel — it maps the pointer to
-// the exact cell under it (row + column) and fills up to and INCLUDING that cell,
+// Interactions: use `edit.waffle.fill()` on the value channel — it maps the pointer
+// to the exact cell under it (row + column) and fills up to and INCLUDING that cell,
 // consistently for both drag and a single click. (A plain `drag()` inverts the 1D
 // value scale, which can't target a cell in a packed grid, so the fill lands on
 // the wrong row.) Every cell carries the shared grid descriptor `node.grid` that
-// `waffleFill` reads. Add a second `waffleFill({ gesture: 'click' })` at mark
-// level for tap-to-set alongside drag-to-fill.
+// the edit reads — which is what `supportsWaffle` below declares. Add a second
+// `edit.waffle.fill({ gesture: 'click' })` at mark level for tap-to-set alongside
+// drag-to-fill.
 
-import { isBand, bandwidthOf, baselineOf } from '../core/scales.js';
+import { isBand, bandwidthOf, bandStartOf, baselineOf } from '../core/scales.js';
 import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
 
 /** @param {any} scale @returns {[number, number]} */
@@ -83,6 +84,9 @@ function buildWaffle(options, forcedOrientation) {
         discreteScale: 'band',
         xKey,
         yKey,
+        // Capability flag: this mark stamps `node.grid`, which is what
+        // edit.waffle.fill reads (see SCOPE_CAPABILITY in core/elicit.js).
+        supportsWaffle: true,
         /**
          * @param {any[]} currentData
          * @param {import('../types').ScaleMap} scales
@@ -118,7 +122,7 @@ function buildWaffle(options, forcedOrientation) {
                 const valueScale = vertical ? yScale : xScale;
                 const bandKey = vertical ? xKey : yKey;
 
-                const bandStart = bandScale ? bandScale(d[bandKey]) : 0;
+                const bandStart = bandStartOf(bandScale, d[bandKey], 0);
                 const thickness = bandwidthOf(bandScale, 20);
                 const baseline = baselineOf(valueScale);
 
@@ -127,7 +131,7 @@ function buildWaffle(options, forcedOrientation) {
                 // same block a bar would draw — just cut into countable cells.
                 const [dlo, dhi] = domainExtent(valueScale);
                 const domainSpan = Math.abs(dhi - dlo) || 1;
-                const domainTopPx = valueScale ? valueScale(dhi) : baseline;
+                const domainTopPx = valueScale ? valueScale.encode(dhi, baseline) : baseline;
                 const blockLen = Math.abs(baseline - domainTopPx) || 1;
 
                 // One cell = `unit` of value, so `totalCells` tile the whole value
@@ -155,7 +159,7 @@ function buildWaffle(options, forcedOrientation) {
                 const drawSize = Math.max(0.5, cellSize - gap);
 
                 // Grid descriptor shared by every cell of this datum, so the
-                // waffle-native `waffleFill` edit can map a pointer to the exact
+                // waffle-native `edit.waffle.fill` edit can map a pointer to the exact
                 // cell (row + column) it is over — the value scale alone can't,
                 // since the packed grid isn't a 1:1 vertical split of the block.
                 const grid = {

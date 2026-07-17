@@ -120,6 +120,9 @@ function cursorForZone(zone) {
 export const brushRectDriver = {
     name: 'brushRect',
     wants: (e) => e.pick === 'brushRect',
+    // Writes hoverIndex/activeIndex (no radial threshold — a rect brush has edge
+    // zones, not a snap radius), so the select effect draws the mark highlight.
+    selects: true,
     onEvent({ feature, event, edits, marks, data, scales, session, runEdit }) {
         const edit = edits[0];
         const edgeInset = edgeInsetOf(edit);

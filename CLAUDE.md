@@ -73,8 +73,8 @@ Follow the contract documented at the top of `src/plot/mark.js`. Concretely:
 ## Before committing a structural change
 
 1. `npm run typecheck` (`tsc --noEmit` against `src/types.d.ts`) must stay clean.
-2. If you touched dispatch, marks, or edits, exercise it in a real browser — start `npx vite`, load a relevant `docs/pages/*.js` example or `docs/playground.html`, and drive the actual gesture. Don't rely on typecheck alone for interaction changes; the driver/session state machines only prove out under real pointer events.
-3. Update `docs/pages/*.js` and `README.md` if the public surface changed — this repo's docs are the regression surface (there is no test suite), and stale docs are exactly the drift this pass cleaned up.
+2. `npm run verify:browser` must stay green. It is the **only** regression gate (there is no unit-test suite): it boots `docs-next`, drives real Chromium, and asserts actual gesture outcomes. If you touched dispatch, marks, or edits, add a check there — the driver/session state machines only prove out under real pointer events, and every interaction bug this repo has shipped was invisible to typecheck. To drive a gesture by hand: `npm run dev`, then load the route.
+3. **`docs-next/` is the documentation.** Update it if the public surface changed — the docs are the regression surface, and a feature with no page effectively doesn't exist. The old `docs/` tree was retired on 2026-07-16; don't recreate an HTML-and-harness docs site beside the Next one.
 4. `src/types.d.ts` is the source of truth for shapes (`Edit`, `Constraint`, `FeatureNode`, `Session`, …) — update it alongside any descriptor change.
 
 ## Don't reintroduce

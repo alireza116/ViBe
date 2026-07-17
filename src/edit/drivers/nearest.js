@@ -11,6 +11,7 @@ import { nearestMark, pickThreshold } from '../pick.js';
 export const nearestDriver = {
     name: 'nearest',
     wants: (e) => e.pick === 'nearest',
+    selects: true,
     onEvent({ event, edits, marks, session, runEdit }) {
         const threshold = pickThreshold(edits[0]);
         let changed = false;

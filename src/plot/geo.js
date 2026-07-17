@@ -12,7 +12,7 @@
 //   geoLine     — coordinate lists / MultiLineString paths + vertex handles
 //   geoRect     — geographic AABB (west/south/east/north)
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
 import { textNodeAt, hasEditText } from './text.js';
 import { resolveFormat } from '../format.js';
 import { projectPoint, projectBounds } from '../core/projection.js';
@@ -384,9 +384,7 @@ export function geoLine(options = {}) {
     const rowMode = !!(channels.lon && channels.lat);
     const lonKey = fieldOf(channels, 'lon') || 'lon';
     const latKey = fieldOf(channels, 'lat') || 'lat';
-    const seriesField = opts.series || opts.z
-        || (channels.stroke && channels.stroke.field)
-        || null;
+    const seriesField = seriesFieldOf(opts, channels);
     const order = opts.order || 'sequence';
     // Per-row lines own their vertices; a connected scatter's dots belong to a
     // sibling geoPoint (so they can be dragged independently).

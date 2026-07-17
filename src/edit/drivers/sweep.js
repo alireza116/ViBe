@@ -11,6 +11,7 @@ import { nearestMark, nearestMarkOnAxis, nearestSeries, pickThreshold } from '..
 export const sweepDriver = {
     name: 'sweep',
     wants: (e) => e.pick === 'sweep',
+    selects: true,
     onEvent({ event, edits, marks, session, runEdit }) {
         const threshold = pickThreshold(edits[0]);
         // The channels the sweep governs: one positional axis -> paint that value

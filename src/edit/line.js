@@ -39,6 +39,8 @@ export function anchor(options = {}) {
         pick: 'plane',
         scope: 'line',
         into,
+        // The appended point is the one the gesture placed.
+        cardinality: 'append',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const sField = seriesField || ctx.seriesKey || null;
@@ -92,6 +94,9 @@ export function newSeries(options = {}) {
         channels: [along, value],
         pick: 'plane',
         scope: 'line',
+        // No `cardinality`: this seeds a WHOLE line (one row per sample), so there
+        // is no single "row the gesture touched" for a constraint to hold fixed.
+        // Same for `draw` below.
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const sField = seriesField || ctx.seriesKey || null;
@@ -296,6 +301,8 @@ export function removeSeries(options = {}) {
         gesture: trigger || options.gesture || 'click',
         channels: channels || null,
         scope: 'line',
+        // The rows are gone; nothing is active for a constraint to resolve around.
+        cardinality: 'delete',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             if (ctx.datum == null) return undefined; // no target resolved

@@ -39,6 +39,23 @@
 // Every data mark should resolve a datum -> pixel through encodeChannel (band+value
 // marks use it for the value axis and band-geometry helpers for the category axis),
 // so positions are computed exactly one way across marks.
+//
+// ── pointerEvents: who silences what ────────────────────────────────────────
+// The engine silences a mark that carries no direct-pick edit, because the
+// renderer defaults nodes to pointer-events:auto and draws lines AFTER circles —
+// an inert rule would otherwise sit over a sibling's handle and swallow its drag.
+// That rule is per-FEATURE and all-or-nothing, and it only fills in a value the
+// mark left unset (`node.pointerEvents == null`).
+//
+// So the split is:
+//   - Don't silence your WHOLE mark to make it inert — leave pointerEvents alone
+//     and let the engine decide (see rule.js). Setting it yourself there also
+//     disables the mark when it DOES carry an edit.
+//   - DO set it per-node on a glyph's CHROME — a line's path, a trend's fitted
+//     line, a dotStack's ghosts, a cone's samples — when the same feature also
+//     emits handles. The engine can't make that distinction for you (it sees one
+//     feature), and without it the chrome, drawn last, eats the handles' drags.
+//     `pointerEvents: 'stroke'` narrows a hit area to a shape's outline.
 
 /**
  * The standard style channels every mark understands, with their default
@@ -71,7 +88,11 @@ export const STANDARD_STYLE_CHANNELS = Object.keys(STYLE_DEFAULTS);
 // channel — it stays off this list.)
 const SHORTHANDS = [
     ...STANDARD_STYLE_CHANNELS,
-    'size', 'symbol', 'text', 'fontSize', 'textAnchor', 'lineAnchor', 'dx', 'dy'
+    'size', 'symbol', 'text', 'fontSize', 'textAnchor', 'lineAnchor', 'dx', 'dy',
+    // Orientation in math degrees (0° = +x, CCW). Constant form is a visual-space
+    // shorthand; a scaled field goes through the angle channel's scale so rotate()
+    // is an exact inverse. Not a style channel — marks that care read it themselves.
+    'angle',
 ];
 
 /**
@@ -112,6 +133,32 @@ export function encodeChannel(scales, channels, channel, datum, fallback) {
     const scale = scales[channel];
     if (!scale) return fallback;
     return scale.encode(raw, fallback);
+}
+
+/**
+ * Resolve the `angle` channel to math degrees (0° = +x, CCW, y-up — the same
+ * convention as needle / pointerDegrees). Scaled when an angle scale exists so
+ * `rotate()` is an exact inverse; otherwise raw (a `{ value }` constant or the
+ * field's literal degrees). Marks stamp the result on `FeatureNode.angle`; the
+ * renderer converts to SVG with `rotate(-deg cx cy)`.
+ * @param {import('../types').ScaleMap} scales
+ * @param {Record<string, any>} channels
+ * @param {import('../types').Datum | null} datum
+ * @param {number} [fallback=0]
+ * @returns {number}
+ */
+export function encodeAngle(scales, channels, datum, fallback = 0) {
+    if (!channels || !channels.angle) return fallback;
+    // scales is an index signature — angle is optional.
+    const angleScale = /** @type {any} */ (scales)['angle'];
+    if (angleScale) return encodeChannel(scales, channels, 'angle', datum, fallback);
+    const spec = channels.angle;
+    if (spec.field != null) {
+        const v = datum ? datum[spec.field] : undefined;
+        return v == null ? fallback : +v;
+    }
+    if (spec.value !== undefined) return +spec.value;
+    return fallback;
 }
 
 /**
@@ -178,23 +225,61 @@ export function resolveStyle(scales, channels, datum, defaults = {}) {
 }
 
 /**
+ * The field that identifies a SERIES — which rows belong to the same line, area,
+ * geoLine, or stack segment. One rule for the whole mark layer, because "what
+ * groups these rows?" is one question: the marks that ask it were each answering
+ * it differently (line read stroke, area read fill-then-stroke), so a coloured
+ * area and a coloured line grouped by different channels.
+ *
+ * Precedence: the explicit option (`series`, or Plot's `z` alias) wins; otherwise
+ * the field behind a paint channel, fill before stroke — Observable Plot's `z`
+ * default, so a coloured chart groups with no extra config.
+ *
+ * `series` is the public option name; `seriesKey` is the internal feature field.
+ * @param {any} opts normalized mark options
+ * @param {Record<string, any>} channels the mark's channel map
+ * @returns {string | null}
+ */
+export function seriesFieldOf(opts, channels = {}) {
+    return opts.series || opts.z
+        || (channels.fill && channels.fill.field)
+        || (channels.stroke && channels.stroke.field)
+        || null;
+}
+
+/**
  * Desugar top-level constant shorthands into `channels`, without clobbering an
  * explicit `channels[ch]` (an explicit channel wins). Keeps
  * `bar({ fill: 'steelblue' })` and `point({ size: 9 })` working through the one
  * channel path. Returns a new options object with a merged `channels` map and the
  * shorthands stripped.
+ *
+ * `except` keeps named shorthands as plain top-level options instead of desugaring
+ * them. That's for a mark where the name is CHROME rather than per-datum style:
+ * an axis's `stroke` paints its spine and its `fontSize` its labels — there is no
+ * datum to resolve them against, so turning them into channels would only create
+ * a channel nothing reads (and force the mark to reach back into raw options for
+ * the real value, which is what axisRadial used to do).
  * @param {any} [options]
+ * @param {{ except?: string[] }} [opts]
  * @returns {any}
  */
-export function normalizeMarkOptions(options = {}) {
+export function normalizeMarkOptions(options = {}, { except = [] } = {}) {
     const { channels = {}, ...rest } = options;
     /** @type {Record<string, any>} */
     const merged = { ...channels };
     for (const ch of SHORTHANDS) {
-        if (rest[ch] === undefined) continue;
+        if (rest[ch] === undefined || except.includes(ch)) continue;
         // An explicit channel for this name wins over the shorthand.
         if (merged[ch] === undefined) merged[ch] = { value: rest[ch] };
         delete rest[ch];
     }
     return { ...rest, channels: merged };
 }
+
+/**
+ * The style names an AXIS mark treats as chrome (its spine, ticks and labels)
+ * rather than as per-datum channels — pass to normalizeMarkOptions's `except`.
+ * @type {string[]}
+ */
+export const AXIS_CHROME = ['stroke', 'strokeWidth', 'fill', 'fontSize'];

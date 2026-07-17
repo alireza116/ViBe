@@ -1,0 +1,41 @@
+mount(Elicit({
+  width: 380, height: 280,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [
+    { x: 30, y: 40, theta: 20 },
+    { x: 60, y: 65, theta: -35 },
+    { x: 75, y: 25, theta: 55 },
+  ],
+  schema: {
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    theta: { type: "quantitative", domain: [-180, 180] },
+  },
+  features: [
+    composite({
+      id: "crosshair",
+      discreteScale: "point",
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        angle: {
+          field: "theta",
+          scale: { range: [-180, 180] },
+          edit: rotate({ pivot: "mark", fold: false, pick: "direct" }),
+        },
+      },
+      parts: [
+        tickY({ length: 32, stroke: "#94a3b8", strokeWidth: 3 }),
+        tickX({ length: 32, stroke: "#94a3b8", strokeWidth: 3 }),
+        // Hub: own shape/fill/size; inherits x/y/angle; keeps rotate() (last).
+        point({
+          shape: "square",
+          size: 6,
+          fill: "#fbbf24",
+          stroke: "#92400e",
+          strokeWidth: 1,
+        }),
+      ],
+    }),
+  ],
+}))

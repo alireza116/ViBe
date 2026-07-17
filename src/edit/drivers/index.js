@@ -6,7 +6,11 @@
 // new interaction mode = adding a driver file here, not editing the engine.
 //
 // A driver is:
-//   { name, wants(edit) -> bool, onEvent(ctx) -> boolean changed }
+//   { name, wants(edit) -> bool, onEvent(ctx) -> boolean changed, selects? }
+// `selects: true` declares that the driver writes a SELECTION into its session
+// (hoverIndex/activeIndex, and optionally px/py/threshold) — which is what lets an
+// edit with `guide: true` draw the `select` effect (snap ring + mark highlight)
+// without guide.js keeping its own list of which picks do that.
 // where ctx = { feature, event, edits, marks, data, scales, session, preview,
 //               stage, runEdit, previewEdit }:
 //   edits       the feature's edits this driver wants (already filtered)
@@ -58,6 +62,8 @@ import { axisDragDriver } from './axisDrag.js';
  * @property {string} name
  * @property {(edit: import('../../types').Edit) => boolean} wants
  * @property {(ctx: DriverContext) => boolean} onEvent
+ * @property {boolean} [selects] writes a selection into its session (see above),
+ *   so an edit with `guide: true` can draw the `select` effect for it.
  */
 
 /** @type {Driver[]} */
@@ -78,6 +84,17 @@ export function registerDriver(driver) {
 }
 
 /**
+ * The driver that will handle this edit, or undefined for a direct/plane-pick edit
+ * no lifecycle driver claims. The one place `pick` is resolved to a driver, so
+ * callers ask the registry a capability question instead of listing pick names.
+ * @param {import('../../types').Edit} edit
+ * @returns {Driver | undefined}
+ */
+export function driverFor(edit) {
+    return drivers.find((d) => d.name === edit.pick || d.wants(edit));
+}
+
+/**
  * Does any of these edits need the plane raised above the marks (a driver whose
  * lifecycle resolves its target from an arbitrary pointer position)? The engine
  * reads this to decide plane-on-top mode. Unknown pick values that match a
@@ -87,11 +104,11 @@ export function registerDriver(driver) {
  */
 export function needsPlaneOnTop(edits) {
     return edits.some((e) => {
+        // `direct` hit-tests the mark itself; `plane` sits UNDER the marks so a
+        // gesture on a mark still reaches it. Every other lifecycle driver
+        // resolves its target from an arbitrary pointer position, so it needs the
+        // plane raised — ask the registry, so a custom driver qualifies too.
         if (e.pick === 'direct' || e.pick === 'plane') return false;
-        // Built-in proximity / lifecycle picks, or any custom registered driver.
-        return e.pick === 'nearest' || e.pick === 'sweep' || e.pick === 'draw'
-            || e.pick === 'brush' || e.pick === 'brushRect' || e.pick === 'geoBrush'
-            || e.pick === 'probe'
-            || drivers.some((d) => d.name === e.pick || d.wants(e));
+        return !!driverFor(e);
     });
 }

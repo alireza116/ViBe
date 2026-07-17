@@ -12,8 +12,9 @@
 //
 // Rebuilt every render (via the engine), so bounds track live data.
 import { resolveChannels, collectEdits } from './route.js';
+import { driverFor } from './drivers/index.js';
 import { DEFAULT_EFFECTS } from '../core/effects.js';
-import { isBand } from '../core/scales.js';
+import { isBand, isDiscrete, rangeExtent } from '../core/scales.js';
 import { axisOf } from '../core/encoding.js';
 
 const DEFAULT_CONSTRAINT_COLOR = '#e4572e';
@@ -82,9 +83,13 @@ export function buildEditGuide(feature, edit, ctx) {
         }
     }
 
-    // Proximity ring + highlight for nearest/sweep/brush-pick edits (the `select`
-    // effect) — all three resolve a target from an arbitrary pointer position.
-    if (edit.pick === 'nearest' || edit.pick === 'sweep' || edit.pick === 'brush') {
+    // Snap ring + mark highlight (the `select` effect) for any edit whose driver
+    // resolves a target from an arbitrary pointer position and records it. Asked of
+    // the driver registry (`selects`) rather than matched against a list of pick
+    // names here — that list had drifted, covering `brush` but not its 2-D siblings
+    // brushRect/geoBrush, which keep the same hover state and so drew nothing.
+    const driver = driverFor(edit);
+    if (driver && driver.selects) {
         nodes.push(...proximityGuide(feature, ctx));
     }
 
@@ -105,11 +110,68 @@ function constraintGuide(constraint, gctx) {
     switch (constraint.constraintType) {
         case 'clamp': return clampGuide(constraint.options, gctx);
         case 'maintainSum': return maintainSumGuide(constraint.options, gctx);
-        // count / unique are CARDINALITY rules (how many data / per category), not
-        // value bounds — there is no line on a value axis to draw, so they render
-        // no guide by design. A custom constraint can still supply meta.guide above.
+        case 'snap': return snapGuide(constraint.options, gctx);
+        // No guide, by design, for the rest:
+        //   count / unique  cardinality rules (how many rows / per category), not
+        //                   value bounds — there's no line on a value axis to draw.
+        //   ordering / monotonic / spacing
+        //                   their bound is the NEIGHBOUR's current value, which is
+        //                   already on screen: the other handle, or the next point.
+        //                   Drawing a line on top of a mark you can see says nothing.
+        // A custom constraint can still supply its own drawer via meta.guide above.
         default: return [];
     }
+}
+
+// A snap grid denser than this is unreadable as ticks — and at that point it isn't
+// telling you anything a continuous axis doesn't already say.
+const MAX_SNAP_TICKS = 200;
+
+/**
+ * snap -> a tick per stop along the value axis, drawn at the plot edge. Unlike a
+ * clamp (two bounds) a snap has no boundary to draw; what's worth showing is WHERE
+ * the value can land, so the handle appearing to lag the pointer reads as a grid
+ * rather than as lost input.
+ *
+ * Only for a continuous value axis: a band/point scale already draws its own slots,
+ * and its categories aren't `step` apart in pixels anyway.
+ * @param {{ step?: number, origin?: number }} options
+ * @param {any} gctx
+ * @returns {import('../types').FeatureNode[]}
+ */
+function snapGuide({ step = 1, origin = 0 }, gctx) {
+    const { primary, width, height, color } = gctx;
+    const scale = primary.scale;
+    if (!scale || !(step > 0) || isDiscrete(scale)) return [];
+
+    const domain = scale.domain().map(Number);
+    const lo = Math.min(...domain);
+    const hi = Math.max(...domain);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [];
+    if ((hi - lo) / step > MAX_SNAP_TICKS) return [];
+
+    const onX = axisOf(primary.name) === 'x';
+    const [rLo, rHi] = rangeExtent(scale);
+    const len = 6;
+    /** @type {import('../types').FeatureNode[]} */
+    const nodes = [];
+
+    // Walk by index, not by accumulating `v += step` — repeated float addition
+    // drifts off the stops the constraint itself computes (origin + n * step).
+    const firstN = Math.ceil((lo - origin) / step);
+    const lastN = Math.floor((hi - origin) / step);
+    for (let n = firstN; n <= lastN; n++) {
+        const at = scale(origin + n * step);
+        if (!Number.isFinite(at) || at < rLo - 0.5 || at > rHi + 0.5) continue;
+        nodes.push(onX
+            ? { type: 'line', x1: at, x2: at, y1: height, y2: height - len,
+                stroke: color, strokeWidth: 1, opacity: 0.5,
+                pointerEvents: 'none', guide: true }
+            : { type: 'line', x1: 0, x2: len, y1: at, y2: at,
+                stroke: color, strokeWidth: 1, opacity: 0.5,
+                pointerEvents: 'none', guide: true });
+    }
+    return nodes;
 }
 
 /**

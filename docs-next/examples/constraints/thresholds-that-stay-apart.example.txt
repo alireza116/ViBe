@@ -1,0 +1,32 @@
+mount(Elicit({
+  width: 420, height: 170,
+  margins: { top: 20, right: 24, bottom: 34, left: 24 },
+  axes: { x: {}, y: false },
+  schema: {
+    grade: { type: "categorical",  domain: ["D", "C", "B", "A"] },
+    at:    { type: "quantitative", domain: [0, 100] },
+  },
+  data: [
+    { grade: "D", at: 50 }, { grade: "C", at: 65 },
+    { grade: "B", at: 78 }, { grade: "A", at: 90 },
+  ],
+  // Where do the grade boundaries go? Two coincident thresholds are almost
+  // always a slip of the hand — they read as one, and the top one then takes
+  // every later grab, so they can never be separated again.
+  // `min` is in DATA units: a constraint never sees the scale, and a rule that
+  // changed meaning when the chart was resized wouldn't be an invariant.
+  constraints: [
+    spacing({ field: "at", min: 8 }),
+    clamp({ min: 0, max: 100, field: "at" }),
+  ],
+  features: [
+    tickX({
+      strokeWidth: 2, stroke: "#2563eb",
+      channels: { x: { field: "at", edit: drag() } },
+    }),
+    text({
+      dy: -14, fontSize: 11, fill: "#64748b",
+      channels: { x: { field: "at" }, text: { field: "grade" } },
+    }),
+  ],
+}))

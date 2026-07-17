@@ -6,7 +6,7 @@ import type { CodeMode, ExampleMeta } from '../../lib/types';
 
 export const meta: ExampleMeta = {
   title: "Fruit basket",
-  blurb: "Each category's cells render its emoji; waffleFill drags the count.",
+  blurb: "Each category's cells render its emoji; edit.waffle.fill drags the count.",
   try: "<b>Drag</b> up a column to change its count.",
 };
 

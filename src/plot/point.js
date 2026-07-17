@@ -19,10 +19,14 @@
 // dot's radius channel, in px — as a field it ramps, and `point({ size: 9 })` is
 // the constant shorthand.
 //
+// `shape: 'circle' | 'square'` (default circle) picks the glyph. A square is a
+// centred rect with side `2 * size`, so it can carry an `angle` channel and
+// rotate about its centre — a circle is rotation-invariant.
+//
 // A missing positional channel parks the dot at the centre of that dimension —
 // symmetric across x and y, so 1D-along-x and 1D-along-y are the same code path.
 
-import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
 
 /**
  * @param {any} [options]
@@ -30,7 +34,7 @@ import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOp
  */
 export function point(options = {}) {
     const opts = normalizeMarkOptions(options);
-    const { channels = {}, id, edits, constraints } = opts;
+    const { channels = {}, id, edits, constraints, shape = 'circle' } = opts;
 
     return {
         id,
@@ -60,12 +64,34 @@ export function point(options = {}) {
                 const cx = encodeChannel(scales, channels, 'x', d, width / 2);
                 const cy = encodeChannel(scales, channels, 'y', d, height / 2);
                 const size = encodeChannel(scales, channels, 'size', d, 5);
+                const angle = encodeAngle(scales, channels, d, 0);
                 // A `symbol` channel turns the dot into a glyph (emoji / unicode
                 // shape) — the same category->encoding path, rendered as text. `size`
                 // still sets its px extent so a glyph point and a circle point match.
                 const glyph = resolveSymbol(scales, channels, d);
                 if (glyph !== undefined) {
-                    return symbolNode(glyph, cx, cy, size, { ...style, data: d, index: i });
+                    return symbolNode(glyph, cx, cy, size, {
+                        ...style,
+                        data: d,
+                        index: i,
+                        ...(angle ? { angle } : {}),
+                    });
+                }
+                if (shape === 'square') {
+                    // Side = diameter of the circle the same `size` would draw, so
+                    // a square point and a circle point occupy the same visual box.
+                    const side = Math.max(0, size * 2);
+                    return {
+                        type: 'rect',
+                        x: cx - side / 2,
+                        y: cy - side / 2,
+                        width: side,
+                        height: side,
+                        ...style,
+                        data: d,
+                        index: i,
+                        ...(angle ? { angle } : {}),
+                    };
                 }
                 return {
                     type: 'circle',
@@ -74,7 +100,8 @@ export function point(options = {}) {
                     r: size,
                     ...style,
                     data: d,
-                    index: i
+                    index: i,
+                    ...(angle ? { angle } : {}),
                 };
             });
         }

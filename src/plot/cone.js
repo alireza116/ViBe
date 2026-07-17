@@ -120,7 +120,7 @@ export function cone(options = {}) {
                 const rMean = angleField != null ? Number(d[angleField]) : 0;
                 const halfWidth = spreadField != null ? Math.abs(Number(d[spreadField])) || 0 : 0;
                 const angleScale = scales.angle;
-                const style = resolveStyle(scales, channels, d, { stroke: '#d33' });
+                const style = resolveStyle(scales, channels, d, { stroke: '#d33', strokeWidth: 2.5 });
 
                 // Optional filled wedge spanning the envelope — its edges are exactly
                 // where the pointer sat when the spread was set.
@@ -166,9 +166,9 @@ export function cone(options = {}) {
                 nodes.push({
                     type: 'line',
                     ...mean,
-                    stroke: style.stroke || '#d33',
-                    strokeWidth: style.strokeWidth || 2.5,
-                    ...(style.opacity != null ? { opacity: style.opacity } : {}),
+                    ...style,
+                    // Chrome: the cone is driven from the plane (its angle/spread
+                    // come from where the pointer is), never by grabbing the line.
                     pointerEvents: 'none'
                 });
             });

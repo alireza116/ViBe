@@ -45,6 +45,7 @@ export const SITE: NavGroup[] = [
       { href: '/editing/lock', title: 'Locked rows (read-only)' },
       { href: '/editing/existence', title: 'Create · Remove · Anchors' },
       { href: '/editing/probe', title: 'Probe (hover · click)' },
+      { href: '/editing/history', title: 'History & keyboard' },
       { href: '/editing/stages', title: 'Stages (multi-step)' },
       { href: '/editing/axis', title: 'Editable axes (domain)' },
     ],

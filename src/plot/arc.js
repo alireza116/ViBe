@@ -1,19 +1,27 @@
 // @ts-check
-// arc.js — pie / donut slices. Each row's magnitude (the `angle` channel's field,
-// or a dedicated value) is stacked into an angular span and drawn as an annular
-// sector. Shares arcPath with axisRadial.
+// arc.js — pie / donut slices. Each row's magnitude (the `value` channel's field)
+// is stacked into an angular span and drawn as an annular sector. Shares arcPath
+// with axisRadial.
 //
 //   arc({
 //     outerRadius: 100, innerRadius: 40,   // donut
 //     channels: {
-//       angle: { field: 'share' },         // magnitude → slice width
+//       value: { field: 'share' },         // magnitude → slice width
 //       fill:  { field: 'party' },
 //     },
 //   })
 //
-// Layout normalizes by the sum of magnitudes over the mark's rows (stacked bar
-// in polar form). Editing slice boundaries is follow-up; v1 supports style/cycle
-// and sibling controls with maintainSum.
+// The magnitude channel is `value`, NOT `angle`. Across this library `angle` means
+// a rotation/angular POSITION (needle's direction, text's rotation, axisRadial's
+// angular scale) — it is inverted back to data by rotate()/drag() as an angle. A
+// slice's `share` is nothing of the sort: it's a quantity that the pie layout
+// normalizes into a sweep. Naming it `angle` made one channel mean two unrelated
+// things depending on the mark, so it's `value` here (see CLAUDE.md, "one
+// documented name per behavior").
+//
+// Layout normalizes by the sum of magnitudes over the mark's rows (stacked bar in
+// polar form). Slice boundaries are draggable via edit.arc.edge(); sibling controls
+// work with maintainSum.
 
 import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 import { arcSpan, arcPath, polarToXY } from './polar.js';
@@ -27,7 +35,6 @@ export function arc(options = {}) {
     const {
         channels = {},
         id,
-        edit,
         edits,
         constraints,
         outerRadius: outerOpt,
@@ -44,12 +51,7 @@ export function arc(options = {}) {
         handleSize = 5,
     } = opts;
 
-    // Mark-level edits (the arc edge edit is whole-dataset, not a channel edit):
-    // accept a single `edit` or an `edits` array and pass them through.
-    const markEdits = [
-        ...(edits || []),
-        ...(Array.isArray(edit) ? edit : edit ? [edit] : []),
-    ];
+    const markEdits = edits || [];
     const editable = markEdits.length > 0;
 
     const [spanStart, spanEnd] = arcSpan({
@@ -57,7 +59,7 @@ export function arc(options = {}) {
         start: start != null ? start : (arcOpt ? undefined : -180),
         end: end != null ? end : (arcOpt ? undefined : 180),
     });
-    const angleField = channels.angle && channels.angle.field;
+    const valueField = channels.value && channels.value.field;
 
     return {
         id,
@@ -65,8 +67,12 @@ export function arc(options = {}) {
         edits: markEdits,
         constraints,
         discreteScale: 'point',
-        xKey: angleField,
-        yKey: angleField,
+        // The magnitude is the mark's value axis; there is no category axis to key
+        // (a pie's rows are its own layout order), so xKey stays undefined rather
+        // than aliasing the same field twice.
+        yKey: valueField,
+        // Capability flag: what edit.arc.* needs to work (see SCOPE_CAPABILITY).
+        supportsArc: true,
         /**
          * @param {any[]} currentData
          * @param {any} scales
@@ -84,12 +90,12 @@ export function arc(options = {}) {
             // Magnitude per row: prefer the raw field (so stacking is in data units),
             // not the encoded angle — pie layout owns the angular math.
             const mags = currentData.map((/** @type {any} */ d) => {
-                if (angleField != null) {
-                    const v = Number(d[angleField]);
+                if (valueField != null) {
+                    const v = Number(d[valueField]);
                     return Number.isFinite(v) && v > 0 ? v : 0;
                 }
                 // Constant / scaled fallback.
-                const enc = encodeChannel(scales, channels, 'angle', d, 0);
+                const enc = encodeChannel(scales, channels, 'value', d, 0);
                 return Number.isFinite(enc) && enc > 0 ? Number(enc) : 0;
             });
             const total = mags.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0);
@@ -126,11 +132,7 @@ export function arc(options = {}) {
                 nodes.push({
                     type: 'path',
                     d: pathD,
-                    fill: style.fill,
-                    stroke: style.stroke,
-                    strokeWidth: style.strokeWidth,
-                    ...(style.opacity != null ? { opacity: style.opacity } : {}),
-                    ...(style.fillOpacity != null ? { fillOpacity: style.fillOpacity } : {}),
+                    ...style,
                     cx, cy,
                     index: i,
                     // Slice boundary angles: mid for labels, a0/a1 for edge editing.

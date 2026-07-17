@@ -14,7 +14,7 @@ mount(Elicit({
     waffleY({
       channels: {
         x: { field: "fruit" },
-        y: { field: "n", edit: waffleFill() },
+        y: { field: "n", edit: edit.waffle.fill() },
         symbol: { field: "fruit", scale: { range: ["🍎","🍌","🍒"] } },
       },
       constraints: [ snap({ step: 1 }) ],

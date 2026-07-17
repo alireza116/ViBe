@@ -9,7 +9,7 @@ const page: DocPage = {
       "name": "needle(options)",
       "summary": "Import from <code class=\"inline\">vibe.plot</code>. One needle (+ hub) per datum.",
       "signatures": [
-        "needle({ channels, length, hubSize, baseWidth, orient, arc, start, end, id }) → Feature"
+        "needle({ channels, length, handleSize, baseWidth, orient, arc, start, end, id }) → Feature"
       ],
       "options": [
         {
@@ -25,7 +25,7 @@ const page: DocPage = {
           "desc": "Needle length in px. Or drive via the <code class=\"inline\">size</code> channel."
         },
         {
-          "name": "hubSize",
+          "name": "handleSize",
           "type": "number",
           "default": "5",
           "desc": "Pivot circle radius in px."

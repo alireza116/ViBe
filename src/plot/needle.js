@@ -34,7 +34,10 @@ export function needle(options = {}) {
         edits,
         constraints,
         length: lengthOpt,
-        hubSize = 5,
+        // The hub is this needle's handle (the pivot you grab), so it takes the
+        // library-wide sub-element radius name — `handleSize`, as on line/area/
+        // trend/arc/face — not a per-mark synonym.
+        handleSize = 5,
         baseWidth = 10,
         arc: arcOpt,
         orient,
@@ -85,11 +88,7 @@ export function needle(options = {}) {
                 nodes.push({
                     type: 'path',
                     d: dPath,
-                    fill: style.fill,
-                    stroke: style.stroke,
-                    strokeWidth: style.strokeWidth,
-                    ...(style.opacity != null ? { opacity: style.opacity } : {}),
-                    ...(style.fillOpacity != null ? { fillOpacity: style.fillOpacity } : {}),
+                    ...style,
                     cx, cy,
                     index: i,
                     cursor: 'grab',
@@ -98,8 +97,8 @@ export function needle(options = {}) {
                 nodes.push({
                     type: 'circle',
                     cx, cy,
-                    r: hubSize,
-                    fill: style.fill,
+                    r: handleSize,
+                    ...style,
                     stroke: style.stroke || '#0f172a',
                     strokeWidth: 1,
                     index: i,

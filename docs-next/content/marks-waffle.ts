@@ -16,7 +16,7 @@ const page: DocPage = {
           "name": "channels",
           "type": "object",
           "default": "{}",
-          "desc": "One band (category) axis and one linear (value) axis; put <code class=\"inline\">edit: waffleFill()</code> on the value channel — it fills up to the exact cell under the pointer, for both drag and click."
+          "desc": "One band (category) axis and one linear (value) axis; put <code class=\"inline\">edit: edit.waffle.fill()</code> on the value channel — it fills up to the exact cell under the pointer, for both drag and click."
         },
         {
           "name": "unit",
@@ -77,7 +77,7 @@ const page: DocPage = {
     {
       "id": "proportion",
       "title": "Picking a proportion",
-      "intro": "One category on a 0–1 axis; each cell is 1/50, so 50 cells fill the block. waffleFill() fills up to the exact cell under the pointer — click or drag — so the value is always a whole number of cells.",
+      "intro": "One category on a 0–1 axis; each cell is 1/50, so 50 cells fill the block. edit.waffle.fill() fills up to the exact cell under the pointer — click or drag — so the value is always a whole number of cells.",
       "examples": [
         "marks-waffle/proportion-picker"
       ]

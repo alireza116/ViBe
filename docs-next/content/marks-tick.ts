@@ -30,7 +30,7 @@ const page: DocPage = {
           "name": "length",
           "type": "number",
           "default": "—",
-          "desc": "Explicit centered span length in pixels (overrides the full band span)."
+          "desc": "Explicit centered span length in pixels. On a band axis it centres in the band; when the span axis also has a channel (e.g. scatter <code class=\"inline\">x</code>+<code class=\"inline\">y</code>), it centres on that channel’s encoded position so a short tick sits on the datum."
         },
         {
           "name": "edits",

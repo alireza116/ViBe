@@ -8,6 +8,8 @@
 // edit's apply() maps a gesture -> that channel's data, through the SAME scale.
 
 import { makeEdit, markCenter, schemaDefaults, resolveMarkNode, invertChannel, recenterSpan } from './shared.js';
+// The swatch grid edit.legend hit-tests is the same one guides.legend draws.
+import { legendLayout } from '../guides/legend.js';
 import { axisOf, pointerDegrees, unwrapDegrees } from '../core/encoding.js';
 
 /**
@@ -244,7 +246,11 @@ export function resize(options = {}) {
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const ch = ctx.channels[0];
-            const c = markCenter(ctx.node);
+            // resolveMarkNode, not ctx.node: a plane-pick gesture (nearest/sweep)
+            // carries no node, so reading ctx.node directly made this universal
+            // edit silently dead under any pick but 'direct'. drag() and rotate()
+            // resolve the same way.
+            const c = markCenter(resolveMarkNode(ctx));
             if (!ch || !ch.scale || !ch.scale.invertible || !c) return undefined;
             const radius = Math.hypot(ctx.pointer.x - c.cx, ctx.pointer.y - c.cy);
             return { ...ctx.datum, [ch.field]: ch.scale.invertValue(radius) };
@@ -376,6 +382,8 @@ export function create(options = {}) {
         // feature doesn't encode (so a 1D likert create just omits the missing y).
         channels: channels || ['x', 'y'],
         pick: 'plane',
+        // The minted row is the one a constraint should resolve around.
+        cardinality: 'append',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             // Seed every declared schema field first (its `default`, else null —
@@ -420,6 +428,9 @@ export function toggle(options = {}) {
         gesture: 'click',
         channels: channels || (channel ? [channel] : ['x']),
         pick: 'plane',
+        // No `cardinality`: this gesture mints on an empty slot and drops on a full
+        // one, so "the row the gesture touched" has no single answer. Left null,
+        // which resolves nothing around it — the honest reading for a slot edit.
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             // Mint the datum the pointer names — the same inversion `create` does.
@@ -463,6 +474,8 @@ export function remove(options = {}) {
         type: 'remove',
         gesture: options.gesture || 'click',
         channels: channels || (channel ? [channel] : null),
+        // The row is gone; no datum is active for a constraint to resolve around.
+        cardinality: 'delete',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             if (ctx.index == null) return undefined; // no target resolved
@@ -539,21 +552,21 @@ export function rank(options = {}) {
 
 /**
  * legend — pick a discrete domain value by clicking a swatch in a legend row.
- * Pair with `guides.legend({ channel })` for the visual row. Layout options
- * (`x`, `y`, `size`, `gap`, `columns`) must match the guide so hit-testing
- * aligns. Writes the chosen domain value into the channel's field on the
- * active (or sole) datum.
+ * Pair with `guides.legend({ channel })` for the visual row, passing it the SAME
+ * layout options (`x`, `y`, `size`, `gap`, `columns`, `labelWidth`): both go
+ * through the one `legendLayout`, so the box you can click is the swatch you can
+ * see. Writes the chosen domain value into the channel's field on the active
+ * (or sole) datum.
  * @param {any} [options]
  * @returns {import('../types').Edit}
  */
 export function legend(options = {}) {
     const {
         channel, channels,
-        x = 8, y = 8, size = 14, gap = 6, columns,
-        labelWidth = 48,
+        x, y, size, gap, columns, labelWidth,
         ...rest
     } = options;
-    const pitch = size + gap + labelWidth;
+    const layout = { x, y, size, gap, columns, labelWidth };
     return makeEdit({
         type: 'legend',
         gesture: 'click',
@@ -565,15 +578,12 @@ export function legend(options = {}) {
             if (!ch || !ch.field || !ch.scale || typeof ch.scale.domain !== 'function') return undefined;
             const domain = ch.scale.domain();
             if (!domain.length) return undefined;
-            const cols = columns || domain.length;
+            const { size: sw, slotAt } = legendLayout(layout, domain.length, ctx);
             const px = ctx.pointer.x, py = ctx.pointer.y;
             let hit = null;
             domain.forEach((value, i) => {
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                const sx = x + col * pitch;
-                const sy = y + row * (size + gap);
-                if (px >= sx && px <= sx + size && py >= sy && py <= sy + size) hit = value;
+                const { x: sx, y: sy } = slotAt(i);
+                if (px >= sx && px <= sx + sw && py >= sy && py <= sy + sw) hit = value;
             });
             if (hit == null) return undefined;
             if (ctx.datum && ctx.index != null) {

@@ -108,7 +108,6 @@ export function face(options = {}) {
         handleSize = 5,
         handles = true,
     } = opts;
-    const sizeOpt = options.size;
 
     // The params are ordinary channels (declared in `channels`, or via the x/y
     // shorthands opts already merged). If the author bound none of the seven, apply
@@ -143,8 +142,11 @@ export function face(options = {}) {
          * @returns {import('../types').FeatureNode[]}
          */
         build: (currentData, scales, width, height) => {
-            const R = sizeOpt != null ? sizeOpt : Math.min(width, height) * 0.35;
-            const stroke = Math.max(2, R * 0.055);
+            // A face's radius comes from the `size` channel like every other shape
+            // mark's does — so `size: 40` (a constant) and `size: { field: 'n' }`
+            // (a scaled radius per face) both work. Resolved per datum, since a
+            // field-driven size differs row to row.
+            const defaultR = Math.min(width, height) * 0.35;
             const ink = '#1f2937';
 
             // A dm-axis descriptor for `param`, or undefined when it isn't bound
@@ -170,6 +172,10 @@ export function face(options = {}) {
             currentData.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
                 const cx = encodeChannel(scales, channels, 'x', d, width / 2);
                 const cy = encodeChannel(scales, channels, 'y', d, height / 2);
+                const R = encodeChannel(scales, channels, 'size', d, defaultR);
+                // Every feature is drawn relative to R, so the ink scales with the
+                // face rather than turning spidery on a big one / blotting a small one.
+                const stroke = Math.max(2, R * 0.055);
                 const style = resolveStyle(scales, channels, d, { fill: '#FFD666', stroke: '#B7791F' });
 
                 // Each param in [0,1] through its scale; unbound -> 0.5 (neutral).

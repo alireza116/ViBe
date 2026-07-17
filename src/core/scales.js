@@ -106,6 +106,7 @@ export function adoptScale(scale, { range, positional, domain } = {}) {
  * (colour, size, opacity). `range` is the channel's visual output range: pixels
  * for x/y, a radius interval for size, a palette or two-stop ramp for colour.
  *   linear|log|pow|sqrt -> continuous field  -> continuous output (pixel | radius)
+ *   symlog              -> continuous field  -> like log, but spans 0 / negatives
  *   time                -> temporal field    -> continuous output over Dates
  *   band                -> discrete field    -> an interval per category (a bar's
  *                                               thickness comes from the bandwidth)
@@ -113,6 +114,7 @@ export function adoptScale(scale, { range, positional, domain } = {}) {
  *                                               on it; no width)
  *   ordinal             -> discrete field    -> discrete output (category -> colour)
  *   sequential          -> continuous field  -> continuous colour along a ramp
+ *   diverging           -> continuous field  -> colour by distance from a pivot
  *
  * band vs point is the discrete split that matters per MARK: a bar needs the
  * interval, a circle wants the tick. The mark declares which it wants
@@ -150,9 +152,46 @@ export function createScale(spec, range) {
         scale = (/** @type {any} */ value) => ramp(t(value));
         scale.domain = () => spec.domain;
         scale.range = () => range;
+    } else if (type === 'diverging') {
+        // A ramp with a PIVOT: a value's distance from the pivot picks its colour,
+        // and each side gets its own half of the ramp. What a sequential scale can't
+        // say — "this is above/below the reference, by this much" — which is most of
+        // what an elicited difference, error or surprise means.
+        //
+        // The pivot is a DATA value (`scale: { type: 'diverging', pivot: 0 }`),
+        // defaulting to 0 when the domain straddles it (the usual neutral) and to the
+        // domain's midpoint when it doesn't. The two sides are scaled independently,
+        // so the pivot keeps its colour even on a lopsided domain like [-2, 10] —
+        // stretching one range across both halves would put the neutral colour at 4.
+        const [dlo, dhi] = [Math.min(...spec.domain), Math.max(...spec.domain)];
+        const pivot = spec.pivot != null
+            ? spec.pivot
+            : (dlo < 0 && dhi > 0 ? 0 : (dlo + dhi) / 2);
+        const t = d3.scaleLinear()
+            .domain([dlo, pivot, dhi])
+            .range([0, 0.5, 1])
+            .clamp(true);
+        // Callable with the d3-scale shape downstream expects, and NO invert() — so
+        // it sniffs as 'discrete'/non-invertible, exactly like `sequential`: a colour
+        // is not something a gesture can drive backwards.
+        const stops = range.length >= 3
+            ? [range[0], range[1], range[range.length - 1]]
+            : [range[0], '#f7f7f7', range[range.length - 1]];
+        const ramp = d3.piecewise(d3.interpolateRgb, stops);
+        scale = (/** @type {any} */ value) => ramp(t(value));
+        scale.domain = () => spec.domain;
+        scale.range = () => range;
+        scale.pivot = () => pivot;
     } else if (type === 'log') {
         scale = d3.scaleLog().domain(spec.domain).range(range);
         if (spec.base != null) scale.base(spec.base);
+    } else if (type === 'symlog') {
+        // Linear near zero, logarithmic beyond it — the scale for a quantity that
+        // spans orders of magnitude AND legitimately reaches 0 (or goes negative),
+        // where `log` simply has no answer. `constant` sets how wide the linear
+        // region is.
+        scale = d3.scaleSymlog().domain(spec.domain).range(range);
+        if (spec.constant != null) scale.constant(spec.constant);
     } else if (type === 'pow' || type === 'sqrt') {
         scale = d3.scalePow().domain(spec.domain).range(range)
             .exponent(spec.exponent != null ? spec.exponent : (type === 'sqrt' ? 0.5 : 1));
@@ -233,6 +272,30 @@ export function positionOnScale(scale, value, fallback) {
  */
 export function bandwidthOf(scale, fallback) {
     return scale && scale.bandwidth ? scale.bandwidth() : fallback;
+}
+
+/**
+ * Leading pixel edge of a value's slot — the companion to `bandwidthOf`, which
+ * gives the slot's thickness. `positionOnScale`/`encode` deliberately return a
+ * band's CENTRE (that's where a mark sits), so a mark that draws the band as a
+ * rectangle needs its start. That's the one geometry question encodeChannel
+ * can't answer, and hand-rolling `scale(d[key])` for it is how the "four ways to
+ * place a mark" drift started — ask here instead.
+ *   band  -> the category's interval start
+ *   point -> the tick itself (no width to offset from)
+ *   other -> encode(value), i.e. the position IS the edge
+ * @param {any} scale
+ * @param {any} value
+ * @param {any} [fallback]
+ * @returns {any}
+ */
+export function bandStartOf(scale, value, fallback) {
+    if (!scale) return fallback;
+    if (scale.kind === 'band' || scale.kind === 'point') {
+        const p = scale(value);
+        return p == null ? fallback : p;
+    }
+    return positionOnScale(scale, value, fallback);
 }
 
 /**

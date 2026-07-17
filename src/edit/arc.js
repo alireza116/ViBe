@@ -25,7 +25,7 @@ import { pointerDegrees } from '../core/encoding.js';
  */
 export function edge(options = {}) {
     return makeEdit({
-        type: 'arcEdge',
+        type: 'edge',
         gesture: 'drag',
         pick: 'direct',
         scope: 'arc',
@@ -34,8 +34,10 @@ export function edge(options = {}) {
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const node = /** @type {any} */ (ctx.node);
             if (!node || !node.edge) return undefined;
-            const angleCh = ctx.markChannels && ctx.markChannels.angle;
-            const field = angleCh && angleCh.field;
+            // The arc's magnitude channel (`value`) — the field the pie normalizes
+            // into sweeps, and therefore the one a boundary drag redistributes.
+            const valueCh = ctx.markChannels && ctx.markChannels.value;
+            const field = valueCh && valueCh.field;
             const data = ctx.data;
             if (!field || !data || !data.length) return undefined;
 
@@ -95,6 +97,3 @@ export function edge(options = {}) {
         }
     });
 }
-
-/** The arc-scoped edit namespace: `edit.arc.edge`. */
-export const arc = { edge };
