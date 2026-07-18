@@ -47,8 +47,9 @@
 //
 // Parts that carry no edit are pure visuals; the engine gives them
 // `pointerEvents:'none'` (a mark with no direct-pick edit can't consume a gesture,
-// so it must not block one), which is what keeps the whisker — drawn above the
-// handles, since the renderer paints lines after circles — from eating their drags.
+// so it must not block one). Put visuals first and handles last in `parts` so
+// handles paint on top; pointer-transparency still covers an inert part that
+// overlaps a later handle.
 
 import { normalizeMarkOptions } from './mark.js';
 

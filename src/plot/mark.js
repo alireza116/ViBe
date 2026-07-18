@@ -49,8 +49,8 @@
 //
 // ── pointerEvents: who silences what ────────────────────────────────────────
 // The engine silences a mark that carries no direct-pick edit, because the
-// renderer defaults nodes to pointer-events:auto and draws lines AFTER circles —
-// an inert rule would otherwise sit over a sibling's handle and swallow its drag.
+// renderer defaults nodes to pointer-events:auto and paints later features/parts
+// on top — an inert rule overlapping a handle would otherwise swallow its drag.
 // That rule is per-FEATURE and all-or-nothing, and it only fills in a value the
 // mark left unset (`node.pointerEvents == null`).
 //

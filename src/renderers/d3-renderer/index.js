@@ -2,7 +2,7 @@
 import * as d3 from "d3";
 import { DEFAULT_EFFECTS } from "../../core/effects.js";
 import { markCenter } from "../../edit/shared.js";
-import { resolveCurve, STYLE_FIELDS } from "../shared.js";
+import { resolveCurve, STYLE_FIELDS, partitionScene } from "../shared.js";
 
 export class D3Renderer {
   constructor() {
@@ -71,67 +71,54 @@ export class D3Renderer {
       onEvent({ type: "click", x: px, y: py, node: d, rawEvent: event });
     };
 
-    // Partition scene nodes by type + role. Draw order below (background ->
-    // guides -> mark rects -> mark circles -> guide circles -> lines -> text)
-    // is the z-order and must be preserved.
-    const byType = (/** @type {string} */ t) =>
-      scene.children.filter((/** @type {any} */ n) => n.type === t);
-    const allRects = byType("rect");
-    const allCircles = byType("circle");
-    const allLines = byType("line");
-    const allPaths = byType("path");
-    const allTexts = byType("text");
-    const allImages = byType("image");
+    // Role layers are fixed (background → guide regions → marks → guide
+    // front). Within the mark layer, features/parts array order is z-order —
+    // type joins still bind by shape, then we reorder DOM.
+    const { background, guideRegions, marks, guideFront } = partitionScene(
+      scene.children,
+    );
+    /** @param {any[]} list @param {string} t */
+    const ofType = (list, t) =>
+      list.filter((/** @type {any} */ n) => n.type === t);
 
-    // Draw order == z-order: background, then guide regions (behind marks),
-    // then interactive marks, then guide circles (proximity rings, in front
-    // of marks), then foreground lines, then labels.
+    const layers = this._sceneLayers(g);
+
     this._drawBackground(
-      g,
-      allImages,
-      allLines.filter((/** @type {any} */ n) => n.background),
-      allTexts.filter((/** @type {any} */ n) => n.background),
+      layers.bg,
+      ofType(background, "image"),
+      ofType(background, "path"),
+      ofType(background, "line"),
+      ofType(background, "text"),
     );
 
-    this._drawGuideRegions(
-      g,
-      allRects.filter((/** @type {any} */ n) => n.guide),
-    );
+    this._drawGuideRegions(layers.guideBack, guideRegions);
 
-    // Connecting paths (line marks) sit above guide regions but BELOW the
-    // handle dots, so the dots stay grabbable on top of the line. Editable
-    // paths (needle / pie) also get drag wiring here.
-    this._drawPaths(g, allPaths, { drag, markClick, keys });
-
+    // Type joins into mark-layer (binding / events); z-order fixed after.
+    this._drawPaths(layers.marks, ofType(marks, "path"), {
+      drag,
+      markClick,
+      keys,
+    });
     this._drawMarks(
-      g,
-      allRects.filter((/** @type {any} */ n) => !n.guide),
-      allCircles.filter((/** @type {any} */ n) => !n.guide),
+      layers.marks,
+      ofType(marks, "rect"),
+      ofType(marks, "circle"),
       { drag, markClick, keys },
     );
+    this._drawLines(layers.marks, ofType(marks, "line"), {
+      drag,
+      markClick,
+      keys,
+    });
+    this._drawTextMarks(layers.marks, ofType(marks, "text"), {
+      drag,
+      markClick,
+      keys,
+    });
+    this._orderMarkLayer(layers.marks, marks);
 
-    this._drawGuideCircles(
-      g,
-      allCircles.filter((/** @type {any} */ n) => n.guide),
-    );
-    this._drawLines(
-      g,
-      allLines.filter((/** @type {any} */ n) => !n.background),
-      { drag, markClick, keys },
-    );
-    // Foreground text splits by role: an editable text MARK (its feature has a
-    // direct-pick edit) gets the interactive draw (drag + click + retype); guide
-    // labels and inert label marks stay non-interactive.
-    const fgTexts = allTexts.filter((/** @type {any} */ n) => !n.background);
-    this._drawTextMarks(
-      g,
-      fgTexts.filter((/** @type {any} */ n) => n.editable),
-      { drag, markClick, keys },
-    );
-    this._drawLabels(
-      g,
-      fgTexts.filter((/** @type {any} */ n) => !n.editable),
-    );
+    // Rules / constraint ticks / proximity rings / guide labels — in front.
+    this._drawGuideFront(layers.guideFront, guideFront);
 
     // In plane-on-top (proximity) mode the plane must sit above the marks and
     // own all pointer events; the marks become purely visual. Guides already
@@ -188,6 +175,11 @@ export class D3Renderer {
       // and gridlines (composable marks emitting `background:true` nodes,
       // see plot/axis.js) render here so marks always sit on top of them.
       g.append("g").attr("class", "bg-layer");
+      // Guide regions behind marks; mark-layer holds ordinary marks in array
+      // z-order; guide-front holds rules / rings / guide labels on top.
+      g.append("g").attr("class", "guide-back-layer");
+      g.append("g").attr("class", "mark-layer");
+      g.append("g").attr("class", "guide-front-layer");
     }
 
     // Sizing runs every render (not just on create) so 'reflow' picks up new
@@ -222,7 +214,108 @@ export class D3Renderer {
     g.select("rect.plane")
       .attr("width", innerWidth)
       .attr("height", innerHeight);
+    // Ensure role layers exist (fresh svg creates them above; a long-lived
+    // container from before mark-layer existed still needs the groups).
+    this._sceneLayers(g);
     return { svg, g, plane: g.select("rect.plane") };
+  }
+
+  /**
+   * Role-layer groups under the scene container. Order in the DOM is the
+   * paint stack: plane → bg → guide-back → marks → guide-front.
+   * Only mutates the layer list when a group is first created — re-appending
+   * every frame would move focused mark nodes and break keyboard editing.
+   * @param {any} g scene container
+   * @returns {{ bg: any, guideBack: any, marks: any, guideFront: any }}
+   */
+  _sceneLayers(g) {
+    const hadMarkLayer = !g.select("g.mark-layer").empty();
+    /** @type {string[]} */
+    const created = [];
+    /** @param {string} cls */
+    const ensure = (cls) => {
+      let layer = g.select(`g.${cls}`);
+      if (layer.empty()) {
+        layer = g.append("g").attr("class", cls);
+        created.push(cls);
+      }
+      return layer;
+    };
+    const bg = ensure("bg-layer");
+    const guideBack = ensure("guide-back-layer");
+    const marks = ensure("mark-layer");
+    const guideFront = ensure("guide-front-layer");
+    // Pre-layer renderers joined marks as direct children of `g`. Drop those
+    // orphans once when the mark-layer is introduced so they can't ghost.
+    if (!hadMarkLayer) {
+      g.selectAll(
+        ":scope > .mark, :scope > path.mark-line, :scope > .guide-region, :scope > .guide-circle, :scope > .guide-label",
+      ).remove();
+    }
+    if (created.length) {
+      // Pin bottom→top order only when the structure changed.
+      const root = /** @type {SVGGElement} */ (g.node());
+      const plane = g.select("rect.plane").node();
+      for (const el of [
+        plane,
+        bg.node(),
+        guideBack.node(),
+        marks.node(),
+        guideFront.node(),
+      ]) {
+        if (el) root.appendChild(/** @type {Node} */ (el));
+      }
+    }
+    return { bg, guideBack, marks, guideFront };
+  }
+
+  /**
+   * Reorder mark-layer children so DOM z-order matches `marks` (scene order).
+   * Type joins append in path→rect→circle→line→text call order; this undoes
+   * that so later features/parts paint on top. Restores focus if sort moved
+   * the active element (keyboard editing keeps a mark focused across redraws).
+   * @param {any} markLayer
+   * @param {any[]} marks
+   */
+  _orderMarkLayer(markLayer, marks) {
+    const order = new Map(
+      marks.map((/** @type {any} */ n, /** @type {number} */ i) => [n, i]),
+    );
+    const sel = markLayer
+      .selectAll(".mark, path.mark-line")
+      .filter((/** @type {any} */ d) => order.has(d));
+    // Skip the DOM move when already sorted — appendChild on a focused node
+    // blurs it and breaks arrow-key editing mid-gesture.
+    const nodes = /** @type {Element[]} */ (sel.nodes());
+    let prev = -1;
+    let needsSort = false;
+    for (const el of nodes) {
+      const i = /** @type {number} */ (
+        order.get(d3.select(el).datum())
+      );
+      if (i < prev) {
+        needsSort = true;
+        break;
+      }
+      prev = i;
+    }
+    if (!needsSort) return;
+
+    const active = typeof document !== "undefined" ? document.activeElement : null;
+    const root = /** @type {Element | null} */ (markLayer.node());
+    sel.sort(
+      (/** @type {any} */ a, /** @type {any} */ b) =>
+        /** @type {number} */ (order.get(a)) -
+        /** @type {number} */ (order.get(b)),
+    );
+    if (
+      active &&
+      root &&
+      root.contains(active) &&
+      typeof (/** @type {any} */ (active).focus) === "function"
+    ) {
+      /** @type {HTMLElement} */ (active).focus();
+    }
   }
 
   /**
@@ -517,22 +610,23 @@ export class D3Renderer {
   // -- semantic draws ------------------------------------------------------
 
   /**
-   * Raster tiles, axis spines/ticks, gridlines, and axis labels — into the
-   * dedicated layer behind the marks. Non-interactive.
+   * Raster tiles, axis spines/ticks, gridlines, axis labels, and vector
+   * basemap paths — into the dedicated layer behind the marks. Non-interactive.
    *
    * Images are joined FIRST (and keyed by {z}/{x}/{y}), so they sit at the back
-   * of the layer, under the gridlines: a basemap is the floor of the chart. The
-   * key is what makes panning/zooming cheap — a tile that stays on screen keeps
-   * its <image> element and never re-fetches.
+   * of the layer: a tile basemap is the floor of the chart. The key is what makes
+   * panning/zooming cheap — a tile that stays on screen keeps its <image> and
+   * never re-fetches. Axis lines/labels follow; background paths (geoBasemap,
+   * radial chrome) are last so they sit above grids the way they did when all
+   * paths shared the mark path pass.
    *
-   * @param {any} g
+   * @param {any} bgLayer
    * @param {any[]} bgImages
+   * @param {any[]} bgPaths
    * @param {any[]} bgLines
    * @param {any[]} bgTexts
    */
-  _drawBackground(g, bgImages, bgLines, bgTexts) {
-    const bgLayer = g.select("g.bg-layer");
-
+  _drawBackground(bgLayer, bgImages, bgPaths, bgLines, bgTexts) {
     const imgSel = bgLayer
       .selectAll("image")
       .data(bgImages, (/** @type {any} */ d) => d.key)
@@ -571,15 +665,32 @@ export class D3Renderer {
       .style("pointer-events", "none");
     this._geomText(textSel, "middle");
     this._applyStyle(textSel, { fill: "#374151", opacity: 1 });
+
+    const pathSel = bgLayer
+      .selectAll("path.bg-path")
+      .data(bgPaths)
+      .join("path")
+      .attr("class", "bg-path")
+      .style("pointer-events", "none")
+      .attr("d", (/** @type {any} */ d) => {
+        if (d.d) return d.d;
+        return d3.line().curve(resolveCurve(d.curve))(d.points || []);
+      });
+    this._applyStyle(pathSel, {
+      fill: "none",
+      stroke: "black",
+      strokeWidth: 1,
+      opacity: 1,
+    });
   }
 
   /**
    * Non-interactive guide regions (shaded bands / outlines), drawn behind marks.
-   * @param {any} g
+   * @param {any} layer
    * @param {any[]} guideRects
    */
-  _drawGuideRegions(g, guideRects) {
-    const rectSel = g
+  _drawGuideRegions(layer, guideRects) {
+    const rectSel = layer
       .selectAll("rect.guide-region")
       .data(guideRects)
       .join("rect")
@@ -595,15 +706,33 @@ export class D3Renderer {
   }
 
   /**
-   * Non-interactive guide circles (proximity rings / highlights), drawn in
-   * front of marks as annotations.
-   * @param {any} g
-   * @param {any[]} guideCircles
+   * Non-interactive guide annotations in front of marks: lines (rules /
+   * constraint ticks), circles (proximity rings), paths, and text labels.
+   * Drawn in `guideFront` scene order so a rule's line stays with its label.
+   * @param {any} layer
+   * @param {any[]} nodes
    */
-  _drawGuideCircles(g, guideCircles) {
-    const circleSel = g
+  _drawGuideFront(layer, nodes) {
+    /** @param {string} t */
+    const ofType = (t) =>
+      nodes.filter((/** @type {any} */ n) => n.type === t);
+
+    const lineSel = layer
+      .selectAll("line.guide-line")
+      .data(ofType("line"))
+      .join("line")
+      .attr("class", "guide-line")
+      .style("pointer-events", "none");
+    this._geomLine(lineSel);
+    this._applyStyle(lineSel, {
+      stroke: "black",
+      strokeWidth: 1,
+      opacity: 1,
+    });
+
+    const circleSel = layer
       .selectAll("circle.guide-circle")
-      .data(guideCircles)
+      .data(ofType("circle"))
       .join("circle")
       .attr("class", "guide-circle")
       .style("pointer-events", "none");
@@ -614,23 +743,66 @@ export class D3Renderer {
       strokeWidth: 1,
       opacity: 1,
     });
+
+    const pathSel = layer
+      .selectAll("path.guide-path")
+      .data(ofType("path"))
+      .join("path")
+      .attr("class", "guide-path")
+      .style("pointer-events", "none")
+      .attr("d", (/** @type {any} */ d) => {
+        if (d.d) return d.d;
+        return d3.line().curve(resolveCurve(d.curve))(d.points || []);
+      });
+    this._applyStyle(pathSel, {
+      fill: "none",
+      stroke: "black",
+      strokeWidth: 1,
+      opacity: 1,
+    });
+
+    const textSel = layer
+      .selectAll("text.guide-label")
+      .data(ofType("text"))
+      .join("text")
+      .attr("class", "guide-label")
+      .style("pointer-events", "none");
+    this._geomText(textSel, "start");
+    this._applyStyle(textSel, { fill: "black", opacity: 1 });
+
+    // Type joins append in call order; restore scene order among guide-front
+    // siblings so a rule's stroke isn't covered by an earlier proximity ring.
+    const order = new Map(
+      nodes.map((/** @type {any} */ n, /** @type {number} */ i) => [n, i]),
+    );
+    layer
+      .selectAll(
+        "line.guide-line, circle.guide-circle, path.guide-path, text.guide-label",
+      )
+      .filter((/** @type {any} */ d) => order.has(d))
+      .sort(
+        (/** @type {any} */ a, /** @type {any} */ b) =>
+          /** @type {number} */ (order.get(a)) -
+          /** @type {number} */ (order.get(b)),
+      );
   }
 
   /**
-   * Interactive marks: rects (bars) then circles (dots). Both get the click +
+   * Interactive marks: rects (bars) and circles (dots). Both get the click +
    * drag wiring; only nodes flagged `editable` (their feature has a direct-pick
    * edit) show an interactive cursor — d3.drag/click is inert on the rest.
-   * @param {any} g
+   * DOM z-order among mark types is fixed later by `_orderMarkLayer`.
+   * @param {any} layer
    * @param {any[]} markRects
    * @param {any[]} markCircles
    * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
    */
-  _drawMarks(g, markRects, markCircles, { drag, markClick, keys }) {
+  _drawMarks(layer, markRects, markCircles, { drag, markClick, keys }) {
     // A mark may opt OUT of the pointer (pointerEvents: 'none') — a ghost/affordance
     // node, or a glyph part that must not swallow the plane's hover/click. Without
     // this a decorative circle would eat the gesture the plane driver needs, the
     // same way line marks and paths already honour the flag.
-    const rectSel = g
+    const rectSel = layer
       .selectAll("rect.mark")
       .data(markRects)
       .join("rect")
@@ -648,7 +820,7 @@ export class D3Renderer {
     this._geomRect(rectSel);
     this._applyStyle(rectSel, { fill: "black" });
 
-    const circleSel = g
+    const circleSel = layer
       .selectAll("circle.mark")
       .data(markCircles)
       .join("circle")
@@ -674,12 +846,12 @@ export class D3Renderer {
    *   - interactive line marks (ticks): flagged `editable`, so they get the same
    *     click + drag wiring as rect/circle marks. Only editable nodes show an
    *     interactive cursor; d3.drag is inert on the rest.
-   * @param {any} g
+   * @param {any} layer
    * @param {any[]} lines
    * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
    */
-  _drawLines(g, lines, { drag, markClick, keys }) {
-    const sel = g
+  _drawLines(layer, lines, { drag, markClick, keys }) {
+    const sel = layer
       .selectAll("line.mark")
       .data(lines)
       .join("line")
@@ -703,12 +875,12 @@ export class D3Renderer {
    * (arcs, needles, pie slices). Non-interactive by default — line connectors
    * are edited through handle dots — but an `editable` path (needle, pie slice)
    * gets the same click + drag wiring as other marks.
-   * @param {any} g
+   * @param {any} layer
    * @param {any[]} paths
    * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} [io]
    */
-  _drawPaths(g, paths, io) {
-    const sel = g
+  _drawPaths(layer, paths, io) {
+    const sel = layer
       .selectAll("path.mark-line")
       .data(paths)
       .join("path")
@@ -737,15 +909,15 @@ export class D3Renderer {
   }
 
   /**
-   * Interactive text MARKS (editable labels). Mirrors _drawMarks: click + drag
-   * wiring, cursor only when editable, honoring a mark's pointerEvents opt-out.
+   * Text marks (editable or inert). Mirrors _drawMarks: click + drag wiring,
+   * cursor only when editable, honoring a mark's pointerEvents opt-out.
    * Double-click opens an inline editor for content editing (see _editText).
-   * @param {any} g
+   * @param {any} layer
    * @param {any[]} texts
    * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
    */
-  _drawTextMarks(g, texts, { drag, markClick, keys }) {
-    const sel = g
+  _drawTextMarks(layer, texts, { drag, markClick, keys }) {
+    const sel = layer
       .selectAll("text.mark")
       .data(texts)
       .join("text")
@@ -846,19 +1018,4 @@ export class D3Renderer {
     input.addEventListener("blur", commit);
   }
 
-  /**
-   * Foreground text labels (guide annotations).
-   * @param {any} g
-   * @param {any[]} texts
-   */
-  _drawLabels(g, texts) {
-    const sel = g
-      .selectAll("text.guide-label")
-      .data(texts)
-      .join("text")
-      .attr("class", "guide-label")
-      .style("pointer-events", "none");
-    this._geomText(sel, "start");
-    this._applyStyle(sel, { fill: "black", opacity: 1 });
-  }
 }

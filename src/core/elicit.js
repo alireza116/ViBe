@@ -435,10 +435,10 @@ export function Elicit(spec) {
             // feature's edits, and flag interactive marks for the cursor.
             //
             // A mark with no direct-pick edit can't consume a gesture, so it must not
-            // BLOCK one: the renderer defaults nodes to pointer-events:auto and draws
-            // lines after circles, so an inert rule (a glyph's whisker) would sit over
-            // a sibling's handle and swallow its drag. Silence it unless the mark
-            // asked for a specific value.
+            // BLOCK one: the renderer defaults nodes to pointer-events:auto and paints
+            // later features/parts on top, so an inert rule listed after a handle (or
+            // any overlapping inert chrome) would swallow its drag. Silence it unless
+            // the mark asked for a specific value.
             //
             // A node over a LOCKED row is inert for the same reason, one level down:
             // its row is read-only, so it is not grabbable, shows no editable cursor,

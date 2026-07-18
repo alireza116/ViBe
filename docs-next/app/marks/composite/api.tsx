@@ -18,7 +18,7 @@ export const api: ApiEntry[] = [
         default: "[]",
         desc: (
           <>
-            The sub-marks, in z-order (visual parts first, handles last). Each part is an ordinary mark with its <b>own</b> <code className="inline">channels</code> / style shorthands (arm geometry, per-part stroke, a tip’s <code className="inline">size</code>). A part with an <code className="inline">edit</code> is a handle; a part without one is inert and the engine makes it <code className="inline">pointerEvents:"none"</code> so it can’t swallow a sibling’s drag.
+            The sub-marks, in z-order (later parts paint on top — visual parts first, handles last). Each part is an ordinary mark with its <b>own</b> <code className="inline">channels</code> / style shorthands (arm geometry, per-part stroke, a tip’s <code className="inline">size</code>). A part with an <code className="inline">edit</code> is a handle; a part without one is inert and the engine makes it <code className="inline">pointerEvents:"none"</code> so it can’t swallow a sibling’s drag.
           </>
         ),
       },

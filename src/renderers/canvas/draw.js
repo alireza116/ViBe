@@ -1,11 +1,12 @@
 // @ts-check
 // Painting: typed FeatureNodes -> canvas 2D calls. The mirror image of the D3
-// renderer's semantic draws — same node types, same z-order, same per-draw style
-// defaults — but emitting `ctx.fill()`/`ctx.stroke()` instead of SVG attributes.
-// No interaction here; this module is a pure function of (context, nodes).
+// renderer's semantic draws — same node types, same role layers + array z-order,
+// same per-draw style defaults — but emitting `ctx.fill()`/`ctx.stroke()` instead
+// of SVG attributes. No interaction here; this module is a pure function of
+// (context, nodes).
 import * as d3 from 'd3';
 import { markCenter } from '../../edit/shared.js';
-import { STYLE_FIELDS, resolveCurve } from '../shared.js';
+import { STYLE_FIELDS, resolveCurve, partitionScene } from '../shared.js';
 
 // SVG text-anchor -> canvas textAlign. `middle` is the only rename.
 /** @type {Record<string, CanvasTextAlign>} */
@@ -194,48 +195,92 @@ function image(ctx, node, cache, requestRepaint) {
 }
 
 /**
- * Paint the whole scene in z-order — the exact partition-and-order of the D3
- * renderer's `render` (background → guide regions → paths → mark rects → mark
- * circles → guide circles → foreground lines → text marks → labels). Draw order IS
- * z-order on a canvas (last wins), so this ordering is load-bearing.
+ * Paint one ordinary mark node (non-background, non-guide). Defaults mirror the
+ * D3 per-type draws.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {any} n
+ */
+function paintMark(ctx, n) {
+    switch (n.type) {
+        case 'path':
+            path(ctx, n, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 });
+            break;
+        case 'rect':
+            rect(ctx, n, { fill: 'black' });
+            break;
+        case 'circle':
+            circle(ctx, n, { fill: 'black' });
+            break;
+        case 'line':
+            line(ctx, n, { stroke: 'black', strokeWidth: 1, opacity: 1 });
+            break;
+        case 'text':
+            // Editable text marks centre-anchor; inert label marks start-anchor —
+            // same split the D3 renderer uses between text.mark and guide-label.
+            text(ctx, n, { fill: 'black', opacity: 1 }, n.editable ? 'middle' : 'start');
+            break;
+        case 'image':
+            // Non-background images are rare; treat like a mark if they land here.
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * Paint a guide-front node (rules, ticks, rings, labels). Defaults match the
+ * D3 guide draws; per-node stroke/fill win via styleOf.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {any} n
+ */
+function paintGuideFront(ctx, n) {
+    switch (n.type) {
+        case 'line':
+            line(ctx, n, { stroke: 'black', strokeWidth: 1, opacity: 1 });
+            break;
+        case 'circle':
+            circle(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 });
+            break;
+        case 'path':
+            path(ctx, n, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 });
+            break;
+        case 'text':
+            text(ctx, n, { fill: 'black', opacity: 1 }, 'start');
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * Paint the whole scene in z-order. Role layers (background → guide regions →
+ * marks → guide front) are fixed; within the mark layer, `scene.children` order
+ * is z-order (later features / parts on top). Draw order IS z-order on a canvas
+ * (last wins).
  * @param {CanvasRenderingContext2D} ctx
  * @param {any[]} children scene nodes
  * @param {{ images: Map<string, any>, requestRepaint: () => void }} io
  */
 export function paintScene(ctx, children, io) {
-    const nodes = children || [];
-    /** @param {string} t */
-    const byType = (t) => nodes.filter((n) => n.type === t);
-    const rects = byType('rect');
-    const circles = byType('circle');
-    const lines = byType('line');
-    const paths = byType('path');
-    const texts = byType('text');
-    const images = byType('image');
+    const { background, guideRegions, marks, guideFront } = partitionScene(children);
 
-    // Background: tiles (floor), then background lines (gridlines), then bg labels.
-    images.forEach((n) => image(ctx, n, io.images, io.requestRepaint));
-    lines.filter((n) => n.background).forEach((n) => line(ctx, n, { stroke: '#6b7280', strokeWidth: 1, opacity: 1 }));
-    texts.filter((n) => n.background).forEach((n) => text(ctx, n, { fill: '#374151', opacity: 1 }, 'middle'));
+    // Background: tiles (floor), then axis chrome, then vector basemap paths
+    // (geoBasemap) so they sit above grids the way they did in the old path pass.
+    background.filter((n) => n.type === 'image')
+        .forEach((n) => image(ctx, n, io.images, io.requestRepaint));
+    for (const n of background) {
+        if (n.type === 'image' || n.type === 'path') continue;
+        if (n.type === 'line') line(ctx, n, { stroke: '#6b7280', strokeWidth: 1, opacity: 1 });
+        else if (n.type === 'text') text(ctx, n, { fill: '#374151', opacity: 1 }, 'middle');
+    }
+    background.filter((n) => n.type === 'path')
+        .forEach((n) => path(ctx, n, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 }));
 
-    // Guide regions (shaded bands) behind the marks.
-    rects.filter((n) => n.guide).forEach((n) => rect(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 }));
+    guideRegions.forEach((n) => rect(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 }));
 
-    // Connecting paths sit above guide regions but below the handle dots.
-    paths.forEach((n) => path(ctx, n, { fill: 'none', stroke: 'black', strokeWidth: 1, opacity: 1 }));
+    // Ordinary marks in features/parts array order.
+    marks.forEach((n) => paintMark(ctx, n));
 
-    // Interactive marks: rects (bars) then circles (dots).
-    rects.filter((n) => !n.guide).forEach((n) => rect(ctx, n, { fill: 'black' }));
-    circles.filter((n) => !n.guide).forEach((n) => circle(ctx, n, { fill: 'black' }));
-
-    // Guide circles (proximity rings) in front of marks.
-    circles.filter((n) => n.guide).forEach((n) => circle(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 }));
-
-    // Foreground lines (rules / ticks).
-    lines.filter((n) => !n.background).forEach((n) => line(ctx, n, { stroke: 'black', strokeWidth: 1, opacity: 1 }));
-
-    // Foreground text: editable text marks (centre-anchored) then inert labels.
-    const fg = texts.filter((n) => !n.background);
-    fg.filter((n) => n.editable).forEach((n) => text(ctx, n, { fill: 'black', opacity: 1 }, 'middle'));
-    fg.filter((n) => !n.editable).forEach((n) => text(ctx, n, { fill: 'black', opacity: 1 }, 'start'));
+    // Rules, constraint ticks, proximity rings, guide labels — in scene order.
+    guideFront.forEach((n) => paintGuideFront(ctx, n));
 }

@@ -38,7 +38,7 @@ export const api: ApiEntry[] = [
         default: "[]",
         desc: (
           <>
-            The marks — <code className="inline">bar(...)</code>, <code className="inline">point(...)</code>, <code className="inline">composite(...)</code>, … drawn in order.
+            The marks — <code className="inline">bar(...)</code>, <code className="inline">point(...)</code>, <code className="inline">composite(...)</code>, … drawn in array order (later marks on top). Auto-axes and edit guides keep their own layers behind / in front of marks.
           </>
         ),
       },

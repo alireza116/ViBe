@@ -45,3 +45,46 @@ export const STYLE_FIELDS = [
     { field: 'fillOpacity', svgAttr: 'fill-opacity', base: null },
     { field: 'strokeOpacity', svgAttr: 'stroke-opacity', base: null }
 ];
+
+/**
+ * Partition scene nodes into paint layers. Role flags (`background`, `guide`)
+ * pin axes and edit guides; among ordinary marks, **array order is z-order**
+ * (later features / composite parts / nodes within a feature paint on top).
+ *
+ * Guide rects (shaded bands / legend chips) stay behind marks; every other
+ * guide node (rules, constraint ticks, proximity rings, labels) goes to
+ * `guideFront` in scene order so lines/text aren't dropped.
+ *
+ * @param {any[]} children `scene.children`
+ * @returns {{
+ *   background: any[],
+ *   guideRegions: any[],
+ *   marks: any[],
+ *   guideFront: any[]
+ * }}
+ */
+export function partitionScene(children) {
+    /** @type {any[]} */
+    const background = [];
+    /** @type {any[]} */
+    const guideRegions = [];
+    /** @type {any[]} */
+    const marks = [];
+    /** @type {any[]} */
+    const guideFront = [];
+
+    for (const n of children || []) {
+        if (!n) continue;
+        if (n.background) {
+            background.push(n);
+            continue;
+        }
+        if (n.guide) {
+            if (n.type === 'rect') guideRegions.push(n);
+            else guideFront.push(n);
+            continue;
+        }
+        marks.push(n);
+    }
+    return { background, guideRegions, marks, guideFront };
+}

@@ -767,7 +767,9 @@ export interface ElicitElement extends HTMLDivElement {
 export interface RenderContext {
   // The chart's host element (a div). The renderer owns what it puts inside.
   container: HTMLElement;
-  // The scene to draw: `scene.children` is a flat array of FeatureNodes, in z-order.
+  // The scene to draw: `scene.children` is a flat array of FeatureNodes in
+  // features/parts array order (later = on top among marks). Renderers may still
+  // pin `background` / `guide` nodes into role layers around that stack.
   scene: { children: FeatureNode[] };
   width: number;
   height: number;
