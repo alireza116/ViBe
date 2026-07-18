@@ -1,0 +1,22 @@
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  // Type + domain live here — once. Marks never declare a domain.
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n:   { type: "quantitative", domain: [0, 60] },
+  },
+  data: [
+    { cat: "A", n: 34 }, { cat: "B", n: 58 },
+    { cat: "C", n: 22 }, { cat: "D", n: 47 },
+  ],
+  features: [
+    bar({
+      fill: "#4f46e5",
+      channels: {
+        x: { field: "cat" },              // categorical + bar → band
+        y: { field: "n", edit: drag() },  // quantitative      → linear
+      },
+    }),
+  ],
+}))

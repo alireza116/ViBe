@@ -1,0 +1,63 @@
+// A tiny driver: hover highlights the nearest mark; click bumps its y.
+edit.registerDriver({
+  name: "clickNearest",
+  wants: (e) => e.pick === "clickNearest",
+  selects: true,
+  onEvent({ event, edits, marks, session, runEdit }) {
+    const threshold = 48;
+    if (event.type === "hover") {
+      session.set({
+        px: event.x, py: event.y, threshold,
+        hoverIndex: edit.nearestMark(marks, event.x, event.y, threshold),
+      });
+      return true;
+    }
+    if (event.type === "hoverout") {
+      session.clear();
+      return true;
+    }
+    if (event.type === "click") {
+      const index = edit.nearestMark(marks, event.x, event.y, threshold);
+      if (index == null) return false;
+      let changed = false;
+      for (const e of edits) {
+        if (e.gesture === "click" && runEdit(e, index)) changed = true;
+      }
+      return changed;
+    }
+    return false;
+  },
+});
+
+const bump = edit.makeEdit({
+  type: "bump",
+  pick: "clickNearest",
+  gesture: "click",
+  channels: ["y"],
+  guide: true,
+  apply: (ctx) => {
+    if (!ctx.datum) return undefined;
+    const field = ctx.channels[0].field;
+    return { ...ctx.datum, [field]: Math.min(100, (ctx.datum[field] || 0) + 10) };
+  },
+});
+
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 25, y: 30 }, { x: 55, y: 55 }, { x: 80, y: 40 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      fill: "#4f46e5", size: 9, stroke: "#1f2733", strokeWidth: 1,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+      edits: [ bump ],
+    }),
+  ],
+}))

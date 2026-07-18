@@ -5,8 +5,11 @@ import { Example } from '../../components/Example';
 import { Lead } from '../../components/Lead';
 import { api } from './api';
 
+import aCustomSquareMark from './_examples/a-custom-square-mark.example.txt';
+import customVsMakeedit from './_examples/custom-vs-makeedit.example.txt';
 import snapDragViaCustomApply from './_examples/snap-drag-via-custom-apply.example.txt';
 import dragToReorder from './_examples/drag-to-reorder.example.txt';
+import clickNearestDriver from './_examples/click-nearest-driver.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -14,18 +17,53 @@ export default function Layout({ children }) {
 
 # Authoring SDK
 
-<Lead>How to build new elicitation devices without forking the engine. Marks use `encodeChannel` / `resolveStyle`; edits use `makeEdit` + `invertChannel`; multi-event lifecycles register via `edit.registerDriver`. Attach edits on a channel (`y: { field, edit: drag() }`) or at mark level (`edits: [drag({ channels: ["x","y"] })]`) — never as a fake `channels.edit` key.</Lead>
+<Lead>Build new elicitation devices without forking the engine. Marks use `plot.encodeChannel` / `resolveStyle`; edits use `edit.makeEdit` + `invertChannel`; multi-event lifecycles register via `edit.registerDriver`. Attach edits on a channel (`y: { field, edit: drag() }`) or at mark level (`edits: [...]`) — never as a fake `channels.edit` key. For the model these extend, see [Core concepts](/concepts); for the stock catalogue, see [Editing](/editing).</Lead>
 
 <ApiReference entries={api} />
 
-<Section id="custom-edit" title="A custom edit with makeEdit">
+<Section id="custom-mark" title="A custom mark">
 
-Prefer makeEdit (or edit.custom) so defaults for pick/gesture/constrain stay consistent.
+A mark is a view over the chart’s one dataset. The factory returns a feature object; the only required method is `build(data, scales, width, height)`. Call `normalizeMarkOptions` first, resolve every channel through `encodeChannel` / `resolveStyle`, pass through `channels` / `edits` / `constraints`, and set `discreteScale` when discrete data needs a band or a point. Don’t set mark-wide `pointerEvents` — leave that to the engine.
+
+<Example
+  code={aCustomSquareMark}
+  title="A custom square mark"
+  blurb="normalizeMarkOptions → encodeChannel / resolveStyle → FeatureNode[]. Stock drag still works because the nodes carry data and index."
+  try={(
+    <>
+      <b>Drag</b> a square — same edit path as a point.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="edit-ladder" title="The edit ladder">
+
+Reach for the smallest tool that fits:
+
+1. **Stock edit** — `drag`, `resize`, `create`, … when the behaviour already exists.
+2. **`custom(fn)`** — one-off `apply`, same gesture/pick defaults.
+3. **`makeEdit(spec)`** — full descriptor control (`type`, `pick`, `cardinality`, `name`, …).
+4. **`registerDriver`** — multi-event lifecycle / a new `pick` value.
+
+`apply` is pure: return a new datum, a new array, or `undefined`. Prefer `invertChannel` over hand-rolled `scale.invert`.
+
+<Example
+  code={customVsMakeedit}
+  title="custom(fn) — the quick escape hatch"
+  blurb="custom wraps fn as apply. Drag rewrites y from the pointer; x still uses stock drag()."
+  try={(
+    <>
+      <b>Drag</b> vertically on a dot to set y; drag the dot itself to move in x.
+    </>
+  )}
+/>
 
 <Example
   code={snapDragViaCustomApply}
-  title="Snap-drag via custom apply"
-  blurb="Invert y, then round to the nearest 10."
+  title="makeEdit + invertChannel"
+  blurb="Full descriptor: invert y, then snap to the nearest 10. Same idea as custom, with an explicit type and channels list."
   try={(
     <>
       <b>Drag</b> the point — it lands on multiples of 10.
@@ -35,19 +73,67 @@ Prefer makeEdit (or edit.custom) so defaults for pick/gesture/constrain stay con
 
 </Section>
 
-<Section id="rank" title="Rank / reorder">
+<Section id="apply-array" title="When apply returns a full array">
 
-edit.rank() swaps rank slots along a discrete axis as you drag.
+Most edits return one datum and the engine splices it at `index`. Whole-dataset edits return a new array — reorder, create, remove. `rank()` is the built-in example: drag swaps discrete rank slots.
 
 <Example
   code={dragToReorder}
-  title="Drag to reorder"
-  blurb="Point scale over ranks; drag swaps with the nearest slot."
+  title="rank() — array-returning apply"
+  blurb="Point scale over ranks; drag swaps with the nearest slot. Your makeEdit can return [...ctx.data] the same way."
   try={(
     <>
       <b>Drag</b> a point to another rank.
     </>
   )}
 />
+
+</Section>
+
+<Section id="drivers" title="Register a driver">
+
+Stock `pick` values (`direct`, `nearest`, `plane`, `probe`, `sweep`, …) already cover most lifecycles. When you need a new one, register a driver: `wants(edit)` claims by `pick`, `onEvent` owns hover/click/drag, and `runEdit` / `previewEdit` commit or preview through the same constraint and undo path. Set `selects: true` if `guide: true` should draw a snap ring.
+
+<Example
+  code={clickNearestDriver}
+  title="clickNearest — hover, then click to bump"
+  blurb={"registerDriver + makeEdit({ pick: \"clickNearest\" }). Hover highlights; click adds 10 to y."}
+  try={(
+    <>
+      <b>Hover</b> near a dot, then <b>click</b> to bump its y.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="glyphs" title="Glyphs: prefer a group of marks">
+
+If a glyph’s handles map to distinct **fields** of a row, build it as a [`composite`](/marks/composite) — ordinary marks over the same rows — so direct-pick dispatch keeps one handle from touching another. Only when several handles must live on **one** feature over **one** datum (positions are derived, not fields) do you need `node.channel` plus a `when` guard. Reach for that last.
+
+A whole-dataset plane gesture (`create`, `rotate`, …) belongs on **exactly one** mark — two marks with the same plane edit would fire twice per click.
+
+</Section>
+
+<Section id="helpers" title="Helpers to reuse">
+
+Don’t reinvent proximity or minting:
+
+- `invertChannel` / `recenterSpan` / `markCenter` — pointer ↔ data for positional edits
+- `schemaDefaults(schema)` — mint a row with every field set to its default (or `null`)
+- `edit.nextSeriesKey(data, seriesField)` — next free series id for a new line
+- `nearestMark` / `nearestSeries` / `nearestMarkOnAxis` — shared distance pickers
+
+For create-like customs, set `cardinality: "append"` so constraints know which row is new. For external UI, give the edit a `name` and drive it with [`el.control(name)`](/editing/external-controls).
+
+</Section>
+
+<Section id="where-next" title="Where next">
+
+- **[Marks](/marks/bar)** — reference implementations (`point`, `bar`, `rule`) to mirror.
+- **[Editing](/editing)** — stock gestures, pick modes, stages, history.
+- **[Composite](/marks/composite)** — multi-handle glyphs as grouped marks.
+- **[Constraints](/constraints)** — dataset invariants your `apply` must respect.
+- **[Gestures · Custom](/editing/gestures#custom)** — more `custom(fn)` patterns with `when`.
 
 </Section>

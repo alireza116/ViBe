@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "schema — Record<field, FieldSchema>",
     summary: (
       <>
-        Declared on a feature (or on <code className="inline">Elicit</code>). Each field maps to a spec that fixes its measurement type, range and creation default — the source of truth a scale and a minted datum both read.
+        Required on <code className="inline">Elicit</code> — marks never own domains. Each field maps to a spec that fixes its measurement type, range and creation default — the source of truth a scale and a minted datum both read.
       </>
     ),
     signatures: [

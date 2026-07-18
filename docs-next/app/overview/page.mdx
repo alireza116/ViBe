@@ -7,6 +7,7 @@ import { api } from './api';
 
 import aBarMark from './_examples/a-bar-mark.example.txt';
 import theSameBarNowEditable from './_examples/the-same-bar-now-editable.example.txt';
+import readingTheAnswer from './_examples/reading-the-answer.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -14,25 +15,25 @@ export default function Layout({ children }) {
 
 # Overview
 
-<Lead>A chart is a declarative `Elicit(spec)`: a list of **marks**, each with **channels** that map data fields to visuals. Every example on these pages shows the **exact code that drew the chart beside it** — the snippet is run verbatim. This page is the 30-second API tour; the sidebar goes deep on each mark and feature.</Lead>
+<Lead>VibeJS builds charts people answer with — drag a bar, place a point — and you get structured data back. A chart is a declarative `Elicit(spec)`: one **schema**, one **dataset**, and a list of **marks**. Every example on these pages runs the exact code beside it. This page is the wiring tour; [Core concepts](/concepts) walks the mental model.</Lead>
 
 <ApiReference entries={api} />
 
 <Section id="anatomy" title="A minimal chart">
 
-An Elicit spec is a renderer plus a list of features (marks). A mark binds channels (x, y, fill, size, …) to data fields through scales. That is the whole model: encode (data → visual) one way, edit (gesture → data) the other.
+Three pieces make a static chart: `schema` (what each field is and its domain), `data` (the rows), and `features` (marks that encode those rows). That is the whole model until you attach an edit.
 
 <Example
   code={aBarMark}
   title="A bar mark"
-  blurb="x is a band of categories, y a linear value, fill a constant. This is a complete, static Elicit spec."
+  blurb="schema + data + bar({ channels }). x is a band of categories, y a linear value, fill a constant."
 />
 
 </Section>
 
 <Section id="encode-edit" title="Encoding, and its inverse">
 
-Attach an edit to a channel and a gesture writes that channel back to the data through the same scale. The bar below is identical to the one above, except y now carries edit: drag() — so encoding (data → bar height) gains its inverse (drag → data).
+Attach an edit to a channel and a gesture writes that channel back through the **same** scale. The bar below is identical to the one above, except `y` now carries `edit: drag()` — so encoding (data → height) gains its inverse (drag → data).
 
 <Example
   code={theSameBarNowEditable}
@@ -41,6 +42,23 @@ Attach an edit to a channel and a gesture writes that channel back to the data t
   try={(
     <>
       <b>Drag</b> a bar up or down.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="reading" title="Reading the answer">
+
+Committed data leaves the chart through `onChange`, `getData()`, or `chart.on("change", …)`. Hover previews never fire these — only a finished edit does.
+
+<Example
+  code={readingTheAnswer}
+  title="onChange / getData"
+  blurb={"onChange logs each commit. getData() returns a deep copy of the elicited rows; on(\"change\") is the same seam as a listener."}
+  try={(
+    <>
+      <b>Drag</b> a bar — open the console to see the committed rows.
     </>
   )}
 />

@@ -2,10 +2,68 @@ import type { ApiEntry } from '../../lib/types';
 
 export const api: ApiEntry[] = [
   {
+    name: "Where things live on the spec",
+    summary: (
+      <>
+        One chart, one place for each concern. Marks are views — they never own <code className="inline">data</code> or domains.
+      </>
+    ),
+    options: [
+      {
+        name: "schema",
+        type: "on Elicit",
+        default: "required",
+        desc: (
+          <>
+            Field type + domain + default. See <a href="/schema">Data schema</a>.
+          </>
+        ),
+      },
+      {
+        name: "data",
+        type: "on Elicit",
+        default: "[]",
+        desc: "The one elicited dataset. Every mark reads these rows.",
+      },
+      {
+        name: "features",
+        type: "on Elicit",
+        default: "[]",
+        desc: "Marks (views) that encode — and optionally edit — columns of that dataset.",
+      },
+      {
+        name: "constraints",
+        type: "on Elicit",
+        default: "[]",
+        desc: (
+          <>
+            Dataset invariants. A mark’s <code className="inline">constraints</code> is sugar — the engine promotes it. See <a href="/constraints">Constraints</a>.
+          </>
+        ),
+      },
+      {
+        name: "channels",
+        type: "on a mark",
+        default: "—",
+        desc: "Bindings: field / value / datum, optional scale override, optional co-located edit.",
+      },
+      {
+        name: "edits",
+        type: "on a mark",
+        default: "—",
+        desc: (
+          <>
+            Mark-level edits for joint / multi-channel gestures (<code className="inline">edits: [drag({'{'} channels: ["x","y"] {'}'})]</code>).
+          </>
+        ),
+      },
+    ],
+  },
+  {
     name: "The channel forms",
     summary: (
       <>
-        The four shapes a channel can take on any mark’s <code className="inline">channels</code>, plus the co-located <code className="inline">edit</code> that makes it writable. Full scale options live on the <b>Scales & channels</b> page.
+        The four shapes a channel can take on any mark’s <code className="inline">channels</code>, plus the co-located <code className="inline">edit</code> that makes it writable. Full scale options live on the <a href="/scales">Scales & channels</a> page.
       </>
     ),
     options: [

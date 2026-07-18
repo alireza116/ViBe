@@ -1,0 +1,26 @@
+// Level B — custom(fn): one-off apply, stock gesture/pick defaults.
+const bumpY = custom((datum, _event, ctx) => {
+  if (!datum) return undefined;
+  const y = ctx.scales.y.invertValue(ctx.pointer.y);
+  return { ...datum, y: Math.round(y) };
+});
+
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 30, y: 40 }, { x: 70, y: 65 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    point({
+      fill: "#0d9488", size: 9, stroke: "#1f2733", strokeWidth: 1,
+      channels: {
+        x: { field: "x", edit: drag() },
+        y: { field: "y" },
+      },
+      edits: [ bumpY ],
+    }),
+  ],
+}))

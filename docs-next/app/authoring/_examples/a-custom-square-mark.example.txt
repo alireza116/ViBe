@@ -1,0 +1,46 @@
+// A minimal mark factory — same contract as point/bar.
+function square(options = {}) {
+  const opts = normalizeMarkOptions(options);
+  const { channels = {}, id, edits, constraints } = opts;
+  return {
+    id, channels, edits, constraints,
+    discreteScale: "point",
+    xKey: channels.x && channels.x.field,
+    yKey: channels.y && channels.y.field,
+    build(data, scales, width, height) {
+      return data.map((d, i) => {
+        const style = resolveStyle(scales, channels, d, { fill: "#4f46e5" });
+        const cx = encodeChannel(scales, channels, "x", d, width / 2);
+        const cy = encodeChannel(scales, channels, "y", d, height / 2);
+        const r = encodeChannel(scales, channels, "size", d, 8);
+        const side = Math.max(0, r * 2);
+        return {
+          type: "rect",
+          x: cx - side / 2, y: cy - side / 2,
+          width: side, height: side,
+          ...style, data: d, index: i,
+        };
+      });
+    },
+  };
+}
+
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  data: [{ x: 25, y: 40 }, { x: 55, y: 70 }, { x: 80, y: 35 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    square({
+      size: 9, stroke: "#1f2733", strokeWidth: 1,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+      },
+      edits: [ drag({ channels: ["x", "y"] }) ],
+    }),
+  ],
+}))

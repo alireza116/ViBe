@@ -5,13 +5,69 @@ export const api: ApiEntry[] = [
     name: "Elicit(spec)",
     summary: (
       <>
-        The entry point (<code className="inline">vibe.Elicit</code>). Returns a DOM element you append. The spec is a chart: a list of <code className="inline">features</code> (marks) plus size, margins and global axes/guides.
+        The entry point (<code className="inline">vibe.Elicit</code>). Returns a DOM element you append. A chart is one <code className="inline">schema</code>, one <code className="inline">data</code>set, and a list of <code className="inline">features</code> (marks) — plus optional constraints, axes, and guides.
       </>
     ),
     signatures: [
-      "Elicit({ width, height, margins, features, axes, guides, effects, renderer }) → HTMLElement",
+      "Elicit({ schema, data?, features, width?, height?, … }) → ElicitElement",
     ],
     options: [
+      {
+        name: "schema",
+        type: "Schema",
+        default: "required",
+        desc: (
+          <>
+            Field → measurement type / domain / default. Owns every field’s data type and <b>domain</b> — marks never declare one. See <a href="/schema">Data schema</a>.
+          </>
+        ),
+      },
+      {
+        name: "data",
+        type: "Datum[]",
+        default: "[]",
+        desc: (
+          <>
+            The one elicited dataset. Seed rows are a starting point; every mark is a <i>view</i> over these rows. May be empty when <code className="inline">create</code> will mint rows from the schema.
+          </>
+        ),
+      },
+      {
+        name: "features",
+        type: "Feature[]",
+        default: "[]",
+        desc: (
+          <>
+            The marks — <code className="inline">bar(...)</code>, <code className="inline">point(...)</code>, <code className="inline">composite(...)</code>, … drawn in order.
+          </>
+        ),
+      },
+      {
+        name: "constraints",
+        type: "Constraint[]",
+        default: "[]",
+        desc: (
+          <>
+            Dataset invariants that gate or repair every edit. See <a href="/constraints">Constraints</a>.
+          </>
+        ),
+      },
+      {
+        name: "onChange",
+        type: "(data) => void",
+        default: "—",
+        desc: "Called with the committed dataset after each edit. Hover previews never fire it.",
+      },
+      {
+        name: "scales",
+        type: "Record<channel, ScaleSpec>",
+        default: "derived",
+        desc: (
+          <>
+            Chart-level scale overrides keyed by channel (<code className="inline">x</code>, <code className="inline">y</code>, <code className="inline">fill</code>, …). Domains stay on the schema. See <a href="/scales">Scales & channels</a>.
+          </>
+        ),
+      },
       {
         name: "width / height",
         type: "number",
@@ -25,20 +81,24 @@ export const api: ApiEntry[] = [
         desc: "Inset around the inner plot (leaves room for axes).",
       },
       {
-        name: "features",
-        type: "Feature[]",
-        default: "[]",
+        name: "responsive",
+        type: "'fixed' | 'scale' | 'reflow' | true",
+        default: "'fixed'",
         desc: (
           <>
-            The marks — <code className="inline">bar(...)</code>, <code className="inline">point(...)</code>, <code className="inline">composite(...)</code>, … drawn in order.
+            Sizing mode — see <a href="/sizing">Responsive sizing</a>.
           </>
         ),
       },
       {
-        name: "x / y",
-        type: "ScaleSpec",
-        default: "from marks",
-        desc: "Optional top-level positional scale specs (a shared domain across marks).",
+        name: "lock",
+        type: "LockSpec",
+        default: "—",
+        desc: (
+          <>
+            Read-only rows. See <a href="/editing/lock">Locked rows</a>.
+          </>
+        ),
       },
       {
         name: "axes",
@@ -71,20 +131,22 @@ export const api: ApiEntry[] = [
     ],
     returns: (
       <>
-        An <b>HTMLElement</b> (a positioned container) carrying the methods below. A chart elicits exactly <b>one</b> dataset: <code className="inline">data</code> lives on the spec, the engine deep-copies it and owns it, and a mark is a <i>view</i> over those rows rather than an owner of its own — which is what lets two marks read the same rows and an invariant hold across both. The engine resolves one global scale per channel and re-renders on every commit.
+        An <b>ElicitElement</b> (a positioned container) carrying the methods below. The engine deep-copies <code className="inline">data</code> and owns it; marks re-derive from the committed rows on every render.
       </>
     ),
   },
   {
     name: "The element Elicit returns",
-    summary: "An ordinary DOM node — append it where you like — with the chart’s API hung off it. There is no separate handle object to keep in sync, and no global registry: everything a caller needs is on the element, so a page of several charts just has several elements.",
+    summary: "An ordinary DOM node — append it where you like — with the chart’s API hung off it. There is no separate handle object to keep in sync, and no global registry: everything a caller needs is on the element.",
     signatures: [
       "chart.getData() → Datum[]",
       "chart.getSchema() → Schema",
       "chart.setData(data) → void",
       "chart.on(\"change\" | \"stage\", cb) → () => void",
       "chart.undo() · chart.redo() · chart.canUndo() · chart.canRedo()",
-      "chart.getStage() · chart.setStage(i) · chart.nextStage()",
+      "chart.getStage() · chart.setStage(i) · chart.nextStage() · chart.getStageLabel()",
+      "chart.control(name, index?) → EditControl",
+      "chart.emit(event) → void",
       "chart.destroy() → void",
     ],
     options: [
@@ -135,6 +197,26 @@ export const api: ApiEntry[] = [
         desc: (
           <>
             Step one <b>gesture</b>, and report whether they moved. See <a href="/editing/history">History & keyboard</a>.
+          </>
+        ),
+      },
+      {
+        name: "control(name, index?)",
+        type: "→ EditControl",
+        default: "—",
+        desc: (
+          <>
+            Drive a named edit from outside the chart (a slider, a picker). Same dispatch as the pointer — constraints, undo, and <code className="inline">change</code> all run. See <a href="/editing/external-controls">External controls</a>.
+          </>
+        ),
+      },
+      {
+        name: "emit(event)",
+        type: "void",
+        default: "—",
+        desc: (
+          <>
+            Low-level: inject a renderer-shaped gesture event (inner pixels). Prefer <code className="inline">control</code> unless you already hold pixels.
           </>
         ),
       },

@@ -5,8 +5,13 @@ import { Example } from '../../components/Example';
 import { Lead } from '../../components/Lead';
 import { api } from './api';
 
+import twoMarksOneDataset from './_examples/two-marks-one-dataset.example.txt';
+import schemaOwnsTheDomain from './_examples/schema-owns-the-domain.example.txt';
 import fieldDrivenColourOrdinalPalette from './_examples/field-driven-colour-ordinal-palette.example.txt';
 import constantStyleShorthands from './_examples/constant-style-shorthands.example.txt';
+import valueVsDatum from './_examples/value-vs-datum.example.txt';
+import markLevelDrag from './_examples/mark-level-drag.example.txt';
+import clampedDrag from './_examples/clamped-drag.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -14,13 +19,47 @@ export default function Layout({ children }) {
 
 # Core concepts
 
-<Lead>**One dataset.** A chart elicits exactly one dataset — even a slider elicits a one-row dataset — so `data` lives on the `Elicit` spec, never on a mark. Each mark is a _view_ over those rows: it encodes some columns and, where a channel carries an `edit`, writes them back. Several marks over the same rows is the point, not a special case — they all re-derive from the committed data on the next render.<br /><br />**One schema.** What each field _is_ — and its **domain** — is declared once, on the spec’s `schema`. A mark never carries a domain, because a domain describes the data, not one mark’s view of it. The scale follows from the two: a categorical field on a bar’s x is a band; on a dot’s x it is a point.<br /><br />Every mark reads the same **channel** surface. A channel is a constant (`fill: "red"`) or a data field through a scale (`fill: { field: "kind" }`). No accessor functions — specs stay serializable. Encoding maps data → visual; an edit on a channel maps a gesture → data, back through the same scale.</Lead>
+<Lead>One dataset, one schema, channels that encode (and optionally edit), constraints that hold for every commit. Walk the model below — then use the sidebar for marks, edits, and scales in depth.</Lead>
 
 <ApiReference entries={api} />
 
-<Section id="channels" title="A channel is a constant or a field">
+<Section id="one-dataset" title="One dataset, marks are views">
 
-Constant channels take a raw value. Field channels name a data field and resolve it through a scale — a category through the ordinal palette, a number through a ramp. The same surface (x, y, fill, stroke, size, opacity, …) is available on every mark, plus top-level style shorthands.
+A chart elicits exactly one dataset — even a slider is one row — so `data` lives on the `Elicit` spec, never on a mark. Each mark is a _view_ over those rows: it encodes some columns and, where a channel carries an `edit`, writes them back. Several marks over the same rows is the point, not a special case — they all re-derive from the committed data on the next render.
+
+<Example
+  code={twoMarksOneDataset}
+  title="Two marks, one dataset"
+  blurb="Bars and points share the same rows. Only the point carries drag — the bars re-derive when the data commits."
+  try={(
+    <>
+      <b>Drag</b> a point — both marks update from the same rows.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="schema" title="Schema owns type and domain">
+
+What each field _is_ — and its **domain** — is declared once, on `schema`. A mark never carries a domain, because a domain describes the data, not one mark’s view of it. The scale follows from the two: a categorical field on a bar’s x is a band; on a dot’s x it is a point. Details on [Data schema](/schema) and [Scales & channels](/scales).
+
+<Example
+  code={schemaOwnsTheDomain}
+  title="Schema owns the domain"
+  blurb="Nothing names a scale. Schema says cat is categorical and n is quantitative; the bar needs an interval for discrete data — band and linear fall out."
+  try={(
+    <>
+      <b>Drag</b> a bar — the edit inverts through the derived scale.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="channels" title="Channel forms">
+
+A channel is a constant or a data field through a scale. No accessor functions — specs stay serializable. The same surface (`x`, `y`, `fill`, `stroke`, `size`, …) is available on every mark, plus top-level style shorthands.
 
 <Example
   code={fieldDrivenColourOrdinalPalette}
@@ -33,5 +72,55 @@ Constant channels take a raw value. Field channels name a data field and resolve
   title="Constant style shorthands"
   blurb="stroke, strokeWidth, opacity as top-level shorthands on a point — a constant channel needs no scale."
 />
+
+<Example
+  code={valueVsDatum}
+  title="value vs datum"
+  blurb="Solid indigo rule: y: { datum: 40 } (data units, through the scale). Dashed amber: y: { value: 28 } (pixel 28, skips the scale)."
+/>
+
+</Section>
+
+<Section id="edits" title="Where edits live">
+
+Encoding maps data → visual; an edit on a channel maps a gesture → data, back through the same scale. Place it on the channel (`y: { field, edit: drag() }`) for a single-channel write, or at mark level (`edits: [...]`) for a joint gesture. Full catalogue on [Editing](/editing).
+
+<Example
+  code={markLevelDrag}
+  title="Mark-level drag (x and y together)"
+  blurb={"edits: [drag({ channels: [\"x\", \"y\"] })] — one gesture writes both fields."}
+  try={(
+    <>
+      <b>Drag</b> a point in two dimensions.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="constraints" title="Constraints are dataset invariants">
+
+A constraint is a pure rule over **the dataset**. It holds no matter which edit fired it, or which mark declared it — mark-level `constraints` is sugar the engine promotes. It can reject a proposal or repair it (return corrected rows). Catalogue on [Constraints](/constraints).
+
+<Example
+  code={clampedDrag}
+  title="Clamped drag"
+  blurb="clamp keeps n in [10, 50]. guide: true draws the live bound while you drag."
+  try={(
+    <>
+      <b>Drag</b> a bar — it stops at 10 and 50.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="where-next" title="Where next">
+
+- **[Marks](/marks/bar)** — every mark factory, from bars and points to glyphs and geo.
+- **[Editing](/editing)** — drag, create/remove, pick modes, stages, history; drive named edits from outside the chart with [`control()`](/editing/external-controls).
+- **[Scales & data](/scales)** — derived scales, schema, and constraints in depth.
+- **[Widgets](/widgets)** — survey instruments built on the same API.
+- **[Authoring SDK](/authoring)** — custom marks, edits, and drivers when the built-ins aren’t enough.
 
 </Section>

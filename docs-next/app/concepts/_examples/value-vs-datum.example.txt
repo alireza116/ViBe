@@ -1,0 +1,31 @@
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { cat: "A", n: 30 }, { cat: "B", n: 55 },
+    { cat: "C", n: 22 }, { cat: "D", n: 44 },
+  ],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n:   { type: "quantitative", domain: [0, 60] },
+  },
+  features: [
+    bar({
+      fill: "#c7d2fe",
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n" },
+      },
+    }),
+    // datum: data units → through the scale (lands where n = 40 is)
+    ruleY({
+      stroke: "#4f46e5", strokeWidth: 2,
+      channels: { y: { datum: 40 } },
+    }),
+    // value: visual units → skips the scale (pixel 28 from the top of the plot)
+    ruleY({
+      stroke: "#b45309", strokeWidth: 2, strokeDasharray: "4 3",
+      channels: { y: { value: 28 } },
+    }),
+  ],
+}))

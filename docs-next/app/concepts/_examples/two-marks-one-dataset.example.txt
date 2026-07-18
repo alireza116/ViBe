@@ -1,0 +1,29 @@
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 16, right: 16, bottom: 28, left: 34 },
+  data: [
+    { cat: "A", n: 30 }, { cat: "B", n: 55 },
+    { cat: "C", n: 22 }, { cat: "D", n: 44 },
+  ],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n:   { type: "quantitative", domain: [0, 60] },
+  },
+  features: [
+    // Both marks read the same rows — neither owns data.
+    bar({
+      fill: "#c7d2fe",
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n" },
+      },
+    }),
+    point({
+      fill: "#4f46e5", stroke: "#1f2733", strokeWidth: 1, size: 7,
+      channels: {
+        x: { field: "cat" },
+        y: { field: "n", edit: drag() },
+      },
+    }),
+  ],
+}))
