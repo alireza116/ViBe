@@ -26,7 +26,7 @@
 // A missing positional channel parks the dot at the centre of that dimension —
 // symmetric across x and y, so 1D-along-x and 1D-along-y are the same code path.
 
-import { encodeChannel, encodeAngle, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions, themeOf, markDefaults } from './mark.js';
 
 /**
  * @param {any} [options]
@@ -59,8 +59,9 @@ export function point(options = {}) {
          * @returns {import('../types').FeatureNode[]}
          */
         build: (currentData, scales, width, height) => {
+            const pointDefaults = markDefaults(scales, 'point', { fill: themeOf(scales).ink });
             return currentData.map((d, i) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                const style = resolveStyle(scales, channels, d, pointDefaults, i, currentData);
                 const cx = encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
                 const cy = encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
                 const size = encodeChannel(scales, channels, 'size', d, 5, i, currentData);

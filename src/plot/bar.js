@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandwidthOf, bandStartOf, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
 
 // bar: a rectangular mark that composes across orientations. The band axis is
 // the categorical/position axis (sets the bar's position + thickness) and the
@@ -131,11 +131,15 @@ function buildBar(options, forcedOrientation) {
                 )
                 : null;
 
+            // Default ink from the theme (classic steelblue unless the theme's `ink`
+            // or a `marks.bar` override changes it); a per-datum fill channel still
+            // wins. Resolved once — the tokens don't vary per row.
+            const barDefaults = markDefaults(scales, 'bar', { fill: themeOf(scales).ink });
+
             return currentData.map((d, i) => {
                 // Standard style surface (fill/stroke/opacity/…), resolved per
-                // datum through the same channels every mark uses. Defaults to the
-                // classic steelblue fill when no fill channel/shorthand is set.
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                // datum through the same channels every mark uses.
+                const style = resolveStyle(scales, channels, d, barDefaults, i, currentData);
 
                 if (orientation === 'horizontal') {
                     // Category on y (band geometry), value/length on x. The value

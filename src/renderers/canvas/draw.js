@@ -8,6 +8,13 @@ import * as d3 from 'd3';
 import { markCenter } from '../../edit/shared.js';
 import { STYLE_FIELDS, resolveCurve, partitionScene } from '../shared.js';
 
+// The active theme's font tokens for this paint pass. Set once at the top of
+// paintScene (synchronous, single-threaded — so a module-level slot is safe) and
+// read by text(), which fires from several draw paths. Null family => 'sans-serif',
+// matching the pre-theme canvas default.
+/** @type {{ family: string | null, size: number } | null} */
+let activeFont = null;
+
 // SVG text-anchor -> canvas textAlign. `middle` is the only rename.
 /** @type {Record<string, CanvasTextAlign>} */
 const ALIGN = { start: 'start', middle: 'center', end: 'end', left: 'left', right: 'right', center: 'center' };
@@ -149,7 +156,9 @@ function text(ctx, node, defaults, anchorDefault) {
     if (node.text == null) return;
     withAngle(ctx, node, () => {
         const s = styleOf(node, defaults);
-        ctx.font = `${node.fontSize != null ? node.fontSize : 10}px sans-serif`;
+        const family = (activeFont && activeFont.family) || 'sans-serif';
+        const size = node.fontSize != null ? node.fontSize : ((activeFont && activeFont.size) || 10);
+        ctx.font = `${size}px ${family}`;
         ctx.textAlign = ALIGN[node.textAnchor || anchorDefault] || 'start';
         ctx.textBaseline = BASELINE[node.dominantBaseline] || 'alphabetic';
         const op = s.opacity != null ? s.opacity : 1;
@@ -259,9 +268,12 @@ function paintGuideFront(ctx, n) {
  * (last wins).
  * @param {CanvasRenderingContext2D} ctx
  * @param {any[]} children scene nodes
- * @param {{ images: Map<string, any>, requestRepaint: () => void }} io
+ * @param {{ images: Map<string, any>, requestRepaint: () => void, theme?: any }} io
  */
 export function paintScene(ctx, children, io) {
+    // The theme's font tokens for this pass (read by text()); null family keeps the
+    // pre-theme 'sans-serif' default so an un-themed chart is unchanged.
+    activeFont = (io && io.theme && io.theme.font) || null;
     const { background, guideRegions, marks, guideFront } = partitionScene(children);
 
     // Background: tiles (floor), then axis chrome, then vector basemap paths

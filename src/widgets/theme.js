@@ -11,6 +11,13 @@
 // That is the point of these widgets as a demonstration: the styling changes, the
 // principles don't. A plain-chart Likert and this one differ only in which guides
 // they draw — same mark, same edit, same constraint.
+//
+// ── Theming ─────────────────────────────────────────────────────────────────
+// The affordance tokens (accent/ring/track/cell/label/question/…) come from the
+// chart's THEME, read LIVE from the render context (`ctx.theme.widget`) each frame,
+// so a `spec.theme` (or `setTheme()`) restyles every survey instrument at once —
+// this is the showcase for the style layer. `THEME` below is the built-in default
+// (identical to `DEFAULT_THEME.widget`), used when no theme rode in on the context.
 
 import { custom } from '../guides/index.js';
 import { bandwidthOf } from '../core/scales.js';
@@ -28,6 +35,10 @@ export const THEME = {
     radius: 11
 };
 
+/** The widget tokens for this frame: the chart's theme, else the built-in default.
+ * @param {any} ctx render context (carries `theme`) @returns {typeof THEME} */
+const widgetTheme = (ctx) => (ctx && ctx.theme && ctx.theme.widget) || THEME;
+
 /** The categories of a band/point scale, in domain order. @param {any} scale */
 const categoriesOf = (scale) => (scale && Array.isArray(scale.domainConfig) ? scale.domainConfig : []);
 
@@ -38,9 +49,11 @@ const categoriesOf = (scale) => (scale && Array.isArray(scale.domainConfig) ? sc
  * @param {{ labelOffset?: number, radius?: number }} [options]
  */
 export function optionRings(options = {}) {
-    const { labelOffset = 30, radius = THEME.radius } = options;
+    const { labelOffset = 30, radius: radiusOpt } = options;
     return custom((/** @type {any} */ ctx) => {
         const { scales, height } = ctx;
+        const tw = widgetTheme(ctx);
+        const radius = radiusOpt != null ? radiusOpt : tw.radius;
         const cats = categoriesOf(scales.x);
         if (!cats.length) return [];
         const cy = height / 2;
@@ -56,17 +69,17 @@ export function optionRings(options = {}) {
                 type: 'line',
                 x1: cxOf(cats[i]) + radius, y1: cy,
                 x2: cxOf(cats[i + 1]) - radius, y2: cy,
-                stroke: THEME.track, strokeWidth: 3, background: true
+                stroke: tw.track, strokeWidth: 3, background: true
             });
         }
         for (const c of cats) {
             nodes.push({
                 type: 'circle', cx: cxOf(c), cy, r: radius,
-                fill: 'none', stroke: THEME.ring, strokeWidth: 1.5
+                fill: 'none', stroke: tw.ring, strokeWidth: 1.5
             });
             nodes.push({
                 type: 'text', x: cxOf(c), y: cy + labelOffset, text: String(c),
-                textAnchor: 'middle', fontSize: THEME.labelSize, fill: THEME.label
+                textAnchor: 'middle', fontSize: tw.labelSize, fill: tw.label
             });
         }
         return nodes;
@@ -83,6 +96,7 @@ export function cellGrid(options = {}) {
     const { pad = 3 } = options;
     return custom((/** @type {any} */ ctx) => {
         const { scales } = ctx;
+        const tw = widgetTheme(ctx);
         const cols = categoriesOf(scales.x);
         const rows = categoriesOf(scales.y);
         if (!cols.length || !rows.length) return [];
@@ -99,20 +113,20 @@ export function cellGrid(options = {}) {
                     y: scales.y.encode(r) - bh / 2 + pad,
                     width: bw - 2 * pad,
                     height: bh - 2 * pad,
-                    fill: THEME.cellFill, stroke: THEME.cellStroke, strokeWidth: 1
+                    fill: tw.cellFill, stroke: tw.cellStroke, strokeWidth: 1
                 });
             }
         }
         for (const c of cols) {
             nodes.push({
                 type: 'text', x: scales.x.encode(c), y: -14, text: String(c),
-                textAnchor: 'middle', fontSize: THEME.labelSize, fill: THEME.label
+                textAnchor: 'middle', fontSize: tw.labelSize, fill: tw.label
             });
         }
         for (const r of rows) {
             nodes.push({
                 type: 'text', x: -10, y: scales.y.encode(r) + 4, text: String(r),
-                textAnchor: 'end', fontSize: THEME.labelSize, fill: THEME.label
+                textAnchor: 'end', fontSize: tw.labelSize, fill: tw.label
             });
         }
         return nodes;
@@ -128,16 +142,17 @@ export function sliderTrack(options = {}) {
     const { format = (/** @type {any} */ v) => String(v) } = options;
     return custom((/** @type {any} */ ctx) => {
         const { scales, width, height } = ctx;
+        const tw = widgetTheme(ctx);
         if (!scales.x) return [];
         const cy = height / 2;
         const dom = scales.x.domainConfig || [0, 1];
         const lo = dom[0], hi = dom[dom.length - 1];
         return [
-            { type: 'line', x1: 0, y1: cy, x2: width, y2: cy, stroke: THEME.track, strokeWidth: 4, background: true },
-            { type: 'line', x1: 0, y1: cy - 7, x2: 0, y2: cy + 7, stroke: THEME.ring, strokeWidth: 2 },
-            { type: 'line', x1: width, y1: cy - 7, x2: width, y2: cy + 7, stroke: THEME.ring, strokeWidth: 2 },
-            { type: 'text', x: 0, y: cy + 26, text: format(lo), textAnchor: 'start', fontSize: THEME.labelSize, fill: THEME.label },
-            { type: 'text', x: width, y: cy + 26, text: format(hi), textAnchor: 'end', fontSize: THEME.labelSize, fill: THEME.label }
+            { type: 'line', x1: 0, y1: cy, x2: width, y2: cy, stroke: tw.track, strokeWidth: 4, background: true },
+            { type: 'line', x1: 0, y1: cy - 7, x2: 0, y2: cy + 7, stroke: tw.ring, strokeWidth: 2 },
+            { type: 'line', x1: width, y1: cy - 7, x2: width, y2: cy + 7, stroke: tw.ring, strokeWidth: 2 },
+            { type: 'text', x: 0, y: cy + 26, text: format(lo), textAnchor: 'start', fontSize: tw.labelSize, fill: tw.label },
+            { type: 'text', x: width, y: cy + 26, text: format(hi), textAnchor: 'end', fontSize: tw.labelSize, fill: tw.label }
         ];
     });
 }
@@ -151,10 +166,13 @@ export function sliderTrack(options = {}) {
  */
 export function prompt(text, options = {}) {
     const { y = -18 } = options;
-    return custom(() => (text ? [{
-        type: 'text', x: 0, y, text,
-        textAnchor: 'start', fontSize: THEME.questionSize, fill: THEME.question
-    }] : []));
+    return custom((/** @type {any} */ ctx) => {
+        const tw = widgetTheme(ctx);
+        return text ? [{
+            type: 'text', x: 0, y, text,
+            textAnchor: 'start', fontSize: tw.questionSize, fill: tw.question
+        }] : [];
+    });
 }
 
 /**
@@ -168,13 +186,14 @@ export function crosshair(labels = {}) {
     const { x = 'x', y = 'y' } = labels;
     return custom((/** @type {any} */ ctx) => {
         const { width, height } = ctx;
+        const tw = widgetTheme(ctx);
         const cx = width / 2, cy = height / 2;
         /**
          * @param {number} px @param {number} py @param {string} text @param {string} anchor
          * @returns {import('../types').FeatureNode}
          */
         const t = (px, py, text, anchor) =>
-            ({ type: 'text', x: px, y: py, text, textAnchor: anchor, fontSize: THEME.labelSize, fill: THEME.label });
+            ({ type: 'text', x: px, y: py, text, textAnchor: anchor, fontSize: tw.labelSize, fill: tw.label });
         // A side label stacks one word per line (plus its extreme), centred on the
         // axis — a long variable name then fits the margin instead of running off
         // the SVG, however wide it is.
@@ -186,8 +205,8 @@ export function crosshair(labels = {}) {
         };
 
         return [
-            { type: 'line', x1: 0, y1: cy, x2: width, y2: cy, stroke: THEME.ring, strokeWidth: 1, background: true },
-            { type: 'line', x1: cx, y1: 0, x2: cx, y2: height, stroke: THEME.ring, strokeWidth: 1, background: true },
+            { type: 'line', x1: 0, y1: cy, x2: width, y2: cy, stroke: tw.ring, strokeWidth: 1, background: true },
+            { type: 'line', x1: cx, y1: 0, x2: cx, y2: height, stroke: tw.ring, strokeWidth: 1, background: true },
             ...side(width + 10, 'high', 'start'),
             ...side(-10, 'low', 'end'),
             t(cx, -8, `${y} (high)`, 'middle'),

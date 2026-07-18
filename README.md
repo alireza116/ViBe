@@ -64,7 +64,7 @@ VibeJS is layered for extensibility:
    - **Geo-scoped** edits, namespaced as `edit.geo.*`: `drag` / `create` (lon/lat via `projection.invert`), `draw` / `dragVertex` / `removeVertex` (coordinate-list lines: author, reshape, simplify), `brush` / `createRect` (geographic west/south/east/north boxes). `brush` runs on the `geoBrush` driver — edge/corner/body, with the grabbed zone latched at **dragstart** and held for the gesture (re-deciding it per tick turns a move into a resize mid-drag), a body move translating by the geographic delta, and a dragend pass that un-inverts a crossed pair. They require chart `projection` and a `geo*` mark.
    - **Scope goes in the name.** A namespaced edit (`edit.line.*`, `edit.arc.*`, `edit.waffle.*`, `edit.geo.*`, `edit.axis.*`) needs the matching mark family, and each declares a `scope` naming the mark capability it requires. Attach one to a mark that lacks the capability and the engine dev-warns rather than leaving you with a gesture that silently does nothing.
    - `pick` selects the target: `direct` (the mark hit), `nearest` (closest within a threshold), `plane` (no target — create), or a driver lifecycle (`sweep` / `draw` / `brush` / `probe`). Multi-event lifecycles live in **self-describing drivers** (`src/edit/drivers/`) — adding an interaction mode is a new driver file, not an engine change.
-   - `pick: 'probe'` is the **hover-preview / click-commit** flow, with no drag: the pointer probes a value (the mark follows the cursor as an *uncommitted preview*), and a click settles it. Any edit works this way. Preview and commit run the same `apply` + the same invariants through one code path, so the preview cannot drift from what the click writes — and a preview never reaches `onChange` or `getData`.
+   - `pick: 'probe'` is the **probe / settle** flow: the pointer probes a value and the proposal follows the cursor as an inert **ghost** (the committed mark stays put — so nothing flickers, even on a matrix), and a **commit** settles it. Two gestures commit, so both natural expectations work — **move-then-click**, and **grab-and-drag** (press on the mark, drag, release). Any edit works this way. Preview and commit run the same `apply` + the same invariants through one code path, so the ghost cannot drift from what a commit writes — and a preview never reaches `onChange` or `getData`. The ghost is drawn by the engine's ghost pass (only the rows a proposal would change, styled by `theme.ghost`).
    - `when` arbitrates when several edits share a gesture (`vibe.when.alt`, `noAlt`, `shift`, `near`, `far`, …): e.g. plain click recolours, Alt-click deletes.
    - `stage` gates an edit to one step of a multi-stage elicitation ("first X, then Y"). It is a uniform filter applied to every edit — not a new mode. A `probe` click on a staged edit commits that stage's field and advances automatically (freezing it); you can also drive stages yourself with `setStage` / `nextStage`. See `cone` and `trend`.
 
@@ -74,9 +74,11 @@ VibeJS is layered for extensibility:
 
 7. **Format (`vibe.format.*`)** — display formatters for text marks (and anywhere a value is shown as a string). A mark's `format` option takes a d3-format string or `(v) => string`; helpers mint common ones (`format.number('.1f')`, `format.percent()`, `format.si()`, `format.time('%b %Y')`, `format.prefix('$')`, `format.suffix(' kg')`). Display-only — the underlying field stays the raw value.
 
-8. **Widgets (`vibe.widgets.*`)** — higher-level named elicitations, each a pure recipe over the core API (no new interaction surface): `likert`, `multipleChoice`, `slider`, `matrix`, `lineCone`, `ranking`, `allocation`, `probabilityTokens`, `interval` (alias `ci`), `histogram`, `region`, `thermometer`, `labeledValue`. Each returns an **ElicitSpec** you pass straight to `Elicit(widgets.likert({…}))`. They look like survey instruments rather than charts — option rings, a cell grid, a track — but that styling is *only* the guide layer (`widgets.THEME`, `optionRings`, `cellGrid`, `sliderTrack`, `crosshair`), so each has a plain-chart twin built from the same mark, edit and constraint.
+8. **Widgets (`vibe.widgets.*`)** — higher-level named elicitations, each a pure recipe over the core API (no new interaction surface): `likert`, `multipleChoice`, `slider`, `matrix`, `lineCone`, `ranking`, `allocation`, `probabilityTokens`, `interval` (alias `ci`), `histogram`, `region`, `thermometer`, `labeledValue`. Each returns an **ElicitSpec** you pass straight to `Elicit(widgets.likert({…}))`. They share one option contract — `question`, `value`/`values`, `onChange`, `width`/`height`, `stage`, and `theme` — and look like survey instruments rather than charts (option rings, a cell grid, a track), but that styling is *only* the guide layer (`optionRings`, `cellGrid`, `sliderTrack`, `crosshair`), so each has a plain-chart twin built from the same mark, edit and constraint. Pass `theme: themes.survey` (or any partial) and the whole family restyles at once.
 
-9. **Renderer (`vibe.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
+9. **Theme (`vibe.themes`, `setTheme`, `spec.theme`)** — the **style layer**: one data object of default colours, fonts, and affordance tokens, deep-merged over the built-in `DEFAULT_THEME`. It supplies the *defaults* marks/chrome/renderers draw with (a per-datum paint channel still wins, and per-mark `theme.marks[name]` overrides sit in between). Resolved once per chart the way `effects` is (`spec.theme → resolveTheme → ctx.theme`, threaded to marks on the scale map), so it never adds a second style path. `themes.survey` is a built-in professional look; `setTheme(partial)` sets an app-wide default. See `/theming`.
+
+10. **Renderer (`vibe.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
 
 **Reading data out.** `Elicit(spec)` returns the chart element augmented with a small observation API: `getData()` (a deep copy of the committed belief dataset), `getSchema()` (a deep copy of the engine-owned schema, including any domain an editable axis reshaped — the caller's `spec.schema` is never mutated), `setData(data)` (seed/reset + re-render; also clears the undo history, since a reseed is a new starting point rather than an edit), and `on("change" | "stage", cb)` (subscribe; returns an unsubscribe). This is in addition to the spec's `onChange`.
 
@@ -104,6 +106,8 @@ vibe-js/
 │   │   ├── tiles.js        # Slippy-map tile cover for geoTile (Web Mercator check + {z}/{x}/{y} placement)
 │   │   ├── samples.js      # Domain sampling for line authoring
 │   │   ├── effects.js      # Interaction-feedback layer (grab / select)
+│   │   ├── theme.js        # Style layer: DEFAULT_THEME, resolveTheme, setTheme, per-mark defaults
+│   │   ├── themes.js       # Built-in themes (default, survey)
 │   │   └── scene.js        # Abstract scene graph
 │   ├── plot/               # Marks (mark.js = shared channel/style foundation)
 │   │   ├── point.js · face.js · bar.js · rect.js · tick.js · text.js · line.js · rule.js · composite.js · axis.js
@@ -121,7 +125,7 @@ vibe-js/
 │   │   ├── shared.js       # makeEdit + datum/series helpers
 │   │   └── drivers/        # Self-describing interaction modes (plane/nearest/sweep/draw/brush/brushRect/geoBrush/probe/axisDrag)
 │   ├── constraints/        # Data-layer invariants (define/clamp/maintainSum/count/unique/snap)
-│   ├── widgets/            # Named survey instruments (likert/choice/slider/matrix/lineCone/ranking/allocation/…) + theme.js
+│   ├── widgets/            # Named survey instruments (likert/choice/slider/matrix/lineCone/ranking/allocation/…) + shared.js (contract) + theme.js (affordances)
 │   ├── guides/             # rule / region / proximity / custom annotations
 │   ├── format.js           # Display formatters (number/percent/si/time/prefix/suffix)
 │   ├── renderers/

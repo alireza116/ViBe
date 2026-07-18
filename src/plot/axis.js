@@ -19,6 +19,7 @@
 
 import * as d3 from 'd3';
 import { positionOnScale, isDiscrete } from '../core/scales.js';
+import { themeOf } from '../core/theme.js';
 
 /** Numeric view of a domain value (a Date sorts by its timestamp). */
 const numOf = (/** @type {any} */ v) => (v instanceof Date ? v.getTime() : v);
@@ -138,16 +139,18 @@ export function axis(options = {}) {
         tickFormat,
         tickSize = 6,
         title,
-        stroke = '#6b7280',  // spine + ticks
-        fill = '#374151',    // tick labels + title (text nodes take a fill)
-        fontSize = 10,
+        // Chrome colours/size default to the theme's axis tokens, resolved at build
+        // time (a factory can't see the chart's theme). An explicit option still wins.
+        stroke: strokeOpt,      // spine + ticks
+        fill: fillOpt,          // tick labels + title (text nodes take a fill)
+        fontSize: fontSizeOpt,
         grid = false,
         // Opt-in interactivity: an edit (edit.axis.scale / edit.axis.categories) or
         // a list of them, and an optional single field the edit pins (defaults to
         // every field on the axis). Axes are inert unless `edit` is given.
         edit,
         field,
-        handleColor = '#2563eb',
+        handleColor: handleColorOpt,
         id
     } = options;
 
@@ -178,6 +181,13 @@ export function axis(options = {}) {
         build: (_data, scales, width, height) => {
             const scale = scales[channel];
             if (!scale) return []; // 1D plot / hidden channel — no-op
+
+            // Resolve chrome from the theme (option overrides > theme.axis tokens).
+            const thm = themeOf(scales);
+            const stroke = strokeOpt ?? thm.axis.stroke;
+            const fill = fillOpt ?? thm.axis.labelFill;
+            const fontSize = fontSizeOpt ?? thm.axis.fontSize;
+            const handleColor = handleColorOpt ?? thm.axis.handle;
 
             const base = baseTranslate(anchor, width, height);
             const t = transform
@@ -306,8 +316,9 @@ export function grid(options = {}) {
         channel = 'x',
         ticks = 5,
         tickValues,
-        stroke = '#e5e7eb',
-        strokeWidth = 1,
+        // Grid line colour/width default to the theme's grid tokens (build-time).
+        stroke: strokeOpt,
+        strokeWidth: strokeWidthOpt,
         id
     } = options;
 
@@ -328,6 +339,9 @@ export function grid(options = {}) {
         build: (_data, scales, width, height) => {
             const scale = scales[channel];
             if (!scale) return [];
+            const thm = themeOf(scales);
+            const stroke = strokeOpt ?? thm.grid.stroke;
+            const strokeWidth = strokeWidthOpt ?? thm.grid.strokeWidth;
             const { values } = tickData(scale, { ticks, tickValues });
 
             /** @type {import('../types').FeatureNode[]} */

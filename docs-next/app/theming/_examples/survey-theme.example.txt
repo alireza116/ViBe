@@ -1,0 +1,7 @@
+// One object restyles the whole instrument: answer ink, chrome, and the
+// affordance rings/track/labels all follow themes.survey.
+mount(Elicit(widgets.likert({
+  question: "How satisfied are you with the result?",
+  options: ["Very low", "Low", "Neutral", "High", "Very high"],
+  theme: themes.survey,
+})));

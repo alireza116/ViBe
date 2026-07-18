@@ -10,13 +10,12 @@
 import { point } from '../plot/index.js';
 import { drag } from '../edit/index.js';
 import { clamp, snap } from '../constraints/index.js';
-import { sliderTrack, prompt, THEME } from './theme.js';
+import { sliderTrack, prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, domain?: [number, number], step?: number,
- *   value?: number, format?: (v: any) => string,
- *   onChange?: (data: any[]) => void, width?: number, height?: number,
- *   stage?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { domain?: [number, number], step?: number,
+ *   value?: number, format?: (v: any) => string }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function slider(opts = {}) {
@@ -29,8 +28,10 @@ export function slider(opts = {}) {
         onChange,
         width = 560,
         height = 120,
-        stage
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     /** @type {any[]} */
     const constraints = [clamp({ min: domain[0], max: domain[1], field: 'value' })];
@@ -39,6 +40,7 @@ export function slider(opts = {}) {
     return {
         width,
         height,
+        theme,
         margins: { top: 34, right: 40, bottom: 40, left: 40 },
         // The contract of the elicited dataset: one quantitative value, bounded.
         schema: { value: { type: 'quantitative', domain } },
@@ -51,8 +53,8 @@ export function slider(opts = {}) {
         features: [
             point({
                 id: 'slider',
-                size: THEME.radius - 2,
-                fill: THEME.accent,
+                size: t.widget.radius - 2,
+                fill: t.widget.accent,
                 channels: {
                     x: { field: 'value' }
                 },

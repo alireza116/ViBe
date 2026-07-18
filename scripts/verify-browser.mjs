@@ -97,7 +97,7 @@ async function main() {
             '/editing/existence', '/editing/probe', '/editing/stages', '/editing/axis',
             '/editing/external-controls',
             '/editing/history', '/widgets', '/scales', '/schema', '/constraints',
-            '/effects', '/guides',
+            '/effects', '/guides', '/theming',
         ];
         for (const r of routes) await visit(r);
 
@@ -762,6 +762,103 @@ async function main() {
         check('external: driving one face slider leaves the others untouched',
             faceAfter[0].smile === faceBefore[0].smile && faceAfter[0].brow === faceBefore[0].brow,
             `smile ${faceBefore[0].smile}->${faceAfter[0].smile}, brow ${faceBefore[0].brow}->${faceAfter[0].brow}`);
+
+        // ---- Probe: ghost preview + drag-commit ---------------------------
+        // The interaction the redesign targets. A hover/drag must PREVIEW as an inert
+        // ghost (the committed mark stays put — no flicker/jump), getData must not move
+        // until a commit, and BOTH a click and a drag-release must settle. Before this,
+        // a dragged probe committed NOTHING: the driver ignored drag and the renderer
+        // swallowed the trailing click. None of that is visible to the typechecker.
+        console.log('\nProbe ghost-preview + drag-commit (/editing/probe)');
+        await open('/editing/probe', '#preview .chart svg circle');
+        // The preview section has two examples; target the FIRST (probe-a-single-value).
+        const pvChart = page.locator('#preview .chart').first();
+        const pvEl = '#preview .chart > div';   // $eval => first match, same chart
+        const pvV = () => page.$eval(pvEl, (e) => e.getData()[0].v);
+        const pvGhosts = () => pvChart.locator('svg [data-ghost]').count();
+        await pvChart.locator('svg').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const pvSvg = await pvChart.locator('svg').boundingBox();
+        const pvKnob0 = await pvChart.locator('svg circle').first().boundingBox();
+        const pvCy = pvKnob0.y + pvKnob0.height / 2;
+        const pvHoverX = pvSvg.x + pvSvg.width * 0.7;   // well right of the seeded knob
+
+        const vBefore = await pvV();
+        // HOVER — preview only, no button.
+        await page.mouse.move(pvHoverX, pvCy);
+        await page.waitForTimeout(120);
+        const vHover = await pvV();
+        const ghostsHover = await pvGhosts();
+        check('probe: hover does NOT commit (getData unchanged)', vHover === vBefore, `v ${vBefore} -> ${vHover}`);
+        check('probe: hover shows a ghost preview node', ghostsHover > 0, `ghosts=${ghostsHover}`);
+
+        // CLICK — settle at the hovered spot.
+        await page.mouse.click(pvHoverX, pvCy);
+        await page.waitForTimeout(120);
+        const vClicked = await pvV();
+        const ghostsClicked = await pvGhosts();
+        check('probe: click commits the previewed value', vClicked > vBefore + 10, `v ${vBefore} -> ${vClicked}`);
+        check('probe: no ghost remains after a click commit', ghostsClicked === 0, `ghosts=${ghostsClicked}`);
+
+        // DRAG-RELEASE — grab the knob, drag left, release. THE slider fix.
+        const pvKnob1 = await pvChart.locator('svg circle').first().boundingBox();
+        const pvFromX = pvKnob1.x + pvKnob1.width / 2;
+        const pvToX = pvSvg.x + pvSvg.width * 0.3;
+        await page.mouse.move(pvFromX, pvCy);
+        await page.mouse.down();
+        for (let k = 1; k <= 8; k++) await page.mouse.move(pvFromX + (pvToX - pvFromX) * k / 8, pvCy);
+        await page.mouse.up();
+        await page.waitForTimeout(120);
+        const vDragged = await pvV();
+        const ghostsDragged = await pvGhosts();
+        check('probe: a drag-release commits (was a total no-op before)', vDragged < vClicked - 5,
+            `v ${vClicked} -> ${vDragged}`);
+        check('probe: no ghost remains after a drag commit', ghostsDragged === 0, `ghosts=${ghostsDragged}`);
+
+        // The whole drag collapses to ONE undo entry (a lazy per-gesture transaction).
+        await page.$eval(pvEl, (e) => e.undo());
+        await page.waitForTimeout(100);
+        const vUndone = await pvV();
+        check('probe: one undo restores the pre-drag value', Math.abs(vUndone - vClicked) < 1.5,
+            `after undo v=${vUndone} vs ${vClicked}`);
+
+        // ---- Probe on a matrix: no flicker, no stale preview --------------
+        // The matrix was the worst case: substituting the whole dataset for a hover
+        // rebuilt every committed cell, so they jumped. Now a hover only ADDS a ghost
+        // of the touched cell; committed cells never move, and leaving clears it.
+        console.log('\nProbe on a matrix — no flicker (/widgets)');
+        await open('/widgets', '#matrix .chart svg');
+        // The matrix section shows the widget; .first() is defensive if that changes.
+        const mxChart = page.locator('#matrix .chart').first();
+        const mxEl = '#matrix .chart > div';
+        const mxLen = () => page.$eval(mxEl, (e) => e.getData().length);
+        await mxChart.locator('svg').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const mxBox = await mxChart.locator('svg').boundingBox();
+        const lenBefore = await mxLen();
+        await page.mouse.move(mxBox.x + mxBox.width * 0.5, mxBox.y + mxBox.height * 0.5);
+        await page.waitForTimeout(150);
+        const lenHover = await mxLen();
+        const mxGhosts = await mxChart.locator('svg [data-ghost]').count();
+        check('matrix: hovering a cell does NOT commit', lenHover === lenBefore, `len ${lenBefore} -> ${lenHover}`);
+        check('matrix: hovering a cell shows a ghost preview', mxGhosts > 0, `ghosts=${mxGhosts}`);
+        await page.mouse.move(mxBox.x - 30, mxBox.y - 30);   // leave the plane
+        await page.waitForTimeout(150);
+        const mxGone = await mxChart.locator('svg [data-ghost]').count();
+        check('matrix: leaving clears the ghost (no stale preview)', mxGone === 0, `ghosts=${mxGone}`);
+
+        // ---- Theming: tokens reach the pixels ------------------------------
+        // The theme's `ink` recolours unstyled marks, and theme.marks[name]
+        // overrides one mark — resolved on the node, so it lands as an SVG attr.
+        console.log('\nTheming (/theming)');
+        await open('/theming', '#tokens .chart svg rect');
+        const inkFill = await page.$eval('#tokens .chart svg rect:not(.plane)', (r) => r.getAttribute('fill'));
+        check('theme: ink recolours the bars', inkFill === '#e11d48', `fill=${inkFill}`);
+        // Per-mark override: bars read `ink`, dots read theme.marks.point.
+        const barFill = await page.$eval('#precedence .chart svg rect:not(.plane)', (r) => r.getAttribute('fill'));
+        const dotFill = await page.$eval('#precedence .chart svg circle', (c) => c.getAttribute('fill'));
+        check('theme: ink colours the bars', barFill === '#0ea5e9', `fill=${barFill}`);
+        check('theme: marks.point overrides just the dots', dotFill === '#f59e0b', `fill=${dotFill}`);
 
         check('no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     } finally {

@@ -26,3 +26,6 @@ export { labeledValue } from './labeledValue.js';
 // The instrument palette + the guide-built affordances (option rings, cell grid,
 // slider track, crosshair frame), exported so a custom instrument can reuse them.
 export { THEME, optionRings, cellGrid, sliderTrack, prompt, crosshair } from './theme.js';
+// The shared widget contract: `widgetTheme(opts.theme)` resolves a widget's theme
+// the same way the engine resolves spec.theme, so a custom instrument stays in step.
+export { widgetTheme } from './shared.js';

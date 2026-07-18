@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
 
 // area: a filled path under a series (the distributional sibling of line). Same
 // grouping / ordering knobs as line; emits one filled `path` per series plus
@@ -164,9 +164,9 @@ function buildArea(options, forcedValueAxis) {
                     sorted.sort((a, b) => (a.d[order] < b.d[order] ? -1 : a.d[order] > b.d[order] ? 1 : 0));
                 }
 
-                const style = resolveStyle(scales, channels, sorted[0] ? sorted[0].d : {}, {
-                    fill: 'steelblue', stroke: 'steelblue', fillOpacity: 0.35
-                });
+                const areaInk = themeOf(scales).ink;
+                const style = resolveStyle(scales, channels, sorted[0] ? sorted[0].d : {},
+                    markDefaults(scales, 'area', { fill: areaInk, stroke: areaInk, fillOpacity: 0.35 }));
 
                 // Span mode: the far edge is a second field, not the baseline. Both
                 // edges resolve through encodeChannel like any other channel, so the

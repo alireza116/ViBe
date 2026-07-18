@@ -1,0 +1,5 @@
+mount(Elicit(widgets.probabilityTokens({
+  question: "Spread 20 tokens over the outcomes you expect",
+  bins: ["Low", "Med", "High"],
+  maxTokens: 20,
+})));

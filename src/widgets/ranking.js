@@ -4,11 +4,11 @@
 
 import { point, text } from '../plot/index.js';
 import { rank } from '../edit/index.js';
-import { prompt, THEME } from './theme.js';
+import { prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, items?: string[], onChange?: (data: any[]) => void,
- *   width?: number, height?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { items?: string[] }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function ranking(opts = {}) {
@@ -17,8 +17,11 @@ export function ranking(opts = {}) {
         items = ['A', 'B', 'C', 'D'],
         onChange,
         width = 420,
-        height = 280
+        height = 280,
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     const ranks = items.map((_, i) => i + 1);
     const data = items.map((item, i) => ({ item, rank: i + 1 }));
@@ -26,6 +29,7 @@ export function ranking(opts = {}) {
     return {
         width,
         height,
+        theme,
         margins: { top: 40, right: 24, bottom: 24, left: 100 },
         schema: {
             item: { type: 'categorical', domain: items },
@@ -38,17 +42,17 @@ export function ranking(opts = {}) {
         features: [
             point({
                 id: 'rank-dots',
-                size: THEME.radius - 2,
-                fill: THEME.accent,
+                size: t.widget.radius - 2,
+                fill: t.widget.accent,
                 channels: {
                     x: { value: 40 },
-                    y: { field: 'rank', edit: rank() }
+                    y: { field: 'rank', edit: rank({ stage }) }
                 }
             }),
             text({
                 id: 'rank-labels',
                 fontSize: 13,
-                fill: '#111',
+                fill: t.widget.label,
                 channels: {
                     x: { value: 56 },
                     y: { field: 'rank' },

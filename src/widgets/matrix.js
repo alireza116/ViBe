@@ -13,12 +13,11 @@
 import { point } from '../plot/index.js';
 import { toggle } from '../edit/index.js';
 import { unique } from '../constraints/index.js';
-import { cellGrid, prompt, THEME } from './theme.js';
+import { cellGrid, prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, questions?: any[], options?: any[], value?: any[],
- *   onChange?: (data: any[]) => void, width?: number, height?: number,
- *   stage?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { questions?: any[], options?: any[], value?: any[] }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function matrix(opts = {}) {
@@ -30,8 +29,10 @@ export function matrix(opts = {}) {
         onChange,
         width = 620,
         height = 100 + questions.length * 46,
-        stage
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     const margins = { top: 62, right: 30, bottom: 20, left: 130 };
     const innerHeight = height - margins.top - margins.bottom;
@@ -39,6 +40,7 @@ export function matrix(opts = {}) {
     return {
         width,
         height,
+        theme,
         margins,
         // The contract of the elicited dataset: which option answers which question.
         schema: {
@@ -64,8 +66,8 @@ export function matrix(opts = {}) {
         features: [
             point({
                 id: 'matrix',
-                size: THEME.radius - 3,
-                fill: THEME.accent,
+                size: t.widget.radius - 3,
+                fill: t.widget.accent,
                 channels: {
                     x: { field: 'option' },
                     y: { field: 'question' }

@@ -1,0 +1,73 @@
+import { DocShell } from '../../components/DocShell';
+import { ApiReference } from '../../components/ApiReference';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+import { api } from './api';
+
+import surveyTheme from './_examples/survey-theme.example.txt';
+import perChartTheme from './_examples/per-chart-theme.example.txt';
+import perMarkOverride from './_examples/per-mark-override.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Theming & style
+
+<Lead>Every default colour, font, and affordance token lives in one place — the **theme**. Pass a partial `theme` on `Elicit` (or on any widget) and it deep-merges over the built-in defaults, so you name only what you change. It sits alongside, and under, the two style hooks you already have: a per-datum paint **channel** (`fill`, `stroke`) still wins over any theme token, and the [effects](/effects) layer still owns interaction feedback. The showcase is the [survey widgets](/widgets): one theme restyles the whole family.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="survey" title="A themed instrument">
+
+`themes.survey` is a built-in professional look. Pass it to any widget and the answer ink, the chrome, and the affordance rings/track/labels all follow it — the behaviour is unchanged, only the style.
+
+<Example
+  code={surveyTheme}
+  title="The survey theme"
+  blurb="One object — themes.survey — restyles ink, chrome, and every affordance."
+  try={"move across the options, click to answer — the look is the only change."}
+/>
+
+</Section>
+
+<Section id="tokens" title="A theme on a plain chart">
+
+A theme is plain data — no functions, no classes — so it merges cleanly. `ink` is the primary mark colour (every mark with no explicit paint channel reads it); `axis` and `grid` are the chrome. Name a token and it changes; leave one out and it inherits the default.
+
+<Example
+  code={perChartTheme}
+  title="Per-chart theme"
+  blurb="ink recolours the bars; axis/grid restyle the chrome. Drag a bar — the value axis still works."
+  try={"drag a bar up or down."}
+/>
+
+</Section>
+
+<Section id="precedence" title="Overrides & precedence">
+
+Resolution is layered, most specific first: a per-datum **channel** or option beats `theme.marks[name]`, which beats the theme **token** (`ink`), which beats the renderer default. So a theme sets the family look while a single mark can still opt out.
+
+<Example
+  code={perMarkOverride}
+  title="Per-mark override"
+  blurb="ink colours the bars; theme.marks.point overrides just the dots."
+  try={"drag a dot — its colour comes from theme.marks.point, not ink."}
+/>
+
+</Section>
+
+<Section id="app-wide" title="App-wide defaults">
+
+To theme a whole application without threading `theme` through every chart, call `setTheme(partial)` once at startup — every chart built afterwards inherits it, and a chart's own `theme` still layers on top. `setTheme(themes.survey)` makes the survey look the default; `setTheme(null)` resets to the built-in.
+
+```js
+import { setTheme, themes } from "vibe";
+
+setTheme(themes.survey);          // app-wide default
+// …every Elicit(...) after this inherits it
+setTheme({ ink: "#4f46e5" });     // or just a token or two
+```
+
+</Section>

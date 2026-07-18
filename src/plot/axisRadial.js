@@ -14,7 +14,7 @@
 
 import { positionOnScale, isDiscrete } from '../core/scales.js';
 import { DEFAULT_PALETTE } from '../core/encoding.js';
-import { encodeChannel, normalizeMarkOptions, AXIS_CHROME } from './mark.js';
+import { encodeChannel, normalizeMarkOptions, AXIS_CHROME, themeOf } from './mark.js';
 import { tickData } from './axis.js';
 import {
     arcSpan,
@@ -66,10 +66,11 @@ export function axisRadial(options = {}) {
         orient,
         start,
         end,
-        labelFill = '#374151',
-        stroke = '#6b7280',
+        // Chrome colours/size default to the theme's axis tokens at build time.
+        labelFill: labelFillOpt,
+        stroke: strokeOpt,
         strokeWidth = 1.25,
-        fontSize = 10,
+        fontSize: fontSizeOpt,
     } = opts;
 
     const [spanStart, spanEnd] = arcSpan({ arc: arcOpt, orient, start, end });
@@ -93,6 +94,12 @@ export function axisRadial(options = {}) {
         build: (currentData, scales, width, height) => {
             const scale = scales[channel];
             if (!scale) return [];
+
+            // Resolve chrome from the theme (option overrides > theme.axis tokens).
+            const thm = themeOf(scales);
+            const labelFill = labelFillOpt ?? thm.axis.labelFill;
+            const stroke = strokeOpt ?? thm.axis.stroke;
+            const fontSize = fontSizeOpt ?? thm.axis.fontSize;
 
             // Prefer the scale's own range as the arc span when the author set one;
             // otherwise fall back to the mark's arc/start/end options.

@@ -23,7 +23,9 @@ export function region(options = {}) {
          */
         build: (ctx) => {
             const { scales, width, height } = ctx;
-            const { x, y, fill = '#64748b', opacity = 0.1 } = resolveGuideOptions(options, ctx);
+            // Fill/opacity default to the theme's region tokens; an option still wins.
+            const rt = (ctx.theme && ctx.theme.guide && ctx.theme.guide.region) || {};
+            const { x, y, fill = rt.fill || '#64748b', opacity = rt.opacity != null ? rt.opacity : 0.1 } = resolveGuideOptions(options, ctx);
 
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];

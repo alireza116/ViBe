@@ -23,7 +23,7 @@
 // polar form). Slice boundaries are draggable via edit.arc.edge(); sibling controls
 // work with maintainSum.
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
 import { arcSpan, arcPath, polarToXY } from './polar.js';
 
 /**
@@ -121,11 +121,8 @@ export function arc(options = {}) {
 
                 if (sweep <= 0) return;
 
-                const style = resolveStyle(scales, channels, d, {
-                    fill: '#4f46e5',
-                    stroke: '#fff',
-                    strokeWidth: 1,
-                }, i, currentData);
+                const style = resolveStyle(scales, channels, d,
+                    markDefaults(scales, 'arc', { fill: '#4f46e5', stroke: '#fff', strokeWidth: 1 }), i, currentData);
                 const pathD = arcPath(cx, cy, outer, a0, a1, { innerRadius });
                 if (!pathD) return;
 

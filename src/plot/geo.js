@@ -12,7 +12,7 @@
 //   geoLine     — coordinate lists / MultiLineString paths + vertex handles
 //   geoRect     — geographic AABB (west/south/east/north)
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
 import { textNodeAt, hasEditText } from './text.js';
 import { resolveFormat } from '../format.js';
 import { projectPoint, projectBounds } from '../core/projection.js';
@@ -261,12 +261,13 @@ export function geoPoint(options = {}) {
             const projection = projectionOf(scales);
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
+            const geoDefaults = markDefaults(scales, 'geoPoint', { fill: themeOf(scales).ink });
             currentData.forEach((d, i) => {
                 const lon = channels.lon ? (d[lonKey]) : d.lon;
                 const lat = channels.lat ? (d[latKey]) : d.lat;
                 const pt = projectPoint(projection, lon, lat);
                 if (!pt) return;
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                const style = resolveStyle(scales, channels, d, geoDefaults, i, currentData);
                 nodes.push({
                     type: 'circle',
                     cx: pt.x,

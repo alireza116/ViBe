@@ -34,6 +34,10 @@ export function createVibeScope() {
     format: vibe.format,
     D3Renderer: vibe.D3Renderer,
     CanvasRenderer: vibe.CanvasRenderer,
+    // Theme layer: `themes` (built-ins), `setTheme` (app-wide), `resolveTheme`.
+    themes: vibe.themes,
+    setTheme: vibe.setTheme,
+    resolveTheme: vibe.resolveTheme,
     d3,
     vancouver,
   };

@@ -1,0 +1,8 @@
+// The same slider, restyled by themes.survey — answer ink, track, and labels
+// all follow the theme. See /theming.
+mount(Elicit(widgets.slider({
+  question: "How confident are you?",
+  domain: [0, 100],
+  value: 60,
+  theme: themes.survey,
+})));

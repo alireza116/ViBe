@@ -45,7 +45,7 @@ export const SITE: NavGroup[] = [
       { href: '/editing/sweep', title: 'Sweep (you-draw-it)' },
       { href: '/editing/lock', title: 'Locked rows (read-only)' },
       { href: '/editing/existence', title: 'Create · Remove · Anchors' },
-      { href: '/editing/probe', title: 'Probe (hover · click)' },
+      { href: '/editing/probe', title: 'Probe (ghost · settle)' },
       { href: '/editing/history', title: 'History & keyboard' },
       { href: '/editing/stages', title: 'Stages (multi-step)' },
       { href: '/editing/external-controls', title: 'External controls (UI · functions)' },
@@ -69,6 +69,7 @@ export const SITE: NavGroup[] = [
     pages: [
       { href: '/effects', title: 'Interaction effects' },
       { href: '/guides', title: 'Guides' },
+      { href: '/theming', title: 'Theming & style' },
     ],
   },
   {

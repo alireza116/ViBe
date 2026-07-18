@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
 
 // line: a connected-path mark over an ordered set of points. It is deliberately
 // GENERAL — a you-draw-it curve, a multi-series line chart, a connected scatter
@@ -117,14 +117,16 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
                 if (g) g.push(p); else groups.set(p.series, [p]);
             }
 
+            // Default ink from the theme (steelblue unless the theme's `ink` or a
+            // `marks.line` override changes it); the connector's stroke and the
+            // handles' fill share it so a line and its handles read as one colour.
+            const lineDefaults = markDefaults(scales, 'line', { stroke: themeOf(scales).ink, strokeWidth: 2 });
+
             // One connector path per series, its points ordered per `order`.
             for (const group of groups.values()) {
                 if (group.length < 2) continue; // nothing to connect
                 const pts = orderPoints(group, order, domainAxis, seriesField);
-                const style = resolveStyle(scales, channels, group[0].d, {
-                    stroke: 'steelblue',
-                    strokeWidth: 2
-                });
+                const style = resolveStyle(scales, channels, group[0].d, lineDefaults);
                 nodes.push({
                     type: 'path',
                     points: pts.map(p => /** @type {[number, number]} */([p.cx, p.cy])),
@@ -142,7 +144,7 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             // Handles: an ordinary circle per datum, so edits/pick reuse the mark
             // machinery. Tagged with `series` so a sweep can scope to one line.
             placed.forEach(({ d, i, cx, cy, series }) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                const style = resolveStyle(scales, channels, d, { fill: lineDefaults.stroke }, i, currentData);
                 nodes.push({
                     type: 'circle',
                     cx,

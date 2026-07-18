@@ -5,12 +5,12 @@
 import { text } from '../plot/index.js';
 import { drag, editText } from '../edit/index.js';
 import { clamp } from '../constraints/index.js';
-import { prompt, THEME } from './theme.js';
+import { prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, mode?: 'number' | 'text', value?: any,
- *   domain?: [number, number], label?: string,
- *   onChange?: (data: any[]) => void, width?: number, height?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { mode?: 'number' | 'text', value?: any,
+ *   domain?: [number, number], label?: string }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function labeledValue(opts = {}) {
@@ -22,13 +22,17 @@ export function labeledValue(opts = {}) {
         label = 'value',
         onChange,
         width = 360,
-        height = 200
+        height = 200,
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     if (mode === 'text') {
         return {
             width,
             height,
+            theme,
             margins: { top: 40, right: 24, bottom: 24, left: 24 },
             // x/y are declared even though no axis is drawn: the label is draggable,
             // so they're elicited fields like any other, and the schema is what owns
@@ -47,13 +51,13 @@ export function labeledValue(opts = {}) {
                 text({
                     id: 'label',
                     fontSize: 18,
-                    fill: THEME.accent,
+                    fill: t.widget.accent,
                     channels: {
                         x: { field: 'x' },
                         y: { field: 'y' },
                         text: { field: 'label', edit: editText() }
                     },
-                    edits: [drag({ channels: ['x', 'y'] })]
+                    edits: [drag({ channels: ['x', 'y'], stage })]
                 })
             ]
         };
@@ -62,6 +66,7 @@ export function labeledValue(opts = {}) {
     return {
         width,
         height,
+        theme,
         margins: { top: 40, right: 40, bottom: 36, left: 48 },
         schema: {
             cat: { type: 'categorical', domain: ['v'] },
@@ -75,10 +80,10 @@ export function labeledValue(opts = {}) {
             text({
                 id: 'readout',
                 fontSize: 22,
-                fill: THEME.accent,
+                fill: t.widget.accent,
                 channels: {
                     x: { field: 'cat' },
-                    y: { field: 'n', edit: drag({ guide: true }) },
+                    y: { field: 'n', edit: drag({ guide: true, stage }) },
                     text: { field: 'n' }
                 }
             })

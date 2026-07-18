@@ -10,6 +10,7 @@ import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
 import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer/index.js';
 import { resolveEffects } from './effects.js';
+import { resolveTheme } from './theme.js';
 import { autoAxes } from './axes.js';
 import { axisOf, pointerForChannel } from './encoding.js';
 
@@ -108,6 +109,21 @@ function inferMeasureOfDomain(domain) {
 }
 
 /**
+ * Dim a ghost-preview node in place. Multiplies its existing opacity by the theme's
+ * ghost opacity (so an already-faint mark stays proportionally faint) and, when the
+ * theme names them, overrides fill/stroke/dash so the preview reads as tentative.
+ * @param {any} node @param {any} ghost the theme.ghost tokens
+ */
+function applyGhostStyle(node, ghost) {
+    const g = ghost || {};
+    const base = node.opacity != null ? node.opacity : 1;
+    node.opacity = base * (g.opacity != null ? g.opacity : 0.45);
+    if (g.fill != null) node.fill = g.fill;
+    if (g.stroke != null) node.stroke = g.stroke;
+    if (g.strokeDasharray != null) node.strokeDasharray = g.strokeDasharray;
+}
+
+/**
  * @param {import('../types').ElicitSpec} spec
  * @returns {import('../types').ElicitElement}
  */
@@ -145,7 +161,13 @@ export function Elicit(spec) {
         : (responsive === 'scale' || responsive === 'reflow') ? responsive
             : 'fixed';
 
-    const effects = resolveEffects(effectsSpec);
+    // Resolve the chart's theme once (DEFAULT_THEME < setTheme() base < spec.theme).
+    // Stamped on the scale map every render (the projection-transport pattern) so
+    // build() and edit/guide ctx read it without a widened signature. The theme also
+    // supplies the DEFAULTS the effects layer merges under, so a themed chart's
+    // grab/select feedback follows the theme unless the chart's own `effects` wins.
+    const theme = resolveTheme(spec.theme);
+    const effects = resolveEffects(effectsSpec, theme.effects);
 
     // Prepend auto-injected axis/grid marks (drawn behind marks via the background
     // layer). Explicit axis marks the user composed into `features` are preserved.
@@ -195,7 +217,9 @@ export function Elicit(spec) {
     // resolver sees (spec.scales and the rest pass through untouched).
     /** @type {Record<string, import('../types').FieldSchema>} */
     const schema = structuredClone(spec.schema || {});
-    const liveSpec = { ...spec, schema };
+    // The resolver sees the RESOLVED theme (not the raw spec.theme partial), so its
+    // colour-scale range fallback can read theme.palette/ramp/diverging.
+    const liveSpec = { ...spec, schema, theme };
 
     // The dataset's invariants, gathered once. A mark may declare `constraints` as
     // sugar; they are promoted here, so an invariant holds for EVERY edit over the
@@ -245,12 +269,15 @@ export function Elicit(spec) {
     // Transient interaction (UI) state, separate from the belief `dataset`. The
     // interaction drivers keep a per-feature session here (proximity selection,
     // sweep/draw locks) — those locks belong to one mark's gesture, so they stay
-    // keyed by feature id. `preview` holds THE UNCOMMITTED dataset a driver has
-    // proposed (the probe driver's hover); it is rendered in place of the committed
-    // rows by every mark, so the pointer shows what a click would commit across the
-    // whole chart, but it never reaches the belief store, `onChange`, or `getData`.
-    // Cleared on commit, hoverout, and stage change.
-    /** @type {{ session: Record<string, any>, preview: any[] | null }} */
+    // keyed by feature id. `preview` holds THE UNCOMMITTED proposal a driver parked
+    // (the probe driver's hover/drag), keyed by feature id: each entry is the
+    // proposed dataset that feature would commit. The committed rows are still what
+    // every mark draws; a proposal is rendered as an inert GHOST of only the rows it
+    // would change, layered on top (see update()'s ghost pass). It never reaches the
+    // belief store, `onChange`, or `getData`. Cleared on commit, hoverout, and stage
+    // change. Per-feature (not one global slot) so two probe marks can't clobber
+    // each other's ghost.
+    /** @type {{ session: Record<string, any>, preview: Record<string, any[]> | null }} */
     const ui = { session: {}, preview: null };
 
     // Caller-facing observers. `change` fires on every committed edit; `stage` fires
@@ -280,7 +307,7 @@ export function Elicit(spec) {
     let past = [];
     /** @type {any[]} */
     let future = [];
-    /** @type {{ before: any, recorded: boolean } | null} */
+    /** @type {{ recorded: boolean } | null} */
     let txn = null;
 
     const snapshot = () => ({
@@ -303,18 +330,21 @@ export function Elicit(spec) {
         ui.preview = null;
     };
 
-    // Open a transaction if none is open. Cheap: the snapshot is only kept if
-    // something actually commits inside it.
-    const beginTxn = () => { if (!txn) txn = { before: snapshot(), recorded: false }; };
+    // Open a transaction if none is open. No snapshot here: a gesture that never
+    // commits (a hover that only PREVIEWS, firing beginTxn on every pointermove) must
+    // not clone the dataset. The snapshot is taken lazily by recordHistory, on the
+    // first commit — which is safe because every commit path calls recordHistory
+    // BEFORE it mutates `dataset`/`schema`, so "now" is still the pre-gesture state.
+    const beginTxn = () => { if (!txn) txn = { recorded: false }; };
     const endTxn = () => { txn = null; };
 
-    // Called by every commit path. Records the pre-gesture state the first time a
-    // transaction changes anything, and drops the redo stack — a new edit after an
-    // undo forks the history, so the old future is gone.
+    // Called by every commit path, BEFORE it mutates state. The first commit in a
+    // transaction snapshots the (still pre-gesture) state and drops the redo stack —
+    // a new edit after an undo forks the history, so the old future is gone.
     const recordHistory = () => {
         if (!txn) beginTxn();
         if (!txn || txn.recorded) return;
-        past.push(txn.before);
+        past.push(snapshot());
         if (past.length > MAX_HISTORY) past.shift();
         future = [];
         txn.recorded = true;
@@ -394,6 +424,10 @@ export function Elicit(spec) {
         // Attached on the scale map as a reserved non-Scale key (cast) so build()
         // and edit ctx share one object without widening ScaleMap's channel types.
         if (projection) /** @type {any} */ (scales).projection = projection;
+        // The resolved theme rides on the scale map as another reserved non-Scale
+        // key, so every mark's build() and the guide/edit ctx read default colours,
+        // fonts and affordance tokens from one object (see core/theme.js: themeOf).
+        /** @type {any} */ (scales).theme = theme;
         if (DEV) warnProjectionCartesianMix(features, scales);
 
         // Plane-on-top mode: when an ACTIVE edit resolves its target from an
@@ -414,9 +448,11 @@ export function Elicit(spec) {
 
         if (DEV) warnDuplicatePlaneEdits(features, activeEdits);
 
-        // A live preview (hover) stands in for the committed rows while it lasts —
-        // for EVERY mark, since they all read the one dataset.
-        const currentData = ui.preview || dataset;
+        // The committed rows are ALWAYS what the marks draw. A hover/drag preview no
+        // longer substitutes the dataset (that made committed marks jump/flicker —
+        // worst on a matrix); instead the proposal is drawn as an inert ghost of only
+        // the rows it would change, layered on top by the ghost pass below.
+        const currentData = dataset;
 
         features.forEach(feature => {
             const nodes = feature.build(currentData, scales, innerWidth, innerHeight);
@@ -453,6 +489,45 @@ export function Elicit(spec) {
             });
         });
 
+        // Ghost-preview pass. For each feature carrying an uncommitted proposal, build
+        // it from the PROPOSED rows and add only the nodes that DIFFER from committed —
+        // a changed/added row (by identity, since computeEdit's splice preserves the
+        // untouched rows' object identity), or a feature's series chrome (index == null,
+        // e.g. a line path) when any of its rows changed. Ghosts are inert: not written
+        // to featureNodes (so picking/guides see committed geometry only), never
+        // editable, pointer-transparent, and styled with theme.ghost so they read as
+        // tentative. Building every feature from the proposal keeps "the ghost is
+        // exactly what a commit would draw" across sibling marks and constraint repairs.
+        if (ui.preview) {
+            for (const feature of features) {
+                if (feature.isAxis || feature.isGrid) continue;
+                const proposed = ui.preview[feature.id];
+                if (!proposed) continue;
+
+                // Which rows the proposal changes, by reference identity.
+                /** @type {Set<number>} */
+                const changedIdx = new Set();
+                let anyChanged = proposed.length !== dataset.length;
+                const n = Math.max(proposed.length, dataset.length);
+                for (let i = 0; i < n; i++) {
+                    if (proposed[i] !== dataset[i]) { changedIdx.add(i); anyChanged = true; }
+                }
+                if (!anyChanged) continue;
+
+                const ghostNodes = feature.build(proposed, scales, innerWidth, innerHeight);
+                ghostNodes.forEach((/** @type {any} */ node) => {
+                    const keep = node.index != null ? changedIdx.has(node.index) : anyChanged;
+                    if (!keep) return;
+                    node.ghost = true;
+                    node.featureId = feature.id;
+                    node.editable = false;
+                    node.pointerEvents = 'none';
+                    applyGhostStyle(node, theme.ghost);
+                    scene.add(node);
+                });
+            }
+        }
+
         // Build guides last so they can read the freshly-updated data. Guides are
         // purely visual (non-interactive) annotations.
         const guideCtx = {
@@ -463,6 +538,7 @@ export function Elicit(spec) {
             featureNodes,
             ui,
             effects,
+            theme,
             width: innerWidth,
             height: innerHeight,
             // The current stage, so an edit's auto-guide can suppress itself when
@@ -490,6 +566,7 @@ export function Elicit(spec) {
             responsive: mode,
             overflow,
             effects,
+            theme,
             onEvent: handleEvent
         });
     };
@@ -682,7 +759,10 @@ export function Elicit(spec) {
         // Only a dataset proposal can be previewed; a domain edit commits directly
         // (numeric drag commits each tick, categorical add/remove is one-shot).
         if (!newData || !Array.isArray(newData)) return false;
-        ui.preview = newData;
+        // Park the proposal under THIS feature's id, so a second probe mark's preview
+        // can't overwrite it. update()'s ghost pass renders only the changed rows.
+        if (!ui.preview) ui.preview = {};
+        ui.preview[feature.id] = newData;
         return true;
     };
 
@@ -746,10 +826,11 @@ export function Elicit(spec) {
         // (hover to preview, click to commit and advance) lives in its driver file,
         // not in engine branches.
         const preview = {
-            get: () => ui.preview,
+            get: () => (ui.preview && ui.preview[fid]) || null,
             clear: () => {
-                if (!ui.preview) return false;
-                ui.preview = null;
+                if (!ui.preview || !ui.preview[fid]) return false;
+                delete ui.preview[fid];
+                if (Object.keys(ui.preview).length === 0) ui.preview = null;
                 return true;
             }
         };

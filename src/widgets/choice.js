@@ -9,12 +9,11 @@
 import { point } from '../plot/index.js';
 import { toggle } from '../edit/index.js';
 import { unique, count } from '../constraints/index.js';
-import { optionRings, prompt, THEME } from './theme.js';
+import { optionRings, prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, options?: any[], max?: number, value?: any[],
- *   onChange?: (data: any[]) => void, width?: number, height?: number,
- *   stage?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { options?: any[], max?: number, value?: any[] }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function multipleChoice(opts = {}) {
@@ -26,8 +25,10 @@ export function multipleChoice(opts = {}) {
         onChange,
         width = 560,
         height = 130,
-        stage
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     /** @type {any[]} */
     const constraints = [unique({ field: 'choice', strategy: 'reject' })];
@@ -36,6 +37,7 @@ export function multipleChoice(opts = {}) {
     return {
         width,
         height,
+        theme,
         margins: { top: 34, right: 60, bottom: 44, left: 60 },
         // The contract of the elicited dataset: one categorical pick per row.
         schema: { choice: { type: 'categorical', domain: options } },
@@ -51,8 +53,8 @@ export function multipleChoice(opts = {}) {
         features: [
             point({
                 id: 'choice',
-                size: THEME.radius - 3,
-                fill: THEME.accent,
+                size: t.widget.radius - 3,
+                fill: t.widget.accent,
                 channels: {
                     x: { field: 'choice' }
                 },

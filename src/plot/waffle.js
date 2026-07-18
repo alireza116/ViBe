@@ -39,7 +39,7 @@
 // drag-to-fill.
 
 import { isBand, bandwidthOf, bandStartOf, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions, themeOf, markDefaults } from './mark.js';
 
 /** @param {any} scale @returns {[number, number]} */
 function domainExtent(scale) {
@@ -105,8 +105,9 @@ function buildWaffle(options, forcedOrientation) {
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 
+            const waffleDefaults = markDefaults(scales, 'waffle', { fill: themeOf(scales).ink });
             currentData.forEach((/** @type {any} */ d, i) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                const style = resolveStyle(scales, channels, d, waffleDefaults, i, currentData);
                 const vertical = orientation !== 'horizontal';
                 // A `symbol` channel (or shape:'symbol') fills the block with glyph
                 // cells — an emoji waffle (🍎🍎🍎 for a count of 3). Every cell of a

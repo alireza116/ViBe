@@ -36,11 +36,16 @@ export const DEFAULT_EFFECTS = {
  *   select: false | { color?, ring?: {...}, highlight?: {...} }
  * Partial sub-objects are merged, so `{ select: { color: '#4f46e5' } }` keeps the
  * default ring/highlight geometry.
+ *
+ * `base` lets a theme supply the defaults (theme.effects) that a chart's own
+ * `effects` spec then layers over — so precedence is spec.effects > theme > built-in.
+ * Defaults to DEFAULT_EFFECTS, so an un-themed call is unchanged.
  * @param {any} [user]
+ * @param {any} [base]
  * @returns {any}
  */
-export function resolveEffects(user = {}) {
-    const d = DEFAULT_EFFECTS;
+export function resolveEffects(user = {}, base = DEFAULT_EFFECTS) {
+    const d = base || DEFAULT_EFFECTS;
 
     let grab;
     if (user.grab === false) grab = { filter: null };            // disabled

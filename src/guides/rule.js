@@ -31,8 +31,11 @@ export function rule(options = {}) {
          */
         build: (ctx) => {
             const { scales, width, height } = ctx;
+            // Colour/dash default to the theme's rule tokens (a theme can restyle
+            // every reference line); an explicit option still wins.
+            const rt = (ctx.theme && ctx.theme.guide && ctx.theme.guide.rule) || {};
             const {
-                x, y, stroke = '#64748b', strokeDasharray = '5 4', label
+                x, y, stroke = rt.stroke || '#64748b', strokeDasharray = rt.strokeDasharray || '5 4', label
             } = resolveGuideOptions(options, ctx);
 
             /** @type {import('../types').FeatureNode[]} */

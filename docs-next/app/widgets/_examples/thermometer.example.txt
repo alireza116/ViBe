@@ -1,0 +1,6 @@
+mount(Elicit(widgets.thermometer({
+  question: "How likely is rain tomorrow?",
+  domain: [0, 100],
+  step: 5,
+  value: 40,
+})));

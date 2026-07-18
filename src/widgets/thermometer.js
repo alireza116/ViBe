@@ -5,11 +5,11 @@
 import { barY } from '../plot/index.js';
 import { drag } from '../edit/index.js';
 import { clamp, snap } from '../constraints/index.js';
-import { prompt, THEME } from './theme.js';
+import { prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, domain?: [number, number], step?: number, value?: number,
- *   onChange?: (data: any[]) => void, width?: number, height?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { domain?: [number, number], step?: number, value?: number }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function thermometer(opts = {}) {
@@ -20,8 +20,11 @@ export function thermometer(opts = {}) {
         value,
         onChange,
         width = 200,
-        height = 320
+        height = 320,
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     /** @type {any[]} */
     const constraints = [clamp({ min: domain[0], max: domain[1], field: 'value' })];
@@ -30,6 +33,7 @@ export function thermometer(opts = {}) {
     return {
         width,
         height,
+        theme,
         margins: { top: 40, right: 40, bottom: 36, left: 48 },
         schema: {
             cat: { type: 'categorical', domain: ['v'] },
@@ -42,13 +46,13 @@ export function thermometer(opts = {}) {
         features: [
             barY({
                 id: 'thermo',
-                fill: THEME.accent,
+                fill: t.widget.accent,
                 fillOpacity: 0.8,
                 channels: {
                     x: { field: 'cat' },
                     y: { field: 'value' }
                 },
-                edits: [drag({ pick: 'probe', channels: ['y'], advance: false, guide: true })]
+                edits: [drag({ pick: 'probe', channels: ['y'], advance: false, guide: true, stage })]
             })
         ]
     };

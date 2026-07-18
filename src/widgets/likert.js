@@ -13,12 +13,11 @@
 import { point } from '../plot/index.js';
 import { create } from '../edit/index.js';
 import { count } from '../constraints/index.js';
-import { optionRings, prompt, THEME } from './theme.js';
+import { optionRings, prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, options?: any[], value?: any,
- *   onChange?: (data: any[]) => void, width?: number, height?: number,
- *   stage?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { options?: any[], value?: any }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function likert(opts = {}) {
@@ -29,12 +28,15 @@ export function likert(opts = {}) {
         onChange,
         width = 560,
         height = 130,
-        stage
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     return {
         width,
         height,
+        theme,
         margins: { top: 34, right: 60, bottom: 44, left: 60 },
         // The contract of the elicited dataset. `ordinal`, not `categorical`: a
         // Likert's options run from one pole to the other, so the domain's order is
@@ -54,8 +56,8 @@ export function likert(opts = {}) {
         features: [
             point({
                 id: 'likert',
-                size: THEME.radius - 3,
-                fill: THEME.accent,
+                size: t.widget.radius - 3,
+                fill: t.widget.accent,
                 channels: {
                     x: { field: 'choice' }
                 },

@@ -19,7 +19,7 @@
 // categorical or linear axis (many small needles across a chart).
 // discreteScale is 'point' so categorical fields land on ticks.
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
 import { arcSpan, needleTriangle } from './polar.js';
 
 /**
@@ -77,11 +77,8 @@ export function needle(options = {}) {
                 const len = lengthOpt != null
                     ? lengthOpt
                     : encodeChannel(scales, channels, 'size', d, Math.min(width, height) * 0.4);
-                const style = resolveStyle(scales, channels, d, {
-                    fill: '#1e293b',
-                    stroke: '#1e293b',
-                    strokeWidth: 1,
-                }, i, currentData);
+                const style = resolveStyle(scales, channels, d,
+                    markDefaults(scales, 'needle', { fill: '#1e293b', stroke: '#1e293b', strokeWidth: 1 }), i, currentData);
                 const pts = needleTriangle(cx, cy, len, deg, baseWidth);
                 const dPath = `M ${pts[0][0]} ${pts[0][1]} L ${pts[1][0]} ${pts[1][1]} L ${pts[2][0]} ${pts[2][1]} Z`;
 

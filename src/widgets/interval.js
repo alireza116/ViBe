@@ -7,7 +7,8 @@
 import { composite, point, ruleY, tick } from '../plot/index.js';
 import { drag, custom } from '../edit/index.js';
 import { clamp, defineConstraint } from '../constraints/index.js';
-import { prompt, THEME } from './theme.js';
+import { prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
  * Keep lo ≤ mean ≤ hi after any handle drag (a cap cannot cross the centre).
@@ -28,9 +29,10 @@ function orderInterval() {
  * unit. Cap drags stay on plain drag() — only the grabbed end moves. When the
  * interval hits a domain wall, the whole interval stops (width preserved) rather
  * than each end clamping independently and collapsing.
+ * @param {number} [stage] active-stage gate, forwarded from the widget options
  * @returns {import('../types').Edit}
  */
-function moveInterval() {
+function moveInterval(stage) {
     return custom((datum, _event, ctx) => {
         const ch = ctx.channels[0];
         if (!ch || !ch.scale || !datum) return undefined;
@@ -62,13 +64,12 @@ function moveInterval() {
         // Keep the mean's offset within the interval (same delta as the ends).
         const meanOut = Number(datum.mean) + (lo - Number(datum.lo));
         return { ...datum, mean: meanOut, lo, hi };
-    }, { guide: true });
+    }, { guide: true, stage });
 }
 
 /**
- * @param {{ question?: string, category?: string, mean?: number, lo?: number, hi?: number,
- *   domain?: [number, number], onChange?: (data: any[]) => void,
- *   width?: number, height?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { category?: string, mean?: number, lo?: number, hi?: number,
+ *   domain?: [number, number] }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function interval(opts = {}) {
@@ -81,12 +82,16 @@ export function interval(opts = {}) {
         domain = [0, 100],
         onChange,
         width = 360,
-        height = 280
+        height = 280,
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     return {
         width,
         height,
+        theme,
         margins: { top: 40, right: 24, bottom: 36, left: 48 },
         schema: {
             cat: { type: 'categorical', domain: [category] },
@@ -110,7 +115,7 @@ export function interval(opts = {}) {
                     // Inert whisker — no edit, so it stays pointer-transparent and
                     // cannot swallow a cap or mean drag.
                     ruleY({
-                        stroke: THEME.accent,
+                        stroke: t.widget.accent,
                         strokeWidth: 2,
                         channels: {
                             x: { field: 'cat' },
@@ -119,27 +124,27 @@ export function interval(opts = {}) {
                         }
                     }),
                     point({
-                        size: THEME.radius - 2,
-                        fill: THEME.accent,
+                        size: t.widget.radius - 2,
+                        fill: t.widget.accent,
                         channels: {
                             x: { field: 'cat' },
-                            y: { field: 'mean', edit: moveInterval() }
+                            y: { field: 'mean', edit: moveInterval(stage) }
                         }
                     }),
                     tick({
-                        stroke: THEME.accent,
+                        stroke: t.widget.accent,
                         strokeWidth: 2,
                         channels: {
                             x: { field: 'cat' },
-                            y: { field: 'lo', edit: drag() }
+                            y: { field: 'lo', edit: drag({ stage }) }
                         }
                     }),
                     tick({
-                        stroke: THEME.accent,
+                        stroke: t.widget.accent,
                         strokeWidth: 2,
                         channels: {
                             x: { field: 'cat' },
-                            y: { field: 'hi', edit: drag() }
+                            y: { field: 'hi', edit: drag({ stage }) }
                         }
                     })
                 ]

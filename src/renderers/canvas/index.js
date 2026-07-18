@@ -74,6 +74,7 @@ export class CanvasRenderer {
 
         paintScene(ctx, scene.children, {
             images: this._images,
+            theme: context.theme,
             requestRepaint: () => this._repaint()
         });
     }
@@ -109,6 +110,7 @@ export class CanvasRenderer {
         ctx.translate(margins.left, margins.top);
         paintScene(ctx, scene.children, {
             images: this._images,
+            theme: context.theme,
             requestRepaint: () => this._repaint()
         });
     }

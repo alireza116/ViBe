@@ -102,6 +102,14 @@ const SHORTHANDS = [
     'angle',
 ];
 
+// The theme helpers a mark's build() reads its DEFAULT ink/fonts from. Re-exported
+// here so a mark imports its whole style vocabulary from one module (marks already
+// import resolveStyle/encodeChannel from mark.js). `themeOf(scales)` reads the theme
+// the engine stamped on the scale map; `markDefaults(scales, name, fallbacks)` layers
+// any `theme.marks[name]` overrides over the mark's built-in fallbacks. See
+// core/theme.js for the precedence rules.
+export { themeOf, markDefaults } from '../core/theme.js';
+
 const DEV = !!(import.meta.env && import.meta.env.DEV);
 
 // A derived channel's fn re-runs on every render, so a warning would repeat

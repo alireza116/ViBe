@@ -9,6 +9,8 @@ import * as widgets from "./widgets/index.js";
 import * as format from "./format.js";
 import { D3Renderer } from "./renderers/d3-renderer/index.js";
 import { CanvasRenderer } from "./renderers/canvas/index.js";
+import { setTheme, resolveTheme, DEFAULT_THEME } from "./core/theme.js";
+import { themes } from "./core/themes.js";
 
 export {
   Elicit,
@@ -21,4 +23,10 @@ export {
   format,
   D3Renderer,
   CanvasRenderer,
+  // Theme layer: `themes` are the built-ins (default, survey); `setTheme` sets the
+  // app-wide default; a chart passes `spec.theme` for a per-chart theme.
+  themes,
+  setTheme,
+  resolveTheme,
+  DEFAULT_THEME,
 };

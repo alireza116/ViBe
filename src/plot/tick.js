@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandSpan } from '../core/scales.js';
-import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf, markDefaults } from './mark.js';
 
 // tick: a thin line-segment mark (Observable Plot's tick). It marks a VALUE on
 // one axis (the linear/continuous axis) and SPANS the other axis — a category
@@ -97,13 +97,12 @@ function buildTick(options, forcedValueAxis) {
                 else valueAxis = 'y';
             }
 
+            // A tick reads as a stroked line, so its per-mark defaults are
+            // stroke/strokeWidth rather than a fill; stroke follows the theme ink.
+            const tickDefaults = markDefaults(scales, 'tick', { stroke: themeOf(scales).ink, strokeWidth: 2 });
+
             return currentData.map((d, i) => {
-                // Standard style surface; a tick reads as a stroked line, so its
-                // per-mark defaults are stroke/strokeWidth rather than a fill.
-                const style = resolveStyle(scales, channels, d, {
-                    stroke: 'steelblue',
-                    strokeWidth: 2
-                }, i, currentData);
+                const style = resolveStyle(scales, channels, d, tickDefaults, i, currentData);
 
                 const angle = encodeAngle(scales, channels, d, 0, i, currentData);
 

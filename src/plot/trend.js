@@ -38,7 +38,7 @@
 // derived values through the y scale's encode, not a hand-rolled field lookup.
 
 import { makeEdit } from '../edit/shared.js';
-import { resolveStyle, normalizeMarkOptions } from './mark.js';
+import { resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
 
 /**
  * Clip an infinite line through (x1,y1)-(x2,y2) to the plot rectangle [0,w]×[0,h].
@@ -195,11 +195,12 @@ export function trend(options = {}) {
 
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
+            const trendDefaults = markDefaults(scales, 'trend', { stroke: '#333', fill: '#333' });
             currentData.forEach((/** @type {any} */ d, i) => {
                 const a = Number(d.intercept) || 0;
                 const b = Number(d.slope) || 0;
                 const yOf = (/** @type {number} */ x) => a + b * x;
-                const style = resolveStyle(scales, channels, d, { stroke: '#333', fill: '#333' });
+                const style = resolveStyle(scales, channels, d, trendDefaults);
 
                 // Sample the line at the x-domain ends, then clip the infinite line
                 // through those points to the plot rectangle — so it runs edge-to-
@@ -213,7 +214,7 @@ export function trend(options = {}) {
                     nodes.push({
                         type: 'line',
                         ...clipped,
-                        stroke: style.stroke || '#333',
+                        stroke: style.stroke || trendDefaults.stroke,
                         strokeWidth: style.strokeWidth || 2,
                         pointerEvents: 'none'
                     });
@@ -224,14 +225,14 @@ export function trend(options = {}) {
                     type: 'circle',
                     cx: xScale.encode(anchor), cy: yScale.encode(yOf(anchor)),
                     r: handleSize,
-                    fill: style.fill || '#333',
+                    fill: style.fill || trendDefaults.fill,
                     data: d, index: i, channel: 'intercept'
                 });
                 nodes.push({
                     type: 'circle',
                     cx: xScale.encode(probe), cy: yScale.encode(yOf(probe)),
                     r: handleSize,
-                    fill: style.fill || '#333',
+                    fill: style.fill || trendDefaults.fill,
                     data: d, index: i, channel: 'slope'
                 });
             });

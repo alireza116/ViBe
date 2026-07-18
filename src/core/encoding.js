@@ -282,9 +282,10 @@ export function unionDomains(measure, domains) {
  * @param {string} channelName
  * @param {import('../types').ScaleType} type
  * @param {{ width: number, height: number }} dims
+ * @param {any} [theme] the resolved theme (supplies default palette/ramp/diverging)
  * @returns {any[]}
  */
-export function channelRange(channelName, type, dims) {
+export function channelRange(channelName, type, dims, theme) {
     switch (channelName) {
         case 'x': return [0, dims.width];
         case 'y': return [dims.height, 0];   // pixel y is inverted
@@ -298,8 +299,11 @@ export function channelRange(channelName, type, dims) {
     // like opacity when driven by a field.
     if (OPACITY_CHANNELS.has(channelName)) return [0.15, 1];
     if (COLOR_CHANNELS.has(channelName)) {
-        if (type === 'diverging') return DEFAULT_DIVERGING;
-        return type === 'sequential' ? DEFAULT_RAMP : DEFAULT_PALETTE;
+        // The theme supplies the default palette/ramp/diverging when a channel names
+        // no explicit range or scheme; falls back to the module defaults.
+        if (type === 'diverging') return (theme && theme.diverging) || DEFAULT_DIVERGING;
+        if (type === 'sequential') return (theme && theme.ramp) || DEFAULT_RAMP;
+        return (theme && theme.palette) || DEFAULT_PALETTE;
     }
     // Symbol channel: a glyph palette (author overrides with scale.range/scheme).
     if (SYMBOL_CHANNELS.has(channelName)) return [...DEFAULT_SYMBOLS];

@@ -528,6 +528,11 @@ export interface FeatureNode {
   // is never `editable`, is pointer-transparent, and proximity picking skips it. A
   // line's connector path is locked when every row of its series is.
   locked?: boolean;
+  // Set by the engine's ghost pass on a probe PREVIEW node: an inert, dimmed copy of
+  // the rows a proposal would change, layered over the committed marks. Never written
+  // to featureNodes (picking/guides ignore it), never editable, pointer-transparent.
+  // The D3 renderer stamps a `data-ghost` attribute so a test can find it.
+  ghost?: boolean;
   // Runtime tags set by marks for the pick/driver layer: `series` groups a line's
   // nodes; `sweepAxis`/`bandAxis` name the axis proximity measures along; `cursor`
   // overrides the interactive cursor (e.g. a tick's ew-resize); `channel` tags one
@@ -627,6 +632,58 @@ export interface AxisSpec {
 // kept separate from mark style channels and customizable per chart. See
 // core/effects.js. `grab` is an element effect (CSS filter) on a dragged mark;
 // `select` is the proximity/nearest overlay (ring at the pointer + mark outline).
+// Recursively-optional version of a type: what a caller MAY pass. `spec.theme`,
+// `setTheme()`, and the built-in `themes` are DeepPartial<Theme> — they name only
+// the tokens they change; resolveTheme deep-merges them over DEFAULT_THEME to a full
+// Theme. (Arrays are values, replaced wholesale, so they are not descended into.)
+export type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends (infer U)[] ? U[] : T[K] extends object ? DeepPartial<T[K]> : T[K];
+};
+
+// The STYLE layer: default colours, fonts, and affordance tokens the library draws
+// with. This is the RESOLVED shape (every container present, as DEFAULT_THEME
+// provides), read by marks (default ink), chrome (axis/grid/guides), the renderers
+// (font family, base fallbacks), and the survey-widget affordances. A per-mark
+// channel/option still wins over any theme token. Callers pass a DeepPartial<Theme>.
+export interface Theme {
+  // The primary mark colour (marks that historically defaulted to 'steelblue').
+  ink: string;
+  // Interactive emphasis: draggable handles, a committed answer, an axis handle.
+  accent: string;
+  // Secondary chrome / de-emphasised marks.
+  muted: string;
+  // Colour-scale defaults fed to resolveScales when a channel names no range/scheme.
+  palette: string[];
+  ramp: string[];
+  diverging: string[];
+  // Typography. `family` null => inherit the host page's font (the default look);
+  // a non-null family is emitted on the root svg / used by the canvas renderer.
+  font: { family: string | null; size: number; labelSize: number; titleSize: number };
+  // Chart chrome.
+  axis: { stroke: string; labelFill: string; fontSize: number; handle: string };
+  grid: { stroke: string; strokeWidth: number };
+  // Non-interactive annotation guides (guides/*).
+  guide: {
+    rule: { stroke: string; strokeDasharray: string };
+    region: { fill: string; opacity: number };
+    legend: { stroke: string; labelFill: string; fontSize: number };
+  };
+  // The constraint-guide colour (per-edit `guideColor` still wins).
+  constraint: { color: string };
+  // Interaction-effects defaults, merged UNDER spec.effects.
+  effects: EffectsSpec;
+  // Ghost-preview styling (probe driver): a ghost multiplies its opacity by
+  // `opacity`; a non-null fill/stroke/strokeDasharray overrides the committed paint.
+  ghost: { opacity: number; fill: string | null; stroke: string | null; strokeDasharray: string | null };
+  // Survey-instrument affordance tokens (widgets/theme.js), read live per frame.
+  widget: {
+    accent: string; ring: string; track: string; cellFill: string; cellStroke: string;
+    label: string; question: string; labelSize: number; questionSize: number; radius: number;
+  };
+  // Sparse per-mark default overrides, keyed by mark name (e.g. { bar: { fill } }).
+  marks: Record<string, Record<string, any>>;
+}
+
 export interface EffectsSpec {
   // false disables; a string is shorthand for { filter }.
   grab?: false | string | { filter?: string | null };
@@ -675,6 +732,10 @@ export interface ElicitSpec {
   axes?: false | { x?: AxisSpec | false; y?: AxisSpec | false };
   // Customizable interaction-effects layer (grab / proximity-select).
   effects?: EffectsSpec;
+  // The chart's theme (style layer): default colours, fonts, and affordance tokens.
+  // A partial, deep-merged over the built-in DEFAULT_THEME (and any setTheme() base).
+  // See Theme (the resolved shape) and DeepPartial.
+  theme?: DeepPartial<Theme>;
   guides?: any[];
   // Sizing mode. 'fixed' (default) draws at the pixel width/height. 'scale' wraps
   // the SVG in a viewBox so the browser scales it to fill the parent (one draw,
@@ -707,6 +768,25 @@ export interface ElicitSpec {
   // the second argument of on('stage', (index, label) => …).
   stageLabels?: (string | null)[];
   [key: string]: any;
+}
+
+// The shared option surface every survey widget (src/widgets/*) accepts, so the
+// family reads consistently. A widget adds its own instrument-specific options
+// (e.g. `options`, `domain`, `categories`) on top. `theme` is the style hook: the
+// widget bakes the resolved tokens into its answer mark and forwards the partial to
+// `spec.theme` so the affordances and chrome restyle too (see widgets/shared.js).
+export interface WidgetOptions {
+  // The question prompt, drawn into the top margin.
+  question?: string;
+  // Called with the committed dataset after each answer.
+  onChange?: (data: Datum[]) => void;
+  width?: number;
+  height?: number;
+  // Active-stage gate for the widget's edit(s) — set to place the instrument in a
+  // multi-stage form (the edit is live only when the chart's stage matches).
+  stage?: number;
+  // The widget's theme (style layer), a partial deep-merged over DEFAULT_THEME.
+  theme?: DeepPartial<Theme>;
 }
 
 // The DOM element Elicit returns: the chart container plus a small observation
@@ -781,6 +861,10 @@ export interface RenderContext {
   responsive?: 'fixed' | 'scale' | 'reflow';
   overflow?: 'hidden' | 'visible';
   effects?: any;
+  // The chart's resolved theme. A renderer reads it for the font family (emitted on
+  // the root svg) and text-size fallback; all mark/chrome colours arrive pre-resolved
+  // on the nodes, so a renderer never has to consult the theme for paint.
+  theme?: Theme;
   // Report a gesture to the engine. The renderer resolves `direct`-pick targets
   // (the node under the pointer) and sets `event.node`; plane gestures leave it unset.
   onEvent: (event: GestureEvent) => void;

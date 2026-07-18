@@ -1,0 +1,5 @@
+mount(Elicit(widgets.labeledValue({
+  question: "Your point estimate",
+  value: 42,
+  domain: [0, 100],
+})));

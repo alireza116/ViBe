@@ -18,6 +18,11 @@ export class D3Renderer {
     ]);
   }
 
+  /** The theme's default text size (fallback for a text node with no fontSize). */
+  _themeFontSize() {
+    return (this._theme && this._theme.font && this._theme.font.size) || 10;
+  }
+
   /**
    * @param {any} context
    */
@@ -53,6 +58,13 @@ export class D3Renderer {
     // spawned from a node's dblclick handler outside this closure.
     this._sceneG = g;
     this._onEvent = onEvent;
+    // The chart's resolved theme (stashed for the draw helpers' font-size fallback).
+    // When the theme names a font family, emit it on the root svg so every SVG text
+    // inherits it; a null family (the default look) leaves the host page's font.
+    this._theme = context.theme || null;
+    const themeFont = this._theme && this._theme.font;
+    d3.select(container).select("svg")
+      .style("font-family", (themeFont && themeFont.family) || null);
 
     /** @param {any} event */
     const pointer = (event) => d3.pointer(event, g.node());
@@ -535,6 +547,9 @@ export class D3Renderer {
         d[field] != null ? d[field] : def,
       );
     }
+    // Mark a probe ghost-preview node so a test (and a stylesheet) can find it. The
+    // single place every mark shape's paint flows through, so one line covers all.
+    sel.attr("data-ghost", (/** @type {any} */ d) => (d.ghost ? "" : null));
     return sel;
   }
 
@@ -600,7 +615,7 @@ export class D3Renderer {
         (/** @type {any} */ d) => d.dominantBaseline || null,
       )
       .attr("font-size", (/** @type {any} */ d) =>
-        d.fontSize != null ? d.fontSize : 10,
+        d.fontSize != null ? d.fontSize : this._themeFontSize(),
       )
       // Math degrees on the node; _angleTransform converts to SVG rotate.
       .attr("transform", (/** @type {any} */ d) => this._angleTransform(d))

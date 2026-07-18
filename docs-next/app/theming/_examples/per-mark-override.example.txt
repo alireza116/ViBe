@@ -1,0 +1,23 @@
+// Precedence, most specific first: a per-datum channel > theme.marks[name] >
+// the theme token > the renderer default. Here `ink` colours the bars, but
+// theme.marks.point overrides just the dots — and a channel would still win.
+mount(Elicit({
+  width: 440, height: 240,
+  margins: { top: 20, right: 20, bottom: 30, left: 36 },
+  data: [{ cat: "A", n: 30 }, { cat: "B", n: 55 }, { cat: "C", n: 40 }, { cat: "D", n: 22 }],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n: { type: "quantitative", domain: [0, 60] },
+  },
+  theme: {
+    ink: "#0ea5e9",
+    marks: { point: { fill: "#f59e0b" } },
+  },
+  features: [
+    barY({ channels: { x: { field: "cat" }, y: { field: "n" } } }),
+    point({
+      size: 6,
+      channels: { x: { field: "cat" }, y: { field: "n", edit: drag() } },
+    }),
+  ],
+}));

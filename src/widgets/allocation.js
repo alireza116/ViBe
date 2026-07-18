@@ -5,12 +5,12 @@
 import { barY } from '../plot/index.js';
 import { drag } from '../edit/index.js';
 import { clamp, maintainSum } from '../constraints/index.js';
-import { prompt, THEME } from './theme.js';
+import { prompt } from './theme.js';
+import { widgetTheme } from './shared.js';
 
 /**
- * @param {{ question?: string, categories?: string[], targetSum?: number,
- *   values?: number[], onChange?: (data: any[]) => void,
- *   width?: number, height?: number }} [opts]
+ * @param {import('../types').WidgetOptions & { categories?: string[], targetSum?: number,
+ *   values?: number[] }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function allocation(opts = {}) {
@@ -21,8 +21,11 @@ export function allocation(opts = {}) {
         values,
         onChange,
         width = 480,
-        height = 280
+        height = 280,
+        stage,
+        theme
     } = opts;
+    const t = widgetTheme(theme);
 
     const equal = targetSum / categories.length;
     const data = categories.map((cat, i) => ({
@@ -33,6 +36,7 @@ export function allocation(opts = {}) {
     return {
         width,
         height,
+        theme,
         margins: { top: 40, right: 24, bottom: 36, left: 48 },
         schema: {
             cat: { type: 'categorical', domain: categories },
@@ -48,11 +52,11 @@ export function allocation(opts = {}) {
         features: [
             barY({
                 id: 'alloc',
-                fill: THEME.accent,
+                fill: t.widget.accent,
                 fillOpacity: 0.75,
                 channels: {
                     x: { field: 'cat' },
-                    y: { field: 'share', edit: drag({ guide: true }) }
+                    y: { field: 'share', edit: drag({ guide: true, stage }) }
                 }
             })
         ]

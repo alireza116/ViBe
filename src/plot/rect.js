@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandwidthOf, bandStartOf, baselineOf, rangeExtent } from '../core/scales.js';
-import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf, markDefaults } from './mark.js';
 
 // rect: the generalized bar. A bar fixes ONE axis to a categorical band (position
 // + thickness) and draws the OTHER as a length from a baseline (or an explicit
@@ -99,9 +99,10 @@ function buildRect(options, forcedValueAxis) {
          */
         build: (currentData, scales, width, height) => {
             const { x: xScale, y: yScale } = scales;
+            const rectDefaults = markDefaults(scales, 'rect', { fill: themeOf(scales).ink });
 
             return currentData.map((d, i) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                const style = resolveStyle(scales, channels, d, rectDefaults, i, currentData);
 
                 const xExt = resolveExtent('x', channels, scales, xScale, d, xKey, forcedValueAxis === 'x', width);
                 const yExt = resolveExtent('y', channels, scales, yScale, d, yKey, forcedValueAxis === 'y', height);

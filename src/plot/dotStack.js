@@ -26,7 +26,7 @@
 // mark in this codebase follows.
 
 import { isDiscrete } from '../core/scales.js';
-import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions, themeOf, markDefaults } from './mark.js';
 
 /**
  * The discrete slots along the category axis — the ghost/label layer iterates
@@ -144,7 +144,7 @@ function buildDotStack(options, forcedAxis) {
                 const key = d[categoryKey];
                 const n = seen.get(key) || 0;
                 seen.set(key, n + 1);
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                const style = resolveStyle(scales, channels, d, markDefaults(scales, 'dotStack', { fill: themeOf(scales).ink }), i, currentData);
                 const pos = placeAt(d, n);
                 // A `symbol` channel renders each token as a glyph (an emoji token
                 // stack) instead of a circle; the ghost rings above stay circles as

@@ -24,9 +24,10 @@ import { rotate } from '../edit/index.js';
 import { crosshair, prompt } from './theme.js';
 
 /**
- * @param {{ question?: string, x?: string, y?: string, r?: number, spread?: number,
- *   samples?: number, seed?: number, wedge?: boolean,
- *   onChange?: (data: any[]) => void, width?: number, height?: number }} [opts]
+ * `lineCone` owns its own two stages (angle, then spread), so it takes no `stage`
+ * option; every other WidgetOptions field applies.
+ * @param {Omit<import('../types').WidgetOptions, 'stage'> & { x?: string, y?: string,
+ *   r?: number, spread?: number, samples?: number, seed?: number, wedge?: boolean }} [opts]
  * @returns {import('../types').ElicitSpec}
  */
 export function lineCone(opts = {}) {
@@ -41,12 +42,14 @@ export function lineCone(opts = {}) {
         wedge = true,
         onChange,
         width = 460,
-        height = 400
+        height = 400,
+        theme
     } = opts;
 
     return {
         width,
         height,
+        theme,
         // Side margins hold the two-line x labels; the top margin stacks the prompt
         // above the "y (high)" label.
         margins: { top: 56, right: 92, bottom: 52, left: 92 },

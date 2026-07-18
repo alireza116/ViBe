@@ -55,6 +55,11 @@ export function legend(options = {}) {
             const domain = scale.domain();
             if (!domain.length) return [];
             const { size, slotAt } = legendLayout(layout, domain.length, ctx);
+            // Swatch stroke / label ink / size from the theme's legend tokens.
+            const lt = (ctx.theme && ctx.theme.guide && ctx.theme.guide.legend) || {};
+            const swatchStroke = lt.stroke || '#374151';
+            const labelFill = lt.labelFill || '#374151';
+            const labelSize = lt.fontSize || 11;
             /** @type {any[]} */
             const nodes = [];
             domain.forEach((/** @type {any} */ value, /** @type {number} */ i) => {
@@ -76,7 +81,7 @@ export function legend(options = {}) {
                     nodes.push({
                         type: 'rect',
                         x: sx, y: sy, width: size, height: size,
-                        fill: encoded, stroke: '#374151', strokeWidth: 1,
+                        fill: encoded, stroke: swatchStroke, strokeWidth: 1,
                         pointerEvents: 'none', guide: true
                     });
                 }
@@ -84,7 +89,7 @@ export function legend(options = {}) {
                     type: 'text',
                     x: sx + size + 4, y: sy + size * 0.75,
                     text: String(value),
-                    fill: '#374151', fontSize: 11, textAnchor: 'start',
+                    fill: labelFill, fontSize: labelSize, textAnchor: 'start',
                     pointerEvents: 'none', guide: true
                 });
             });

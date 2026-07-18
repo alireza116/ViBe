@@ -1,0 +1,21 @@
+// A theme on a plain chart. `ink` recolours every mark that has no explicit
+// paint channel; `axis`/`grid` restyle the chrome. A partial — you name only
+// the tokens you change, the rest inherit the default.
+mount(Elicit({
+  width: 440, height: 240,
+  margins: { top: 20, right: 20, bottom: 30, left: 36 },
+  data: [{ cat: "A", n: 30 }, { cat: "B", n: 55 }, { cat: "C", n: 40 }, { cat: "D", n: 22 }],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n: { type: "quantitative", domain: [0, 60] },
+  },
+  theme: {
+    ink: "#e11d48",
+    axis: { stroke: "#cbd5e1", labelFill: "#64748b" },
+    grid: { stroke: "#f1f5f9" },
+  },
+  axes: { x: {}, y: { grid: true } },
+  features: [
+    barY({ channels: { x: { field: "cat" }, y: { field: "n", edit: drag() } } }),
+  ],
+}));

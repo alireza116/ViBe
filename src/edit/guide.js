@@ -59,7 +59,10 @@ export function buildEditGuide(feature, edit, ctx) {
     const markChannels = feature.channels || {};
     const resolved = resolveChannels(edit.channels, markChannels, scales);
     const primary = resolved[0];
-    const color = edit.guideColor || DEFAULT_CONSTRAINT_COLOR;
+    // The guide colour: the edit's own `guideColor` wins; otherwise the theme's
+    // constraint colour (falls back to the historical default if no theme in ctx).
+    const themeColor = ctx.theme && ctx.theme.constraint && ctx.theme.constraint.color;
+    const color = edit.guideColor || themeColor || DEFAULT_CONSTRAINT_COLOR;
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
 

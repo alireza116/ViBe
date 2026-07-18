@@ -1,0 +1,5 @@
+mount(Elicit(widgets.histogram({
+  question: "How many cups of coffee per day?",
+  bins: ["0", "1", "2", "3", "4+"],
+  max: 40,
+})));

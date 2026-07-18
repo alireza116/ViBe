@@ -1,21 +1,28 @@
 // @ts-check
-// probe.js — the hover-preview / click-commit lifecycle. No drag: the pointer
-// PROBES a value (the mark follows the cursor as an uncommitted preview) and a
-// click SETTLES it (commits the datum and advances the stage). It is the
-// interaction behind the classic multi-step elicitations — "move the line, click
-// to set it; now move to open the cone, click to set that too" — and behind the
-// dot plot's tentative dot that only becomes real on click.
+// probe.js — the ghost-preview / settle lifecycle. The pointer PROBES a value: the
+// proposal follows the cursor as an inert GHOST mark (the committed mark stays put),
+// and a commit SETTLES it — writing the datum and advancing any stage. Two gestures
+// settle, so both natural expectations work:
+//   · move-then-click — no button held; the ghost tracks the pointer, a click
+//     settles it. The classic multi-step elicitation ("move the line, click to set
+//     it; now open the cone, click to set that too") and the dot plot's tentative dot.
+//   · grab-and-drag  — press on the mark, drag (the ghost tracks the drag), release
+//     to settle. This is what a slider/thermometer expects; before, a probe ignored
+//     drag entirely and the renderer swallowed the trailing click, so a dragged
+//     probe committed NOTHING. Now dragend settles.
 //
 //   angle:  { field: 'r',      edit: rotate({ pick: 'probe', stage: 0 }) }
 //   spread: { field: 'spread', edit: rotate({ pick: 'probe', stage: 1, relativeTo: 'angle' }) }
 //
 // It runs the SAME edit twice through two engine entry points that share one
-// `computeEdit` (apply + invariants): `previewEdit` on hover (parked in the
-// transient preview store, never seen by onChange/getData) and `runEdit` on click
-// (committed). So the preview is guaranteed to be exactly what the click writes —
-// there is no second, drifting "preview" code path.
+// `computeEdit` (apply + invariants): `previewEdit` on hover/drag (parked in the
+// transient per-feature preview store, rendered as a ghost, never seen by
+// onChange/getData) and `runEdit` on click/dragend (committed). So the ghost is
+// guaranteed to be exactly what a commit writes — there is no second, drifting
+// "preview" code path. A hover that lands on an invalid spot (no proposal) clears
+// the stale ghost so it snaps back to the committed mark.
 //
-// Stage advance: an edit that carries a `stage` settles that stage on click, so
+// Stage advance: an edit that carries a `stage` settles that stage on commit, so
 // the driver calls `stage.next()` and the engine's stage gate deactivates it —
 // the field is frozen and the next stage's edit takes over. An unstaged probe
 // edit (the dot plot's `create`) just commits, over and over. `advance: false`
@@ -48,24 +55,29 @@ export const probeDriver = {
     onEvent: (ctx) => {
         const { event, edits, preview, stage, runEdit, previewEdit } = ctx;
         if (!edits.length) return false;
+        const type = event.type;
 
-        // Hover: propose, don't commit. The preview supersedes the feature's data
-        // for the next render only.
-        if (event.type === 'hover') {
-            let changed = false;
+        // PREVIEW — a hover (no button) or a drag-move (button held) both propose the
+        // value at the pointer without committing; the engine renders it as a ghost.
+        // dragstart previews too, so the ghost appears the instant the press lands.
+        // If NOTHING proposed (an invalid spot — outside a band, a rejected value),
+        // clear any stale ghost so it snaps back to the committed mark.
+        if (type === 'hover' || type === 'dragstart' || type === 'drag') {
+            let any = false;
             for (const edit of edits) {
-                if (previewEdit(edit, targetIndex(ctx, edit))) changed = true;
+                if (previewEdit(edit, targetIndex(ctx, edit))) any = true;
             }
-            return changed;
+            return any || preview.clear();
         }
 
-        // Leaving the plane drops the proposal — the mark snaps back to the last
-        // committed belief.
-        if (event.type === 'hoverout') return preview.clear();
+        // Leaving the plane drops the proposal — the ghost vanishes.
+        if (type === 'hoverout') return preview.clear();
 
-        // Click: settle. Commit the same proposal, then advance past any stage the
-        // committed edits belong to (the gate then deactivates them).
-        if (event.type === 'click') {
+        // SETTLE — a click (move-then-click) or a drag release (grab-and-drag) commits
+        // the same proposal, then advances past any stage the committed edits belong
+        // to (the gate then deactivates them). The renderer suppresses the click that
+        // trails a real drag, so a drag settles exactly once via dragend.
+        if (type === 'click' || type === 'dragend') {
             let changed = false;
             let advance = false;
             for (const edit of edits) {

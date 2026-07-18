@@ -39,7 +39,7 @@
 // All nodes are non-interactive: the whole plane is the gesture surface (rotate
 // is a plane/probe-pick edit), exactly how a line's connector sits under its handles.
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
 
 /** Deterministic PRNG so the sampled fan is STABLE across re-renders. */
 function mulberry32(/** @type {number} */ seed) {
@@ -115,12 +115,13 @@ export function cone(options = {}) {
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 
+            const coneDefaults = markDefaults(scales, 'cone', { stroke: '#d33', strokeWidth: 2.5 });
             currentData.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
                 const meanDeg = encodeChannel(scales, channels, 'angle', d, 0, i, currentData);
                 const rMean = angleField != null ? Number(d[angleField]) : 0;
                 const halfWidth = spreadField != null ? Math.abs(Number(d[spreadField])) || 0 : 0;
                 const angleScale = scales.angle;
-                const style = resolveStyle(scales, channels, d, { stroke: '#d33', strokeWidth: 2.5 }, i, currentData);
+                const style = resolveStyle(scales, channels, d, coneDefaults, i, currentData);
 
                 // Optional filled wedge spanning the envelope — its edges are exactly
                 // where the pointer sat when the spread was set.
@@ -133,7 +134,7 @@ export function cone(options = {}) {
                         type: 'path',
                         points: [[a.x1, a.y1], [a.x2, a.y2], [b.x2, b.y2], [b.x1, b.y1]],
                         curve: 'linear',
-                        fill: style.stroke || '#d33',
+                        fill: style.stroke || coneDefaults.stroke,
                         fillOpacity: 0.08,
                         stroke: 'none',
                         pointerEvents: 'none',

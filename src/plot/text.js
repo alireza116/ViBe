@@ -33,7 +33,7 @@
 //   textX — value on x, y parked at the vertical centre (a 1-D label along x)
 //   textY — value on y, x parked at the horizontal centre (a 1-D label along y)
 
-import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, callChannelFn } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, callChannelFn, markDefaults } from './mark.js';
 import { resolveFormat } from '../format.js';
 
 /**
@@ -109,7 +109,7 @@ export function hasEditText(edits, channels) {
  */
 export function textNodeAt(scales, channels, d, i, px, py, opts = {}) {
     const { format = (/** @type {any} */ v) => v, canEditText = false } = opts;
-    const style = resolveStyle(scales, channels, d, { fill: '#111' }, i);
+    const style = resolveStyle(scales, channels, d, markDefaults(scales, 'text', { fill: '#111' }), i);
 
     const dx = +rawChannel(channels, 'dx', d, 0, i) || 0;
     const dy = +rawChannel(channels, 'dy', d, 0, i) || 0;
