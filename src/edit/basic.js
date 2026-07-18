@@ -485,13 +485,56 @@ export function remove(options = {}) {
 }
 
 /**
+ * The one apply `set` and `editText` share: write the value carried in `ctx.value`
+ * into the first channel's field. There is no pixel to invert — the value arrives
+ * whole (a typed string, a picked category, a slider number), via the `commit`
+ * gesture. Factored so "write a value into a field" has one implementation.
+ * @param {import('../types').EditContext} ctx
+ * @returns {any}
+ */
+function writeValue(ctx) {
+    const ch = ctx.channels[0];
+    if (!ch || !ch.field || ctx.value === undefined || !ctx.datum) return undefined;
+    return { ...ctx.datum, [ch.field]: ctx.value };
+}
+
+/**
+ * set — the universal value edit: write `ctx.value` into the channel's field,
+ * whatever the field's TYPE (quantitative, colour, categorical, temporal). Unlike
+ * the positional edits its input isn't a pixel to invert — it's the value itself,
+ * carried on the `commit` gesture in `ctx.value`. This is the edit an EXTERNAL
+ * controller drives with `el.control(name).set(value)`: a picker sets a category,
+ * a swatch sets a colour, a number field sets a magnitude — all through the same
+ * `commit` path `editText` uses, so the engine treats it as an ordinary direct
+ * gesture (no new pick/driver). The channel's scale still declares what values are
+ * ACCEPTED (`el.control(name).accepts()` reads that domain), so the UI can offer
+ * only valid choices.
+ *
+ * Placed on any channel (`fill: { field:'group', edit: set() }`) or at mark level
+ * (`edits: [set({ channels:['fill'] })]`).
+ * @param {any} [options]
+ * @returns {import('../types').Edit}
+ */
+export function set(options = {}) {
+    const { channel, channels, ...rest } = options;
+    return makeEdit({
+        type: 'set',
+        gesture: 'commit',
+        pick: 'direct',
+        channels: channels || (channel ? [channel] : null),
+        ...rest,
+        apply: writeValue
+    });
+}
+
+/**
  * editText — content edit: write a typed string back into the text channel's field.
- * Unlike every other edit its input isn't a pixel to invert — it's the string the
- * user typed. The renderer owns the keyboard lifecycle (double-click a text mark →
- * inline input → Enter/blur commits, Esc cancels) and emits a single `commit`
- * gesture carrying the value in `ctx.value`; this edit just stores it. Keeping the
- * keyboard lifecycle in the renderer means the engine treats `commit` as an
- * ordinary direct gesture (no new pick/driver), staying ignorant of the mode.
+ * The text specialization of `set`: same `commit`/`ctx.value` write, but named and
+ * defaulted for text so the renderer's inline-keyboard lifecycle (double-click a
+ * text mark → inline input → Enter/blur commits, Esc cancels) reads clearly. The
+ * renderer owns that lifecycle and emits a single `commit` gesture carrying the
+ * value in `ctx.value`; this edit just stores it, so the engine treats `commit` as
+ * an ordinary direct gesture (no new pick/driver), staying ignorant of the mode.
  *
  * Placed on the text channel (`text: { field:'label', edit: editText() }`) or at
  * mark level (`edits: [editText({ channels:['text'] })]`).
@@ -506,11 +549,7 @@ export function editText(options = {}) {
         pick: 'direct',
         channels: channels || (channel ? [channel] : ['text']),
         ...rest,
-        apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const ch = ctx.channels[0];
-            if (!ch || !ch.field || ctx.value === undefined || !ctx.datum) return undefined;
-            return { ...ctx.datum, [ch.field]: ctx.value };
-        }
+        apply: writeValue
     });
 }
 

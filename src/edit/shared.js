@@ -21,6 +21,11 @@ export const asList = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
 export function makeEdit(spec) {
     return {
         type: spec.type,
+        // Stable handle for `el.control(name)` — the name an external controller
+        // (a slider, a picker, a rotate icon) addresses this edit by. null (the
+        // default) means the edit isn't externally addressable; it stays purely
+        // pointer/keyboard-driven, unchanged. Naming an edit adds no dispatch path.
+        name: spec.name || null,
         gesture: spec.gesture || 'drag',
         channels: spec.channels || null,
         when: spec.when || null,

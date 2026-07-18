@@ -1,0 +1,79 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import scatterPickerAndHandle from './_examples/scatter-picker-and-handle.example.txt';
+import pickVsCycle from './_examples/pick-vs-cycle.example.txt';
+import faceSliders from './_examples/face-sliders.example.txt';
+import rotateBox from './_examples/rotate-box.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# External controls
+
+<Lead>Bind an edit to any external controller — a `<select>`, sliders, a rotate icon, a plain function — and drive it from outside the SVG. Give the edit a `name`, then call `el.control(name).set(value)`. Nothing about how edits work changes: the control synthesizes the **same** events a pointer produces and hands them to the one dispatch, so constraints, undo/redo, guides, and `on("change")` all run identically. It is a new input *source*, not a second interaction system — the same move the keyboard already makes when it turns an arrow key into a drag.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="how" title="Name an edit, then drive it">
+
+The value flows the opposite way through the same scale. An edit maps a gesture → data by *inverting* a channel's scale; `control(name).set(value)` maps data → a gesture by running that scale *forward*, then dispatches the ordinary edit. For a value edit (`set`/`editText`) there is no pixel at all — the value is carried straight through. `control(name).accepts()` reports what the channel's scale allows, so a picker or slider can offer only valid values.
+
+</Section>
+
+<Section id="scatter" title="A picker and a drag pad">
+
+The `<select>` writes the point's category through a `set()` edit; its options come from `control("category", 0).accepts().values`. The pad drives a two-axis `drag` live — `begin() … set({x,y}) … end()` collapses into one undo entry. The `clamp` on `y` gates the pad exactly as it gates a mouse drag: external control is not a bypass.
+
+<Example
+  code={scatterPickerAndHandle}
+  title="Scatter: category picker + drag pad"
+  blurb="A <select> sets the category; a draggable pad moves the point through the clamped drag edit."
+  try={"pick a category; drag the pad; the point obeys the y ≤ 80 clamp either way."}
+/>
+
+</Section>
+
+<Section id="pick" title="Pick vs. cycle: driving other gestures">
+
+`.set(value)` covers the value edits (`set`/`editText`) and the positional ones (`drag`/`rotate`/`resize`). The click-triggered edits — `cycle`, `remove`, `toggle` — take no value; they just fire. `.fire()` drives those, dispatching the edit's own gesture on the datum. So one circle can offer a **picker** (`set` — jump straight to a value) *and* a **cycle** (`fire` — step to the next), on the same field, alongside the native click.
+
+<Example
+  code={pickVsCycle}
+  title="A circle: pick or cycle its category"
+  blurb="A dropdown sets the category (set); a button and the circle itself step it (cycle)."
+  try={"choose from the dropdown, press ⟳, or click the circle — all change the same field."}
+/>
+
+</Section>
+
+<Section id="face" title="Sliders for facial features">
+
+Each facial parameter is a channel; bind it to a field with a named `set()` edit and a slider can write it — while the face stays directly draggable (grab the mouth, pull a smile). One dataset, two input sources, the same edits. Each slider's range comes from `control(field).accepts().domain`.
+
+<Example
+  code={faceSliders}
+  title="Face: parameter sliders"
+  blurb="Three sliders drive three facial params; dragging the face keeps them in sync."
+  try={"move a slider, or drag the face directly — both write the same fields."}
+/>
+
+</Section>
+
+<Section id="rotate" title="A rotate icon for a box">
+
+`rotate` reads a pointer angle about the mark; driving it by degrees is the inverse. `control("spin", 0).set(deg)` forward-encodes the angle to the pointer that would produce it, then runs the ordinary rotate edit. The box also rotates by direct drag.
+
+<Example
+  code={rotateBox}
+  title="Rotate a box by an icon"
+  blurb="Buttons step the angle in data space; the façade forward-encodes to the rotate edit."
+  try={"press the rotate buttons, or drag the box itself."}
+/>
+
+</Section>

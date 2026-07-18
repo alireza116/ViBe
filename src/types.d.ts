@@ -202,6 +202,11 @@ export interface Constraint {
 
 export interface Edit {
   type: string;
+  // Stable handle an external controller addresses this edit by, via
+  // `el.control(name)`. null (default) = not externally addressable; the edit
+  // stays purely pointer/keyboard-driven. Naming an edit adds no dispatch path —
+  // `el.control` synthesizes the same events the pointer does (see ElicitElement).
+  name: string | null;
   gesture: string;
   channels: string[] | null;
   when: ((ctx: EditContext) => boolean) | null;
@@ -710,7 +715,90 @@ export interface ElicitElement extends HTMLDivElement {
   getStageLabel(): string | null;
   setStage(stage: number): void;
   nextStage(): void;
+  // External control — drive an edit from OUTSIDE the chart (a slider, a picker,
+  // a rotate icon, a plain function). A new input SOURCE, not a second interaction
+  // system: `emit`/`control` synthesize the same renderer-shaped events the pointer
+  // and keyboard already produce and feed them to the one dispatch, so constraints,
+  // undo, guides, and 'change' all run identically. See the keyboard-`nudge`
+  // precedent in core/elicit.js.
+  //
+  // Low-level: inject a renderer-shaped event. x/y are INNER (margin-subtracted)
+  // pixels. Prefer `control` unless you already hold pixels.
+  emit(event: GestureEvent): void;
+  // High-level: a handle bound to the edit named `name` (see Edit.name) acting on
+  // the datum at `index` (default 0). `.set(value)` drives it by a DATA value —
+  // forward-encoded through the channel's scale for positional edits, or carried
+  // whole for a `set()`/`editText()` value edit.
+  control(name: string, index?: number): EditControl;
   // Detach the ResizeObserver used by `responsive: 'reflow'`. No-op otherwise;
   // call it when unmounting a reflow chart. Present on every element.
   destroy(): void;
+}
+
+// A renderer-shaped gesture event, the one shape every input source (pointer,
+// keyboard nudge, external controller) funnels into `handleEvent`. x/y are INNER
+// (margin-subtracted) pixels — the space an edit's `ctx.pointer` reads.
+export interface GestureEvent {
+  type: 'dragstart' | 'drag' | 'dragend' | 'click' | 'dblclick' | 'commit' | (string & {});
+  // The scene node the gesture landed on. Present -> direct-pick dispatch to that
+  // node's feature; absent -> plane dispatch fans to every feature.
+  node?: any;
+  x?: number;
+  y?: number;
+  // A non-pixel payload (a typed string, a picked value) read as `ctx.value` — how
+  // a `commit` gesture carries what `set()`/`editText()` write.
+  value?: any;
+  // "One press = one complete gesture": a lone `drag` self-closes its undo txn
+  // instead of leaking it (the keyboard nudge's trick, reused for one-shot control).
+  nudge?: boolean;
+  // Addresses ONE edit by its `name` (Edit.name). Direct dispatch then runs only that
+  // edit instead of fanning to every same-gesture edit on the feature — so several
+  // `set()`s on one feature (a face's params) stay independent. Set by `el.control`;
+  // native pointer events leave it unset (and keep the ordinary fan-out).
+  editName?: string;
+  rawEvent?: any;
+  [key: string]: any;
+}
+
+// A handle bound to a named edit + datum (from `el.control`). It reads the edit's
+// own `gesture` to route value-space vs pointer-space — the handle branches; the
+// engine dispatch never learns a controller exists.
+export interface EditControl {
+  // One-shot write. A value edit (set/editText) carries `value` whole; a positional
+  // edit (drag/resize/rotate/rank) forward-encodes it to a pointer and self-closes
+  // its undo txn (one entry). Pass a scalar for a single-channel edit, or a
+  // { channelName: value } / { field: value } map for a multi-channel one (2-D drag).
+  set(value: any): void;
+  // Bracket a LIVE drag so many `.set()` ticks collapse into ONE undo entry, exactly
+  // like a pointer drag's dragstart..dragend.
+  begin(): void;
+  end(): void;
+  // Fire a TRIGGER edit that takes no value (cycle advances a category, remove drops
+  // the row, toggle flips it): dispatches the edit's own gesture (a click/dblclick)
+  // on the datum's node. `.set` covers commit/drag edits; `.fire` covers these. Pass
+  // a gesture to override the edit's own.
+  fire(gesture?: string): void;
+  // Raw event passthrough, auto-scoped to this feature's node for the datum.
+  emit(event: GestureEvent): void;
+  // What values this channel ACCEPTS, read off its scale — so external UI (dropdown
+  // options, slider min/max, colour choices) can respect the scale. null if the edit
+  // isn't found. `values`/`domain` list the accepted set (discrete) or range
+  // (continuous); `kind`/`type`/`temporal`/`invertible` are the scale's capabilities.
+  accepts(): ChannelAccepts | null;
+}
+
+// The accepted-value description `EditControl.accepts()` returns, derived from the
+// channel's scale + the field's schema. Read capability flags, never `scale.type`.
+export interface ChannelAccepts {
+  field: string | null;
+  type: MeasureType | null;
+  kind: 'band' | 'point' | 'continuous' | 'discrete' | null;
+  temporal: boolean;
+  invertible: boolean;
+  // A discrete channel's accepted value set is its domain; a continuous channel's
+  // accepted [min, max] is its domain. `values` is the discrete set only (null when
+  // continuous), so a dropdown can offer exactly the valid choices.
+  domain: any[] | null;
+  values: any[] | null;
+  range: any[] | null;
 }

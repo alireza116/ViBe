@@ -1,0 +1,56 @@
+// Two ways to change one circle's category, both external. `cycle` is a CLICK edit
+// that steps to the next value; a picker SETS a value directly. They coexist on the
+// same `fill` field: click the circle (or the ⟳ button) to step, or choose from the
+// dropdown to jump straight there.
+const chart = Elicit({
+  width: 300, height: 190,
+  margins: { top: 10, right: 10, bottom: 10, left: 10 },
+  schema: {
+    kind: { type: "categorical", domain: ["low", "med", "high"] },
+  },
+  data: [ { kind: "low" } ],
+  features: [
+    point({
+      size: 26,
+      channels: {
+        x: { value: 150 },
+        y: { value: 90 },
+        fill: {
+          field: "kind",
+          scale: { range: ["#93c5fd", "#3b82f6", "#1e3a8a"] },
+          // Direct choice — a picker writes exactly this value.
+          edit: set({ name: "pick" }),
+        },
+      },
+      // Step-at-a-time — a click (on the circle or a button) advances the category.
+      edits: [ cycle({ name: "step", channel: "fill" }) ],
+    }),
+  ],
+});
+mount(chart);
+
+const controls = document.createElement("div");
+controls.style.cssText = "display:flex;gap:12px;align-items:center;margin-top:10px;font:13px system-ui";
+
+// A picker → `set`: options are exactly the values the fill scale accepts.
+const pick = document.createElement("select");
+for (const v of chart.control("pick", 0).accepts().values) {
+  const o = document.createElement("option");
+  o.value = v; o.textContent = v; pick.append(o);
+}
+pick.value = chart.getData()[0].kind;
+pick.onchange = () => chart.control("pick", 0).set(pick.value);
+const pickWrap = document.createElement("label");
+pickWrap.style.cssText = "display:flex;gap:6px;align-items:center";
+pickWrap.append("pick", pick);
+
+// A button → `fire`: dispatches the cycle edit's own click gesture, no value.
+const step = document.createElement("button");
+step.textContent = "⟳ cycle";
+step.onclick = () => chart.control("step", 0).fire();
+
+controls.append(pickWrap, step);
+mount(controls);
+
+// Keep the picker in step whichever way the category changed.
+chart.on("change", () => { pick.value = chart.getData()[0].kind; });

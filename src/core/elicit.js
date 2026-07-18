@@ -11,7 +11,7 @@ import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer.js';
 import { resolveEffects } from './effects.js';
 import { autoAxes } from './axes.js';
-import { axisOf } from './encoding.js';
+import { axisOf, pointerForChannel } from './encoding.js';
 
 // Dev-only builds get the capability guards below. `import.meta.env.DEV` must be
 // written PLAINLY: Vite only injects `import.meta.env` into a module that mentions
@@ -699,7 +699,14 @@ export function Elicit(spec) {
         if (index == null) return false;
         let changed = false;
         activeEdits(feature)
-            .filter(e => e.pick === 'direct' && e.gesture === event.type)
+            // A gesture normally fans to EVERY direct edit sharing its type (arbitrated
+            // by each edit's `when`). An externally-driven event may ADDRESS one edit by
+            // name (event.editName), so a feature carrying several same-gesture edits —
+            // three `set()`s on a face's params — drives exactly the one asked for
+            // instead of all of them. Native pointer events set no editName, so their
+            // fan-out is unchanged.
+            .filter(e => e.pick === 'direct' && e.gesture === event.type
+                && (!event.editName || e.name === event.editName))
             .forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
         return changed;
     };
@@ -876,6 +883,179 @@ export function Elicit(spec) {
         future = [];
         endTxn();
         update();
+    };
+
+    // ── External control: drive an edit from outside the chart ────────────────
+    // An external controller (a slider, a `<select>`, a rotate icon, a plain
+    // function) is a new INPUT SOURCE, not a second interaction system. It
+    // synthesizes the SAME renderer-shaped events the pointer and keyboard
+    // produce and feeds them to the one `handleEvent` — exactly what the keyboard
+    // `nudge` normalizer already does above. Constraints, undo, guides,
+    // `on('change')`, and re-render all run because the event traverses the
+    // identical pipeline. No new pick, no driver, no dispatch branch.
+
+    // Low-level: inject a renderer-shaped event. `x`/`y` are INNER (margin-
+    // subtracted) pixels — the space `ctx.pointer` reads. Event shape:
+    // { type, node?, x?, y?, value?, nudge?, rawEvent? }. Callers usually want
+    // `el.control(name)` (below), which computes pixels from a DATA value for you.
+    el.emit = (/** @type {any} */ event) => handleEvent(event);
+
+    // Find the (feature, edit) an external controller addresses by `name` (set via
+    // drag({ name: 'move' }) etc.). Lazy — scanned each call so it tracks re-renders
+    // and stage changes.
+    const findNamedEdit = (/** @type {string} */ name) => {
+        /** @type {{ feature: any, edit: any } | null} */
+        let hit = null;
+        let count = 0;
+        for (const feature of features) {
+            for (const edit of collectEdits(feature)) {
+                if (edit.name === name) { count++; if (!hit) hit = { feature, edit }; }
+            }
+        }
+        if (DEV && count === 0) console.warn(`[vibe] el.control("${name}"): no edit is named "${name}".`);
+        if (DEV && count > 1) console.warn(`[vibe] el.control("${name}"): ${count} edits share the name "${name}"; driving the first.`);
+        return hit;
+    };
+
+    // The scene node for a datum index in a feature, resolved fresh from the CURRENT
+    // render (never cached — nodes are rebuilt every update). Gives radial edits
+    // (resize/rotate about the mark) their pivot via markCenter.
+    const nodeAt = (/** @type {any} */ feature, /** @type {number} */ index) =>
+        (featureNodes[feature.id] || []).find((/** @type {any} */ n) => n && n.index === index) || null;
+
+    // High-level façade: a handle bound to a named edit + datum. It reads the edit's
+    // own `gesture` to route value-space vs pointer-space — the FAÇADE branches; the
+    // engine dispatch never learns a controller exists.
+    el.control = (/** @type {string} */ name, /** @type {number} */ index = 0) => {
+        // Value -> the pointer that would set it, forward-encoding through the SAME
+        // scale the edit inverts (the inverse of the edit's inverse — encoding, run
+        // forward). Mirrors the nudge normalizer: untouched axes keep the datum's
+        // CURRENT pixel so they don't teleport.
+        const dragPointer = (/** @type {any} */ feature, /** @type {any} */ edit, /** @type {any} */ value) => {
+            const node = nodeAt(feature, index);
+            const center = markCenter(node);
+            const datum = dataset[index];
+            const channels = feature.channels || {};
+            // Base: where the datum currently sits, so a single-axis set doesn't move
+            // the other axis.
+            let x = datum ? encodeChannel(scales, channels, 'x', datum, center ? center.cx : 0) : (center ? center.cx : 0);
+            let y = datum ? encodeChannel(scales, channels, 'y', datum, center ? center.cy : 0) : (center ? center.cy : 0);
+            const resolved = resolveChannels(edit.channels, channels, scales);
+            // `value` is either a scalar (single-channel edit) or a { channelName: v }
+            // / { field: v } map for a multi-channel edit (a 2-D drag).
+            const valueFor = (/** @type {any} */ ch) => {
+                if (value != null && typeof value === 'object' && !(value instanceof Date)) {
+                    if (ch.name in value) return value[ch.name];
+                    if (ch.field != null && ch.field in value) return value[ch.field];
+                    return undefined;
+                }
+                return value; // scalar applies to the sole channel
+            };
+            for (const ch of resolved) {
+                if (!ch.scale || !ch.scale.invertible) continue;
+                const v = valueFor(ch);
+                if (v === undefined) continue;
+                const visual = ch.scale.encode(v);
+                const p = pointerForChannel(ch.name, visual, center);
+                if (!p) continue;
+                if (axisOf(ch.name) === 'x' || ch.name === 'size' || ch.name === 'angle') x = p.x;
+                if (axisOf(ch.name) === 'y' || ch.name === 'size' || ch.name === 'angle') y = p.y;
+            }
+            return { node, x, y };
+        };
+
+        // True between begin() and end(): a live drag session, so `.set` ticks emit a
+        // plain `drag` (they collapse into the open txn) instead of a self-closing
+        // one-shot `nudge` drag (which would close the txn every tick).
+        let live = false;
+
+        const handle = {
+            // One-shot write. Commit-gesture edits (set/editText) carry the value whole
+            // in `ctx.value`; drag-gesture edits forward-encode it to a pointer. Outside
+            // a begin()/end() session a drag self-closes its txn with `nudge:true` (one
+            // undo entry); inside one, it stays a plain `drag` so the session collapses.
+            set(/** @type {any} */ value) {
+                const found = findNamedEdit(name);
+                if (!found) return;
+                const { feature, edit } = found;
+                const node = nodeAt(feature, index);
+                // editName addresses THIS edit, so a sibling edit sharing the gesture
+                // (another set() on the same feature) doesn't also fire.
+                if (edit.gesture === 'commit') {
+                    el.emit({ type: 'commit', node, value, editName: name, x: node ? node.cx : 0, y: node ? node.cy : 0 });
+                    return;
+                }
+                const { node: n, x, y } = dragPointer(feature, edit, value);
+                el.emit(live
+                    ? { type: 'drag', node: n, x, y, editName: name }
+                    : { type: 'drag', node: n, x, y, nudge: true, editName: name });
+            },
+            // Live drag: begin()/end() bracket the txn so many .set() ticks collapse
+            // into ONE undo entry (exactly like a pointer drag's dragstart..dragend).
+            begin() {
+                const found = findNamedEdit(name);
+                if (!found) return;
+                live = true;
+                el.emit({ type: 'dragstart', node: nodeAt(found.feature, index), editName: name });
+            },
+            end() {
+                const found = findNamedEdit(name);
+                live = false;
+                if (!found) return;
+                el.emit({ type: 'dragend', node: nodeAt(found.feature, index), editName: name });
+            },
+            // Fire a TRIGGER edit — one that takes no value, it just acts on the datum
+            // (cycle advances a category, remove drops the row, toggle flips it). An
+            // external button drives it: `control(name).fire()` dispatches the edit's
+            // own gesture (a click/dblclick) on the datum's node. Pass a gesture to
+            // override. This is the counterpart of `.set` for the click/dblclick edits
+            // — `.set` covers commit/drag, `.fire` covers the rest. (Plane-pick edits
+            // like create need coordinates; use `.emit({ type, x, y })` for those.)
+            fire(/** @type {string} */ gesture) {
+                const found = findNamedEdit(name);
+                if (!found) return;
+                const g = gesture || found.edit.gesture || 'click';
+                el.emit({ type: g, node: nodeAt(found.feature, index), editName: name });
+            },
+            // Raw passthrough, auto-scoped to this feature's node for the datum.
+            emit(/** @type {any} */ event) {
+                const found = findNamedEdit(name);
+                el.emit({ node: found ? nodeAt(found.feature, index) : undefined, ...event });
+            },
+            // What values this channel ACCEPTS, read off its scale — so external UI
+            // (dropdown options, slider min/max, colour choices) respects the scale
+            // instead of fighting it. Reads capability flags, never `scale.type`.
+            accepts() {
+                const found = findNamedEdit(name);
+                if (!found) return null;
+                const { feature, edit } = found;
+                const ch = resolveChannels(edit.channels, feature.channels || {}, scales)[0];
+                const scale = /** @type {any} */ (ch && ch.scale);
+                const fieldSpec = (schema && ch && ch.field && schema[ch.field]) || null;
+                const measure = (fieldSpec && fieldSpec.type) || null;
+                // Prefer the scale's domain; fall back to the schema's declared domain
+                // so a non-positional channel (a face param) still reports its range.
+                const domain = (scale && typeof scale.domain === 'function' ? scale.domain() : null)
+                    || (fieldSpec && fieldSpec.domain) || null;
+                const range = scale && typeof scale.range === 'function' ? scale.range() : null;
+                return {
+                    field: ch ? ch.field : null,
+                    type: measure,                         // MeasureType (quantitative/categorical/…)
+                    kind: scale ? scale.kind : null,       // band | point | continuous | discrete
+                    temporal: !!(scale && scale.temporal),
+                    invertible: !!(scale && scale.invertible),
+                    // A discrete channel's domain IS its accepted value set; a
+                    // continuous channel's domain is its accepted [min, max].
+                    domain,
+                    values: (
+                        (scale && (scale.kind === 'band' || scale.kind === 'discrete' || scale.kind === 'point'))
+                        || measure === 'categorical' || measure === 'ordinal'
+                    ) ? domain : null,
+                    range,
+                };
+            },
+        };
+        return handle;
     };
 
     // Undo / redo one GESTURE (see the history store above). Both return whether

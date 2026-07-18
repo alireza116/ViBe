@@ -47,6 +47,7 @@ export const SITE: NavGroup[] = [
       { href: '/editing/probe', title: 'Probe (hover · click)' },
       { href: '/editing/history', title: 'History & keyboard' },
       { href: '/editing/stages', title: 'Stages (multi-step)' },
+      { href: '/editing/external-controls', title: 'External controls (UI · functions)' },
       { href: '/editing/axis', title: 'Editable axes (domain)' },
     ],
   },

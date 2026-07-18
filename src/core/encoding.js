@@ -379,3 +379,34 @@ export function visualForChannel(channelName, pointer, center) {
     }
     return undefined; // channel isn't spatially adjustable this way
 }
+
+/**
+ * The forward sibling of visualForChannel: given a channel and a VISUAL value
+ * (already run through the channel's scale — a pixel for x/y, a radius for size,
+ * a degree for angle), return the pointer position a gesture would have been at
+ * to produce it. This lets an EXTERNAL controller drive a positional edit by a
+ * DATA value: forward-encode value -> visual through the same scale the edit
+ * inverts, then place the pointer here and synthesize a drag. It is the exact
+ * inverse of visualForChannel, so a value round-trips (encode -> pointer ->
+ * edit's invert) back to itself. `center` is the mark centre a radial channel
+ * (size/angle) pivots about; positional channels reuse the untouched axis of it.
+ * @param {string} channelName
+ * @param {number} visual value already in the scale's OUTPUT space
+ * @param {{ cx: number, cy: number } | null} [center]
+ * @returns {{ x: number, y: number } | undefined}
+ */
+export function pointerForChannel(channelName, visual, center = null) {
+    const axis = axisOf(channelName);
+    if (axis === 'x') return { x: visual, y: center ? center.cy : 0 };
+    if (axis === 'y') return { x: center ? center.cx : 0, y: visual };
+    if (!center) return undefined; // radial channels need a pivot
+    if (channelName === 'size') { // radius along +x from the centre
+        return { x: center.cx + visual, y: center.cy };
+    }
+    if (channelName === 'angle') { // point on a unit-ish circle at `visual` degrees
+        const rad = visual * Math.PI / 180;
+        const R = 100; // any R > 0 works — pointerDegrees only reads atan2, not distance
+        return { x: center.cx + R * Math.cos(rad), y: center.cy - R * Math.sin(rad) };
+    }
+    return undefined; // channel isn't spatially adjustable this way
+}

@@ -1,0 +1,101 @@
+// External controllers drive the SAME edits a pointer does. A `<select>` sets the
+// category (a value edit); a draggable pad moves the point (a positional edit).
+// Both go through the normal pipeline — the clamp on y holds for the pad exactly
+// as it would for a mouse drag.
+const chart = Elicit({
+  width: 380, height: 260,
+  margins: { top: 14, right: 14, bottom: 26, left: 30 },
+  schema: {
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    group: { type: "categorical",  domain: ["A", "B", "C"] },
+  },
+  data: [
+    { x: 30, y: 40, group: "A" },
+    { x: 62, y: 70, group: "B" },
+    { x: 78, y: 25, group: "C" },
+  ],
+  // A dataset invariant: y can never exceed 80. It gates EVERY edit, including the
+  // pad drag below — external control is not a bypass.
+  constraints: [ clamp({ field: "y", max: 80 }) ],
+  features: [
+    point({
+      size: 7,
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        fill: {
+          field: "group",
+          scale: { range: ["#2563eb", "#059669", "#d97706"] },
+          // A universal value edit: an external picker writes the chosen category.
+          edit: set({ name: "category" }),
+        },
+      },
+      // One drag over BOTH axes, named so a controller can address it.
+      edits: [ drag({ name: "move", channels: ["x", "y"] }) ],
+    }),
+  ],
+});
+mount(chart);
+
+// We drive datum 0 (the first point). `.accepts()` reads what the channel allows.
+const i = 0;
+const cats = chart.control("category", i).accepts().values;   // ["A","B","C"]
+const [dx, dy] = [chart.getSchema().x.domain, chart.getSchema().y.domain];
+
+const controls = document.createElement("div");
+controls.style.cssText = "display:flex;gap:16px;align-items:center;margin-top:10px;font:12px system-ui";
+
+// 1) Category picker — options come straight from the scale's accepted values.
+const pick = document.createElement("select");
+for (const c of cats) {
+  const o = document.createElement("option");
+  o.value = c; o.textContent = c; pick.append(o);
+}
+pick.value = chart.getData()[i].group;
+pick.onchange = () => chart.control("category", i).set(pick.value);
+const pickWrap = document.createElement("label");
+pickWrap.style.cssText = "display:flex;gap:6px;align-items:center";
+pickWrap.append("category", pick);
+
+// 2) A draggable pad — the "UI element around the point". Dragging maps the pad's
+// local position to data space and drives the `move` edit live: begin() … set() …
+// end() collapse into ONE undo entry, just like a real drag.
+const pad = document.createElement("div");
+pad.style.cssText = "position:relative;width:120px;height:120px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;touch-action:none;cursor:grab";
+const knob = document.createElement("div");
+knob.style.cssText = "position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#111827";
+pad.append(knob);
+const placeKnob = () => {
+  const d = chart.getData()[i];
+  knob.style.left = ((d.x - dx[0]) / (dx[1] - dx[0]) * 100) + "%";
+  knob.style.top = (100 - (d.y - dy[0]) / (dy[1] - dy[0]) * 100) + "%";
+};
+let move = null;
+const toData = (ev) => {
+  const r = pad.getBoundingClientRect();
+  const fx = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+  const fy = Math.max(0, Math.min(1, (ev.clientY - r.top) / r.height));
+  return { x: dx[0] + fx * (dx[1] - dx[0]), y: dy[0] + (1 - fy) * (dy[1] - dy[0]) };
+};
+pad.addEventListener("pointerdown", (ev) => {
+  pad.setPointerCapture(ev.pointerId);
+  move = chart.control("move", i);
+  move.begin();
+  move.set(toData(ev));
+});
+pad.addEventListener("pointermove", (ev) => { if (move) move.set(toData(ev)); });
+const stop = () => { if (move) { move.end(); move = null; } };
+pad.addEventListener("pointerup", stop);
+pad.addEventListener("pointercancel", stop);
+
+const padWrap = document.createElement("div");
+padWrap.style.cssText = "display:flex;flex-direction:column;gap:4px;align-items:center;color:#64748b";
+padWrap.append(pad, document.createTextNode("drag to move point 0"));
+
+controls.append(pickWrap, padWrap);
+mount(controls);
+
+// Keep the picker + knob in sync with committed data (edits, undo, redo all fire).
+chart.on("change", () => { pick.value = chart.getData()[i].group; placeKnob(); });
+placeKnob();

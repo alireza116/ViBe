@@ -29,7 +29,7 @@
 // Or at mark level for joint / arbitrary edits:
 //   edits: [ vibe.edit.drag({ channels: ["x", "y"] }), vibe.edit.line.anchor() ]
 
-export { drag, dragSpan, brushSpan, brushRect, resize, rotate, cycle, create, toggle, remove, editText, legend, custom, rank } from './basic.js';
+export { drag, dragSpan, brushSpan, brushRect, resize, rotate, cycle, create, toggle, remove, set, editText, legend, custom, rank } from './basic.js';
 
 export { when } from './when.js';
 // Authoring kit — public so custom edits / marks can reuse the same primitives.

@@ -95,6 +95,7 @@ async function main() {
             '/marks/axis-radial', '/marks/arc', '/marks/geo', '/marks/trend', '/marks/axes',
             '/editing', '/editing/gestures', '/editing/sweep', '/editing/lock',
             '/editing/existence', '/editing/probe', '/editing/stages', '/editing/axis',
+            '/editing/external-controls',
             '/editing/history', '/widgets', '/scales', '/schema', '/constraints',
             '/effects', '/guides',
         ];
@@ -577,6 +578,93 @@ async function main() {
             `${zcBefore[0].delta} -> ${zcAfter[0].delta}`);
         check('diverging: the ramp re-colours as the value crosses the pivot',
             zcFill1 !== zcFill0, `${zcFill0} -> ${zcFill1}`);
+
+        // ---- External controls: drive an edit from outside the chart ---------
+        // The whole point is reaching the edit pipeline WITHOUT a pointer event, so
+        // these call the public control API directly (a slider/picker/icon is just a
+        // handler that does the same). The proof is that everything the pointer path
+        // gives — the scale round-trip, constraints, undo — still holds.
+        console.log('\nExternal controls (/editing/external-controls)');
+        await open('/editing/external-controls', '#scatter .chart svg circle');
+
+        const scEl = '#scatter .chart > div';
+        const scData = () => page.$eval(scEl, (e) => e.getData());
+
+        // accepts() surfaces what the channel allows, from its scale.
+        const cats = await page.$eval(scEl, (e) => e.control('category', 0).accepts().values);
+        check('external: accepts() lists the categorical domain',
+            JSON.stringify(cats) === JSON.stringify(['A', 'B', 'C']), JSON.stringify(cats));
+
+        // A value write (the picker's commit path).
+        await page.$eval(scEl, (e) => e.control('category', 0).set('C'));
+        check('external: set() writes a category value', (await scData())[0].group === 'C');
+
+        // Forward-encode a 2-D data value to a drag; the clamp on y must still gate it.
+        await page.$eval(scEl, (e) => e.control('move', 0).set({ x: 3, y: 999 }));
+        let sd = await scData();
+        check('external: set({x,y}) forward-encodes through the scale',
+            Math.abs(sd[0].x - 3) < 0.8, `x=${sd[0].x}`);
+        check('external: a dataset constraint gates the external edit too',
+            sd[0].y === 80, `y=${sd[0].y} (clamp max 80)`);
+
+        // Undo reverts the external edit and flips redo — it is an ordinary commit.
+        const canBefore = await page.$eval(scEl, (e) => ({ u: e.canUndo(), r: e.canRedo() }));
+        await page.$eval(scEl, (e) => e.undo());
+        sd = await scData();
+        check('external: undo reverts the external edit', sd[0].y !== 80, `y=${sd[0].y}`);
+        const canAfter = await page.$eval(scEl, (e) => ({ u: e.canUndo(), r: e.canRedo() }));
+        check('external: undo flips canRedo', canBefore.r === false && canAfter.r === true);
+
+        // A live drag (begin … set … set … end) collapses into ONE undo entry.
+        const pre = (await scData())[0];
+        await page.$eval(scEl, (e) => {
+            const h = e.control('move', 0);
+            h.begin(); h.set({ x: 10, y: 10 }); h.set({ x: 22, y: 15 }); h.end();
+        });
+        const mid = (await scData())[0];
+        check('external: a live drag moves the point', Math.abs(mid.x - 22) < 0.8, `x=${mid.x}`);
+        await page.$eval(scEl, (e) => e.undo());
+        const post = (await scData())[0];
+        check('external: one undo restores the whole live drag',
+            Math.abs(post.x - pre.x) < 0.8 && Math.abs(post.y - pre.y) < 0.8,
+            `(${post.x},${post.y}) vs (${pre.x},${pre.y})`);
+
+        // Pick vs cycle on ONE field: set() jumps to a value, fire() steps a click edit.
+        await open('/editing/external-controls', '#pick .chart svg circle');
+        const pkEl = '#pick .chart > div';
+        const pkKind = () => page.$eval(pkEl, (e) => e.getData()[0].kind);
+        await page.$eval(pkEl, (e) => e.control('pick', 0).set('high'));
+        check('external: set() jumps straight to a category', (await pkKind()) === 'high', await pkKind());
+        await page.$eval(pkEl, (e) => e.control('step', 0).fire());
+        check('external: fire() steps a click edit (cycle wraps high -> low)',
+            (await pkKind()) === 'low', await pkKind());
+        await page.$eval(pkEl, (e) => e.control('step', 0).fire());
+        check('external: fire() advances again (low -> med)', (await pkKind()) === 'med', await pkKind());
+
+        // Rotate by a DATA angle: forward-encode degrees -> pointer -> the rotate edit.
+        await open('/editing/external-controls', '#rotate .chart svg');
+        const rotEl = '#rotate .chart > div';
+        await page.$eval(rotEl, (e) => e.control('spin', 0).set(90));
+        const theta = (await page.$eval(rotEl, (e) => e.getData()))[0].theta;
+        check('external: rotate driven by an angle value lands on it',
+            Math.abs(theta - 90) < 1.5, `theta=${theta}`);
+
+        // Face params: accepts() reports the schema range; set() writes the field.
+        await open('/editing/external-controls', '#face .chart svg');
+        const faceEl = '#face .chart > div';
+        const faceDomain = await page.$eval(faceEl, (e) => e.control('smile').accepts().domain);
+        check('external: accepts() reports a continuous range',
+            JSON.stringify(faceDomain) === JSON.stringify([0, 1]), JSON.stringify(faceDomain));
+        const faceBefore = await page.$eval(faceEl, (e) => e.getData());
+        await page.$eval(faceEl, (e) => e.control('eyes').set(0.9));
+        const faceAfter = await page.$eval(faceEl, (e) => e.getData());
+        check('external: a slider set() writes its facial field',
+            Math.abs(faceAfter[0].eyes - 0.9) < 1e-9, `eyes=${faceAfter[0].eyes}`);
+        // The regression: three set()s on one feature must stay INDEPENDENT — driving
+        // one must not move the others (editName addresses just the named edit).
+        check('external: driving one face slider leaves the others untouched',
+            faceAfter[0].smile === faceBefore[0].smile && faceAfter[0].brow === faceBefore[0].brow,
+            `smile ${faceBefore[0].smile}->${faceAfter[0].smile}, brow ${faceBefore[0].brow}->${faceAfter[0].brow}`);
 
         check('no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     } finally {

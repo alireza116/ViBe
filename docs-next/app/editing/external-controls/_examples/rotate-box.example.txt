@@ -1,0 +1,57 @@
+// A rotate icon spins a box. `rotate` is a positional edit — it reads a pointer
+// angle about the mark. Driving it by a DATA value (degrees) is just the inverse:
+// `.set(deg)` forward-encodes the angle to the pointer that would produce it, then
+// runs the ordinary edit. The box is also directly rotatable by dragging it.
+const chart = Elicit({
+  width: 300, height: 260,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  schema: {
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    theta: { type: "quantitative", domain: [0, 360] },
+  },
+  data: [ { x: 50, y: 50, theta: 20 } ],
+  features: [
+    rect({
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        width:  { value: 90 },
+        height: { value: 60 },
+        fill: { value: "#6366f1" },
+        stroke: { value: "#3730a3" },
+        angle: {
+          field: "theta",
+          scale: { range: [0, 360] },
+          edit: rotate({ name: "spin", pick: "direct", pivot: "mark", fold: false }),
+        },
+      },
+    }),
+  ],
+});
+mount(chart);
+
+const controls = document.createElement("div");
+controls.style.cssText = "display:flex;gap:8px;align-items:center;margin-top:10px;font:13px system-ui";
+
+const spinBy = (delta) => {
+  const now = chart.getData()[0].theta;
+  const next = ((now + delta) % 360 + 360) % 360;
+  chart.control("spin", 0).set(next);   // forward-encodes deg -> pointer -> rotate
+};
+
+const ccw = document.createElement("button");
+ccw.textContent = "⟲ −15°";
+ccw.onclick = () => spinBy(-15);
+const cw = document.createElement("button");
+cw.textContent = "⟳ +15°";
+cw.onclick = () => spinBy(15);
+
+const readout = document.createElement("span");
+readout.style.cssText = "color:#64748b";
+const sync = () => { readout.textContent = Math.round(chart.getData()[0].theta) + "°"; };
+chart.on("change", sync);
+sync();
+
+controls.append(ccw, cw, readout);
+mount(controls);

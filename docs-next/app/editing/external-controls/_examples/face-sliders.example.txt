@@ -1,0 +1,53 @@
+// A face is a row of fields; each facial PARAM is a channel. Bind each to a field
+// with a named `set()` edit and an external slider can write it — while the face
+// stays directly draggable too (grab the mouth, pull a smile). One dataset, two
+// input sources, the same edits.
+const PARAMS = [
+  { param: "mouthCurve", field: "smile", label: "smile" },
+  { param: "eyeScale",   field: "eyes",  label: "eyes"  },
+  { param: "browTilt",   field: "brow",  label: "brow"  },
+];
+
+const channels = {};
+for (const { param, field } of PARAMS) {
+  channels[param] = { field, edit: set({ name: field }) };
+}
+
+const chart = Elicit({
+  width: 300, height: 300,
+  margins: { top: 12, right: 12, bottom: 12, left: 12 },
+  schema: {
+    smile: { type: "quantitative", domain: [0, 1] },
+    eyes:  { type: "quantitative", domain: [0, 1] },
+    brow:  { type: "quantitative", domain: [0, 1] },
+  },
+  data: [ { smile: 0.7, eyes: 0.5, brow: 0.4 } ],
+  features: [ face({ channels }) ],
+});
+mount(chart);
+
+const controls = document.createElement("div");
+controls.style.cssText = "display:flex;flex-direction:column;gap:8px;margin-top:10px;font:12px system-ui;max-width:300px";
+
+const sliders = {};
+for (const { field, label } of PARAMS) {
+  // `.accepts()` tells the UI the field's range (from the scale/schema), so the
+  // slider offers only values the channel accepts.
+  const [lo, hi] = chart.control(field).accepts().domain;
+  const row = document.createElement("label");
+  row.style.cssText = "display:grid;grid-template-columns:48px 1fr;gap:8px;align-items:center";
+  const s = document.createElement("input");
+  s.type = "range"; s.min = lo; s.max = hi; s.step = (hi - lo) / 100;
+  s.value = chart.getData()[0][field];
+  s.oninput = () => chart.control(field).set(+s.value);
+  sliders[field] = s;
+  row.append(label, s);
+  controls.append(row);
+}
+mount(controls);
+
+// Dragging the face directly also fires `change` — keep the sliders in step.
+chart.on("change", () => {
+  const d = chart.getData()[0];
+  for (const { field } of PARAMS) sliders[field].value = d[field];
+});
