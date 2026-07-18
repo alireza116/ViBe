@@ -21,14 +21,15 @@ export default function Layout({ children }) {
 # Core concepts
 
 <Lead>
-  In this page, learn the core concepts of ViBE's visual elicitation model.
+  The model behind every VibeJS chart: one dataset, marks that encode it, and
+  edits that write it back.
 </Lead>
 
 {/* <ApiReference entries={api} /> */}
 
-<Section id="one-dataset" title="Marks are views over a data schema, that can be encoded and edited.">
+<Section id="one-dataset" title="Marks are views over one dataset">
 
-A chart elicits exactly one dataset from a user who interacts with and edits the chart. Each mark is a _view_ over a dataset: it encodes some features to specific channels and, where a channel carries an `edit`, writes them back.
+A chart elicits one dataset. Each mark is a _view_ over that dataset: it encodes some fields onto visual channels, and where a channel carries an `edit`, it writes them back. Two marks over the same rows stay in sync — an edit on one commits to the shared data, and the other re-renders from it.
 
 <Example
   code={twoMarksOneDataset}
@@ -43,9 +44,9 @@ A chart elicits exactly one dataset from a user who interacts with and edits the
 
 </Section>
 
-<Section id="schema" title="Schema owns type and domain">
+<Section id="schema" title="The schema owns type and domain">
 
-Since elicitation, usually starts with an empty chart, the dataset is empty and there is nothing to visualize. So we need a data schema. The `schema` defines What each field _is_ — and its **domain**. You define it once. Marks define can define the scale through which they are encoded, and if no scale is defined, the scale is inferred. Details on [Data schema](/schema) and [Scales & channels](/scales).
+Elicitation often starts from an empty chart, so the data can't tell you what a field is or how wide its axis runs. The `schema` states this once: each field's **type** (`quantitative`, `categorical`, `ordinal`, or `temporal`) and its **domain**. A mark may name the scale a field encodes through; when it doesn't, the scale is inferred from the type. See [Data schema](/schema) and [Scales & channels](/scales).
 
 <Example
   code={schemaOwnsTheDomain}
@@ -60,9 +61,14 @@ Since elicitation, usually starts with an empty chart, the dataset is empty and 
 
 </Section>
 
-<Section id="channels" title="Channel forms">
+<Section id="channels" title="Channels">
 
-Marks encode data through specific channels through a scale. a visual-space constant (`{ value }`), a data-space constant that still goes through the scale (`{ datum }`), or a raw unscaled field (`{ field, scale: null }`). These four stay serializable. The same surface (`x`, `y`, `fill`, `stroke`, `size`, …) is available on every mark, plus top-level style shorthands.
+A mark encodes data onto channels — `x`, `y`, `fill`, `stroke`, `size`, and so on. Every mark exposes the same channel set, plus top-level style shorthands. A channel takes one of four serializable forms:
+
+- `{ field: "n" }` — a field, mapped through its scale.
+- `{ value: 25 }` — a visual-space constant; on `y` it is pixel 25, skipping the scale.
+- `{ datum: 25 }` — a data-space constant, mapped through the scale; on `y` it lands where the value 25 sits.
+- `{ field: "n", scale: null }` — a raw field, used as-is with no scale.
 
 <Example
   code={fieldDrivenColourOrdinalPalette}
@@ -86,11 +92,11 @@ Marks encode data through specific channels through a scale. a visual-space cons
 
 </Section>
 
-<Section id="derived" title="Derived channels (fn)">
+<Section id="derived" title="Derived channels">
 
-Instead of using scales to derrive visual values, sometimes it's just easier to derrive visual values from functions. a conditional, a lookup across several fields — a fifth form computes the channel per datum: `fill: { fn: d => d.x > 50 ? "red" : "blue" }` (the top-level shorthand `fill: d => …` desugars to it). The function runs in **visual space** — its return value is used as-is (on `y` it is a pixel), never through a scale.
+A fifth form computes the channel from a function, one datum at a time: `fill: { fn: d => d.x > 50 ? "red" : "blue" }` (the shorthand `fill: d => …` desugars to it). The function runs in **visual space** — its return value is used as-is (on `y`, a pixel), never through a scale.
 
-A derived channel is **read-only**: it is opaque to the edit layer, so it can't carry an `edit`. Put the edit on the source field (here `x`) — because every mark re-derives from the committed rows on each render, the fill recomputes for free, live during the drag. On a line or area, a paint fn (`fill`/`stroke`) runs once per **series**, against that series' first row.
+A derived channel is **read-only**. It is opaque to the edit layer, so it can't carry an `edit`; put the edit on the source field instead (here `x`). Every mark re-derives from the committed rows on each render, so the colour recomputes live during the drag. On a line or area, a paint function (`fill`/`stroke`) runs once per **series**, against that series' first row.
 
 <Example
   code={thresholdFillFn}
@@ -107,9 +113,9 @@ A derived channel is **read-only**: it is opaque to the edit layer, so it can't 
 
 </Section>
 
-<Section id="edits" title="Where edits live">
+<Section id="edits" title="Edits">
 
-Encoding maps data → visual; an edit on a channel maps a gesture → data, back through the same scale. Place it on the channel (`y: { field, edit: drag() }`) for a single-channel write, or at mark level (`edits: [...]`) for a joint gesture. Full catalogue on [Editing](/editing).
+An edit is the inverse of an encoding. Encoding maps data → visual; an edit maps a gesture → data, back through the same scale. Put it on a channel (`y: { field, edit: drag() }`) to write one field, or at mark level (`edits: [...]`) for a gesture that writes several at once. Full catalogue on [Editing](/editing).
 
 <Example
   code={markLevelDrag}
@@ -126,9 +132,9 @@ Encoding maps data → visual; an edit on a channel maps a gesture → data, bac
 
 </Section>
 
-<Section id="constraints" title="Constraints are dataset invariants">
+<Section id="constraints" title="Constraints">
 
-A constraint is a pure rule over **the dataset**. It holds no matter which edit fired it, or which mark declared it — mark-level `constraints` is sugar the engine promotes. It can reject a proposal or repair it (return corrected rows). Catalogue on [Constraints](/constraints).
+A constraint is a pure rule over **the dataset**. It holds no matter which edit fired it or which mark declared it — a mark's `constraints` is sugar the engine promotes to the whole dataset. A constraint can reject a proposed edit or repair it by returning corrected rows. Catalogue on [Constraints](/constraints).
 
 <Example
   code={clampedDrag}

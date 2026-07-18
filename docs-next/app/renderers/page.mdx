@@ -12,18 +12,18 @@ export default function Layout({ children }) {
 
 # Renderers — the drawing backend is swappable
 
-<Lead>A mark never draws. It produces plain-data **scene nodes** (a circle at `cx,cy`, a rect, a path); the engine collects them and hands the whole scene to a **renderer**, which turns nodes into pixels and reports gestures back. That seam is the entire coupling between the engine and the screen — marks, edits, scales, guides, and constraints are all renderer-agnostic. Swap the renderer through `renderer:` on the spec and nothing upstream changes.</Lead>
+<Lead>A mark produces plain-data **scene nodes** — a circle at `cx,cy`, a rect, a path. The engine collects them and hands the whole scene to a **renderer**, which turns nodes into pixels and reports gestures back. This seam is the only coupling between the engine and the screen: marks, edits, scales, guides, and constraints all behave the same under any renderer. Swap the renderer through `renderer:` on the spec and nothing upstream changes.</Lead>
 
-The default is `new D3Renderer()` — an SVG backend. `new CanvasRenderer()` is a second implementation of the **same contract** (`render(context)` in, `onEvent` out), drawing to a `<canvas>` instead. The examples below run entirely on canvas: there are no SVG elements in the chart, yet every edit works exactly as it does under SVG, because the interaction model lives in the engine, not the renderer.
+The default is `new D3Renderer()`, an SVG backend. `new CanvasRenderer()` implements the **same contract** (`render(context)` in, `onEvent` out) and draws to a `<canvas>`. The examples below run entirely on canvas — every edit behaves exactly as it does under SVG, because the interaction model lives in the engine.
 
 <Section id="direct" title="Direct-pick drag, on canvas">
 
-SVG gets hit-testing for free — the browser picks the element under the pointer. A canvas is one opaque element, so the canvas renderer resolves the touched mark **geometrically** (the same distance math the `nearest` pick already used) and dispatches the identical `drag` edit. Drag a bar: the gesture inverts through the `y` scale and rewrites the value, just like the SVG version.
+Under SVG, the browser hit-tests: it picks the element under the pointer. A canvas is a single element, so the canvas renderer finds the touched mark **geometrically**, using the same distance math as the `nearest` pick, then dispatches the same `drag` edit. Drag a bar and the gesture inverts through the `y` scale and rewrites the value, as it does under SVG.
 
 <Example
   code={canvasDragABar}
   title="Drag a value (canvas)"
-  blurb="renderer: new CanvasRenderer(). y carries edit: drag(); the direct-pick target is hit-tested against the scene nodes, not the DOM."
+  blurb="renderer: new CanvasRenderer(). y carries edit: drag(); the direct-pick target is hit-tested geometrically against the scene nodes."
   try={(
     <>
       <b>Drag</b> a bar up or down.
@@ -35,12 +35,12 @@ SVG gets hit-testing for free — the browser picks the element under the pointe
 
 <Section id="plane" title="Plane gestures, on canvas">
 
-Plane-driven edits (`sweep`, `draw`, `nearest`, `create`) never needed a DOM element — they resolve their target from the pointer coordinates. The canvas renderer feeds those same coordinates through one pointer state machine, so a you-draw-it sweep works untouched.
+Plane-driven edits (`sweep`, `draw`, `nearest`, `create`) resolve their target straight from the pointer coordinates. The canvas renderer feeds those coordinates through the same pointer state machine, so a you-draw-it sweep works unchanged.
 
 <Example
   code={canvasSweepALine}
   title="Sweep a line (canvas)"
-  blurb="A plane-pick sweep: drag across the plot to redraw the line. No node identity involved — just coordinates through the scale."
+  blurb="A plane-pick sweep: drag across the plot to redraw the line. It works from pointer coordinates through the scale, with no node identity needed."
   try={(
     <>
       <b>Drag</b> left-to-right across the chart to reshape the line.
