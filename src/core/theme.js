@@ -41,6 +41,11 @@ export const DEFAULT_THEME = {
     accent: '#2563eb',
     // Secondary chrome / de-emphasised marks.
     muted: '#9ca3af',
+    // The chart's backdrop, applied as the CSS background of the svg/canvas (so it
+    // covers the margin band too). Defaults to null = transparent (the host page's
+    // background shows through, exactly as before); a dark theme sets it to paint the
+    // whole chart. This is the one piece a dark-mode chart needs beyond light ink.
+    background: null,
 
     // Colour scales fed to resolveScales when a channel names no explicit range or
     // scheme. Arrays replace wholesale on merge (they are values, not sub-objects).

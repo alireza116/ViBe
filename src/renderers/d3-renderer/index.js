@@ -64,7 +64,10 @@ export class D3Renderer {
     this._theme = context.theme || null;
     const themeFont = this._theme && this._theme.font;
     d3.select(container).select("svg")
-      .style("font-family", (themeFont && themeFont.family) || null);
+      .style("font-family", (themeFont && themeFont.family) || null)
+      // The chart backdrop (null => transparent). Covers the margin band, so a
+      // dark theme's labels sit on the dark background too.
+      .style("background", (this._theme && this._theme.background) || null);
 
     /** @param {any} event */
     const pointer = (event) => d3.pointer(event, g.node());

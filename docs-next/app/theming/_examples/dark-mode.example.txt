@@ -1,0 +1,17 @@
+// themes.dark carries a `background` token, so the chart paints its own dark
+// surface — light ink, light labels, slate grid, no host CSS required. The same
+// spec renders identically light or dark; only the theme changes.
+mount(Elicit({
+  width: 440, height: 240,
+  margins: { top: 20, right: 20, bottom: 30, left: 36 },
+  data: [{ cat: "A", n: 30 }, { cat: "B", n: 55 }, { cat: "C", n: 40 }, { cat: "D", n: 22 }],
+  schema: {
+    cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    n: { type: "quantitative", domain: [0, 60] },
+  },
+  theme: themes.dark,
+  axes: { x: {}, y: { grid: true } },
+  features: [
+    barY({ channels: { x: { field: "cat" }, y: { field: "n", edit: drag() } } }),
+  ],
+}));

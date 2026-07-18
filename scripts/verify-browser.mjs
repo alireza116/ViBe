@@ -859,6 +859,11 @@ async function main() {
         const dotFill = await page.$eval('#precedence .chart svg circle', (c) => c.getAttribute('fill'));
         check('theme: ink colours the bars', barFill === '#0ea5e9', `fill=${barFill}`);
         check('theme: marks.point overrides just the dots', dotFill === '#f59e0b', `fill=${dotFill}`);
+        // Dark mode: the `background` token paints the svg, and light ink recolours marks.
+        const darkBg = await page.$eval('#dark .chart svg', (s) => s.style.background || getComputedStyle(s).backgroundColor);
+        const darkBar = await page.$eval('#dark .chart svg rect:not(.plane)', (r) => r.getAttribute('fill'));
+        check('theme: dark background paints the chart', /rgb\(15,\s*23,\s*42\)|#0f172a/i.test(darkBg), `bg=${darkBg}`);
+        check('theme: dark ink recolours the bars', darkBar === '#38bdf8', `fill=${darkBar}`);
 
         check('no page/console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
     } finally {

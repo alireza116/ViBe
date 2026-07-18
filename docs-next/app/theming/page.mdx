@@ -8,6 +8,7 @@ import { api } from './api';
 import surveyTheme from './_examples/survey-theme.example.txt';
 import perChartTheme from './_examples/per-chart-theme.example.txt';
 import perMarkOverride from './_examples/per-mark-override.example.txt';
+import darkMode from './_examples/dark-mode.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -28,6 +29,19 @@ export default function Layout({ children }) {
   title="The survey theme"
   blurb="One object — themes.survey — restyles ink, chrome, and every affordance."
   try={"move across the options, click to answer — the look is the only change."}
+/>
+
+</Section>
+
+<Section id="dark" title="Dark mode">
+
+Yes — a theme can produce a fully dark chart. The `background` token paints the chart's own surface (svg / canvas, margin band included), so `themes.dark` is self-contained: light ink, light labels, a slate grid, no host CSS required. The same spec renders light or dark; only the `theme` changes.
+
+<Example
+  code={darkMode}
+  title="themes.dark"
+  blurb="A slate backdrop with light ink and chrome — the chart paints its own surface."
+  try={"drag a bar — the interaction is identical, only the palette is dark."}
 />
 
 </Section>

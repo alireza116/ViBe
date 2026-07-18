@@ -45,6 +45,12 @@ export class CanvasRenderer {
         // Stash for the event listeners + the async-image repaint.
         this._ctx = context;
 
+        // Chart backdrop (theme.background; null => transparent). A CSS background on
+        // the canvas element, matching the D3 renderer's svg background — it sits
+        // under the cleared/painted pixels, so a dark theme fills the whole chart.
+        const canvasEl = /** @type {HTMLCanvasElement} */ (this._canvas);
+        canvasEl.style.background = (context.theme && context.theme.background) || '';
+
         const canvas = /** @type {HTMLCanvasElement} */ (this._canvas);
         const ctx = /** @type {CanvasRenderingContext2D} */ (this._2d);
 

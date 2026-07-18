@@ -652,6 +652,10 @@ export interface Theme {
   accent: string;
   // Secondary chrome / de-emphasised marks.
   muted: string;
+  // The chart backdrop, applied as the svg/canvas CSS background (covers the margin
+  // band too). null = transparent (the default — the host page shows through); a
+  // dark theme sets it so a dark-mode chart is self-contained.
+  background: string | null;
   // Colour-scale defaults fed to resolveScales when a channel names no range/scheme.
   palette: string[];
   ramp: string[];

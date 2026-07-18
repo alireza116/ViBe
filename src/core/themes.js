@@ -44,5 +44,36 @@ export const themes = {
             questionSize: 15,
             radius: 12
         }
+    },
+
+    // A dark-mode look: a slate backdrop with light ink and chrome. `background` is
+    // the piece that makes it self-contained — the chart paints its own dark surface,
+    // so it reads on a dark page without any host CSS. Every token is chosen for
+    // contrast on the backdrop.
+    dark: {
+        background: '#0f172a',
+        ink: '#38bdf8',
+        accent: '#38bdf8',
+        muted: '#64748b',
+        axis: { stroke: '#475569', labelFill: '#cbd5e1', fontSize: 10, handle: '#38bdf8' },
+        grid: { stroke: '#1e293b' },
+        guide: {
+            rule: { stroke: '#94a3b8', strokeDasharray: '5 4' },
+            region: { fill: '#94a3b8', opacity: 0.14 },
+            legend: { stroke: '#cbd5e1', labelFill: '#cbd5e1', fontSize: 11 }
+        },
+        constraint: { color: '#fb7185' },
+        widget: {
+            accent: '#38bdf8',
+            ring: '#334155',
+            track: '#1e293b',
+            cellFill: '#1e293b',
+            cellStroke: '#334155',
+            label: '#cbd5e1',
+            question: '#f1f5f9',
+            labelSize: 12,
+            questionSize: 13,
+            radius: 11
+        }
     }
 };

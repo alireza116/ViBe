@@ -9,7 +9,7 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "theme: { ink, accent, muted, palette, ramp, diverging, font, axis, grid, guide, constraint, ghost, widget, marks }",
+      "theme: { ink, accent, muted, background, palette, ramp, diverging, font, axis, grid, guide, constraint, ghost, widget, marks }",
     ],
     options: [
       {
@@ -23,6 +23,12 @@ export const api: ApiEntry[] = [
         type: "string",
         default: "#2563eb",
         desc: <>Interactive emphasis: draggable handles, a committed survey answer, an editable-axis handle.</>,
+      },
+      {
+        name: "background",
+        type: "string | null",
+        default: "null",
+        desc: <>The chart backdrop, applied as the svg/canvas CSS background (margin band included). <code className="inline">null</code> is transparent (the host page shows through); set it for a self-contained dark-mode chart — see <code className="inline">themes.dark</code>.</>,
       },
       {
         name: "palette / ramp / diverging",
@@ -66,10 +72,10 @@ export const api: ApiEntry[] = [
     name: "themes",
     summary: (
       <>
-        The built-in themes. <code className="inline">themes.default</code> is the library look; <code className="inline">themes.survey</code> is a clean, professional survey style. Each is a partial — pass it as <code className="inline">theme</code>, or layer your own on top with a deep-merge.
+        The built-in themes. <code className="inline">themes.default</code> is the library look; <code className="inline">themes.survey</code> is a clean, professional survey style; <code className="inline">themes.dark</code> is a self-contained dark mode (it sets <code className="inline">background</code>). Each is a partial — pass it as <code className="inline">theme</code>, or layer your own on top with a deep-merge.
       </>
     ),
-    signatures: ["themes.default", "themes.survey"],
+    signatures: ["themes.default", "themes.survey", "themes.dark"],
   },
   {
     name: "setTheme(partial)",
