@@ -21,21 +21,19 @@ export default function Layout({ children }) {
 # Core concepts
 
 <Lead>
-  One dataset, one schema, channels that encode (and optionally edit),
-  constraints that hold for every commit. Walk the model below — then use the
-  sidebar for marks, edits, and scales in depth.
+  In this page, learn the core concepts of ViBE's visual elicitation model.
 </Lead>
 
-<ApiReference entries={api} />
+{/* <ApiReference entries={api} /> */}
 
-<Section id="one-dataset" title="One dataset, marks are views">
+<Section id="one-dataset" title="Marks are views over a data schema, that can be encoded and edited.">
 
-A chart elicits exactly one dataset — even a slider is one row — so `data` lives on the `Elicit` spec, never on a mark. Each mark is a _view_ over those rows: it encodes some columns and, where a channel carries an `edit`, writes them back. Several marks over the same rows is the point, not a special case — they all re-derive from the committed data on the next render.
+A chart elicits exactly one dataset from a user who interacts with and edits the chart. Each mark is a _view_ over a dataset: it encodes some features to specific channels and, where a channel carries an `edit`, writes them back.
 
 <Example
   code={twoMarksOneDataset}
   title="Two marks, one dataset"
-  blurb="Bars and points share the same rows. Only the point carries drag — the bars re-derive when the data commits."
+  blurb="Bars and points share the dataset and schema. The point mark carries the drag edit and writes the 'n' field over the y channel, the bar mark updates when the data commits."
   try={
     <>
       <b>Drag</b> a point — both marks update from the same rows.
@@ -47,7 +45,7 @@ A chart elicits exactly one dataset — even a slider is one row — so `data` l
 
 <Section id="schema" title="Schema owns type and domain">
 
-What each field _is_ — and its **domain** — is declared once, on `schema`. A mark never carries a domain, because a domain describes the data, not one mark’s view of it. The scale follows from the two: a categorical field on a bar’s x is a band; on a dot’s x it is a point. Details on [Data schema](/schema) and [Scales & channels](/scales).
+Since elicitation, usually starts with an empty chart, the dataset is empty and there is nothing to visualize. So we need a data schema. The `schema` defines What each field _is_ — and its **domain**. You define it once. Marks define can define the scale through which they are encoded, and if no scale is defined, the scale is inferred. Details on [Data schema](/schema) and [Scales & channels](/scales).
 
 <Example
   code={schemaOwnsTheDomain}
@@ -64,7 +62,7 @@ What each field _is_ — and its **domain** — is declared once, on `schema`. A
 
 <Section id="channels" title="Channel forms">
 
-A channel is a data field through a scale (`{ field }`), a visual-space constant (`{ value }`), a data-space constant that still goes through the scale (`{ datum }`), or a raw unscaled field (`{ field, scale: null }`). These four stay serializable. The same surface (`x`, `y`, `fill`, `stroke`, `size`, …) is available on every mark, plus top-level style shorthands.
+Marks encode data through specific channels through a scale. a visual-space constant (`{ value }`), a data-space constant that still goes through the scale (`{ datum }`), or a raw unscaled field (`{ field, scale: null }`). These four stay serializable. The same surface (`x`, `y`, `fill`, `stroke`, `size`, …) is available on every mark, plus top-level style shorthands.
 
 <Example
   code={fieldDrivenColourOrdinalPalette}
