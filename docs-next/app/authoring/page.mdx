@@ -23,7 +23,7 @@ export default function Layout({ children }) {
 
 <Section id="custom-mark" title="A custom mark">
 
-A mark is a view over the chart’s one dataset. The factory returns a feature object; the only required method is `build(data, scales, width, height)`. Call `normalizeMarkOptions` first, resolve every channel through `encodeChannel` / `resolveStyle`, pass through `channels` / `edits` / `constraints`, and set `discreteScale` when discrete data needs a band or a point. Don’t set mark-wide `pointerEvents` — leave that to the engine.
+A mark is a view over the chart’s one dataset. The factory returns a feature object; the only required method is `build(data, scales, width, height)`. Call `normalizeMarkOptions` first, resolve every channel through `encodeChannel` / `resolveStyle`, pass through `channels` / `edits` / `constraints`, and set `discreteScale` when discrete data needs a band or a point. Don’t set mark-wide `pointerEvents` — leave that to the engine. To let a datum’s [derived channels (`{ fn }`)](/concepts#derived) see their row index and the dataset, pass the optional `index` and `data` args when you resolve per datum: `resolveStyle(scales, channels, d, defaults, i, data)`.
 
 <Example
   code={aCustomSquareMark}

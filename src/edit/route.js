@@ -34,6 +34,10 @@ export function collectEdits(feature) {
     const channels = feature.channels || {};
     for (const [name, chSpec] of Object.entries(channels)) {
         if (chSpec && chSpec.edit) {
+            // A derived channel (`{ fn }`) is read-only: it recomputes from the
+            // committed rows on every render, so there is nothing to invert. Drop
+            // any edit placed on it (warnMisplacedEdits explains why in DEV).
+            if (typeof chSpec.fn === 'function' && chSpec.field == null) continue;
             const e = chSpec.edit;
             // Inject the placement channel when the edit didn't name its own.
             edits.push(e.channels ? e : { ...e, channels: [name] });
@@ -64,6 +68,14 @@ export function warnMisplacedEdits(feature) {
                 `[vibe] feature "${fid}" has a misplaced edit under channels.${name}. ` +
                 `Attach edits on a channel (y: { field, edit: drag() }) or at mark level ` +
                 `(edits: [drag({ channels: ['x','y'] })]). A bare channels.edit key is ignored.`
+            );
+        } else if (chSpec && chSpec.edit && typeof chSpec.fn === 'function' && chSpec.field == null) {
+            warnedMisplaced.add(key);
+            console.warn(
+                `[vibe] feature "${fid}" puts an edit on the derived channel "${name}" ({ fn }). ` +
+                `A derived channel is read-only — it recomputes from the committed rows on every ` +
+                `render, so the edit is ignored. Attach the edit to the source field's channel ` +
+                `(e.g. x: { field: "x", edit: drag() }); the fn re-derives automatically after each commit.`
             );
         }
     }

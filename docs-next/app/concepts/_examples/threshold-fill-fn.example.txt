@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 420, height: 260,
+  margins: { top: 16, right: 16, bottom: 32, left: 40 },
+  data: [{ x: 25, y: 50 }, { x: 75, y: 50 }],
+  schema: {
+    x: { type: "quantitative", domain: [0, 100] },
+    y: { type: "quantitative", domain: [0, 100] },
+  },
+  features: [
+    // Dashed threshold at x = 50 (data units, through the scale).
+    ruleX({
+      stroke: "#94a3b8", strokeWidth: 1.5, strokeDasharray: "4 3",
+      channels: { x: { datum: 50 } },
+    }),
+    point({
+      stroke: "#1f2733", strokeWidth: 1, size: 10,
+      channels: {
+        x: { field: "x", edit: drag() },
+        y: { field: "y" },
+        // Derived channel: computed per datum in VISUAL space (a colour, used
+        // as-is). Read-only — the drag lives on x; fill re-derives on commit.
+        fill: { fn: (d) => d.x > 50 ? "#dc2626" : "#2563eb" },
+      },
+    }),
+  ],
+}))

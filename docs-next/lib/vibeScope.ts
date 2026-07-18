@@ -32,6 +32,8 @@ export function createVibeScope() {
     guides: vibe.guides,
     widgets: vibe.widgets,
     format: vibe.format,
+    D3Renderer: vibe.D3Renderer,
+    CanvasRenderer: vibe.CanvasRenderer,
     d3,
     vancouver,
   };

@@ -8,7 +8,7 @@ import { markCenter, nudgeTarget } from '../edit/shared.js';
 import { encodeChannel } from '../plot/mark.js';
 import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
 import { autoEditGuides } from '../edit/guide.js';
-import { D3Renderer } from '../renderers/d3-renderer.js';
+import { D3Renderer } from '../renderers/d3-renderer/index.js';
 import { resolveEffects } from './effects.js';
 import { autoAxes } from './axes.js';
 import { axisOf, pointerForChannel } from './encoding.js';

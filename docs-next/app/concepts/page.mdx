@@ -1,17 +1,18 @@
-import { DocShell } from '../../components/DocShell';
-import { ApiReference } from '../../components/ApiReference';
-import { Section } from '../../components/Section';
-import { Example } from '../../components/Example';
-import { Lead } from '../../components/Lead';
-import { api } from './api';
+import { DocShell } from "../../components/DocShell";
+import { ApiReference } from "../../components/ApiReference";
+import { Section } from "../../components/Section";
+import { Example } from "../../components/Example";
+import { Lead } from "../../components/Lead";
+import { api } from "./api";
 
-import twoMarksOneDataset from './_examples/two-marks-one-dataset.example.txt';
-import schemaOwnsTheDomain from './_examples/schema-owns-the-domain.example.txt';
-import fieldDrivenColourOrdinalPalette from './_examples/field-driven-colour-ordinal-palette.example.txt';
-import constantStyleShorthands from './_examples/constant-style-shorthands.example.txt';
-import valueVsDatum from './_examples/value-vs-datum.example.txt';
-import markLevelDrag from './_examples/mark-level-drag.example.txt';
-import clampedDrag from './_examples/clamped-drag.example.txt';
+import twoMarksOneDataset from "./_examples/two-marks-one-dataset.example.txt";
+import schemaOwnsTheDomain from "./_examples/schema-owns-the-domain.example.txt";
+import fieldDrivenColourOrdinalPalette from "./_examples/field-driven-colour-ordinal-palette.example.txt";
+import constantStyleShorthands from "./_examples/constant-style-shorthands.example.txt";
+import valueVsDatum from "./_examples/value-vs-datum.example.txt";
+import markLevelDrag from "./_examples/mark-level-drag.example.txt";
+import clampedDrag from "./_examples/clamped-drag.example.txt";
+import thresholdFillFn from "./_examples/threshold-fill-fn.example.txt";
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -19,7 +20,11 @@ export default function Layout({ children }) {
 
 # Core concepts
 
-<Lead>One dataset, one schema, channels that encode (and optionally edit), constraints that hold for every commit. Walk the model below — then use the sidebar for marks, edits, and scales in depth.</Lead>
+<Lead>
+  One dataset, one schema, channels that encode (and optionally edit),
+  constraints that hold for every commit. Walk the model below — then use the
+  sidebar for marks, edits, and scales in depth.
+</Lead>
 
 <ApiReference entries={api} />
 
@@ -31,11 +36,11 @@ A chart elicits exactly one dataset — even a slider is one row — so `data` l
   code={twoMarksOneDataset}
   title="Two marks, one dataset"
   blurb="Bars and points share the same rows. Only the point carries drag — the bars re-derive when the data commits."
-  try={(
+  try={
     <>
       <b>Drag</b> a point — both marks update from the same rows.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -48,23 +53,25 @@ What each field _is_ — and its **domain** — is declared once, on `schema`. A
   code={schemaOwnsTheDomain}
   title="Schema owns the domain"
   blurb="Nothing names a scale. Schema says cat is categorical and n is quantitative; the bar needs an interval for discrete data — band and linear fall out."
-  try={(
+  try={
     <>
       <b>Drag</b> a bar — the edit inverts through the derived scale.
     </>
-  )}
+  }
 />
 
 </Section>
 
 <Section id="channels" title="Channel forms">
 
-A channel is a constant or a data field through a scale. No accessor functions — specs stay serializable. The same surface (`x`, `y`, `fill`, `stroke`, `size`, …) is available on every mark, plus top-level style shorthands.
+A channel is a data field through a scale (`{ field }`), a visual-space constant (`{ value }`), a data-space constant that still goes through the scale (`{ datum }`), or a raw unscaled field (`{ field, scale: null }`). These four stay serializable. The same surface (`x`, `y`, `fill`, `stroke`, `size`, …) is available on every mark, plus top-level style shorthands.
 
 <Example
   code={fieldDrivenColourOrdinalPalette}
   title="Field-driven colour (ordinal palette)"
-  blurb={"channels: { fill: { field: \"kind\" } } — a category drives fill through the ordinal palette."}
+  blurb={
+    'channels: { fill: { field: "kind" } } — a category drives fill through the ordinal palette.'
+  }
 />
 
 <Example
@@ -81,6 +88,27 @@ A channel is a constant or a data field through a scale. No accessor functions �
 
 </Section>
 
+<Section id="derived" title="Derived channels (fn)">
+
+Instead of using scales to derrive visual values, sometimes it's just easier to derrive visual values from functions. a conditional, a lookup across several fields — a fifth form computes the channel per datum: `fill: { fn: d => d.x > 50 ? "red" : "blue" }` (the top-level shorthand `fill: d => …` desugars to it). The function runs in **visual space** — its return value is used as-is (on `y` it is a pixel), never through a scale.
+
+A derived channel is **read-only**: it is opaque to the edit layer, so it can't carry an `edit`. Put the edit on the source field (here `x`) — because every mark re-derives from the committed rows on each render, the fill recomputes for free, live during the drag. On a line or area, a paint fn (`fill`/`stroke`) runs once per **series**, against that series' first row.
+
+<Example
+  code={thresholdFillFn}
+  title="Threshold fill (derived)"
+  blurb={
+    'fill: { fn: d => d.x > 50 ? "#dc2626" : "#2563eb" } — the drag writes x; the colour re-derives on every render.'
+  }
+  try={
+    <>
+      <b>Drag</b> a point across the dashed line — its colour flips.
+    </>
+  }
+/>
+
+</Section>
+
 <Section id="edits" title="Where edits live">
 
 Encoding maps data → visual; an edit on a channel maps a gesture → data, back through the same scale. Place it on the channel (`y: { field, edit: drag() }`) for a single-channel write, or at mark level (`edits: [...]`) for a joint gesture. Full catalogue on [Editing](/editing).
@@ -88,12 +116,14 @@ Encoding maps data → visual; an edit on a channel maps a gesture → data, bac
 <Example
   code={markLevelDrag}
   title="Mark-level drag (x and y together)"
-  blurb={"edits: [drag({ channels: [\"x\", \"y\"] })] — one gesture writes both fields."}
-  try={(
+  blurb={
+    'edits: [drag({ channels: ["x", "y"] })] — one gesture writes both fields.'
+  }
+  try={
     <>
       <b>Drag</b> a point in two dimensions.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -106,11 +136,11 @@ A constraint is a pure rule over **the dataset**. It holds no matter which edit 
   code={clampedDrag}
   title="Clamped drag"
   blurb="clamp keeps n in [10, 50]. guide: true draws the live bound while you drag."
-  try={(
+  try={
     <>
       <b>Drag</b> a bar — it stops at 10 and 50.
     </>
-  )}
+  }
 />
 
 </Section>

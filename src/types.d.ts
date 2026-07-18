@@ -266,6 +266,11 @@ export interface DomainEditResult {
   resize?: { width?: number; height?: number };
 }
 
+// A derived-channel accessor: computed per datum in VISUAL space (its result is
+// used as-is, never scaled). `i`/`data` are supplied by per-datum marks and may
+// be undefined at constant-resolving call sites.
+export type ChannelFn = (d: Datum, i?: number, data?: Datum[]) => any;
+
 // A single channel binding on a mark (Observable Plot's model, declarative).
 // One of:
 //   { field }              a data field, through the channel's global scale
@@ -275,11 +280,25 @@ export interface DomainEditResult {
 //                          `y: { datum: 25 }` lands at the pixel where y=25 is
 //   { field, scale: null } a raw field, read unscaled (the datum already holds a
 //                          literal colour / pixel)
-// No accessor functions, so specs stay serializable/introspectable.
+//   { fn }                 a DERIVED channel — fn(d, i, data) computed per datum
+//                          in VISUAL space (result used as-is, never scaled), e.g.
+//                          `fill: d => d.x > 50 ? 'red' : 'blue'`
+// The first four stay serializable/introspectable. `{ fn }` is the one deliberate
+// exception: opaque to the edit layer, so a derived channel is READ-ONLY — it
+// can't carry an `edit` (dev-warned + ignored). Put edits on the source field's
+// channel; the fn re-derives from the committed rows on every render. A function
+// shorthand (`fill: d => …`) desugars to `{ fn }`; an explicit `{ value: someFn }`
+// stays an opaque constant, never invoked.
 export interface ChannelSpec {
   field?: string;
   value?: any;
   datum?: any;
+  // Derived channel: computed per datum in VISUAL space (result used as-is, never
+  // scaled — on `y` it is a pixel). READ-ONLY: an `edit` here is ignored (put it on
+  // the source field's channel — the fn re-derives after every commit). On a
+  // line-family mark a paint fn (fill/stroke) runs once per SERIES, against the
+  // series' first row. i/data are supplied by per-datum marks, undefined elsewhere.
+  fn?: ChannelFn;
   // The field's DATA type. Overrides the schema's declaration for this channel;
   // useful for a field the schema doesn't cover. Below an explicit `scale`.
   type?: MeasureType;
@@ -354,22 +373,24 @@ export interface Channels extends StyleChannels {
 export interface MarkOptions {
   channels?: Channels;
   // Constant shorthands — e.g. `fill: 'steelblue'`, `strokeWidth: 2`, `size: 9`.
+  // A FUNCTION shorthand (`fill: d => d.x > 50 ? 'red' : 'blue'`) desugars to a
+  // derived channel (`{ fn }`), computed per datum in visual space (read-only).
   fill?: any;
   stroke?: any;
-  strokeWidth?: number;
-  opacity?: number;
-  fillOpacity?: number;
-  strokeOpacity?: number;
-  size?: number;
+  strokeWidth?: number | ChannelFn;
+  opacity?: number | ChannelFn;
+  fillOpacity?: number | ChannelFn;
+  strokeOpacity?: number | ChannelFn;
+  size?: number | ChannelFn;
   // Text-mark shorthands (desugar into raw channels via normalizeMarkOptions).
   text?: any;
-  fontSize?: number;
-  textAnchor?: 'start' | 'middle' | 'end' | string;
-  lineAnchor?: 'top' | 'middle' | 'bottom' | string;
-  dx?: number;
-  dy?: number;
+  fontSize?: number | ChannelFn;
+  textAnchor?: 'start' | 'middle' | 'end' | string | ChannelFn;
+  lineAnchor?: 'top' | 'middle' | 'bottom' | string | ChannelFn;
+  dx?: number | ChannelFn;
+  dy?: number | ChannelFn;
   // Orientation shorthand (math degrees) — desugars to channels.angle.
-  angle?: number;
+  angle?: number | ChannelFn;
   // Text-mark display formatter: a d3-format string or `(value) => string`.
   // Display-only — the underlying field stays the raw value. See `vibe.format`.
   format?: string | ((v: any) => string);
@@ -665,7 +686,10 @@ export interface ElicitSpec {
   // content in the margin band show — needed for radial/gauge axis labels that
   // sit just outside the plot area.
   overflow?: 'hidden' | 'visible';
-  renderer?: any;
+  // The drawing backend. Defaults to a new `D3Renderer` (SVG). Any object satisfying
+  // the `Renderer` contract works — `CanvasRenderer` is a second, canvas-2D
+  // implementation of the same contract, which is what proves the seam is real.
+  renderer?: Renderer;
   // Chart-level scale overrides, keyed by channel ('x', 'y', 'fill', 'size', …).
   // Scales are GLOBAL per channel, so this is their honest home; a channel's own
   // `scale` is the shorthand for the single-mark case. This wins over it. No
@@ -733,6 +757,40 @@ export interface ElicitElement extends HTMLDivElement {
   // Detach the ResizeObserver used by `responsive: 'reflow'`. No-op otherwise;
   // call it when unmounting a reflow chart. Present on every element.
   destroy(): void;
+}
+
+// What the engine hands a renderer each frame. The renderer draws `scene.children`
+// (typed FeatureNodes) into `container` and reports gestures back through `onEvent`
+// as INNER (margin-subtracted) pixels. This is the entire coupling between the
+// engine and its drawing backend — everything else (marks, edits, scales, guides)
+// is renderer-agnostic.
+export interface RenderContext {
+  // The chart's host element (a div). The renderer owns what it puts inside.
+  container: HTMLElement;
+  // The scene to draw: `scene.children` is a flat array of FeatureNodes, in z-order.
+  scene: { children: FeatureNode[] };
+  width: number;
+  height: number;
+  margins: { top: number; right: number; bottom: number; left: number };
+  // True when active edits are plane-driven (sweep/draw/nearest): the renderer must
+  // route all gestures as plane events (no node) rather than hit-testing marks.
+  planeOnTop?: boolean;
+  planeCursor?: string;
+  responsive?: 'fixed' | 'scale' | 'reflow';
+  overflow?: 'hidden' | 'visible';
+  effects?: any;
+  // Report a gesture to the engine. The renderer resolves `direct`-pick targets
+  // (the node under the pointer) and sets `event.node`; plane gestures leave it unset.
+  onEvent: (event: GestureEvent) => void;
+  [key: string]: any;
+}
+
+// The drawing-backend contract. `D3Renderer` (SVG) and `CanvasRenderer` (canvas 2D)
+// both satisfy it. One method: draw the scene and wire the events for one frame.
+// State an implementation keeps between frames (idempotent scaffolding, gesture
+// state, image caches) is its own business — the engine only ever calls `render`.
+export interface Renderer {
+  render(context: RenderContext): void;
 }
 
 // A renderer-shaped gesture event, the one shape every input source (pointer,

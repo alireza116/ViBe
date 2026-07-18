@@ -1,0 +1,24 @@
+mount(Elicit({
+  width: 420, height: 260,
+  renderer: new CanvasRenderer(),
+  margins: { top: 16, right: 16, bottom: 40, left: 44 },
+  data: [
+    { month: 0, demand: 50 }, { month: 1, demand: 50 },
+    { month: 2, demand: 50 }, { month: 3, demand: 50 },
+    { month: 4, demand: 50 }, { month: 5, demand: 50 },
+  ],
+  schema: {
+    month:  { type: "quantitative", domain: [0, 5] },
+    demand: { type: "quantitative", domain: [0, 100] },
+  },
+  axes: { x: { title: "Month" }, y: { title: "Demand" } },
+  features: [
+    lineY({
+      stroke: "#059669", strokeWidth: 3, curve: "catmullRom",
+      channels: {
+        x: { field: "month" },
+        y: { field: "demand", edit: drag({ pick: "sweep", guide: true }) },
+      },
+    }),
+  ],
+}))

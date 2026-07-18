@@ -106,7 +106,7 @@ function buildWaffle(options, forcedOrientation) {
             const nodes = [];
 
             currentData.forEach((/** @type {any} */ d, i) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
                 const vertical = orientation !== 'horizontal';
                 // A `symbol` channel (or shape:'symbol') fills the block with glyph
                 // cells — an emoji waffle (🍎🍎🍎 for a count of 3). Every cell of a

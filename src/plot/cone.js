@@ -115,12 +115,12 @@ export function cone(options = {}) {
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
 
-            currentData.forEach((/** @type {any} */ d) => {
-                const meanDeg = encodeChannel(scales, channels, 'angle', d, 0);
+            currentData.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
+                const meanDeg = encodeChannel(scales, channels, 'angle', d, 0, i, currentData);
                 const rMean = angleField != null ? Number(d[angleField]) : 0;
                 const halfWidth = spreadField != null ? Math.abs(Number(d[spreadField])) || 0 : 0;
                 const angleScale = scales.angle;
-                const style = resolveStyle(scales, channels, d, { stroke: '#d33', strokeWidth: 2.5 });
+                const style = resolveStyle(scales, channels, d, { stroke: '#d33', strokeWidth: 2.5 }, i, currentData);
 
                 // Optional filled wedge spanning the envelope — its edges are exactly
                 // where the pointer sat when the spread was set.

@@ -88,7 +88,7 @@ async function main() {
         // ---- Every documented route mounts -------------------------------
         console.log('\nAll routes (docs-next)');
         const routes = [
-            '/', '/overview', '/concepts', '/sizing', '/authoring',
+            '/', '/overview', '/concepts', '/sizing', '/renderers', '/authoring',
             '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',
             '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
             '/marks/dotstack', '/marks/waffle', '/marks/cone', '/marks/needle',
@@ -147,6 +147,81 @@ async function main() {
             const svgW = await page.$eval(`#${id} svg`, (e) => Math.round(e.getBoundingClientRect().width));
             check(`${id}: chart scales to its column`, Math.abs(svgW - colW) <= 2, `svg ${svgW} vs col ${colW}`);
         }
+
+        // ---- Canvas renderer ----------------------------------------------
+        // A second renderer (CanvasRenderer) drawing to <canvas> instead of SVG.
+        // The point of these checks is the interaction contract: with no DOM
+        // elements to hit, direct-pick must resolve the touched mark geometrically
+        // and plane gestures must route by coordinates — both invisible to
+        // typecheck, both broken silently if the seam leaks. We assert BEHAVIOUR
+        // (drag → data moved), and that the chart is genuinely canvas (no svg).
+        console.log('\nCanvas renderer (/renderers)');
+        await open('/renderers', '#direct .chart canvas');
+
+        // The chart must be canvas, not SVG — proves the renderer actually swapped.
+        const directCanvasCount = await page.locator('#direct .chart canvas').count();
+        const directSvgCount = await page.locator('#direct .chart svg').count();
+        check('canvas: direct example renders a <canvas>', directCanvasCount === 1, `canvas=${directCanvasCount}`);
+        check('canvas: direct example has no <svg>', directSvgCount === 0, `svg=${directSvgCount}`);
+
+        // Read the y-values out of the getData panel (bars: [20,45,30,60]).
+        const ysOf = (sel) => page.$eval(`${sel} .data-body`, (el) => {
+            const out = [];
+            const re = /y:\s*(-?\d+(?:\.\d+)?)/g; let m;
+            while ((m = re.exec(el.textContent)) !== null) out.push(Number(m[1]));
+            return out;
+        });
+
+        const barsBefore = await ysOf('#direct');
+        // Bar D (4th of 4) is the tallest, so its rect is the biggest hit target.
+        // Its band centre is margins.left + step*3.5 = 30 + (336/4)*3.5 = 324 css px,
+        // and value 60 puts its top around inner-y 88 — a press at y≈150 lands inside.
+        // Scroll into view first: mouse.move uses viewport coords, and a section below
+        // the fold would put the drag off-screen (a no-op).
+        await page.locator('#direct .chart canvas').scrollIntoViewIfNeeded();
+        const dcBox = await page.locator('#direct .chart canvas').boundingBox();
+        const colX = dcBox.x + 324;
+        await page.mouse.move(colX, dcBox.y + 150);
+        await page.mouse.down();
+        for (let k = 1; k <= 10; k++) await page.mouse.move(colX, dcBox.y + 150 - k * 9);
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const barsAfter = await ysOf('#direct');
+        check('canvas: direct-pick drag rewrites the value (hit-tested, no DOM node)',
+            barsBefore.length === 4 && barsAfter.length === 4 && barsAfter[3] > barsBefore[3] + 5,
+            `D: ${barsBefore[3]} -> ${barsAfter[3]}`);
+        check('canvas: drag moved ONLY the grabbed bar',
+            barsAfter[0] === barsBefore[0] && barsAfter[1] === barsBefore[1] && barsAfter[2] === barsBefore[2],
+            `${barsBefore} -> ${barsAfter}`);
+
+        // Plane gesture: a you-draw-it sweep (planeOnTop). No node identity — the
+        // driver picks each target from the pointer coordinates the canvas reports.
+        const demandOf = () => page.$eval('#plane .data-body', (el) => {
+            const out = [];
+            const re = /demand:\s*(-?\d+(?:\.\d+)?)/g; let m;
+            while ((m = re.exec(el.textContent)) !== null) out.push(Number(m[1]));
+            return out;
+        });
+        const demandBefore = await demandOf(); // all 50
+        await page.locator('#plane .chart canvas').scrollIntoViewIfNeeded();
+        const swBox = await page.locator('#plane .chart canvas').boundingBox();
+        // Sweep left→right along the top of the plot (low y = high value).
+        await page.mouse.move(swBox.x + 44, swBox.y + 40);
+        await page.mouse.down();
+        for (let k = 1; k <= 18; k++) await page.mouse.move(swBox.x + 44 + k * 20, swBox.y + 40);
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const demandAfter = await demandOf();
+        check('canvas: plane sweep raises the swept values (coordinate-routed)',
+            Math.max(...demandAfter) > 70 && Math.max(...demandBefore) <= 51,
+            `max ${Math.max(...demandBefore)} -> ${Math.max(...demandAfter)}`);
+
+        // A plane click on empty space must not throw (no node under the pointer).
+        const errsBeforeClick = errors.length;
+        await page.mouse.click(swBox.x + 10, swBox.y + 10);
+        await page.waitForTimeout(100);
+        check('canvas: click on empty space does not error', errors.length === errsBeforeClick,
+            errors.slice(errsBeforeClick).join(' | '));
 
         // ---- Waffle cell-fill consistency ---------------------------------
         console.log('\nWaffle fill consistency (/marks/waffle)');
@@ -257,6 +332,28 @@ async function main() {
         const repainted = drawn.filter((d) => d.year >= 1991 && d.year <= 2010);
         check('lock: the free years in that same stroke were repainted',
             repainted.length > 0 && repainted.every((d) => Math.abs(d.deaths - 55000) < 3000));
+
+        // ---- Derived fn channel (/concepts) ----------------------------------
+        // A derived channel ({ fn }) is computed per datum in visual space and is
+        // read-only: the edit lives on the source field (x), and the fill must
+        // re-derive on the committed rows every render. Only a real drag across the
+        // threshold proves the recompute path — a static render can't.
+        console.log('\nDerived fn channel (/concepts)');
+        await open('/concepts', '#derived .chart svg circle');
+        const fnAt = await frameOf('derived', {
+            m: { top: 16, right: 16, bottom: 32, left: 40 }, w: 420, h: 260, xd: [0, 100], yd: [0, 100]
+        });
+        const fnRows = () => page.$eval('#derived .chart > div', (el) => el.getData());
+        const fnFill = () => page.$eval('#derived .chart svg circle',
+            (c) => (c.getAttribute('fill') || c.style.fill || '').toLowerCase());
+        check('fn: row 0 starts below the threshold and derives the blue fill', (await fnFill()) === '#2563eb');
+        let fr = await fnRows();
+        await dragPath(fnAt(fr[0].x, fr[0].y), fnAt(85, fr[0].y));
+        fr = await fnRows();
+        check('fn: the drag wrote the source field across the threshold', fr[0].x > 50, `x=${fr[0].x}`);
+        check('fn: the fill re-derived to the above-threshold red', (await fnFill()) === '#dc2626');
+        await dragPath(fnAt(fr[0].x, fr[0].y), fnAt(20, fr[0].y));
+        check('fn: dragging back below re-derives the original blue', (await fnFill()) === '#2563eb');
 
         // ---- Arc: the `value` magnitude channel + boundary drag --------------
         // The magnitude channel is `value` (not `angle` — that means rotation

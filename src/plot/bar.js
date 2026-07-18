@@ -135,7 +135,7 @@ function buildBar(options, forcedOrientation) {
                 // Standard style surface (fill/stroke/opacity/…), resolved per
                 // datum through the same channels every mark uses. Defaults to the
                 // classic steelblue fill when no fill channel/shorthand is set.
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
 
                 if (orientation === 'horizontal') {
                     // Category on y (band geometry), value/length on x. The value

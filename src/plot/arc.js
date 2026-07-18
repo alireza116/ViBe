@@ -125,7 +125,7 @@ export function arc(options = {}) {
                     fill: '#4f46e5',
                     stroke: '#fff',
                     strokeWidth: 1,
-                });
+                }, i, currentData);
                 const pathD = arcPath(cx, cy, outer, a0, a1, { innerRadius });
                 if (!pathD) return;
 

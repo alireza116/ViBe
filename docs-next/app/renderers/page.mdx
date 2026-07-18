@@ -1,0 +1,51 @@
+import { DocShell } from '../../components/DocShell';
+import { Section } from '../../components/Section';
+import { Example } from '../../components/Example';
+import { Lead } from '../../components/Lead';
+
+import canvasDragABar from './_examples/canvas-drag-a-bar.example.txt';
+import canvasSweepALine from './_examples/canvas-sweep-a-line.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Renderers — the drawing backend is swappable
+
+<Lead>A mark never draws. It produces plain-data **scene nodes** (a circle at `cx,cy`, a rect, a path); the engine collects them and hands the whole scene to a **renderer**, which turns nodes into pixels and reports gestures back. That seam is the entire coupling between the engine and the screen — marks, edits, scales, guides, and constraints are all renderer-agnostic. Swap the renderer through `renderer:` on the spec and nothing upstream changes.</Lead>
+
+The default is `new D3Renderer()` — an SVG backend. `new CanvasRenderer()` is a second implementation of the **same contract** (`render(context)` in, `onEvent` out), drawing to a `<canvas>` instead. The examples below run entirely on canvas: there are no SVG elements in the chart, yet every edit works exactly as it does under SVG, because the interaction model lives in the engine, not the renderer.
+
+<Section id="direct" title="Direct-pick drag, on canvas">
+
+SVG gets hit-testing for free — the browser picks the element under the pointer. A canvas is one opaque element, so the canvas renderer resolves the touched mark **geometrically** (the same distance math the `nearest` pick already used) and dispatches the identical `drag` edit. Drag a bar: the gesture inverts through the `y` scale and rewrites the value, just like the SVG version.
+
+<Example
+  code={canvasDragABar}
+  title="Drag a value (canvas)"
+  blurb="renderer: new CanvasRenderer(). y carries edit: drag(); the direct-pick target is hit-tested against the scene nodes, not the DOM."
+  try={(
+    <>
+      <b>Drag</b> a bar up or down.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="plane" title="Plane gestures, on canvas">
+
+Plane-driven edits (`sweep`, `draw`, `nearest`, `create`) never needed a DOM element — they resolve their target from the pointer coordinates. The canvas renderer feeds those same coordinates through one pointer state machine, so a you-draw-it sweep works untouched.
+
+<Example
+  code={canvasSweepALine}
+  title="Sweep a line (canvas)"
+  blurb="A plane-pick sweep: drag across the plot to redraw the line. No node identity involved — just coordinates through the scale."
+  try={(
+    <>
+      <b>Drag</b> left-to-right across the chart to reshape the line.
+    </>
+  )}
+/>
+
+</Section>

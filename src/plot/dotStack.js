@@ -144,7 +144,7 @@ function buildDotStack(options, forcedAxis) {
                 const key = d[categoryKey];
                 const n = seen.get(key) || 0;
                 seen.set(key, n + 1);
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
                 const pos = placeAt(d, n);
                 // A `symbol` channel renders each token as a glyph (an emoji token
                 // stack) instead of a circle; the ghost rings above stay circles as

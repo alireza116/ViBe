@@ -103,9 +103,9 @@ function buildTick(options, forcedValueAxis) {
                 const style = resolveStyle(scales, channels, d, {
                     stroke: 'steelblue',
                     strokeWidth: 2
-                });
+                }, i, currentData);
 
-                const angle = encodeAngle(scales, channels, d, 0);
+                const angle = encodeAngle(scales, channels, d, 0, i, currentData);
 
                 if (valueAxis === 'x') {
                     // Vertical tick: value on x (linear), span the y band.

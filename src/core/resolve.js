@@ -114,6 +114,21 @@ export function resolveScales(features, dataset, spec, dims) {
             // schema entry.
             if (chSpec.scale === null) continue;
 
+            // A derived channel (`{ fn }`) is computed per datum in VISUAL space —
+            // its result is used as-is, never scaled — so it declares no field and
+            // feeds no scale. Skip it explicitly (rather than relying on the empty-
+            // bucket drop below) so a stray `scale`/`type` on it can't contaminate a
+            // shared axis bucket's scaleOpt/measure.
+            if (typeof chSpec.fn === 'function' && chSpec.field == null) {
+                if (DEV && (chSpec.scale !== undefined || chSpec.type !== undefined)) {
+                    warnOnce(`fn:${ch}`,
+                        `[vibe] channel "${ch}" is derived ({ fn }) — its result is used ` +
+                        `as-is in visual space, so its "${chSpec.scale !== undefined ? 'scale' : 'type'}" ` +
+                        `is ignored. Drop it, or use a field channel if you want a scale.`);
+                }
+                continue;
+            }
+
             // `domain` and `range` are not channel options: the schema owns the
             // domain, the scale owns the range. Both used to live here, and a
             // leftover is invisible — the channel silently takes its default range

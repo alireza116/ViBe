@@ -215,7 +215,7 @@ function buildArea(options, forcedValueAxis) {
                     ? (valueAxis === 'y' ? ['y1', 'y2'] : ['x1', 'x2'])
                     : [valueAxis];
                 sorted.forEach(({ d, i }) => {
-                    const hStyle = resolveStyle(scales, channels, d, { fill: style.fill || 'steelblue' });
+                    const hStyle = resolveStyle(scales, channels, d, { fill: style.fill || 'steelblue' }, i, currentData);
                     for (const ch of handleChannels) {
                         const onY = ch[0] === 'y';
                         const along = onY

@@ -33,7 +33,7 @@
 //   textX — value on x, y parked at the vertical centre (a 1-D label along x)
 //   textY — value on y, x parked at the horizontal centre (a 1-D label along y)
 
-import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, callChannelFn } from './mark.js';
 import { resolveFormat } from '../format.js';
 
 /**
@@ -53,18 +53,24 @@ function dominantBaselineOf(anchor) {
 /**
  * Read a non-positional channel raw: a field's value, a `{ value }` constant, else
  * the fallback. No scale — these channels (text/fontSize/textAnchor/…) are literals.
+ * A derived channel (`{ fn }`, e.g. `text: d => …`) is computed per datum.
  * @param {Record<string, any>} channels
  * @param {string} name
  * @param {any} datum
  * @param {any} fallback
+ * @param {number} [index] row index, passed to a derived channel's fn
  * @returns {any}
  */
-function rawChannel(channels, name, datum, fallback) {
+function rawChannel(channels, name, datum, fallback, index) {
     const spec = channels[name];
     if (!spec) return fallback;
     if (spec.field != null) {
         const v = datum[spec.field];
         return v == null ? fallback : v;
+    }
+    // Derived channel — fn(d, i) computed in visual space (no scale here anyway).
+    if (typeof spec.fn === 'function') {
+        return callChannelFn(spec, name, datum, index, undefined, fallback);
     }
     if (spec.value !== undefined) return spec.value;
     return fallback;
@@ -103,25 +109,25 @@ export function hasEditText(edits, channels) {
  */
 export function textNodeAt(scales, channels, d, i, px, py, opts = {}) {
     const { format = (/** @type {any} */ v) => v, canEditText = false } = opts;
-    const style = resolveStyle(scales, channels, d, { fill: '#111' });
+    const style = resolveStyle(scales, channels, d, { fill: '#111' }, i);
 
-    const dx = +rawChannel(channels, 'dx', d, 0) || 0;
-    const dy = +rawChannel(channels, 'dy', d, 0) || 0;
+    const dx = +rawChannel(channels, 'dx', d, 0, i) || 0;
+    const dy = +rawChannel(channels, 'dy', d, 0, i) || 0;
 
     // Angle: math degrees via the shared encodeAngle path (scaled when a scale
     // exists so rotate() is an exact inverse; else raw). The renderer converts
     // to SVG with rotate(-deg) about the label's anchor.
-    const angle = encodeAngle(scales, channels, d, 0);
+    const angle = encodeAngle(scales, channels, d, 0, i);
 
-    const lineAnchor = rawChannel(channels, 'lineAnchor', d, 'middle');
+    const lineAnchor = rawChannel(channels, 'lineAnchor', d, 'middle', i);
 
     return {
         type: 'text',
         x: px + dx,
         y: py + dy,
-        text: format(rawChannel(channels, 'text', d, '')),
-        fontSize: rawChannel(channels, 'fontSize', d, 12),
-        textAnchor: rawChannel(channels, 'textAnchor', d, 'middle'),
+        text: format(rawChannel(channels, 'text', d, '', i)),
+        fontSize: rawChannel(channels, 'fontSize', d, 12, i),
+        textAnchor: rawChannel(channels, 'textAnchor', d, 'middle', i),
         lineAnchor,
         dominantBaseline: dominantBaselineOf(lineAnchor),
         ...(angle ? { angle } : {}),

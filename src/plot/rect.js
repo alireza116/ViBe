@@ -101,7 +101,7 @@ function buildRect(options, forcedValueAxis) {
             const { x: xScale, y: yScale } = scales;
 
             return currentData.map((d, i) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
 
                 const xExt = resolveExtent('x', channels, scales, xScale, d, xKey, forcedValueAxis === 'x', width);
                 const yExt = resolveExtent('y', channels, scales, yScale, d, yKey, forcedValueAxis === 'y', height);
@@ -114,7 +114,7 @@ function buildRect(options, forcedValueAxis) {
                 if (xExt.band && !yExt.band) bandAxis = 'x';
                 else if (yExt.band && !xExt.band) bandAxis = 'y';
 
-                const angle = encodeAngle(scales, channels, d, 0);
+                const angle = encodeAngle(scales, channels, d, 0, i, currentData);
 
                 return {
                     type: 'rect',

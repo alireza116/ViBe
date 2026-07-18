@@ -266,12 +266,12 @@ export function geoPoint(options = {}) {
                 const lat = channels.lat ? (d[latKey]) : d.lat;
                 const pt = projectPoint(projection, lon, lat);
                 if (!pt) return;
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
                 nodes.push({
                     type: 'circle',
                     cx: pt.x,
                     cy: pt.y,
-                    r: encodeChannel(scales, channels, 'size', d, 5),
+                    r: encodeChannel(scales, channels, 'size', d, 5, i, currentData),
                     ...style,
                     data: d,
                     index: i,

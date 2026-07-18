@@ -60,15 +60,15 @@ export function point(options = {}) {
          */
         build: (currentData, scales, width, height) => {
             return currentData.map((d, i) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
-                const cx = encodeChannel(scales, channels, 'x', d, width / 2);
-                const cy = encodeChannel(scales, channels, 'y', d, height / 2);
-                const size = encodeChannel(scales, channels, 'size', d, 5);
-                const angle = encodeAngle(scales, channels, d, 0);
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
+                const cx = encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
+                const cy = encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                const size = encodeChannel(scales, channels, 'size', d, 5, i, currentData);
+                const angle = encodeAngle(scales, channels, d, 0, i, currentData);
                 // A `symbol` channel turns the dot into a glyph (emoji / unicode
                 // shape) — the same category->encoding path, rendered as text. `size`
                 // still sets its px extent so a glyph point and a circle point match.
-                const glyph = resolveSymbol(scales, channels, d);
+                const glyph = resolveSymbol(scales, channels, d, i, currentData);
                 if (glyph !== undefined) {
                     return symbolNode(glyph, cx, cy, size, {
                         ...style,

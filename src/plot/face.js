@@ -176,7 +176,7 @@ export function face(options = {}) {
                 // Every feature is drawn relative to R, so the ink scales with the
                 // face rather than turning spidery on a big one / blotting a small one.
                 const stroke = Math.max(2, R * 0.055);
-                const style = resolveStyle(scales, channels, d, { fill: '#FFD666', stroke: '#B7791F' });
+                const style = resolveStyle(scales, channels, d, { fill: '#FFD666', stroke: '#B7791F' }, i, currentData);
 
                 // Each param in [0,1] through its scale; unbound -> 0.5 (neutral).
                 /** @param {string} p */

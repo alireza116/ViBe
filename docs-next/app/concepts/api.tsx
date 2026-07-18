@@ -63,7 +63,7 @@ export const api: ApiEntry[] = [
     name: "The channel forms",
     summary: (
       <>
-        The four shapes a channel can take on any mark’s <code className="inline">channels</code>, plus the co-located <code className="inline">edit</code> that makes it writable. Full scale options live on the <a href="/scales">Scales & channels</a> page.
+        The five shapes a channel can take on any mark’s <code className="inline">channels</code>, plus the co-located <code className="inline">edit</code> that makes it writable. Full scale options live on the <a href="/scales">Scales & channels</a> page.
       </>
     ),
     options: [
@@ -102,6 +102,16 @@ export const api: ApiEntry[] = [
         type: "raw",
         default: "—",
         desc: "A field passed through unscaled (the datum already holds a literal colour / pixel).",
+      },
+      {
+        name: "{ fn }",
+        type: "derived · read-only",
+        default: "—",
+        desc: (
+          <>
+            Computed per datum in <b>visual space</b> (used as-is, never scaled) — <code className="inline">fill: {'{'} fn: d ={'>'} d.x {'>'} 50 ? "red" : "blue" {'}'}</code>. The shorthand <code className="inline">fill: d ={'>'} …</code> desugars to it. Read-only: put the <code className="inline">edit</code> on the source field and the fn re-derives on commit.
+          </>
+        ),
       },
       {
         name: "{ …, edit }",

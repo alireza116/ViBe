@@ -10,14 +10,21 @@
 //      unscaled) and spread onto the scene node, so any mark is styleable in one
 //      line and the renderer applies them uniformly.
 //
-// Declarative only. A channel is one of:
+// Declarative first. A channel is one of:
 //   { field }              a data field, through the channel's global scale
 //   { value }              a VISUAL-space constant — skips the scale
 //   { datum }              a DATA-space constant — goes THROUGH the scale, so
 //                          `y: { datum: 25 }` lands where y=25 is, not at 25px
 //   { field, scale: null } a raw field, unscaled (the datum holds a literal)
-// No accessor functions — specs stay serializable and introspectable by the
-// edit/elicitation layer.
+//   { fn }                 a DERIVED channel — fn(d, i, data) is computed per
+//                          datum in VISUAL space (its result is used as-is, never
+//                          scaled). e.g. fill: d => d.x > 50 ? 'red' : 'blue'.
+// The first four stay serializable and introspectable by the edit/elicitation
+// layer. `{ fn }` is the one deliberate exception: it is opaque to that layer, so
+// it is READ-ONLY — a derived channel can't carry an `edit` (it recomputes from
+// the committed rows on every render, so a source-field edit re-derives it for
+// free). A top-level function shorthand (`fill: d => …`) desugars to `{ fn }`; an
+// explicit `{ value: someFn }` stays an opaque constant, never invoked.
 //
 // ── The mark contract ───────────────────────────────────────────────────────
 // A mark NEVER owns data. `Elicit` owns the chart's one dataset; a mark is a view
@@ -95,23 +102,66 @@ const SHORTHANDS = [
     'angle',
 ];
 
+const DEV = !!(import.meta.env && import.meta.env.DEV);
+
+// A derived channel's fn re-runs on every render, so a warning would repeat
+// forever. Warn once per offending channel, the way resolve.js's guards do.
+/** @type {Set<string>} */
+const warnedFn = new Set();
+
 /**
- * Map a datum through one channel using the global scale. Handles visual
- * constants (`{ value }`), data-space constants (`{ datum }`), scaled fields
- * (`{ field }`), unscaled raw fields (`{ field, scale: null }`), and missing
- * scales/fields (fall back). Declarative only — a function `value` is treated as
- * an opaque constant, never invoked.
+ * Evaluate a derived channel's `fn(d, i, data)` in VISUAL space. The result is
+ * used as-is (never scaled). A null/undefined datum resolves to the fallback
+ * rather than calling `fn(undefined)` (constant-resolving callers pass no datum);
+ * a fn that returns null/undefined or throws also falls back, so a bad accessor
+ * never blanks the chart.
+ * @param {any} spec the channel spec (must have a function `fn`)
+ * @param {string} channel channel name, for the DEV warning key
+ * @param {import('../types').Datum | null} datum
+ * @param {number | undefined} index
+ * @param {import('../types').Datum[] | undefined} data
+ * @param {any} fallback
+ * @returns {any}
+ */
+export function callChannelFn(spec, channel, datum, index, data, fallback) {
+    if (datum == null) return fallback;
+    try {
+        const out = spec.fn(datum, index, data);
+        return out == null ? fallback : out;
+    } catch (err) {
+        if (DEV && !warnedFn.has(channel)) {
+            warnedFn.add(channel);
+            console.warn(`[vibe] fn on channel "${channel}" threw: ` +
+                `${err instanceof Error ? err.message : err}; using the fallback.`);
+        }
+        return fallback;
+    }
+}
+
+/**
+ * Map a datum through one channel using the global scale. Handles derived
+ * channels (`{ fn }`, computed per datum in visual space), visual constants
+ * (`{ value }`), data-space constants (`{ datum }`), scaled fields (`{ field }`),
+ * unscaled raw fields (`{ field, scale: null }`), and missing scales/fields (fall
+ * back). A function `value` (not `fn`) stays an opaque constant, never invoked.
  * @param {import('../types').ScaleMap} scales
  * @param {Record<string, any>} channels
  * @param {string} channel
  * @param {import('../types').Datum | null} datum a null datum resolves constants only
  * @param {any} [fallback]
+ * @param {number} [index] row index, passed to a derived channel's fn
+ * @param {import('../types').Datum[]} [data] the dataset, passed to a derived fn
  * @returns {any}
  */
-export function encodeChannel(scales, channels, channel, datum, fallback) {
+export function encodeChannel(scales, channels, channel, datum, fallback, index, data) {
     const spec = channels[channel];
     if (!spec) return fallback;
     if (spec.field === undefined) {
+        // Derived channel — fn(d, i, data) computed in visual space, used as-is.
+        // Wins over value/datum so `{ fn }` is unambiguous.
+        if (typeof spec.fn === 'function') {
+            return callChannelFn(spec, channel, datum, index, data, fallback);
+        }
         // Visual-space constant — the value IS the output. Subsumes static options
         // like fill: "steelblue".
         if (spec.value !== undefined) return spec.value;
@@ -145,14 +195,20 @@ export function encodeChannel(scales, channels, channel, datum, fallback) {
  * @param {Record<string, any>} channels
  * @param {import('../types').Datum | null} datum
  * @param {number} [fallback=0]
+ * @param {number} [index] row index, passed to a derived channel's fn
+ * @param {import('../types').Datum[]} [data] the dataset, passed to a derived fn
  * @returns {number}
  */
-export function encodeAngle(scales, channels, datum, fallback = 0) {
+export function encodeAngle(scales, channels, datum, fallback = 0, index, data) {
     if (!channels || !channels.angle) return fallback;
     // scales is an index signature — angle is optional.
     const angleScale = /** @type {any} */ (scales)['angle'];
-    if (angleScale) return encodeChannel(scales, channels, 'angle', datum, fallback);
+    if (angleScale) return encodeChannel(scales, channels, 'angle', datum, fallback, index, data);
     const spec = channels.angle;
+    // Derived angle — fn returns degrees directly (visual space, no scale).
+    if (typeof spec.fn === 'function') {
+        return +callChannelFn(spec, 'angle', datum, index, data, fallback);
+    }
     if (spec.field != null) {
         const v = datum ? datum[spec.field] : undefined;
         return v == null ? fallback : +v;
@@ -170,11 +226,13 @@ export function encodeAngle(scales, channels, datum, fallback = 0) {
  * @param {import('../types').ScaleMap} scales
  * @param {Record<string, any>} channels
  * @param {import('../types').Datum} datum
+ * @param {number} [index] row index, passed to a derived channel's fn
+ * @param {import('../types').Datum[]} [data] the dataset, passed to a derived fn
  * @returns {string | undefined}
  */
-export function resolveSymbol(scales, channels, datum) {
+export function resolveSymbol(scales, channels, datum, index, data) {
     if (!channels || !channels.symbol) return undefined;
-    const glyph = encodeChannel(scales, channels, 'symbol', datum, undefined);
+    const glyph = encodeChannel(scales, channels, 'symbol', datum, undefined, index, data);
     return (glyph == null || glyph === '') ? undefined : String(glyph);
 }
 
@@ -211,14 +269,16 @@ export function symbolNode(glyph, cx, cy, size, extra = {}) {
  * @param {Record<string, any>} channels
  * @param {import('../types').Datum} datum
  * @param {Record<string, any>} [defaults] per-mark default fallbacks (e.g. fill)
+ * @param {number} [index] row index, passed to a derived channel's fn
+ * @param {import('../types').Datum[]} [data] the dataset, passed to a derived fn
  * @returns {Record<string, any>}
  */
-export function resolveStyle(scales, channels, datum, defaults = {}) {
+export function resolveStyle(scales, channels, datum, defaults = {}, index, data) {
     /** @type {Record<string, any>} */
     const style = {};
     for (const ch of STANDARD_STYLE_CHANNELS) {
         const fallback = ch in defaults ? defaults[ch] : STYLE_DEFAULTS[ch];
-        const value = encodeChannel(scales, channels, ch, datum, fallback);
+        const value = encodeChannel(scales, channels, ch, datum, fallback, index, data);
         if (value !== undefined) style[ch] = value;
     }
     return style;
@@ -271,7 +331,12 @@ export function normalizeMarkOptions(options = {}, { except = [] } = {}) {
     for (const ch of SHORTHANDS) {
         if (rest[ch] === undefined || except.includes(ch)) continue;
         // An explicit channel for this name wins over the shorthand.
-        if (merged[ch] === undefined) merged[ch] = { value: rest[ch] };
+        // A function shorthand (`fill: d => …`) desugars to a DERIVED channel
+        // (`{ fn }`), computed per datum in visual space; any other value is a
+        // visual-space constant (`{ value }`).
+        if (merged[ch] === undefined) {
+            merged[ch] = typeof rest[ch] === 'function' ? { fn: rest[ch] } : { value: rest[ch] };
+        }
         delete rest[ch];
     }
     return { ...rest, channels: merged };

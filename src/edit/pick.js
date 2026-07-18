@@ -158,6 +158,71 @@ export function nearestMarkOnAxis(marks, px, py, threshold, axis, series) {
     return best != null && bestDist <= threshold ? best : null;
 }
 
+// How far outside a thin mark's outline still counts as "on" it, in px. A stroked
+// line or path has no area, so a bare containment test would be unhittable; this is
+// the grab tolerance the SVG hit-tester effectively grants via the stroke width.
+const HIT_TOLERANCE = 4;
+
+/**
+ * The topmost mark the pointer is actually ON (containment), or null — the geometric
+ * replacement for the browser's SVG hit-test, used by renderers with no DOM elements
+ * to hit (the canvas renderer). Distinct from `nearestMark`: `direct` pick means "the
+ * mark under the pointer", not "the closest mark within 40px", so this tests real
+ * containment and walks the scene BACK-TO-FRONT (last drawn wins, matching paint /
+ * z-order).
+ *
+ * It also honours what SVG enforced for free: a node is only a target if its feature
+ * has a direct-pick edit (`editable`) and it isn't locked, a guide, background, or
+ * explicitly `pointerEvents:'none'` — the pointer-transparency invariant, which the
+ * DOM hit-tester applied via CSS and a geometric hit-test must apply itself.
+ *
+ * Reuses `distanceToMark` for the genuine distance cases (circle centre, line/path
+ * segments); a rect is a real point-in-bounds test rather than `distanceToMark`'s
+ * band-proximity shortcut, because "anywhere in the column" is what NEAREST wants,
+ * not what a direct hit is.
+ * @param {any[]} marks
+ * @param {number} px
+ * @param {number} py
+ * @returns {any | null} the hit node object (not its index), or null
+ */
+export function hitTest(marks, px, py) {
+    const list = marks || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+        const mark = list[i];
+        if (!mark || !mark.editable) continue;
+        if (mark.locked || mark.guide || mark.background) continue;
+        if (mark.pointerEvents === 'none') continue;
+        if (containsPoint(mark, px, py)) return mark;
+    }
+    return null;
+}
+
+/**
+ * @param {any} mark @param {number} px @param {number} py @returns {boolean}
+ */
+function containsPoint(mark, px, py) {
+    if (mark.type === 'circle') {
+        const r = mark.r != null ? mark.r : 5;
+        return distanceToMark(mark, px, py) <= r + HIT_TOLERANCE;
+    }
+    if (mark.type === 'rect') {
+        const w = mark.width || 0;
+        const h = mark.height || 0;
+        return px >= mark.x - HIT_TOLERANCE && px <= mark.x + w + HIT_TOLERANCE
+            && py >= mark.y - HIT_TOLERANCE && py <= mark.y + h + HIT_TOLERANCE;
+    }
+    if (mark.type === 'line' || mark.type === 'path') {
+        const half = (mark.strokeWidth || 1) / 2;
+        return distanceToMark(mark, px, py) <= half + HIT_TOLERANCE;
+    }
+    if (mark.type === 'text') {
+        // A text mark's box is unknown to geometry; treat a small radius about its
+        // anchor as the hit area (enough to grab a label handle).
+        return Math.hypot(px - mark.x, py - mark.y) <= (mark.fontSize || 10) + HIT_TOLERANCE;
+    }
+    return false;
+}
+
 // A nearest edit needs a usable snap radius; 0 (makeEdit's default) would mean
 // "exact hit only", which defeats the purpose, so fall back to a sane default.
 export const DEFAULT_PICK_THRESHOLD = 40;

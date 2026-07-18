@@ -81,7 +81,7 @@ export function needle(options = {}) {
                     fill: '#1e293b',
                     stroke: '#1e293b',
                     strokeWidth: 1,
-                });
+                }, i, currentData);
                 const pts = needleTriangle(cx, cy, len, deg, baseWidth);
                 const dPath = `M ${pts[0][0]} ${pts[0][1]} L ${pts[1][0]} ${pts[1][1]} L ${pts[2][0]} ${pts[2][1]} Z`;
 

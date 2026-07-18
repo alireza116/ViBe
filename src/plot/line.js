@@ -142,7 +142,7 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             // Handles: an ordinary circle per datum, so edits/pick reuse the mark
             // machinery. Tagged with `series` so a sweep can scope to one line.
             placed.forEach(({ d, i, cx, cy, series }) => {
-                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' });
+                const style = resolveStyle(scales, channels, d, { fill: 'steelblue' }, i, currentData);
                 nodes.push({
                     type: 'circle',
                     cx,
