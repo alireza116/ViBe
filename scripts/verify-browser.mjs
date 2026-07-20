@@ -473,6 +473,34 @@ async function main() {
             Math.abs(undone[0].y - beforeDrag[0].y) < 0.01,
             `${afterDrag[0].y} -> ${undone[0].y}, expected ${beforeDrag[0].y}`);
 
+        // ---- A bar emptied to the baseline stays grabbable (SVG overlay) ----
+        // A zero-height <rect> takes no pointer events, so dragging a bar to 0 used
+        // to strand it: you could never drag it back up. The renderer now lays a
+        // transparent min-height hit rect over a collapsed editable bar. Drive it:
+        // empty bar A to the baseline, then re-grab AT the baseline and drag up.
+        const eBox = await bar0.boundingBox();
+        const eColX = eBox.x + eBox.width / 2;
+        const eBaseY = eBox.y + eBox.height; // bars grow up from the baseline
+        await page.mouse.move(eColX, eBox.y + 6);
+        await page.mouse.down();
+        for (let k = 1; k <= 12; k++) await page.mouse.move(eColX, eBox.y + 6 + k * ((eBaseY - eBox.y) / 12));
+        await page.mouse.move(eColX, eBaseY + 20); // overshoot to pin it at 0
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const emptied = (await barRows())[0].y;
+        check('empty: bar drags down to (near) zero', emptied <= 1, `y=${emptied}`);
+        // The visible rect is now zero-height; only the hit overlay can catch this.
+        const hitCount = await page.locator('#editing svg rect.mark-hit').count();
+        check('empty: a hit overlay exists over the collapsed bar', hitCount >= 1, `overlays=${hitCount}`);
+        await page.mouse.move(eColX, eBaseY - 2); // inside the overlay band, not the 0-area rect
+        await page.mouse.down();
+        for (let k = 1; k <= 12; k++) await page.mouse.move(eColX, eBaseY - 2 - k * 12);
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const regrabbed = (await barRows())[0].y;
+        check('empty: the collapsed bar is still grabbable (drags back up)',
+            regrabbed > emptied + 5, `${emptied} -> ${regrabbed}`);
+
         // ---- brushSpan honours a custom edgeInset (/marks/bar #span) -------
         // edgeInset used to be silently dropped by makeEdit (only canonical keys
         // survived), so the brush driver always fell back to its 8px default. The

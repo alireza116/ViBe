@@ -163,6 +163,35 @@ export function nearestMarkOnAxis(marks, px, py, threshold, axis, series) {
 // the grab tolerance the SVG hit-tester effectively grants via the stroke width.
 const HIT_TOLERANCE = 4;
 
+// Minimum grabbable thickness for a rect, in px. A bar whose value collapses to the
+// baseline has height 0 (or width 0, horizontal) — no area to hit under DIRECT pick,
+// so the bar becomes ungrabbable exactly when you want to drag it back up. Floor the
+// *hit* geometry (never the drawn geometry) to this so a degenerate rect keeps a
+// finger-sized target. Shared with the SVG renderer, which lays a transparent hit
+// rect of this box over each editable degenerate bar (a zero-area <rect> takes no
+// pointer events), so both backends grab an emptied bar identically.
+export const MIN_GRAB = 12;
+
+/**
+ * The floored HIT box of a rect node: its drawn box, but each dimension expanded
+ * symmetrically to at least MIN_GRAB so a collapsed bar stays grabbable. Visual-only
+ * geometry (`x`/`y`/`width`/`height`) is untouched; this is purely the target area.
+ * @param {any} mark
+ * @returns {{ x: number, y: number, w: number, h: number }}
+ */
+export function rectHitBox(mark) {
+    const w = mark.width || 0;
+    const h = mark.height || 0;
+    const gw = Math.max(w, MIN_GRAB);
+    const gh = Math.max(h, MIN_GRAB);
+    return {
+        x: mark.x - (gw - w) / 2,
+        y: mark.y - (gh - h) / 2,
+        w: gw,
+        h: gh
+    };
+}
+
 /**
  * The topmost mark the pointer is actually ON (containment), or null — the geometric
  * replacement for the browser's SVG hit-test, used by renderers with no DOM elements
@@ -206,10 +235,11 @@ function containsPoint(mark, px, py) {
         return distanceToMark(mark, px, py) <= r + HIT_TOLERANCE;
     }
     if (mark.type === 'rect') {
-        const w = mark.width || 0;
-        const h = mark.height || 0;
-        return px >= mark.x - HIT_TOLERANCE && px <= mark.x + w + HIT_TOLERANCE
-            && py >= mark.y - HIT_TOLERANCE && py <= mark.y + h + HIT_TOLERANCE;
+        // Floor the hit box to MIN_GRAB first, THEN grant the outline tolerance, so a
+        // zero-height/zero-width bar (value at the baseline) keeps a grabbable target.
+        const box = rectHitBox(mark);
+        return px >= box.x - HIT_TOLERANCE && px <= box.x + box.w + HIT_TOLERANCE
+            && py >= box.y - HIT_TOLERANCE && py <= box.y + box.h + HIT_TOLERANCE;
     }
     if (mark.type === 'line' || mark.type === 'path') {
         const half = (mark.strokeWidth || 1) / 2;

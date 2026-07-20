@@ -2,6 +2,7 @@
 import * as d3 from "d3";
 import { DEFAULT_EFFECTS } from "../../core/effects.js";
 import { markCenter } from "../../edit/shared.js";
+import { rectHitBox, MIN_GRAB } from "../../edit/pick.js";
 import { resolveCurve, STYLE_FIELDS, partitionScene } from "../shared.js";
 
 export class D3Renderer {
@@ -141,7 +142,9 @@ export class D3Renderer {
     // own all pointer events; the marks become purely visual. Guides already
     // use pointer-events:none, so they remain visible through the plane.
     if (planeOnTop) {
-      g.selectAll(".mark").style("pointer-events", "none");
+      // Silence the grab overlays too (.mark-hit): in proximity mode the plane owns
+      // every gesture, and a leftover hit rect would swallow it just like a mark.
+      g.selectAll(".mark, .mark-hit").style("pointer-events", "none");
       plane.raise().style("cursor", planeCursor || "pointer");
     }
   }
@@ -864,6 +867,35 @@ export class D3Renderer {
       .call(keys);
     this._geomRect(rectSel);
     this._applyStyle(rectSel, { fill: "black" });
+
+    // Grab overlay for collapsed bars. A rect whose value sits at the baseline is
+    // drawn at zero height (or width) and so takes NO pointer events — the browser
+    // can't hit a zero-area <rect>, so a bar you just emptied becomes ungrabbable.
+    // Lay a transparent, min-sized hit rect (the same floored box the canvas
+    // hit-tester uses via rectHitBox) over each editable, degenerate bar, wired to
+    // the SAME drag/click. Focus/keys stay on the visible rect (still focusable at
+    // zero area), so this adds no duplicate tab stop — it only restores the pointer.
+    const hitRects = markRects.filter(
+      (/** @type {any} */ d) =>
+        d.editable &&
+        d.pointerEvents !== "none" &&
+        ((d.width || 0) < MIN_GRAB || (d.height || 0) < MIN_GRAB),
+    );
+    const hitSel = layer
+      .selectAll("rect.mark-hit")
+      .data(hitRects)
+      .join("rect")
+      .attr("class", "mark-hit")
+      .style("pointer-events", "all")
+      .style("fill", "transparent")
+      .style("cursor", (/** @type {any} */ d) => d.cursor || "ns-resize")
+      .attr("x", (/** @type {any} */ d) => rectHitBox(d).x)
+      .attr("y", (/** @type {any} */ d) => rectHitBox(d).y)
+      .attr("width", (/** @type {any} */ d) => rectHitBox(d).w)
+      .attr("height", (/** @type {any} */ d) => rectHitBox(d).h)
+      .on("click", markClick)
+      .call(drag);
+    hitSel.raise();
 
     const circleSel = layer
       .selectAll("circle.mark")
