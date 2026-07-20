@@ -1,0 +1,35 @@
+mount(Elicit({
+  width: 380, height: 220,
+  margins: { top: 20, right: 16, bottom: 30, left: 40 },
+  data: [
+    { name: "A", value: 12, group: "North" },
+    { name: "B", value: 8,  group: "South" },
+    { name: "C", value: 15, group: "East"  },
+    { name: "D", value: 6,  group: "West"  },
+  ],
+  schema: {
+    name: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    group: { type: "categorical", domain: ["North", "South", "East", "West"] },
+    value: { type: "quantitative", domain: [0, 16] },
+  },
+  features: [
+    // Click a bar to SELECT it. Selection is pipeline state (no `selected` column);
+    // the selected bar gets the highlight outline automatically.
+    barY({
+      channels: {
+        x: { field: "name" },
+        y: { field: "value" },
+        fill: { field: "group" },
+      },
+      edits: [ edit.select() ]
+    }),
+
+    // The legend picker edits whichever row is currently selected — its `row`
+    // defaults to the chart's selection, so there is no findIndex to keep in sync.
+    legendColor({
+      anchor: "right",
+      title: "group",
+      edit: edit.legend(),
+    }),
+  ],
+}))

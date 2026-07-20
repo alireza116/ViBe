@@ -16,6 +16,11 @@ const {
   arc: _editArc,
   geo: _editGeo,
   waffle: _editWaffle,
+  // The legend pickers stay under `edit.*` so the same-named `legend` MARK (from
+  // vibe.plot) — and its `legendColor`/`legendSize`/`legendSymbol` siblings — win
+  // the bare name, the way axis/arc/waffle marks win over their edit namespaces.
+  legend: _editLegend,
+  legendValue: _editLegendValue,
   nextSeriesKey: _nsk,
   when: _editWhen,
   ...universalEdits

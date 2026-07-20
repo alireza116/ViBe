@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 380, height: 220,
+  margins: { top: 20, right: 16, bottom: 30, left: 40 },
+  data: [
+    { group: "North", value: 12 },
+    { group: "South", value: 8 },
+    { group: "East",  value: 15 },
+    { group: "West",  value: 6 },
+  ],
+  schema: {
+    group: { type: "categorical", domain: ["North", "South", "East", "West"] },
+    value: { type: "quantitative", domain: [0, 16] },
+  },
+  features: [
+    barY({
+      channels: {
+        x: { field: "group" },
+        y: { field: "value" },
+        fill: { field: "group" },
+      },
+    }),
+    // A legend for the fill channel, reserving space on the right so the bars
+    // shrink to make room instead of drawing under it.
+    legendColor({ anchor: "right", title: "group" }),
+  ],
+}))

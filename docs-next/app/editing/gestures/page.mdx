@@ -55,7 +55,7 @@ Move, resize, and recolour on a single mark — separated by when. Plain drag mo
 
 <Section id="custom" title="Custom — the escape hatch">
 
-custom(fn) wraps fn as apply. The edit still declares its gesture (default drag) — the engine only calls fn when that gesture fires. fn receives (datum, event, ctx): datum is the touched row, event the raw DOM event, ctx the EditContext (pointer, scales, data, … — see the Editing overview). Return a new datum (or array); every field you set is written into the belief store.
+custom(fn) wraps fn as apply. The edit still declares its gesture (default drag) — the engine only calls fn when that gesture fires. fn receives the EditContext: ctx.datum is the touched row, ctx.event the raw DOM event, plus the pointer, scales, data, … — see the Editing overview. Return a new datum (or array); every field you set is written into the belief store.
 
 <Example
   code={invertYYourself}

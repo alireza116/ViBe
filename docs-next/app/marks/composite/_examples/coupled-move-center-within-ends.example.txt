@@ -32,7 +32,8 @@ mount(Elicit({
             x: { field: "g" },
             // Coupled move: the dot shifts lo/hi by the mean's delta.
             y: { field: "mean",
-                 edit: edit.custom((d, e, ctx) => {
+                 edit: edit.custom((ctx) => {
+                   const d = ctx.datum;
                    const s = ctx.channels[0].scale;
                    const mean = s.invertValue(ctx.pointer.y);
                    const delta = mean - d.mean;

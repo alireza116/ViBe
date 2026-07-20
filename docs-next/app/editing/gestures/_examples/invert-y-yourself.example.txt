@@ -16,8 +16,8 @@ mount(Elicit({
       },
       edits: [
         // default gesture: "drag" — pass { gesture: "click" } to change it
-        custom((datum, event, ctx) => ({
-          ...datum,
+        custom((ctx) => ({
+          ...ctx.datum,
           y: ctx.scales.y.invertValue(ctx.pointer.y),
           touched: true, // becomes data; omit if you only want to rewrite y
         })),

@@ -15,7 +15,7 @@ mount(Elicit({
   features: [
     dotStack({
       channels: { x: { field: "bin" } },
-      edits: [ create({ trigger: "click", channels: ["x"] }), remove() ],
+      edits: [ create({ gesture: "click", channels: ["x"] }), remove() ],
       constraints: [ count({ max: 25 }) ],
       label: true,
     }),

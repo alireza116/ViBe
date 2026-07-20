@@ -104,6 +104,8 @@ export class D3Renderer {
       ofType(background, "path"),
       ofType(background, "line"),
       ofType(background, "text"),
+      ofType(background, "rect"),
+      ofType(background, "circle"),
     );
 
     this._drawGuideRegions(layers.guideBack, guideRegions);
@@ -628,23 +630,27 @@ export class D3Renderer {
   // -- semantic draws ------------------------------------------------------
 
   /**
-   * Raster tiles, axis spines/ticks, gridlines, axis labels, and vector
-   * basemap paths — into the dedicated layer behind the marks. Non-interactive.
+   * Raster tiles, axis spines/ticks, gridlines, axis labels, legend swatches/
+   * ramps, and vector basemap paths — into the dedicated layer behind the marks.
+   * Non-interactive.
    *
    * Images are joined FIRST (and keyed by {z}/{x}/{y}), so they sit at the back
    * of the layer: a tile basemap is the floor of the chart. The key is what makes
    * panning/zooming cheap — a tile that stays on screen keeps its <image> and
-   * never re-fetches. Axis lines/labels follow; background paths (geoBasemap,
-   * radial chrome) are last so they sit above grids the way they did when all
-   * paths shared the mark path pass.
+   * never re-fetches. Legend rects/circles (colour chips, size dots, ramp slices)
+   * and axis lines/labels follow; background paths (geoBasemap, radial chrome)
+   * are last so they sit above grids the way they did when all paths shared the
+   * mark path pass.
    *
    * @param {any} bgLayer
    * @param {any[]} bgImages
    * @param {any[]} bgPaths
    * @param {any[]} bgLines
    * @param {any[]} bgTexts
+   * @param {any[]} [bgRects]
+   * @param {any[]} [bgCircles]
    */
-  _drawBackground(bgLayer, bgImages, bgPaths, bgLines, bgTexts) {
+  _drawBackground(bgLayer, bgImages, bgPaths, bgLines, bgTexts, bgRects = [], bgCircles = []) {
     const imgSel = bgLayer
       .selectAll("image")
       .data(bgImages, (/** @type {any} */ d) => d.key)
@@ -663,6 +669,27 @@ export class D3Renderer {
         d.opacity != null ? d.opacity : null,
       );
     imgSel.lower();
+
+    // Legend colour chips / ramp slices / opacity swatches. Painted before axis
+    // lines so a side legend's labels (bg texts) sit on top of its chips.
+    const rectSel = bgLayer
+      .selectAll("rect.bg-rect")
+      .data(bgRects)
+      .join("rect")
+      .attr("class", "bg-rect")
+      .style("pointer-events", "none");
+    this._geomRect(rectSel);
+    this._applyStyle(rectSel, { fill: "none", stroke: "none", strokeWidth: 1, opacity: 1 });
+
+    // Legend size dots (a size channel encodes to a radius, drawn as a circle).
+    const circleSel = bgLayer
+      .selectAll("circle.bg-circle")
+      .data(bgCircles)
+      .join("circle")
+      .attr("class", "bg-circle")
+      .style("pointer-events", "none");
+    this._geomCircle(circleSel);
+    this._applyStyle(circleSel, { fill: "none", stroke: "none", strokeWidth: 1, opacity: 1 });
 
     const lineSel = bgLayer
       .selectAll("line")
@@ -830,7 +857,7 @@ export class D3Renderer {
         (/** @type {any} */ d) => d.pointerEvents || "auto",
       )
       .style("cursor", (/** @type {any} */ d) =>
-        d.editable ? "ns-resize" : "default",
+        d.editable ? d.cursor || "ns-resize" : "default",
       )
       .on("click", markClick)
       .call(drag)

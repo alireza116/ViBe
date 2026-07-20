@@ -9,7 +9,7 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "create({ channels, defaults, trigger }) → Edit",
+      "create({ channels, defaults, gesture }) → Edit",
     ],
     options: [
       {
@@ -25,7 +25,7 @@ export const api: ApiEntry[] = [
         desc: "Seed values for the non-positional fields (group, mag, …).",
       },
       {
-        name: "trigger",
+        name: "gesture",
         type: "'click' | 'dblclick'",
         default: "'click'",
         desc: "The plane gesture that creates.",
@@ -45,7 +45,7 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "remove({ pick, threshold, when, trigger }) → Edit",
+      "remove({ pick, threshold, when, gesture }) → Edit",
     ],
     options: [
       {
@@ -69,7 +69,7 @@ export const api: ApiEntry[] = [
         ),
       },
       {
-        name: "trigger / gesture",
+        name: "gesture",
         type: "string",
         default: "'click'",
         desc: "The gesture that removes.",
@@ -89,7 +89,7 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "edit.line.anchor({ into, threshold, channels, trigger }) → Edit",
+      "edit.line.anchor({ into, threshold, channels, gesture }) → Edit",
     ],
     options: [
       {
@@ -109,7 +109,7 @@ export const api: ApiEntry[] = [
         desc: "Proximity radius for the nearest-line resolution.",
       },
       {
-        name: "trigger",
+        name: "gesture",
         type: "string",
         default: "'click'",
         desc: "The gesture that adds a point.",
@@ -125,7 +125,7 @@ export const api: ApiEntry[] = [
     name: "edit.line.newSeries(options)",
     summary: "Seeds a whole flat line at once — one anchor per sampled domain position, at the clicked value.",
     signatures: [
-      "edit.line.newSeries({ along, value, samples, trigger }) → Edit",
+      "edit.line.newSeries({ along, value, samples, gesture }) → Edit",
     ],
     options: [
       {
@@ -141,7 +141,7 @@ export const api: ApiEntry[] = [
         desc: "Domain positions to seed (see resolveSamples).",
       },
       {
-        name: "trigger",
+        name: "gesture",
         type: "string",
         default: "'dblclick'",
         desc: "The gesture that seeds a line.",
@@ -157,11 +157,11 @@ export const api: ApiEntry[] = [
     name: "edit.line.removeSeries(options)",
     summary: "Deletes a whole line — reads the target’s series key and filters out every datum sharing it.",
     signatures: [
-      "edit.line.removeSeries({ trigger, when }) → Edit",
+      "edit.line.removeSeries({ gesture, when }) → Edit",
     ],
     options: [
       {
-        name: "trigger",
+        name: "gesture",
         type: "string",
         default: "'click'",
         desc: (

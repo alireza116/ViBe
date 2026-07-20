@@ -7,11 +7,12 @@ import { collectEdits, resolveChannels, warnMisplacedEdits } from '../edit/route
 import { markCenter, nudgeTarget } from '../edit/shared.js';
 import { encodeChannel } from '../plot/mark.js';
 import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
-import { autoEditGuides } from '../edit/guide.js';
+import { autoEditGuides, selectEffectNodes } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer/index.js';
 import { resolveEffects } from './effects.js';
 import { resolveTheme } from './theme.js';
 import { autoAxes } from './axes.js';
+import { reserveLegends } from './legends.js';
 import { axisOf, pointerForChannel } from './encoding.js';
 
 // Dev-only builds get the capability guards below. `import.meta.env.DEV` must be
@@ -176,6 +177,10 @@ export function Elicit(spec) {
     // Flattened because a group mark (composite) desugars to an ARRAY of features.
     const axesOpt = spec.projection != null && axes === undefined ? false : axes;
     const features = [...autoAxes(userFeatures, axesOpt), ...userFeatures].flat(Infinity);
+    // Whether any feature is a space-reserving legend (core/legends.js). Static —
+    // the feature set doesn't change — so the reservation step is skipped entirely
+    // for the common no-legend chart.
+    const hasLegends = features.some((f) => f && f.isLegend);
 
     // Working dims. In 'reflow' mode `curW` tracks the container's measured width
     // (height stays the given value); 'fixed'/'scale' keep the design dims. Marks
@@ -185,8 +190,14 @@ export function Elicit(spec) {
     const designH = typeof height === 'number' ? height : 400;
     let curW = designW;
     let curH = designH;
-    let innerWidth = curW - margins.left - margins.right;
-    let innerHeight = curH - margins.top - margins.bottom;
+    // Author margins are the outer padding / axis room. Legends RESERVE extra space
+    // on their side (see core/legends.js), so the engine works with EFFECTIVE
+    // margins = author margins + each side's legend band. Recomputed every render;
+    // equals the author margins when there are no legends.
+    const authorMargins = margins;
+    let effectiveMargins = { ...authorMargins };
+    let innerWidth = curW - effectiveMargins.left - effectiveMargins.right;
+    let innerHeight = curH - effectiveMargins.top - effectiveMargins.bottom;
 
     features.forEach((feature, index) => {
         if (!feature.id) feature.id = `feature-${index}`;
@@ -263,6 +274,7 @@ export function Elicit(spec) {
         currentStage = n;
         ui.session = {};
         ui.preview = null;
+        ui.selection.clear(); // selection is per-stage transient, like the session
         for (const cb of listeners.stage) cb(currentStage, stageLabelOf(currentStage));
     };
 
@@ -277,14 +289,32 @@ export function Elicit(spec) {
     // belief store, `onChange`, or `getData`. Cleared on commit, hoverout, and stage
     // change. Per-feature (not one global slot) so two probe marks can't clobber
     // each other's ghost.
-    /** @type {{ session: Record<string, any>, preview: Record<string, any[]> | null }} */
-    const ui = { session: {}, preview: null };
+    // `selection` is transient PIPELINE state: which dataset rows are currently
+    // selected, an interaction concept the engine owns — never a `selected` data
+    // column. A Set (single-exclusive today, so at most one member; a Set so
+    // multi-select is a later widening, not an API break). Written only through the
+    // selection commit path (edit.select / el.select), reset on setData/stage
+    // change, and stamped onto the scale map each render (scales.selection) so a
+    // legend/mark can target "the selected row" without a widened build signature.
+    /** @type {{ session: Record<string, any>, preview: Record<string, any[]> | null, selection: Set<number> }} */
+    const ui = { session: {}, preview: null, selection: new Set() };
+
+    // The primary selected datum index (the sole member under single-exclusive
+    // selection), or null. Stale indices — a selected row later removed — read as
+    // null rather than pointing at a shifted row.
+    const selectionPrimary = () => {
+        for (const i of ui.selection) {
+            if (i >= 0 && i < dataset.length) return i;
+        }
+        return null;
+    };
 
     // Caller-facing observers. `change` fires on every committed edit; `stage` fires
-    // when setStage advances (Phase 2). Attached to the returned container as
-    // `.on('change' | 'stage', cb)`.
-    /** @type {{ change: Set<Function>, stage: Set<Function> }} */
-    const listeners = { change: new Set(), stage: new Set() };
+    // when setStage advances; `select` fires when the selection changes (no data
+    // moved, so it is NOT a `change`). Attached to the returned container as
+    // `.on('change' | 'stage' | 'select', cb)`.
+    /** @type {{ change: Set<Function>, stage: Set<Function>, select: Set<Function> }} */
+    const listeners = { change: new Set(), stage: new Set(), select: new Set() };
 
     // ---- Undo history --------------------------------------------------------
     // An elicitation is someone's belief being drafted, so "take that back" is a
@@ -357,6 +387,46 @@ export function Elicit(spec) {
         for (const cb of listeners.change) cb(structuredClone(dataset));
     };
 
+    // Notify a selection change. Selection is not the belief data, so it is a
+    // SEPARATE channel from `change` — a `select` listener hears it, `onChange`/
+    // `getData` never do.
+    const notifySelect = () => {
+        const primary = selectionPrimary();
+        for (const cb of listeners.select) cb(primary, [...ui.selection]);
+    };
+
+    // Commit a SELECTION edit's proposal. Like a domain edit it writes engine state
+    // that ISN'T the dataset — here `ui.selection` — so it bypasses the datum
+    // splice, the data-layer constraints, AND undo history: nothing about the belief
+    // data changed, so there is nothing to take back and `onChange` stays silent.
+    // The descriptor is `{ index, exclusive, toggle }` (see edit.select). Returns
+    // whether the selection actually moved, so the dispatch reports it as a render
+    // (via shouldRender) exactly as it does for a data edit — no self-render here, so
+    // the gesture path renders once. The external el.select* wrappers, which call
+    // this OUTSIDE a dispatch, render themselves.
+    /** @param {{ index?: number | null, exclusive?: boolean, toggle?: boolean, clear?: boolean }} sel */
+    const commitSelectionEdit = (sel) => {
+        const before = [...ui.selection].join(',');
+        applySelection(sel);
+        const after = [...ui.selection].join(',');
+        if (before === after) return false;
+        notifySelect();
+        return true;
+    };
+
+    // Mutate ui.selection from a selection descriptor. Single-exclusive semantics:
+    // an `exclusive` write clears the set first; `toggle` deselects a row that is
+    // already the sole selection (click-to-toggle-off); `clear` empties it.
+    /** @param {{ index?: number | null, exclusive?: boolean, toggle?: boolean, clear?: boolean }} sel */
+    const applySelection = (sel) => {
+        if (sel.clear || sel.index == null) { ui.selection.clear(); return; }
+        const has = ui.selection.has(sel.index);
+        const sole = has && ui.selection.size === 1;
+        if (sel.exclusive !== false) ui.selection.clear();
+        if (sel.toggle && sole) return; // toggled the sole selection off — leave empty
+        ui.selection.add(sel.index);
+    };
+
     // The most recently built scene nodes per feature, so plane-pick edits can
     // hit-test against exact mark geometry and guides can look marks up by index.
     /** @type {Record<string, any[]>} */
@@ -391,8 +461,8 @@ export function Elicit(spec) {
     // only) re-measure the container's width from the parent. Returns whether the
     // width actually changed, so a resize can skip a redundant re-render.
     const recomputeInner = () => {
-        innerWidth = curW - margins.left - margins.right;
-        innerHeight = curH - margins.top - margins.bottom;
+        innerWidth = curW - effectiveMargins.left - effectiveMargins.right;
+        innerHeight = curH - effectiveMargins.top - effectiveMargins.bottom;
         dims.width = innerWidth;
         dims.height = innerHeight;
     };
@@ -414,6 +484,26 @@ export function Elicit(spec) {
         measure(); // reflow: pick up the container's current width before drawing
         scene.clear();
 
+        // Legend reservation: a legend on a side shrinks the plot to make room. A
+        // legend's band depends only on its scale's DOMAIN (label count / extent),
+        // not on the pixel dims — so one provisional resolve gives the domains, we
+        // reserve the bands, inflate the author margins, and recompute the inner
+        // rect before the real resolve below. No feedback loop, so no iteration.
+        if (hasLegends) {
+            effectiveMargins = { ...authorMargins };
+            recomputeInner();
+            const provisional = resolveScales(features, dataset, liveSpec, dims);
+            /** @type {any} */ (provisional).theme = theme; // measure reads legend font tokens
+            const bands = reserveLegends(features, provisional, authorMargins);
+            effectiveMargins = {
+                top: authorMargins.top + bands.top,
+                right: authorMargins.right + bands.right,
+                bottom: authorMargins.bottom + bands.bottom,
+                left: authorMargins.left + bands.left,
+            };
+            recomputeInner();
+        }
+
         // Re-resolve global scales so inferred domains follow the live data, and
         // an edited schema domain (edit.axis.*) reshapes every axis/grid/mark.
         scales = resolveScales(features, dataset, liveSpec, dims);
@@ -428,6 +518,10 @@ export function Elicit(spec) {
         // key, so every mark's build() and the guide/edit ctx read default colours,
         // fonts and affordance tokens from one object (see core/theme.js: themeOf).
         /** @type {any} */ (scales).theme = theme;
+        // The primary selected datum index rides on the scale map as one more
+        // reserved non-Scale key, so a legend/mark reads "the selected row" from the
+        // same object it already gets, without a widened build() signature.
+        /** @type {any} */ (scales).selection = selectionPrimary();
         if (DEV) warnProjectionCartesianMix(features, scales);
 
         // Plane-on-top mode: when an ACTIVE edit resolves its target from an
@@ -553,12 +647,28 @@ export function Elicit(spec) {
             });
         });
 
+        // Selection highlight: reuse the `select` EFFECT (the outline effects.js
+        // already draws for a proximity/nearest hover) to mark the selected row, so
+        // an explicit selection reads identically to a hover selection. Drawn for
+        // every non-chrome feature carrying a node at the selected index — one
+        // dataset, so a bar and its label both light up. `highlight`-only info (no
+        // px/threshold) means no snap ring, just the outline.
+        const selIndex = selectionPrimary();
+        if (selIndex != null && effects.select && effects.select.enabled !== false) {
+            for (const feature of features) {
+                if (feature.isAxis || feature.isGrid || feature.isLegend) continue;
+                const marks = featureNodes[feature.id] || [];
+                selectEffectNodes({ activeIndex: selIndex }, marks, effects.select)
+                    .forEach((/** @type {any} */ node) => { node.guide = true; scene.add(node); });
+            }
+        }
+
         renderer.render({
             container,
             scene,
             width: curW,
             height: curH,
-            margins,
+            margins: effectiveMargins,
             scales,
             spec,
             planeOnTop,
@@ -587,7 +697,7 @@ export function Elicit(spec) {
      * @param {import('../types').Edit} edit
      * @param {any} event
      * @param {number | null} index
-     * @returns {any[] | { __domain: import('../types').DomainEditResult } | null}
+     * @returns {any[] | { __domain?: import('../types').DomainEditResult, __selection?: any } | null}
      */
     const computeEdit = (feature, edit, event, index) => {
         const currentData = dataset;
@@ -615,9 +725,10 @@ export function Elicit(spec) {
             // the angular sibling of resize reading the mark centre.
             width: innerWidth,
             height: innerHeight,
-            // The chart margins, so a grow-mode axis edit recovers the outer size
-            // from an inner axis length (inner + margins). Harmless to other edits.
-            margins,
+            // The chart margins (effective: author + legend bands), so a grow-mode
+            // axis edit recovers the outer size from an inner axis length (inner +
+            // margins). Harmless to other edits.
+            margins: effectiveMargins,
             // The engine-owned dataset schema, so a mint (create) can populate
             // every declared field with its default (or null) — not just the
             // positional ones — and an axis domain edit reads a field's domain.
@@ -629,10 +740,19 @@ export function Elicit(spec) {
             // resolve WHICH line a plane gesture means. Harmless to other edits.
             seriesKey: feature.seriesKey || null,
             marks: featureNodes[feature.id] || [],
-            // The line's ordering knob and the engine's per-drag lock, for a `draw`
-            // (create-as-you-drag) edit. Harmless to every other edit.
+            // The line's ordering knob and the engine's per-gesture driver session
+            // (zone/handle locks, draw mode), for edits that read their driver's
+            // lock (draw, brushSpan/brushRect, axis.scale). Harmless to the rest.
             order: feature.order || null,
-            drawState: (ui.session && ui.session[feature.id]) || null
+            session: (ui.session && ui.session[feature.id]) || null,
+            // The primary selected datum index (transient pipeline state), so an
+            // edit's apply/when can target or arbitrate on the selection — e.g. a
+            // `select` edit that reads whether the touched row is already selected.
+            selection: selectionPrimary(),
+            // The edit itself, so a `when` predicate can arbitrate against the
+            // edit's own knobs (when.near reads its `threshold`). Descriptors are
+            // data; self-reference adds no dispatch path.
+            edit
         };
         if (edit.when && !edit.when(ctx)) return null; // arbitration
 
@@ -647,6 +767,16 @@ export function Elicit(spec) {
         if (edit.target === 'domain') {
             return (result && typeof result === 'object' && result.domains)
                 ? /** @type {any} */ ({ __domain: result })
+                : null;
+        }
+
+        // A SELECTION edit (edit.select) writes transient pipeline state, not the
+        // dataset: apply returns a { __select } descriptor. Same shape as the domain
+        // path — it bypasses the datum-splice, the data constraints, and undo — but
+        // its destination is ui.selection. runEdit's selection-commit path handles it.
+        if (edit.target === 'selection') {
+            return (result && typeof result === 'object' && result.__select)
+                ? /** @type {any} */ ({ __selection: result.__select })
                 : null;
         }
 
@@ -699,6 +829,10 @@ export function Elicit(spec) {
         // A domain edit reshapes the schema (and maybe the dataset / chart size).
         if (proposed && !Array.isArray(proposed) && proposed.__domain) {
             return commitDomainEdit(proposed.__domain);
+        }
+        // A selection edit writes ui.selection, not the belief data.
+        if (proposed && !Array.isArray(proposed) && proposed.__selection) {
+            return commitSelectionEdit(proposed.__selection);
         }
         recordHistory();
         dataset = /** @type {any[]} */ (proposed);
@@ -957,6 +1091,7 @@ export function Elicit(spec) {
         dataset = structuredClone(data);
         seedCount = dataset.length;
         ui.preview = null;
+        ui.selection.clear(); // a reseed's row indices are new; drop the old selection
         // A reseed is a new starting point, not an edit: there is nothing sensible
         // to undo BACK to (and undoing past it would resurrect rows the caller
         // replaced, under a lock that no longer covers them).
@@ -965,6 +1100,50 @@ export function Elicit(spec) {
         endTxn();
         update();
     };
+
+    // ── Selection: read/drive the transient selection from outside ────────────
+    // Selection is pipeline state, not data — so it has its own small API beside
+    // getData/setData, and its own `select` event. Driving it externally goes
+    // through the SAME applySelection the edit.select gesture does, so an external
+    // <select>, a keyboard, or a click all leave the selection in one shape.
+
+    // The primary selected index (number) or null. The counterpart of getData for
+    // selection; a caller reads it to drive its own UI (which row is highlighted).
+    el.getSelection = () => selectionPrimary();
+
+    // Drive the selection from outside, then render. Each wrapper renders itself (it
+    // runs OUTSIDE the dispatch, which is what renders the gesture path), and returns
+    // whether the selection moved.
+    /** @param {{ index?: number | null, exclusive?: boolean, toggle?: boolean, clear?: boolean }} sel */
+    const driveSelection = (sel) => {
+        const moved = commitSelectionEdit(sel);
+        if (moved) update();
+        return moved;
+    };
+
+    // Select a SPECIFIC ITEM by dataset index (the external counterpart of clicking
+    // a mark). `null` (or a negative / out-of-range index) clears the selection.
+    // Exclusive: the named row becomes the sole selection, replacing whatever was
+    // selected.
+    el.select = (/** @type {number | null} */ index) => {
+        const i = index == null || index < 0 || index >= dataset.length ? null : index;
+        return driveSelection({ index: i, exclusive: true, toggle: false, clear: i == null });
+    };
+
+    // Select by CATEGORY / predicate: pick the first row matching `{ field: value }`
+    // (or a predicate function) and select it. This is the "select a category"
+    // entry point — an external control names a value, the chart finds and selects
+    // the row carrying it. No match clears the selection.
+    el.selectWhere = (/** @type {any} */ where, /** @type {any} */ value) => {
+        const match = typeof where === 'function'
+            ? /** @type {(d: any, i: number) => boolean} */ (where)
+            : (/** @type {any} */ d) => d && d[where] === value;
+        const i = dataset.findIndex(match);
+        return el.select(i < 0 ? null : i);
+    };
+
+    // Clear the selection entirely.
+    el.clearSelection = () => driveSelection({ index: null, clear: true });
 
     // ── External control: drive an edit from outside the chart ────────────────
     // An external controller (a slider, a `<select>`, a rotate icon, a plain
@@ -1164,7 +1343,7 @@ export function Elicit(spec) {
         return true;
     };
     // Subscribe to committed changes; returns an unsubscribe function.
-    el.on = (/** @type {'change' | 'stage'} */ type, /** @type {Function} */ cb) => {
+    el.on = (/** @type {'change' | 'stage' | 'select'} */ type, /** @type {Function} */ cb) => {
         listeners[type].add(cb);
         return () => listeners[type].delete(cb);
     };

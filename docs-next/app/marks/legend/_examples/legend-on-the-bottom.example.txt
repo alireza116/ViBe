@@ -1,0 +1,20 @@
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 20, right: 20, bottom: 30, left: 40 },
+  data: [
+    { x: 1, y: 3, group: "A" }, { x: 2, y: 5, group: "B" },
+    { x: 3, y: 2, group: "C" }, { x: 4, y: 6, group: "A" },
+    { x: 5, y: 4, group: "B" }, { x: 6, y: 7, group: "C" },
+  ],
+  schema: {
+    x: { type: "quantitative", domain: [0, 7] },
+    y: { type: "quantitative", domain: [0, 8] },
+    group: { type: "categorical", domain: ["A", "B", "C"] },
+  },
+  features: [
+    point({ size: 7, channels: { x: { field: "x" }, y: { field: "y" }, fill: { field: "group" } } }),
+    // anchor:'bottom' lays the swatches out in a row and reserves space below
+    // the x-axis (offset past the author's bottom margin, so it clears the axis).
+    legendColor({ anchor: "bottom" }),
+  ],
+}))

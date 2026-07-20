@@ -94,7 +94,7 @@ export const api: ApiEntry[] = [
         default: "—",
         desc: (
           <>
-            Normalize a partial spec into a full descriptor. Defaults: <code className="inline">gesture: "drag"</code>, <code className="inline">pick: "direct"</code>, <code className="inline">channels: null</code> (inject the channel it’s placed on).
+            Normalize a partial spec into a full descriptor. Defaults: <code className="inline">gesture: "drag"</code>, <code className="inline">pick: "direct"</code>, <code className="inline">channels: null</code> (inject the channel it’s placed on). Keys the descriptor doesn’t know pass through onto the edit — the sanctioned way a custom driver carries per-edit options (the built-ins’ <code className="inline">edgeInset</code> works the same way).
           </>
         ),
       },

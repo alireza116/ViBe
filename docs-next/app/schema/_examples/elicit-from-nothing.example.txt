@@ -17,7 +17,7 @@ mount(Elicit({
         fill: { field: "class" },
       },
       edits: [
-        create({ trigger: "dblclick" }),
+        create({ gesture: "dblclick" }),
         drag({ channels: ["x", "y"] }),
         cycle({ channel: "fill", gesture: "click" }),
       ],

@@ -1,0 +1,78 @@
+// Selection is pipeline state, so it has its own external API beside the data —
+// no `selected` column. `el.select(index)` picks a SPECIFIC ITEM; `el.selectWhere`
+// picks by CATEGORY (the first row matching a field/value). Clicking a bar selects
+// it too (edit.select), and `on("select")` reports whichever way it moved. The
+// legend then edits the SELECTED bar's group.
+const chart = Elicit({
+  width: 360, height: 210,
+  margins: { top: 16, right: 16, bottom: 28, left: 36 },
+  data: [
+    { name: "A", value: 12, group: "North" },
+    { name: "B", value: 8,  group: "South" },
+    { name: "C", value: 15, group: "North" },
+    { name: "D", value: 6,  group: "South" },
+  ],
+  schema: {
+    name: { type: "categorical", domain: ["A", "B", "C", "D"] },
+    group: { type: "categorical", domain: ["North", "South"] },
+    value: { type: "quantitative", domain: [0, 16] },
+  },
+  features: [
+    barY({
+      channels: {
+        x: { field: "name" },
+        y: { field: "value" },
+        fill: { field: "group" },
+      },
+      edits: [ select() ],           // click a bar to select it
+    }),
+    legendColor({ anchor: "right", title: "group", edit: edit.legend() }),
+  ],
+});
+mount(chart);
+
+const controls = document.createElement("div");
+controls.style.cssText = "display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px;font:13px system-ui";
+
+// Select a SPECIFIC ITEM by its name (→ el.selectWhere on the `name` field).
+const item = document.createElement("select");
+for (const d of chart.getData()) {
+  const o = document.createElement("option");
+  o.value = d.name; o.textContent = d.name; item.append(o);
+}
+item.onchange = () => chart.selectWhere("name", item.value);
+const itemWrap = document.createElement("label");
+itemWrap.style.cssText = "display:flex;gap:6px;align-items:center";
+itemWrap.append("item", item);
+
+// Select a CATEGORY — the first bar in a group (→ el.selectWhere on `group`).
+const cat = document.createElement("select");
+for (const g of ["North", "South"]) {
+  const o = document.createElement("option");
+  o.value = g; o.textContent = g; cat.append(o);
+}
+const catBtn = document.createElement("button");
+catBtn.textContent = "select group";
+catBtn.onclick = () => chart.selectWhere("group", cat.value);
+const catWrap = document.createElement("label");
+catWrap.style.cssText = "display:flex;gap:6px;align-items:center";
+catWrap.append("group", cat, catBtn);
+
+// Clear.
+const clear = document.createElement("button");
+clear.textContent = "clear";
+clear.onclick = () => chart.clearSelection();
+
+const readout = document.createElement("span");
+readout.style.cssText = "margin-left:auto;color:#6b7280";
+
+controls.append(itemWrap, catWrap, clear, readout);
+mount(controls);
+
+// on("select") hears selection changes — never `change`, since no data moved.
+chart.on("select", (i) => {
+  const d = i == null ? null : chart.getData()[i];
+  readout.textContent = d ? `selected: ${d.name} (${d.group})` : "nothing selected";
+  if (d) item.value = d.name;
+});
+readout.textContent = "nothing selected";

@@ -93,6 +93,7 @@ async function main() {
             '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
             '/marks/dotstack', '/marks/waffle', '/marks/cone', '/marks/needle',
             '/marks/axis-radial', '/marks/arc', '/marks/geo', '/marks/trend', '/marks/axes',
+            '/marks/legend',
             '/editing', '/editing/gestures', '/editing/sweep', '/editing/lock',
             '/editing/existence', '/editing/probe', '/editing/stages', '/editing/axis',
             '/editing/external-controls',
@@ -472,6 +473,33 @@ async function main() {
             Math.abs(undone[0].y - beforeDrag[0].y) < 0.01,
             `${afterDrag[0].y} -> ${undone[0].y}, expected ${beforeDrag[0].y}`);
 
+        // ---- brushSpan honours a custom edgeInset (/marks/bar #span) -------
+        // edgeInset used to be silently dropped by makeEdit (only canonical keys
+        // survived), so the brush driver always fell back to its 8px default. The
+        // Gantt example passes edgeInset: 10 — a grab 9px inside an edge is an
+        // EDGE grab only if the custom inset reached the driver; with the dropped
+        // option it classified as body and translated BOTH fields.
+        console.log('\nbrushSpan edgeInset (/marks/bar)');
+        const spanRows = () => page.$$eval('#span .chart > div', (els) => els[1].getData());
+        const ganttBar = page.locator('#span .chart').nth(1).locator('svg rect.mark').first();
+        await ganttBar.scrollIntoViewIfNeeded();
+        const gBox = await ganttBar.boundingBox();
+        const sBefore = await spanRows();
+        const gx = gBox.x + gBox.width - 9; // 9px inside the right edge
+        const gy = gBox.y + gBox.height / 2;
+        await page.mouse.move(gx, gy);
+        await page.mouse.down();
+        for (let k = 1; k <= 6; k++) await page.mouse.move(gx + k * 5, gy);
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const sAfter = await spanRows();
+        check('brushSpan: custom edgeInset makes it an edge grab (start untouched)',
+            Math.abs(sAfter[0].start - sBefore[0].start) < 0.01,
+            `start ${sBefore[0].start} -> ${sAfter[0].start}`);
+        check('brushSpan: the grabbed edge resized outward',
+            sAfter[0].end > sBefore[0].end + 5,
+            `end ${sBefore[0].end} -> ${sAfter[0].end}`);
+
         // ---- Undo/redo, driven the way a caller would ----------------------
         // The docs page wires real buttons off canUndo()/canRedo(); that wiring is
         // the part an app copies, so drive the buttons rather than the methods.
@@ -846,6 +874,180 @@ async function main() {
         await page.waitForTimeout(150);
         const mxGone = await mxChart.locator('svg [data-ghost]').count();
         check('matrix: leaving clears the ghost (no stale preview)', mxGone === 0, `ghosts=${mxGone}`);
+
+        // ---- Legend: reserves space + pickers write back ------------------
+        // A legend is the first chrome that RESERVES space (shrinks the plot), and
+        // its pickers write to the dataset through the normal edit pipeline. Both
+        // are invisible to typecheck: reservation is a layout negotiation, and the
+        // pickers are direct-pick on nodes out in the reserved margin band, where
+        // the interaction plane doesn't reach.
+        console.log('\nLegend (/marks/legend)');
+        await open('/marks/legend', '#discrete .chart svg rect.plane');
+
+        // Reservation: the plot's interaction plane (== inner width) must be smaller
+        // than the no-legend inner width (svg width - author margins 40+16 = 324),
+        // proving the right legend band shrank the plot instead of overlapping it.
+        const disc = await page.$eval('#discrete .chart svg', (svg) => ({
+            svgW: Number(svg.getAttribute('width')),
+            planeW: Number(svg.querySelector('rect.plane')?.getAttribute('width')),
+        }));
+        check('legend: reserves space (plane narrower than no-legend inner)',
+            disc.planeW > 150 && disc.planeW < 300, `plane ${disc.planeW}, svg ${disc.svgW}`);
+
+        // Colours: inert legend chips live in the background layer (bg-rect). Their
+        // fills must be the fill-scale palette — the same colours the bars encode —
+        // otherwise a missing bg-rect paint path would leave labels with no chips.
+        const colours = await page.$eval('#discrete .chart svg', (svg) => {
+            const swatches = [...svg.querySelectorAll('rect.bg-rect')]
+                .filter((r) => r.getAttribute('fill') && r.getAttribute('fill') !== 'none')
+                .map((r) => r.getAttribute('fill'));
+            const bars = [...svg.querySelectorAll('rect.mark')]
+                .map((r) => r.getAttribute('fill'));
+            return { swatches, bars };
+        });
+        check('legend: draws one coloured swatch per category',
+            colours.swatches.length === 4, `swatches=${JSON.stringify(colours.swatches)}`);
+        check('legend: swatch colours match the fill channel (bars)',
+            colours.swatches.length === colours.bars.length
+            && colours.swatches.every((c, i) => c === colours.bars[i]),
+            `swatches=${JSON.stringify(colours.swatches)} bars=${JSON.stringify(colours.bars)}`);
+
+        // Category picker: clicking a swatch sets the field to that category. Swatch
+        // DOM order === domain order [A,B,C,D]; nth(2) is "C".
+        const groupOf = () => page.$eval('#picker .data-body', (el) => {
+            const m = el.textContent.match(/group:\s*"([^"]+)"/);
+            return m ? m[1] : null;
+        });
+        await page.locator('#picker .chart svg').scrollIntoViewIfNeeded();
+        const groupBefore = await groupOf();
+        const swatches = page.locator('#picker .chart svg rect.mark');
+        const swatchCount = await swatches.count();
+        check('legend: draws one interactive swatch per category', swatchCount === 4, `swatches=${swatchCount}`);
+        await swatches.nth(2).click();
+        await page.waitForTimeout(120);
+        const groupAfter = await groupOf();
+        check('legend: clicking a swatch sets the category',
+            groupBefore === 'A' && groupAfter === 'C', `${groupBefore} -> ${groupAfter}`);
+
+        // Continuous value picker: dragging the ramp handle DOWN (toward the low end
+        // of a vertical ramp) lowers the value, clamped into [0,30]. The handle is
+        // the rightmost circle mark (the point sits in the plot, the handle in the
+        // band).
+        const tempOf = () => page.$eval('#value .data-body', (el) => {
+            const m = el.textContent.match(/temp:\s*(-?\d+(?:\.\d+)?)/);
+            return m ? Number(m[1]) : null;
+        });
+        await page.locator('#value .chart svg').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const handleBox = await page.$$eval('#value .chart svg circle.mark', (cs) => {
+            const svg = cs[0].ownerSVGElement.getBoundingClientRect();
+            let best = null;
+            for (const c of cs) {
+                const r = c.getBoundingClientRect();
+                const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+                if (!best || cx > best.cx) best = { cx, cy };
+            }
+            return best ? { cx: best.cx, cy: best.cy, svgTop: svg.top } : null;
+        });
+        const tempBefore = await tempOf();
+        check('legend: ramp renders a draggable handle', handleBox != null, `handle=${JSON.stringify(handleBox)}`);
+        if (handleBox) {
+            await page.mouse.move(handleBox.cx, handleBox.cy);
+            await page.mouse.down();
+            for (let k = 1; k <= 12; k++) await page.mouse.move(handleBox.cx, handleBox.cy + k * 5);
+            await page.mouse.up();
+            await page.waitForTimeout(120);
+            const tempAfter = await tempOf();
+            check('legend: dragging the ramp handle lowers the value (by-hand invert)',
+                tempBefore != null && tempAfter != null && tempAfter < tempBefore - 3 && tempAfter >= 0,
+                `temp ${tempBefore} -> ${tempAfter}`);
+        }
+
+        // ---- Selection as pipeline state (pick-and-edit) ------------------
+        // Clicking a bar SELECTS it (edit.select) — selection is transient engine
+        // state, never a `selected` data column — and the legend then edits the
+        // SELECTED row. Only real pointer events prove the select/toggle/exclusive
+        // state machine, and that the legend targets the selection (not row 0).
+        console.log('\nSelection: pick-and-edit (/marks/legend #dynamic-target)');
+        const selEl = '#dynamic-target .chart > div';
+        const selData = () => page.$eval(selEl, (el) => el.getData());
+        const selIndex = () => page.$eval(selEl, (el) => el.getSelection());
+        await page.locator('#dynamic-target .chart svg').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+
+        // Bars are always rect.mark (the tall rects in the plot). Legend swatches
+        // become interactive rect.mark ONLY once a row is selected (before that the
+        // legend has no target row, so its swatches stay inert bg-rects) — which is
+        // itself the point, so query them after a selection exists.
+        const markCentres = (filter) => page.$$eval('#dynamic-target .chart svg rect.mark',
+            (rs, hi) => rs.filter((r) => { const h = Number(r.getAttribute('height')); return hi ? h > 20 : Math.abs(h - 14) < 1; })
+                .map((r) => { const b = r.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }),
+            filter === 'bar');
+        const bars = await markCentres('bar');
+        check('select: four bars to pick from', bars.length === 4, `bars=${bars.length}`);
+
+        const beforeSel = await selData();
+        check('select: the dataset carries no `selected` column',
+            beforeSel.every((d) => !('selected' in d)), JSON.stringify(beforeSel[0]));
+
+        // Click bar A → selected index 0.
+        await page.mouse.click(bars[0].x, bars[0].y);
+        await page.waitForTimeout(100);
+        check('select: clicking a bar selects it', (await selIndex()) === 0, `sel=${await selIndex()}`);
+
+        // Click bar B → the exclusive selection MOVES.
+        await page.mouse.click(bars[1].x, bars[1].y);
+        await page.waitForTimeout(100);
+        check('select: exclusive — selecting another moves the selection', (await selIndex()) === 1, `sel=${await selIndex()}`);
+
+        // Click bar B again → toggles OFF.
+        await page.mouse.click(bars[1].x, bars[1].y);
+        await page.waitForTimeout(100);
+        check('select: clicking the selected bar deselects it', (await selIndex()) === null, `sel=${await selIndex()}`);
+
+        // Select bar C (index 2, group "East"), then click the "South" swatch
+        // (domain order North/South/East/West → index 1). The legend must edit ROW 2
+        // (the selection), leaving row 0 untouched — proving it targets the selection
+        // rather than the old default row 0.
+        await page.mouse.click(bars[2].x, bars[2].y);
+        await page.waitForTimeout(100);
+        check('select: bar C is now selected', (await selIndex()) === 2, `sel=${await selIndex()}`);
+        // With a row selected, the legend's swatches turn interactive.
+        const swatchBoxes = await markCentres('swatch');
+        check('select: a selection makes the legend swatches interactive', swatchBoxes.length === 4, `swatches=${swatchBoxes.length}`);
+        const g0Before = (await selData())[0].group, g2Before = (await selData())[2].group;
+        await page.mouse.click(swatchBoxes[1].x, swatchBoxes[1].y);
+        await page.waitForTimeout(120);
+        const selAfter = await selData();
+        check('select: the legend edits the SELECTED row (row 2), not row 0',
+            g2Before === 'East' && selAfter[2].group === 'South' && selAfter[0].group === g0Before,
+            `row2 ${g2Before}->${selAfter[2].group}, row0 ${g0Before}->${selAfter[0].group}`);
+        check('select: editing through the legend still writes no `selected` column',
+            selAfter.every((d) => !('selected' in d)), JSON.stringify(selAfter[2]));
+
+        // ---- Selection: external API (item + category) --------------------
+        // el.select(index) picks a SPECIFIC item; el.selectWhere(field, value) picks
+        // a CATEGORY (first match). Both go through the same commit a click does.
+        console.log('\nSelection: external API (/editing/external-controls #selection)');
+        await open('/editing/external-controls', '#selection .chart svg');
+        const xsel = '#selection .chart > div';
+        await page.locator('#selection .chart svg').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const xIndex = () => page.$eval(xsel, (el) => el.getSelection());
+        const xData = () => page.$eval(xsel, (el) => el.getData());
+
+        const s1 = await page.$eval(xsel, (el) => el.select(2));
+        check('el.select: selects a specific item by index', s1 === true && (await xIndex()) === 2, `sel=${await xIndex()}`);
+
+        await page.$eval(xsel, (el) => el.selectWhere('group', 'South'));
+        check('el.selectWhere: selects the first row of a category (index 1)',
+            (await xIndex()) === 1, `sel=${await xIndex()}`);
+
+        await page.$eval(xsel, (el) => el.clearSelection());
+        check('el.clearSelection: deselects', (await xIndex()) === null, `sel=${await xIndex()}`);
+
+        check('selection: never writes the dataset (no `selected` column)',
+            (await xData()).every((d) => !('selected' in d)), JSON.stringify((await xData())[0]));
 
         // ---- Theming: tokens reach the pixels ------------------------------
         // The theme's `ink` recolours unstyled marks, and theme.marks[name]

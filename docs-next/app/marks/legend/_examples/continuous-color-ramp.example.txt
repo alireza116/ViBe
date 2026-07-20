@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 380, height: 240,
+  margins: { top: 20, right: 16, bottom: 32, left: 44 },
+  data: [
+    { hour: 0, temp: 4 },  { hour: 3, temp: 6 },  { hour: 6, temp: 9 },
+    { hour: 9, temp: 16 }, { hour: 12, temp: 24 }, { hour: 15, temp: 27 },
+    { hour: 18, temp: 19 }, { hour: 21, temp: 11 },
+  ],
+  schema: {
+    hour: { type: "quantitative", domain: [0, 24] },
+    temp: { type: "quantitative", domain: [0, 30] },
+  },
+  features: [
+    point({
+      size: 8,
+      channels: {
+        x: { field: "hour" },
+        y: { field: "temp" },
+        // A quantitative fill resolves to a SEQUENTIAL colour scale, so the
+        // legend draws a gradient ramp with ticks instead of swatches.
+        fill: { field: "temp" },
+      },
+    }),
+    legendColor({ anchor: "right", title: "temp" }),
+  ],
+}))

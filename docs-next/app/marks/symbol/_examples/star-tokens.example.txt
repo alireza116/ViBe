@@ -7,7 +7,7 @@ mount(Elicit({
     dotStack({
       symbol: "⭐", size: 12,
       channels: { x: { field: "rating" } },
-      edits: [ create({ trigger: "click", channels: ["x"] }), remove() ],
+      edits: [ create({ gesture: "click", channels: ["x"] }), remove() ],
       constraints: [ count({ max: 24 }) ],
     }),
   ],

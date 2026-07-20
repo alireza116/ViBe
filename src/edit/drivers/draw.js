@@ -4,7 +4,7 @@
 // existing line -> 'edit' (sweep that series); empty space (or into:'new') ->
 // 'draw' (a fresh series, points laid down as the pointer moves). The lock (mode
 // + series + pointer/domain trail) lives in the feature's session; the draw
-// edit's apply() reads it via ctx.drawState. So one gesture both reshapes drawn
+// edit's apply() reads it via ctx.session. So one gesture both reshapes drawn
 // lines and draws new ones.
 
 import { nearestSeries, pickThreshold } from '../pick.js';

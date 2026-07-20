@@ -8,8 +8,6 @@
 // edit's apply() maps a gesture -> that channel's data, through the SAME scale.
 
 import { makeEdit, markCenter, schemaDefaults, resolveMarkNode, invertChannel, recenterSpan } from './shared.js';
-// The swatch grid edit.legend hit-tests is the same one guides.legend draws.
-import { legendLayout } from '../guides/legend.js';
 import { axisOf, pointerDegrees, unwrapDegrees } from '../core/encoding.js';
 
 /**
@@ -17,16 +15,14 @@ import { axisOf, pointerDegrees, unwrapDegrees } from '../core/encoding.js';
  * On x AND y it's a 2D move; on y alone it's a bar drag. On `angle` (with a mark
  * centre) it is a rotate. Works on any invertible scale (linear pixel, band ->
  * nearest category) via scale.invertValue.
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function drag(options = {}) {
-    const { channel, channels, ...rest } = options;
     return makeEdit({
         type: 'drag',
         gesture: 'drag',
-        channels: channels || (channel ? [channel] : null),
-        ...rest,
+        ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const next = { ...ctx.datum };
             const center = markCenter(resolveMarkNode(ctx));
@@ -46,16 +42,14 @@ export function drag(options = {}) {
  * each tick recenters the mark's CURRENT pixel span on the pointer (no
  * dragstart/delta tracking) — the same "gesture sets the absolute value"
  * model `drag` already uses, just applied to two fields at once.
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function dragSpan(options = {}) {
-    const { channels, ...rest } = options;
     return makeEdit({
         type: 'dragSpan',
         gesture: 'drag',
-        channels: channels || null,
-        ...rest,
+        ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const [chA, chB] = ctx.channels;
             const node = resolveMarkNode(ctx);
@@ -72,8 +66,8 @@ export function dragSpan(options = {}) {
  * body translates both together (like `dragSpan`). Which zone a gesture means
  * is resolved once, at dragstart, by the `brush` driver (src/edit/drivers/
  * brush.js) — this apply() is stateless per tick, just branching on the
- * driver's lock (`ctx.drawState.zone`), exactly how `draw()` (line.js) reads
- * its own driver-set `ctx.drawState` to pick edit-vs-draw behavior.
+ * driver's lock (`ctx.session.zone`), exactly how `draw()` (line.js) reads
+ * its own driver-set `ctx.session` to pick edit-vs-draw behavior.
  *
  * x1 is not guaranteed to stay the smaller of the pair mid-gesture (dragging
  * an edge past the other is allowed, and renders fine — bar.js's rect always
@@ -82,28 +76,27 @@ export function dragSpan(options = {}) {
  * swaps the two field VALUES if they ended up inverted — a one-time, purely
  * data-side cleanup that changes nothing on screen (rendering is already
  * order-agnostic), so it can't cause the mid-drag jump a per-tick sort would.
- * @param {any} [options]
+ * @param {import('../types').BrushSpanOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function brushSpan(options = {}) {
     // `pick` is dropped, not just defaulted: brushSpan only works with the brush
-    // driver (it reads ctx.drawState.zone, which only that driver sets), so
+    // driver (it reads ctx.session.zone, which only that driver sets), so
     // unlike other edits it can't be repointed at a different pick strategy.
-    const { channels, edgeInset, pick: _pick, ...rest } = options;
+    // `edgeInset` is a driver-only knob: makeEdit passes it through onto the
+    // descriptor, where the brush driver reads it (edgeInsetOf), the same way
+    // pickThreshold reads edit.threshold.
+    const { pick: _pick, ...rest } = options;
     return makeEdit({
         type: 'brushSpan',
         gesture: 'drag',
-        channels: channels || null,
-        // Not a standard Edit field; the brush driver reads edit.edgeInset
-        // directly (the same way pickThreshold reads edit.threshold).
-        edgeInset,
         ...rest,
         pick: 'brush',
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const [chA, chB] = ctx.channels;
             const datum = ctx.datum;
             if (!chA || !chB || !datum) return undefined;
-            const zone = ctx.drawState && ctx.drawState.zone;
+            const zone = ctx.session && ctx.session.zone;
             if (!zone) return undefined; // driver sets the lock on dragstart
 
             if (zone === 'canonicalize') {
@@ -120,7 +113,7 @@ export function brushSpan(options = {}) {
             }
 
             // zone is an edge lock: the driver names which physical field it grabbed.
-            const lockedField = ctx.drawState && ctx.drawState.field;
+            const lockedField = ctx.session && ctx.session.field;
             const target = lockedField === chA.field ? chA
                 : lockedField === chB.field ? chB : null;
             if (!target) return undefined;
@@ -138,7 +131,7 @@ export function brushSpan(options = {}) {
  * the whole rect. Which zone a gesture means is classified ONCE at dragstart by the
  * brushRect driver (src/edit/drivers/brushRect.js) and locked in the feature's
  * session for the gesture — this apply() is stateless per tick, branching on the
- * driver's lock (`ctx.drawState.zone` + `ctx.drawState.fields`), exactly like
+ * driver's lock (`ctx.session.zone` + `ctx.session.fields`), exactly like
  * brushSpan reads its 1-D lock.
  *
  * Editing is OPT-IN and composable, via two options the driver reads directly (the
@@ -154,23 +147,26 @@ export function brushSpan(options = {}) {
  * (dragging an edge past its partner is fine — rect.js always takes min/max). At
  * dragend the driver re-invokes with `zone:'canonicalize'`, a one-time data cleanup
  * that swaps any inverted pair's VALUES (on both axes) with no visual change.
- * @param {any} [options]
+ * @param {import('../types').BrushRectOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function brushRect(options = {}) {
     // `pick` is dropped (brushRect only works with its driver, which sets the
-    // zone lock). `resize`/`move`/`edgeInset` are driver-only knobs: makeEdit keeps
-    // only canonical Edit fields, so they're attached to the descriptor AFTER it's
-    // built (the driver reads them off the edit object, like edgeInsetOf does).
-    const { channels, edgeInset, resize = 'both', move = true, pick: _pick, ...rest } = options;
-    const edit = makeEdit({
+    // zone lock). `resize`/`move`/`edgeInset` are driver-only knobs: makeEdit
+    // passes them through onto the descriptor, where the driver reads them
+    // (like edgeInsetOf does). `resize`/`move` are re-stated so their defaults
+    // land on the descriptor even when the caller omits them.
+    const { resize = 'both', move = true, pick: _pick, ...rest } = options;
+    return makeEdit({
         type: 'brushRect',
         gesture: 'drag',
-        channels: channels || ['x1', 'x2', 'y1', 'y2'],
+        channels: ['x1', 'x2', 'y1', 'y2'],
         ...rest,
+        resize,
+        move,
         pick: 'brushRect',
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const zone = ctx.drawState && ctx.drawState.zone;
+            const zone = ctx.session && ctx.session.zone;
             const datum = ctx.datum;
             if (!zone || !datum) return undefined;
 
@@ -209,7 +205,7 @@ export function brushRect(options = {}) {
             }
 
             // edge / corner: the driver named which field(s) the grab locked.
-            const fields = (ctx.drawState && ctx.drawState.fields) || [];
+            const fields = (ctx.session && ctx.session.fields) || [];
             const out = { ...datum };
             let placed = false;
             for (const ch of ctx.channels) {
@@ -222,28 +218,20 @@ export function brushRect(options = {}) {
             return placed ? out : undefined;
         }
     });
-    // Attach the driver-only knobs (dropped by makeEdit's canonical filter).
-    const e = /** @type {any} */ (edit);
-    e.edgeInset = edgeInset;
-    e.resize = resize;
-    e.move = move;
-    return edit;
 }
 
 /**
  * resize — magnitude edit: the gesture's radius (distance from the mark centre)
  * inverts back to the channel's value, mirroring how the channel encodes value
  * -> radius. Usually placed on `size`.
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function resize(options = {}) {
-    const { channel, ...rest } = options;
     return makeEdit({
         type: 'resize',
         gesture: 'drag',
-        channels: channel ? [channel] : null,
-        ...rest,
+        ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const ch = ctx.channels[0];
             // resolveMarkNode, not ctx.node: a plane-pick gesture (nearest/sweep)
@@ -275,11 +263,11 @@ export function resize(options = {}) {
  * `relativeTo` names another angular channel and makes the gesture measure the
  * ABSOLUTE angular distance from that channel's current angle — the "open the
  * cone" spread gesture.
- * @param {any} [options]
+ * @param {import('../types').RotateOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function rotate(options = {}) {
-    const { channel, relativeTo, pivot = 'plot', fold = true, ...rest } = options;
+    const { relativeTo, pivot = 'plot', fold = true, ...rest } = options;
     const pick = rest.pick || 'plane';
     const pointerAngle = (/** @type {import('../types').EditContext} */ ctx) => {
         let cx = (ctx.width || 0) / 2;
@@ -309,7 +297,6 @@ export function rotate(options = {}) {
         type: 'rotate',
         gesture: 'drag',
         pick: 'plane',
-        channels: channel ? [channel] : null,
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const ch = ctx.channels[0];
@@ -341,16 +328,14 @@ export function rotate(options = {}) {
 /**
  * cycle — discrete edit: advance the channel to the next value in its domain.
  * Usually placed on an ordinal `color`. Needs a stable domain (see notes).
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function cycle(options = {}) {
-    const { channel, ...rest } = options;
     return makeEdit({
         type: 'cycle',
         gesture: 'click',
-        channels: channel ? [channel] : null,
-        ...rest,
+        ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const ch = ctx.channels[0];
             if (!ch || !ch.scale || !ch.scale.domain || !ctx.datum) return undefined;
@@ -368,19 +353,19 @@ export function cycle(options = {}) {
  * pixel is inverted through each positional channel — plus `defaults` for the
  * non-positional fields (group, mag, …). Editing the created mark afterwards
  * routes through the channel edits like any other mark, so create and edit share
- * one bidirectional model. `trigger` picks the plane gesture ('click' default,
+ * one bidirectional model. `gesture` picks the plane gesture ('click' default,
  * or 'dblclick' to keep create distinct from a plane drag).
- * @param {any} [options]
+ * @param {import('../types').CreateOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function create(options = {}) {
-    const { channels, defaults = {}, trigger = 'click', ...rest } = options;
+    const { defaults = {}, ...rest } = options;
     return makeEdit({
         type: 'create',
-        gesture: trigger,
+        gesture: 'click',
         // Default to the positional channels; resolveChannels drops any the
         // feature doesn't encode (so a 1D likert create just omits the missing y).
-        channels: channels || ['x', 'y'],
+        channels: ['x', 'y'],
         pick: 'plane',
         // The minted row is the one a constraint should resolve around.
         cardinality: 'append',
@@ -418,15 +403,15 @@ export function create(options = {}) {
  *
  * `pick: 'plane'` by default (a click in empty space). Give it `pick: 'probe'` and
  * the hover previews the toggle before the click commits it.
- * @param {any} [options]
+ * @param {import('../types').ToggleOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function toggle(options = {}) {
-    const { channel, channels, defaults = {}, ...rest } = options;
+    const { defaults = {}, ...rest } = options;
     return makeEdit({
         type: 'toggle',
         gesture: 'click',
-        channels: channels || (channel ? [channel] : ['x']),
+        channels: ['x'],
         pick: 'plane',
         // No `cardinality`: this gesture mints on an empty slot and drops on a full
         // one, so "the row the gesture touched" has no single answer. Left null,
@@ -461,22 +446,20 @@ export function toggle(options = {}) {
  * event, and `pick` selects the target — 'direct' (the mark clicked) or 'nearest'
  * (the closest mark within threshold, deletable from empty space).
  *
- * Trigger defaults to a plain click. When another click edit already lives on the
+ * The gesture defaults to a plain click. When another click edit already lives on the
  * mark (e.g. `cycle` recolour), pair them with a modifier so they don't both
  * fire: `cycle({ when: when.noAlt })` + `remove({ when: when.alt })` — Alt-click
  * to delete, plain click to recolour.
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function remove(options = {}) {
-    const { channel, channels, ...rest } = options;
     return makeEdit({
         type: 'remove',
-        gesture: options.gesture || 'click',
-        channels: channels || (channel ? [channel] : null),
+        gesture: 'click',
         // The row is gone; no datum is active for a constraint to resolve around.
         cardinality: 'delete',
-        ...rest,
+        ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             if (ctx.index == null) return undefined; // no target resolved
             return ctx.data.filter((_, i) => i !== ctx.index);
@@ -512,17 +495,15 @@ function writeValue(ctx) {
  *
  * Placed on any channel (`fill: { field:'group', edit: set() }`) or at mark level
  * (`edits: [set({ channels:['fill'] })]`).
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function set(options = {}) {
-    const { channel, channels, ...rest } = options;
     return makeEdit({
         type: 'set',
         gesture: 'commit',
         pick: 'direct',
-        channels: channels || (channel ? [channel] : null),
-        ...rest,
+        ...options,
         apply: writeValue
     });
 }
@@ -538,17 +519,16 @@ export function set(options = {}) {
  *
  * Placed on the text channel (`text: { field:'label', edit: editText() }`) or at
  * mark level (`edits: [editText({ channels:['text'] })]`).
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function editText(options = {}) {
-    const { channel, channels, ...rest } = options;
     return makeEdit({
         type: 'editText',
         gesture: 'commit',
         pick: 'direct',
-        channels: channels || (channel ? [channel] : ['text']),
-        ...rest,
+        channels: ['text'],
+        ...options,
         apply: writeValue
     });
 }
@@ -559,21 +539,19 @@ export function editText(options = {}) {
  * occupies that slot so ranks stay unique. Returns a full dataset (whole-dataset
  * edit). Place on the rank channel: `y: { field: 'rank', edit: rank() }` or
  * `edits: [rank({ channels: ['y'] })]`.
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function rank(options = {}) {
-    const { channel, channels, field, ...rest } = options;
     return makeEdit({
         type: 'rank',
         gesture: 'drag',
-        pick: rest.pick || 'direct',
-        channels: channels || (channel ? [channel] : null),
-        ...rest,
+        ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const ch = ctx.channels[0];
             if (!ch || !ctx.datum || ctx.index == null) return undefined;
-            const f = field || ch.field;
+            // The field comes from the channel — the only place a field is named.
+            const f = ch.field;
             if (!f) return undefined;
             const nextRank = invertChannel(ch, ctx.pointer);
             if (nextRank === undefined) return undefined;
@@ -590,64 +568,126 @@ export function rank(options = {}) {
 }
 
 /**
- * legend — pick a discrete domain value by clicking a swatch in a legend row.
- * Pair with `guides.legend({ channel })` for the visual row, passing it the SAME
- * layout options (`x`, `y`, `size`, `gap`, `columns`, `labelWidth`): both go
- * through the one `legendLayout`, so the box you can click is the swatch you can
- * see. Writes the chosen domain value into the channel's field on the active
- * (or sole) datum.
- * @param {any} [options]
+ * select — a SELECTION edit: click a mark to make it the chart's selected row.
+ * Selection is transient PIPELINE state the engine owns (ui.selection), NOT a
+ * `selected` data column — the same status a hover/preview has. apply() writes no
+ * dataset row; it returns a `{ __select }` descriptor under `target: 'selection'`,
+ * which the engine routes to its selection commit exactly the way an axis edit's
+ * `{ domains }` routes to the schema. So no `change` fires, nothing lands in undo,
+ * and the dataset stays clean.
+ *
+ * Single-exclusive by default: selecting a row clears the rest, and clicking the
+ * already-selected row toggles it back off. `toggle: false` makes a click always
+ * select (never deselect); `exclusive: false` adds to the selection instead of
+ * replacing it (forward-looking — selection is a Set) .
+ *
+ * Pairs with a selection-aware target: `plot.legend({ edit: edit.legend() })`
+ * defaults its target row to the selection, so "click a bar, then click a legend
+ * swatch" edits the bar you picked — no `selected` field in the data.
+ * @param {import('../types').SelectEditOptions} [options]
  * @returns {import('../types').Edit}
  */
-export function legend(options = {}) {
-    const {
-        channel, channels,
-        x, y, size, gap, columns, labelWidth,
-        ...rest
-    } = options;
-    const layout = { x, y, size, gap, columns, labelWidth };
+export function select(options = {}) {
+    const { exclusive = true, toggle = true, ...rest } = options;
     return makeEdit({
-        type: 'legend',
+        type: 'select',
         gesture: 'click',
-        pick: 'plane',
-        channels: channels || (channel ? [channel] : ['fill']),
+        pick: 'direct',
+        target: 'selection',
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const ch = ctx.channels[0];
-            if (!ch || !ch.field || !ch.scale || typeof ch.scale.domain !== 'function') return undefined;
-            const domain = ch.scale.domain();
-            if (!domain.length) return undefined;
-            const { size: sw, slotAt } = legendLayout(layout, domain.length, ctx);
-            const px = ctx.pointer.x, py = ctx.pointer.y;
-            let hit = null;
-            domain.forEach((value, i) => {
-                const { x: sx, y: sy } = slotAt(i);
-                if (px >= sx && px <= sx + sw && py >= sy && py <= sy + sw) hit = value;
-            });
-            if (hit == null) return undefined;
-            if (ctx.datum && ctx.index != null) {
-                return { ...ctx.datum, [ch.field]: hit };
-            }
-            if (ctx.data.length === 1) {
-                return [{ ...ctx.data[0], [ch.field]: hit }];
-            }
-            return undefined;
+            if (ctx.index == null) return undefined;
+            return { __select: { index: ctx.index, exclusive, toggle } };
         }
     });
 }
 
 /**
- * custom — the escape hatch: arbitrary edit over the whole datum + event.
- * @param {(datum: any, event: any, ctx: import('../types').EditContext) => any} fn
- * @param {any} [options]
+ * The field a legend edit writes into: the channel's own field when the edit
+ * names one, else the field the scale is built from (`scale.fields[0]`, stamped
+ * by resolveScales). A legend mark carries no channel map, so the scale is the
+ * only place the field is known.
+ * @param {import('../types').ResolvedChannel} ch
+ * @returns {string | undefined}
+ */
+function legendField(ch) {
+    if (!ch) return undefined;
+    if (ch.field) return ch.field;
+    const fields = ch.scale && /** @type {any} */ (ch.scale).fields;
+    return fields && fields[0];
+}
+
+/**
+ * legend — a discrete CATEGORY PICKER: click a swatch in a `plot.legend()` to set
+ * the channel's field to that category. A direct-pick click on the swatch node,
+ * which carries the value it stands for (`node.category`) — so the box you click
+ * IS the swatch you see, with no separate hit-test geometry to keep in sync. The
+ * legend mark injects the channel; the value is written into the target datum
+ * (the swatch's `node.index`, the legend's `row`).
+ * @param {import('../types').LegendEditOptions} [options]
+ * @returns {import('../types').Edit}
+ */
+export function legend(options = {}) {
+    return makeEdit({
+        type: 'legend',
+        gesture: 'click',
+        pick: 'direct',
+        ...options,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const field = legendField(ctx.channels[0]);
+            if (!field || !ctx.node || ctx.datum == null) return undefined;
+            const value = ctx.node.category;
+            if (value === undefined) return undefined;
+            return { ...ctx.datum, [field]: value };
+        }
+    });
+}
+
+/**
+ * legendValue — a continuous VALUE PICKER: drag the handle on a `plot.legend()`
+ * colour ramp to set the channel's field to a numeric value. A direct-pick drag
+ * on the handle node, which carries the ramp's band geometry (`rampStart`/
+ * `rampEnd`/`loValue`/`hiValue`/`along`). We map the pointer along the band back
+ * to a value BY HAND — a colour scale isn't invertible, so `invertChannel` can't,
+ * which is exactly why this edit exists. The value is clamped into [lo, hi] and
+ * written into the target datum (the handle's `node.index`, the legend's `row`).
+ * @param {import('../types').EditOptions} [options]
+ * @returns {import('../types').Edit}
+ */
+export function legendValue(options = {}) {
+    return makeEdit({
+        type: 'legendValue',
+        gesture: 'drag',
+        pick: 'direct',
+        ...options,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const node = ctx.node;
+            if (!node || node.rampStart == null || node.rampEnd == null) return undefined;
+            const field = legendField(ctx.channels[0]);
+            if (!field || ctx.datum == null) return undefined;
+            const span = node.rampEnd - node.rampStart;
+            if (!span) return undefined;
+            const pos = node.along === 'y' ? ctx.pointer.y : ctx.pointer.x;
+            const t = Math.max(0, Math.min(1, (pos - node.rampStart) / span));
+            const value = node.loValue + t * (node.hiValue - node.loValue);
+            return { ...ctx.datum, [field]: value };
+        }
+    });
+}
+
+/**
+ * custom — the escape hatch: an arbitrary apply over the full EditContext (the
+ * datum, event, pointer, resolved channels, … are all on `ctx`), with the same
+ * one-argument shape every built-in apply has.
+ * @param {(ctx: import('../types').EditContext) => any} fn
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function custom(fn, options = {}) {
     return makeEdit({
         type: 'custom',
-        gesture: options.gesture || 'drag',
-        channels: options.channels || null,
+        gesture: 'drag',
         ...options,
-        apply: (/** @type {import('../types').EditContext} */ ctx) => fn(ctx.datum, ctx.event, ctx)
+        apply: fn
     });
 }

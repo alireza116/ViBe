@@ -163,13 +163,21 @@ export interface EditContext {
   // The line's ordering knob, so a create-as-you-drag (draw) edit can pick its
   // mode: 'sequence' -> freehand append; otherwise -> you-draw-it column upsert.
   order?: string | null;
-  // The feature's transient session (per-drag lock for a draw edit: drawSeries +
-  // last pointer/domain), read and mutated across a single press-drag. Set by the
-  // draw driver.
-  drawState?: Session | null;
+  // The feature's transient per-gesture driver session: the zone/handle lock a
+  // lifecycle driver classified at dragstart (brush/brushRect), a draw's mode +
+  // locked series, an axis drag's handle snapshot. Read (and, for pointer
+  // tracking, mutated) across a single press-drag. Set by the edit's driver.
+  session?: Session | null;
   // Chart geographic projection when `ElicitSpec.projection` is set. Geo edits
   // invert the pointer through the same object geo marks use for apply/path.
   projection?: ProjectionContext | null;
+  // The primary selected datum index (transient pipeline state — ui.selection),
+  // or null. So an edit's apply/when can read or target the selection: edit.select
+  // reads whether the touched row is already selected to decide toggle-off.
+  selection?: number | null;
+  // The edit being dispatched, so a `when` predicate can arbitrate against the
+  // edit's own knobs (when.near reads its `threshold`). Purely informational.
+  edit?: Edit;
 }
 
 export interface ResolvedChannel {
@@ -241,9 +249,12 @@ export interface Edit {
   // datum (spliced at `index`) or a whole array. 'domain' -> the schema: apply
   // returns { domains: { [field]: any[] }, data?, resize? } and the engine writes
   // each field's schema domain (and optionally replaces the dataset / resizes the
-  // chart). A capability flag, read like the array-vs-datum classification — not
-  // an interaction-mode branch. Used by the editable-axis edits (edit.axis.*).
-  target?: 'domain';
+  // chart). 'selection' -> the transient selection (ui.selection): apply returns
+  // { __select: { index, exclusive?, toggle? } } and the engine updates which row
+  // is selected — no dataset write, no undo entry, no `change` (edit.select). A
+  // capability flag, read like the array-vs-datum classification — not an
+  // interaction-mode branch. Used by edit.axis.* ('domain') and edit.select.
+  target?: 'domain' | 'selection';
   // How this edit changes the dataset's SHAPE. The engine reads it to resolve
   // `activeIndex` — the datum a constraint repairs around — WITHOUT knowing which
   // edit is running, the same way `target` classifies the write destination:
@@ -255,6 +266,112 @@ export interface Edit {
   // draw), leaves this null: "the touched datum" has no single answer there.
   cardinality?: 'append' | 'delete' | null;
   apply: (ctx: EditContext) => any;
+  // Driver-specific knobs (edgeInset, resize, move, …) PASS THROUGH makeEdit onto
+  // the descriptor, where the edit's driver reads them (see edgeInsetOf in
+  // edit/pick.js). That passthrough is the one sanctioned way a driver — built-in
+  // or registered via registerDriver — carries per-edit options; there is no
+  // side-channel or post-hoc attachment. They are typed on the factory options
+  // (BrushSpanOptions etc.), not here, to keep the canonical fields strict.
+}
+
+// ---------------------------------------------------------------------------
+// Edit factory options — what a caller passes to vibe.edit.* factories. Every
+// factory takes EditOptions; the ones with extra knobs extend it below. Any
+// canonical Edit field may be overridden here (gesture, pick, when, stage, …);
+// keys the descriptor doesn't know pass through onto it for a driver to read
+// (see the note on Edit.apply).
+export interface EditOptions {
+  // Stable handle for `el.control(name)` (see Edit.name).
+  name?: string;
+  // The raw gesture this edit claims: 'drag' | 'click' | 'dblclick' | 'commit'.
+  gesture?: string;
+  // Single-channel spelling of `channels` — every factory accepts either; the
+  // singular wins when both are given (it also overrides a factory's default
+  // `channels`, e.g. toggle's ['x']).
+  channel?: string;
+  channels?: string[];
+  when?: (ctx: EditContext) => boolean;
+  pick?: Edit['pick'];
+  // Proximity radius in px for nearest-style target resolution — also what
+  // when.near/when.far arbitrate with, so the two always agree.
+  threshold?: number;
+  // Edit-scoped constraint sugar (see Edit.constrain).
+  constrain?: Constraint | Constraint[];
+  guide?: boolean;
+  guideColor?: string;
+  stage?: number;
+  advance?: boolean;
+  cardinality?: 'append' | 'delete' | null;
+  // Driver-specific knobs pass through onto the descriptor.
+  [key: string]: any;
+}
+
+export interface CreateOptions extends EditOptions {
+  // Values for the non-positional fields of the minted datum (group, mag, …).
+  defaults?: Record<string, any>;
+}
+
+export interface ToggleOptions extends CreateOptions {}
+
+export interface RotateOptions extends EditOptions {
+  // 'plot' (default) rotates about the plot centre; 'mark' about the hit node.
+  pivot?: 'plot' | 'mark';
+  // Fold into (-90, 90] for direction-agnostic lines (default); false for dials.
+  fold?: boolean;
+  // Another angular channel to measure the absolute angular distance from.
+  relativeTo?: string;
+}
+
+export interface BrushSpanOptions extends EditOptions {
+  // Edge-zone radius in px: a grab within this of an endpoint resizes that edge;
+  // beyond it, the body translates. Read by the brush/brushRect driver.
+  edgeInset?: number;
+}
+
+export interface BrushRectOptions extends BrushSpanOptions {
+  // Which axes' edges/corners are live for resizing.
+  resize?: 'both' | 'x' | 'y' | 'none';
+  // Whether a body drag translates the whole rect.
+  move?: boolean;
+}
+
+export interface AnchorOptions extends EditOptions {
+  // Which line a new point joins: the closest within threshold, or a fresh one.
+  into?: 'nearest' | 'new';
+  // The series (grouping) field; defaults to the mark's own.
+  series?: string;
+}
+
+export interface NewSeriesOptions extends EditOptions {
+  // The independent axis the line runs ALONG, and the axis it carries a value on.
+  along?: 'x' | 'y';
+  value?: 'x' | 'y';
+  // Domain positions to seed anchors at (see core/samples.js resolveSamples):
+  // a count, explicit positions, or a time interval; default = the scale's ticks.
+  samples?: any;
+  series?: string;
+}
+
+export interface DrawOptions extends NewSeriesOptions {
+  // Freehand pointer-sampling distance in px.
+  minDist?: number;
+  into?: 'nearest' | 'new';
+}
+
+// edit.legend (a category picker) reads the clicked swatch's `node.category`; it
+// carries no layout of its own — the `plot.legend()` mark owns geometry. Kept as a
+// named type for the picker's few knobs (all inherited from EditOptions today).
+export interface LegendEditOptions extends EditOptions {}
+
+// edit.select (a selection edit). Selection is transient pipeline state, so these
+// knobs govern set semantics, not a data write.
+export interface SelectEditOptions extends EditOptions {
+  // Selecting a row clears the rest (default true). false adds to the selection —
+  // forward-looking, since ui.selection is a Set; single-exclusive today.
+  exclusive?: boolean;
+  // Clicking the already-selected row deselects it (default true). false makes a
+  // click always select, never toggle off.
+  toggle?: boolean;
 }
 
 // The result an edit with `target: 'domain'` returns from apply(): the schema
@@ -550,7 +667,7 @@ export interface FeatureNode {
 
 // Per-feature transient interaction state a driver keeps in ui.session[featureId]
 // (proximity selection, sweep/draw locks). Read by guides to draw the snap ring +
-// highlight and by a draw edit via ctx.drawState. All fields optional/driver-set.
+// highlight and by an edit via ctx.session. All fields optional/driver-set.
 export interface Session {
   px?: number;
   py?: number;
@@ -814,9 +931,29 @@ export interface ElicitElement extends HTMLDivElement {
   redo(): boolean;
   canUndo(): boolean;
   canRedo(): boolean;
-  // Subscribe to committed changes ('change': (data)) or stage advances
-  // ('stage': (stageIndex, stageLabel?)). Returns an unsubscribe function.
-  on(type: 'change' | 'stage', cb: (...args: any[]) => void): () => void;
+  // Subscribe to committed changes ('change': (data)), stage advances
+  // ('stage': (stageIndex, stageLabel?)), or selection changes ('select':
+  // (primaryIndex | null, indices[])). Selection is not the belief data, so it has
+  // its OWN event — a 'select' listener hears it, 'change'/getData never do.
+  // Returns an unsubscribe function.
+  on(type: 'change' | 'stage' | 'select', cb: (...args: any[]) => void): () => void;
+  // ── Selection: transient pipeline state, NOT the belief data. Its own tiny API
+  // beside getData/setData because a `selected` data column is exactly what this
+  // replaces (see edit.select). All routes go through one applySelection, so an
+  // external <select>, the keyboard, and a mark click leave selection in one shape.
+  //
+  // The primary selected datum index, or null. A stale index (the row was removed)
+  // reads as null.
+  getSelection(): number | null;
+  // Select a SPECIFIC ITEM by dataset index (external counterpart of clicking a
+  // mark). null / out-of-range clears. Exclusive: the row becomes the sole
+  // selection. Returns whether the selection moved.
+  select(index: number | null): boolean;
+  // Select by CATEGORY / predicate: select the first row matching { field: value }
+  // (or a predicate function). The "select a category" entry point. No match clears.
+  selectWhere(field: string | ((d: Datum, i: number) => boolean), value?: any): boolean;
+  // Clear the selection entirely.
+  clearSelection(): boolean;
   // Multi-stage controls (see ElicitSpec.stage). getStage reads the current index.
   getStage(): number;
   // Optional label for the current stage (from ElicitSpec.stageLabels), or null.

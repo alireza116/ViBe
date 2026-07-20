@@ -33,7 +33,8 @@ function orderInterval() {
  * @returns {import('../types').Edit}
  */
 function moveInterval(stage) {
-    return custom((datum, _event, ctx) => {
+    return custom((/** @type {import('../types').EditContext} */ ctx) => {
+        const datum = ctx.datum;
         const ch = ctx.channels[0];
         if (!ch || !ch.scale || !datum) return undefined;
         const mean = ch.scale.invertValue(ctx.pointer.y);

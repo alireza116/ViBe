@@ -109,12 +109,12 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "custom((datum, event, ctx) => datum | data[] | undefined, options?) → Edit",
+      "custom((ctx) => datum | data[] | undefined, options?) → Edit",
     ],
     options: [
       {
         name: "fn",
-        type: "(datum, event, ctx) => …",
+        type: "(ctx) => …",
         default: "—",
         desc: (
           <>

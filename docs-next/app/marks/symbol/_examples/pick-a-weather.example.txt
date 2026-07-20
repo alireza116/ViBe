@@ -1,16 +1,19 @@
 mount(Elicit({
-  width: 360, height: 220,
-  margins: { top: 60, right: 16, bottom: 20, left: 16 },
+  width: 360, height: 240,
+  margins: { top: 16, right: 16, bottom: 16, left: 16 },
   data: [ { sky: "cloudy" } ],
   schema: { sky: { type: "ordinal", domain: ["sunny","partly","cloudy","rain","storm"] } },
+  axes: false,
   features: [
     point({
       size: 40,
       channels: {
+        x: { value: 60 }, y: { value: 100 },
         symbol: { field: "sky", scale: { scheme: "weather" } },
       },
-      edits: [ legend({ channel: "symbol", x: 8, y: 8, size: 22, labelWidth: 8 }) ],
     }),
+    // A glyph legend that doubles as a picker: legendSymbol draws the row of
+    // glyphs, edit.legend() makes each one click-to-set the category.
+    legendSymbol({ anchor: "bottom", swatchSize: 22, edit: edit.legend() }),
   ],
-  guides: [ guides.legend({ channel: "symbol", x: 8, y: 8, size: 22, labelWidth: 8 }) ],
 }))

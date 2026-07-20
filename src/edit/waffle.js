@@ -43,17 +43,15 @@ function countAt(pointer, grid) {
  * so on any other mark it can only no-op. `scope: 'waffle'` is what lets the
  * engine say so out loud (see SCOPE_CAPABILITY in core/elicit.js) instead of
  * leaving you with a dead gesture and no error.
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function fill(options = {}) {
-    const { channel, channels, ...rest } = options;
     return makeEdit({
         type: 'fill',
         gesture: 'drag',
-        channels: channels || (channel ? [channel] : null),
         scope: 'waffle',
-        ...rest,
+        ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const grid = ctx.node && ctx.node.grid;
             const ch = ctx.channels && ctx.channels[0];

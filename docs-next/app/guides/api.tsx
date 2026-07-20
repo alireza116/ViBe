@@ -2,7 +2,7 @@ import type { ApiEntry } from '../../lib/types';
 
 export const api: ApiEntry[] = [
   {
-    name: "guides.rule · guides.region · guides.proximity · guides.legend",
+    name: "guides.rule · guides.region · guides.proximity",
     summary: (
       <>
         Import from <code className="inline">vibe.guides</code> and pass in the chart’s <code className="inline">guides: [...]</code>. All position in <b>data space</b> through the same <code className="inline">scale.encode()</code> a mark uses, so they compose across scale types. Non-interactive.
@@ -12,7 +12,6 @@ export const api: ApiEntry[] = [
       "guides.rule({ x?, y?, stroke, strokeDasharray, label }) → Guide",
       "guides.region({ x?, y?, fill, opacity }) → Guide",
       "guides.proximity({ target, color }) → Guide",
-      "guides.legend({ channel, x, y, size, gap, columns }) → Guide",
       "guides.custom((ctx) => FeatureNode[]) → Guide",
       "",
       "// any option may be a function of the guide context:",
@@ -60,16 +59,6 @@ export const api: ApiEntry[] = [
         type: "string",
         default: "effect",
         desc: "Override the highlight colour (else the effects layer’s).",
-      },
-      {
-        name: "legend.channel",
-        type: "string",
-        default: "'fill'",
-        desc: (
-          <>
-            Discrete channel whose domain becomes swatches. Pair with <code className="inline">edit.legend</code> using the same layout.
-          </>
-        ),
       },
     ],
     returns: (

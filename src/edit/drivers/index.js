@@ -87,11 +87,14 @@ export function registerDriver(driver) {
  * The driver that will handle this edit, or undefined for a direct/plane-pick edit
  * no lifecycle driver claims. The one place `pick` is resolved to a driver, so
  * callers ask the registry a capability question instead of listing pick names.
+ * Two passes: an exact `name === pick` match anywhere in the registry beats any
+ * `wants()` claim, so an earlier driver's greedy `wants` can never shadow the
+ * driver an edit names explicitly.
  * @param {import('../../types').Edit} edit
  * @returns {Driver | undefined}
  */
 export function driverFor(edit) {
-    return drivers.find((d) => d.name === edit.pick || d.wants(edit));
+    return drivers.find((d) => d.name === edit.pick) || drivers.find((d) => d.wants(edit));
 }
 
 /**

@@ -98,7 +98,7 @@ export const api: ApiEntry[] = [
     name: "EditContext (ctx)",
     summary: (
       <>
-        The object handed to <code className="inline">apply(ctx)</code> and <code className="inline">when(ctx)</code> — and to the third argument of <code className="inline">custom(fn)</code>. It is the gesture already resolved into plot space plus the mark/scale state needed to invert it. Built once per edit invocation in the engine; read it, don’t mutate it.
+        The object handed to <code className="inline">apply(ctx)</code> and <code className="inline">when(ctx)</code> — and to <code className="inline">custom(fn)</code>'s one argument. It is the gesture already resolved into plot space plus the mark/scale state needed to invert it. Built once per edit invocation in the engine; read it, don’t mutate it.
       </>
     ),
     options: [
@@ -199,7 +199,7 @@ export const api: ApiEntry[] = [
     ],
     returns: (
       <>
-        See <code className="inline">EditContext</code> in <code className="inline">src/types.d.ts</code> for the full shape (including line-scoped fields like <code className="inline">seriesKey</code> / <code className="inline">drawState</code>).
+        See <code className="inline">EditContext</code> in <code className="inline">src/types.d.ts</code> for the full shape (including line-scoped fields like <code className="inline">seriesKey</code> / <code className="inline">session</code>).
       </>
     ),
   },
@@ -239,7 +239,7 @@ export const api: ApiEntry[] = [
         default: "gestures",
         desc: (
           <>
-            Escape hatch — an arbitrary <code className="inline">(datum, event, ctx) ={'>'} …</code>.
+            Escape hatch — an arbitrary <code className="inline">(ctx) ={'>'} …</code> over the full EditContext.
           </>
         ),
       },

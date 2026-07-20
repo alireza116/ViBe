@@ -10,7 +10,7 @@
 //   dotStack({
 //     size: 7,                                  // token radius
 //     channels: { x: { field: 'bin' } },
-//     edits: [ create({ trigger: 'click', channels: ['x'] }), remove() ],
+//     edits: [ create({ gesture: 'click', channels: ['x'] }), remove() ],
 //     constraints: [ count({ max: 20 }), unique({ field: 'bin', max: 10 }) ],
 //   })
 //

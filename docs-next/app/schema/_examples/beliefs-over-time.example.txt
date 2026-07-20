@@ -14,7 +14,7 @@ mount(Elicit({
         x: { field: "when" }, y: { field: "belief" },
       },
       edits: [
-        create({ trigger: "dblclick" }),
+        create({ gesture: "dblclick" }),
         drag({ channels: ["x", "y"] }),
       ],
     }),

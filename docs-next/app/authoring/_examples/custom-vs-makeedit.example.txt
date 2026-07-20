@@ -1,8 +1,8 @@
 // Level B — custom(fn): one-off apply, stock gesture/pick defaults.
-const bumpY = custom((datum, _event, ctx) => {
-  if (!datum) return undefined;
+const bumpY = custom((ctx) => {
+  if (!ctx.datum) return undefined;
   const y = ctx.scales.y.invertValue(ctx.pointer.y);
-  return { ...datum, y: Math.round(y) };
+  return { ...ctx.datum, y: Math.round(y) };
 });
 
 mount(Elicit({

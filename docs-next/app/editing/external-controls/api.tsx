@@ -40,6 +40,28 @@ export const api: ApiEntry[] = [
     ],
   },
   {
+    name: "select() · el.select · el.selectWhere",
+    summary: (
+      <>
+        Selection is transient <em>pipeline</em> state, not a <code className="inline">selected</code> data
+        column. Put <code className="inline">edit.select()</code> on a mark to select it by click; drive the
+        same state from outside with <code className="inline">el.select(index)</code> (a specific item) or{' '}
+        <code className="inline">el.selectWhere(field, value)</code> (a category — the first matching row).
+        The selected row gets the highlight outline, and a legend picker's{' '}
+        <code className="inline">row</code> defaults to it. A <code className="inline">select</code> event
+        fires; <code className="inline">on("change")</code>/<code className="inline">getData</code> never do.
+      </>
+    ),
+    signatures: [
+      "edits: [ select() ]            // click a mark to select it",
+      "el.select(2)                   // select a SPECIFIC item by index",
+      "el.selectWhere(\"group\", \"North\")  // select by CATEGORY (first match)",
+      "el.getSelection()             // → index | null",
+      "el.clearSelection()           // deselect all",
+      "el.on(\"select\", (i, all) => …)  // selection changed (no data moved)",
+    ],
+  },
+  {
     name: "container.emit(event)",
     summary: (
       <>

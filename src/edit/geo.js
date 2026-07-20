@@ -56,10 +56,10 @@ export function drag(options = {}) {
  * @returns {import('../types').Edit}
  */
 export function create(options = {}) {
-    const { defaults = {}, trigger = 'click', ...rest } = options;
+    const { defaults = {}, ...rest } = options;
     return makeEdit({
         type: 'create',
-        gesture: trigger,
+        gesture: 'click',
         channels: null,
         pick: 'plane',
         scope: 'geo',
@@ -178,7 +178,7 @@ export function draw(options = {}) {
         into,
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const st = ctx.drawState;
+            const st = ctx.session;
             if (!st) return undefined;
             const ll = invertPoint(projectionOf(ctx), ctx.pointer);
             if (!ll) return undefined;
@@ -237,7 +237,7 @@ function boundsFields(mc) {
  * Which zone a gesture means (edge / corner / body) is classified ONCE at
  * dragstart by the geoBrush driver (src/edit/drivers/geoBrush.js) and locked in
  * the feature's session for the whole gesture; this apply just reads the lock
- * (`ctx.drawState`), exactly like `brushRect` in basic.js. Re-deciding the zone
+ * (`ctx.session`), exactly like `brushRect` in basic.js. Re-deciding the zone
  * per tick is what made the old version resize when you meant to move.
  *
  * A body move translates by the geographic delta from the latched grab anchor,
@@ -248,19 +248,20 @@ function boundsFields(mc) {
  * @returns {import('../types').Edit}
  */
 export function brush(options = {}) {
-    // `edgeInset` / `move` are driver-only knobs: makeEdit keeps only canonical
-    // Edit fields, so they're attached to the descriptor after it's built (the
-    // driver reads them off the edit, as edgeInsetOf does).
-    const { edgeInset, move = true, pick: _pick, ...rest } = options;
-    const edit = makeEdit({
+    // `edgeInset` / `move` are driver-only knobs: makeEdit passes them through
+    // onto the descriptor, where the driver reads them (as edgeInsetOf does).
+    // `move` is re-stated so its default lands even when the caller omits it.
+    const { move = true, pick: _pick, ...rest } = options;
+    return makeEdit({
         type: 'brush',
         gesture: 'drag',
         channels: null,
         scope: 'geo',
         ...rest,
+        move,
         pick: 'geoBrush',
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const st = ctx.drawState;
+            const st = ctx.session;
             const zone = st && st.zone;
             const d = ctx.datum;
             if (!zone || !d) return undefined; // driver sets the lock on dragstart
@@ -312,9 +313,6 @@ export function brush(options = {}) {
             };
         },
     });
-    if (edgeInset != null) /** @type {any} */ (edit).edgeInset = edgeInset;
-    /** @type {any} */ (edit).move = move;
-    return edit;
 }
 
 /**
@@ -345,7 +343,6 @@ function overExistingRect(ctx, inset) {
 export function createRect(options = {}) {
     const {
         defaults = {},
-        trigger = 'click',
         // Default spans in degrees when minting a new box.
         width = 10,
         height = 6,
@@ -354,7 +351,7 @@ export function createRect(options = {}) {
     } = options;
     return makeEdit({
         type: 'createRect',
-        gesture: trigger,
+        gesture: 'click',
         channels: null,
         pick: 'plane',
         scope: 'geo',

@@ -26,16 +26,16 @@ import { drag } from './basic.js';
  * The new point's series is written to the feature's series field; its position is
  * the inverted pointer on each positional channel (2D by default). Order is handled
  * by the mark's `order` (domain sort or as-drawn), so anchor just appends.
- * @param {any} [options]
+ * @param {import('../types').AnchorOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function anchor(options = {}) {
-    const { into = 'nearest', channels, trigger = 'click', series: seriesField, ...rest } = options;
+    const { into = 'nearest', series: seriesField, ...rest } = options;
     const threshold = options.threshold != null && options.threshold > 0 ? options.threshold : DEFAULT_PICK_THRESHOLD;
     return makeEdit({
         type: 'anchor',
-        gesture: trigger,
-        channels: channels || ['x', 'y'],
+        gesture: 'click',
+        channels: ['x', 'y'],
         pick: 'plane',
         scope: 'line',
         into,
@@ -83,14 +83,14 @@ export function anchor(options = {}) {
  *   along / value  : the positional axes ("x"/"y"); the independent axis the line
  *                    runs ALONG, and the axis it carries a value on. Defaults x/y.
  *   samples        : passed to resolveSamples for the anchor domain positions.
- * @param {any} [options]
+ * @param {import('../types').NewSeriesOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function newSeries(options = {}) {
-    const { along = 'x', value = 'y', samples, trigger = 'dblclick', series: seriesField, ...rest } = options;
+    const { along = 'x', value = 'y', samples, series: seriesField, ...rest } = options;
     return makeEdit({
         type: 'newSeries',
-        gesture: trigger,
+        gesture: 'dblclick',
         channels: [along, value],
         pick: 'plane',
         scope: 'line',
@@ -149,7 +149,7 @@ export function newSeries(options = {}) {
  *             path, e.g. a route over a map).
  * So one gesture both draws new lines and reshapes drawn ones — near edits, far draws.
  * The engine (draw driver) owns the per-drag lock; this apply reads it from
- * ctx.drawState (mode + locked series) and ctx.order.
+ * ctx.session (mode + locked series) and ctx.order.
  *   along / value  : the positional axes ("x"/"y"); the independent axis the line
  *                    runs ALONG, and the axis it carries a value on. Defaults x/y.
  *   channels       : governed channels (default [along, value]); freehand needs both.
@@ -157,24 +157,24 @@ export function newSeries(options = {}) {
  *   minDist        : freehand pointer-sampling distance in px (default 8).
  *   threshold      : proximity radius for the edit-vs-draw decision (default 40).
  *   into           : 'nearest' (default, near edits / far draws) | 'new' (always draw).
- * @param {any} [options]
+ * @param {import('../types').DrawOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function draw(options = {}) {
     const {
-        along = 'x', value = 'y', channels, samples, minDist = 8,
+        along = 'x', value = 'y', samples, minDist = 8,
         into = 'nearest', series: seriesField, ...rest
     } = options;
     return makeEdit({
         type: 'draw',
         gesture: 'drag',
-        channels: channels || [along, value],
+        channels: [along, value],
         pick: 'draw',
         scope: 'line',
         into,
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const st = ctx.drawState;
+            const st = ctx.session;
             if (!st) return undefined; // engine sets the per-drag lock on dragstart
             const sField = seriesField || ctx.seriesKey || null;
             const seriesVal = st.drawSeries;
@@ -275,7 +275,7 @@ export function draw(options = {}) {
 /**
  * sweep — you-draw-it painting: a drag that repaints the value of each point the
  * pointer crosses (series-scoped in the engine). Convenience over `drag`.
- * @param {any} [options]
+ * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function sweep(options = {}) {
@@ -289,17 +289,16 @@ export function sweep(options = {}) {
  * series key, and filters out every datum in that series — so clicking any point
  * on a line removes the entire line. Restores create/remove symmetry: anchor +
  * newSeries + draw build lines, remove + removeSeries take them apart.
- *   trigger : the gesture (default 'click'); pair with `when` if another click
- *             edit shares the mark (e.g. remove one point vs the whole series).
- * @param {any} [options]
+ *   gesture : default 'click'; pair with `when` if another click edit shares
+ *             the mark (e.g. remove one point vs the whole series).
+ * @param {import('../types').AnchorOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function removeSeries(options = {}) {
-    const { series: seriesField, trigger, channels, ...rest } = options;
+    const { series: seriesField, ...rest } = options;
     return makeEdit({
         type: 'removeSeries',
-        gesture: trigger || options.gesture || 'click',
-        channels: channels || null,
+        gesture: 'click',
         scope: 'line',
         // The rows are gone; nothing is active for a constraint to resolve around.
         cardinality: 'delete',

@@ -276,13 +276,17 @@ export function paintScene(ctx, children, io) {
     activeFont = (io && io.theme && io.theme.font) || null;
     const { background, guideRegions, marks, guideFront } = partitionScene(children);
 
-    // Background: tiles (floor), then axis chrome, then vector basemap paths
-    // (geoBasemap) so they sit above grids the way they did in the old path pass.
+    // Background: tiles (floor), then legend chips/ramps + axis chrome, then
+    // vector basemap paths (geoBasemap) so they sit above grids the way they did
+    // in the old path pass. Rects/circles are the legend mark's inert swatches —
+    // without them a non-interactive legend draws labels with no colour chips.
     background.filter((n) => n.type === 'image')
         .forEach((n) => image(ctx, n, io.images, io.requestRepaint));
     for (const n of background) {
         if (n.type === 'image' || n.type === 'path') continue;
-        if (n.type === 'line') line(ctx, n, { stroke: '#6b7280', strokeWidth: 1, opacity: 1 });
+        if (n.type === 'rect') rect(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 });
+        else if (n.type === 'circle') circle(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 });
+        else if (n.type === 'line') line(ctx, n, { stroke: '#6b7280', strokeWidth: 1, opacity: 1 });
         else if (n.type === 'text') text(ctx, n, { fill: '#374151', opacity: 1 }, 'middle');
     }
     background.filter((n) => n.type === 'path')

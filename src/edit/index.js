@@ -20,6 +20,9 @@
 //     stage     active only in this stage of a multi-step elicitation; null = always
 //     advance   probe only: a click settling a staged edit advances the stage
 //     apply     (ctx) => datum | dataset | undefined — performs the edit
+// Keys the descriptor doesn't know (edgeInset, resize, move, …) pass through
+// makeEdit onto the edit, where its driver reads them — the one sanctioned way
+// a driver (built-in or registerDriver'd) carries per-edit options.
 //
 // Universal edits (any mark) live in basic.js; line-scoped authoring edits live in
 // line.js and are grouped under `edit.line.*` so the scope is visible in the name.
@@ -29,7 +32,7 @@
 // Or at mark level for joint / arbitrary edits:
 //   edits: [ vibe.edit.drag({ channels: ["x", "y"] }), vibe.edit.line.anchor() ]
 
-export { drag, dragSpan, brushSpan, brushRect, resize, rotate, cycle, create, toggle, remove, set, editText, legend, custom, rank } from './basic.js';
+export { drag, dragSpan, brushSpan, brushRect, resize, rotate, cycle, create, toggle, remove, set, editText, legend, legendValue, select, custom, rank } from './basic.js';
 
 export { when } from './when.js';
 // Authoring kit — public so custom edits / marks can reuse the same primitives.

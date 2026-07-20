@@ -9,6 +9,7 @@ import scatterPickerAndHandle from './_examples/scatter-picker-and-handle.exampl
 import pickVsCycle from './_examples/pick-vs-cycle.example.txt';
 import faceSliders from './_examples/face-sliders.example.txt';
 import rotateBox from './_examples/rotate-box.example.txt';
+import selectItemOrCategory from './_examples/select-item-or-category.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -74,6 +75,19 @@ Each facial parameter is a channel; bind it to a field with a named `set()` edit
   title="Rotate a box by an icon"
   blurb="Buttons step the angle in data space; the façade forward-encodes to the rotate edit."
   try={"press the rotate buttons, or drag the box itself."}
+/>
+
+</Section>
+
+<Section id="selection" title="Driving the selection">
+
+Selection is **pipeline state**, not a data column — so it has its own external API beside `getData`/`setData`, and its own `select` event. `el.select(index)` picks a **specific item**; `el.selectWhere(field, value)` picks by **category** (the first row matching). Both go through the same path a click on a mark does (`edit.select()`), so the selected row gets the highlight outline and a legend picker edits it — whichever input moved the selection. `on("select")` reports the change; `getData` and `on("change")` stay silent, because no belief data moved.
+
+<Example
+  code={selectItemOrCategory}
+  title="Select an item, or a category"
+  blurb="A dropdown selects a specific bar; a button selects the first bar in a group; the legend edits whichever is selected."
+  try={"pick an item or a group — or click a bar — then use the legend to change its group."}
 />
 
 </Section>

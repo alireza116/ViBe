@@ -1,0 +1,110 @@
+import { DocShell } from '../../../components/DocShell';
+import { ApiReference } from '../../../components/ApiReference';
+import { Section } from '../../../components/Section';
+import { Example } from '../../../components/Example';
+import { Lead } from '../../../components/Lead';
+import { api } from './api';
+
+import discreteColorLegend from './_examples/discrete-color-legend.example.txt';
+import continuousColorRamp from './_examples/continuous-color-ramp.example.txt';
+import legendOnTheBottom from './_examples/legend-on-the-bottom.example.txt';
+import categoryPicker from './_examples/category-picker.example.txt';
+import valuePicker from './_examples/value-picker.example.txt';
+import pickAndEdit from './_examples/pick-and-edit.example.txt';
+
+export default function Layout({ children }) {
+  return <DocShell>{children}</DocShell>;
+}
+
+# Legend
+
+<Lead>A legend for a non-positional channel — `fill`, `stroke`, `size`, `symbol`. Like an axis, it is a composable mark that reads the channel's scale; unlike an axis, it **reserves space** on its side, so the plot shrinks to make room and the legend never overlaps the marks. It can also be a **picker**: click a swatch to set a category, or drag a ramp handle to set a value, written straight back to the data.</Lead>
+
+<ApiReference entries={api} />
+
+<Section id="discrete" title="A discrete colour legend">
+
+`legendColor()` reads the `fill` scale and draws a swatch per category. `anchor` picks the side; the engine measures the legend and shrinks the plot so the bars never draw underneath it.
+
+<Example
+  code={discreteColorLegend}
+  title="Swatches, reserving space"
+  blurb="A categorical fill; the legend claims the right band and the bars shrink to fit."
+/>
+
+</Section>
+
+<Section id="ramp" title="A continuous colour ramp">
+
+A quantitative `fill` resolves to a **sequential** colour scale, so the same `legendColor()` draws a gradient ramp with ticks instead of swatches — no extra option.
+
+<Example
+  code={continuousColorRamp}
+  title="Gradient ramp"
+  blurb="fill: { field: 'temp' } over a quantitative field becomes a ramp."
+/>
+
+</Section>
+
+<Section id="bottom" title="Any side">
+
+`anchor: 'bottom'` (or `'top'`) lays the swatches out in a row and reserves space on that side — past the axis, so it clears the x-axis labels.
+
+<Example
+  code={legendOnTheBottom}
+  title="Legend on the bottom"
+  blurb="A horizontal row below the x-axis; the plot height shrinks to fit."
+/>
+
+</Section>
+
+<Section id="picker" title="A category picker">
+
+Pass `edit: edit.legend()` to make each swatch a click target that sets the channel's field on the target row (the first, by default) — a natural fit for a one-row belief.
+
+<Example
+  code={categoryPicker}
+  title="Click a swatch to pick"
+  blurb="A one-row belief whose category is set by clicking the legend."
+  try={(
+    <>
+      <b>Click</b> a swatch to set the group; the dot recolours.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="dynamic-target" title="Editing a selected item">
+
+Selection is **pipeline state**, not a data column: give the bars an `edit.select()` and a click selects one (the selected bar gets the highlight outline). The legend's `row` **defaults to the selection**, so the swatch you click edits the bar you picked — no `selected` field, no `findIndex` to keep in sync. Pin `row` to a number or a `(data, { selection }) => index` function to override.
+
+<Example
+  code={pickAndEdit}
+  title="Pick a bar, then edit its group"
+  blurb="The bars carry edit.select(); the legend edits the selected bar. Nothing about selection touches the data."
+  try={(
+    <>
+      <b>Click</b> a bar to select it, then <b>click</b> a legend swatch to change its group.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="value" title="A continuous value picker">
+
+Pass `edit: edit.legendValue()` to add a handle you drag along the ramp. A colour scale isn't invertible, so the edit maps the drag position back into the domain by hand and writes the value.
+
+<Example
+  code={valuePicker}
+  title="Drag the ramp to pick a value"
+  blurb="Dragging the handle sets temp; the dot's colour tracks it."
+  try={(
+    <>
+      <b>Drag</b> the handle up and down the ramp to set the value.
+    </>
+  )}
+/>
+
+</Section>

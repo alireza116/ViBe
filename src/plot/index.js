@@ -16,6 +16,7 @@ export { axisRadial } from './axisRadial.js';
 export { arc, pie, donut } from './arc.js';
 export { composite } from './composite.js';
 export { axis, axisX, axisY, grid, gridX, gridY } from './axis.js';
+export { legend, legendColor, legendSize, legendSymbol } from './legend.js';
 // Shared mark foundation — for authoring new marks (channel resolution + the
 // standard style surface). See mark.js.
 export { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, STANDARD_STYLE_CHANNELS } from './mark.js';

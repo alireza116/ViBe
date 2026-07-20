@@ -31,7 +31,7 @@ mount(Elicit({
         fill: { field: "immigration", scale: { scheme: "RdYlGn" } },
       },
       edits: [
-        create({ trigger: "dblclick" }),
+        create({ gesture: "dblclick" }),
         drag({ channels: ["x", "y"] }),
       ],
     }),

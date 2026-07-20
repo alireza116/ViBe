@@ -65,7 +65,7 @@ function domainsFor(fields, domain) {
  * edit.axis.scale — drag an end-handle of a numeric/temporal axis to grow or shrink
  * its range. The axisDrag driver locks the grabbed handle at dragstart (which end,
  * the anchored extreme's pixel+value, this extreme's pixel+value, the slope) into
- * ctx.drawState; this apply turns that snapshot + the live pointer into the new
+ * ctx.session; this apply turns that snapshot + the live pointer into the new
  * [min,max]:
  *
  *   rescale (default) — the pixel range is fixed; the anchored extreme keeps its
@@ -87,7 +87,7 @@ export function scale(options = {}) {
         scope: 'axis',
         target: 'domain',
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            const lock = ctx.drawState;
+            const lock = ctx.session;
             const ch = ctx.channels[0];
             if (!lock || !lock.grabEnd || !ch || !ch.scale) return undefined;
             const fields = targetFields(ch.scale, field);

@@ -35,6 +35,7 @@ export const SITE: NavGroup[] = [
       { href: '/marks/geo', title: 'Geo' },
       { href: '/marks/trend', title: 'Trend line' },
       { href: '/marks/axes', title: 'Axis, Grid & Rule' },
+      { href: '/marks/legend', title: 'Legend' },
     ],
   },
   {

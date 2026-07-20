@@ -51,9 +51,10 @@ export const STYLE_FIELDS = [
  * pin axes and edit guides; among ordinary marks, **array order is z-order**
  * (later features / composite parts / nodes within a feature paint on top).
  *
- * Guide rects (shaded bands / legend chips) stay behind marks; every other
- * guide node (rules, constraint ticks, proximity rings, labels) goes to
- * `guideFront` in scene order so lines/text aren't dropped.
+ * Guide rects (shaded bands) stay behind marks; every other guide node (rules,
+ * constraint ticks, proximity rings, labels) goes to `guideFront` in scene order
+ * so lines/text aren't dropped. Legend chips/ramps use `background` (same layer
+ * as axes) so a non-interactive legend sits behind marks without stealing hits.
  *
  * @param {any[]} children `scene.children`
  * @returns {{

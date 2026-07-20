@@ -15,11 +15,19 @@ export const asList = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
 
 /**
  * Normalize an edit spec into the canonical Edit descriptor the engine routes to.
+ *
+ * Unknown keys PASS THROUGH onto the descriptor: driver-specific knobs
+ * (`edgeInset`, `resize`, `move`, …) ride on the edit where their driver reads
+ * them (see edgeInsetOf in pick.js). Canonical keys are normalized below and
+ * always win over a raw spread value. This is the one sanctioned way a custom
+ * driver (registerDriver) carries per-edit options — no post-hoc attachment.
  * @param {any} spec
  * @returns {import('../types').Edit}
  */
 export function makeEdit(spec) {
+    const { channel, channels, ...rest } = spec;
     return {
+        ...rest,
         type: spec.type,
         // Stable handle for `el.control(name)` — the name an external controller
         // (a slider, a picker, a rotate icon) addresses this edit by. null (the
@@ -27,7 +35,11 @@ export function makeEdit(spec) {
         // pointer/keyboard-driven, unchanged. Naming an edit adds no dispatch path.
         name: spec.name || null,
         gesture: spec.gesture || 'drag',
-        channels: spec.channels || null,
+        // `channel` is the single-channel spelling, folded into `channels` here so
+        // EVERY factory accepts either without its own destructuring. The singular
+        // wins: it's the more specific spelling, and it lets a factory default
+        // (`channels: ['x']` in toggle) be overridden by a user's `channel: 'y'`.
+        channels: channel ? [channel] : (channels || null),
         when: spec.when || null,
         pick: spec.pick || 'direct',
         threshold: spec.threshold != null ? spec.threshold : 0,

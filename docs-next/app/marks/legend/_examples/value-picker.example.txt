@@ -1,0 +1,14 @@
+mount(Elicit({
+  width: 320, height: 210,
+  margins: { top: 20, right: 16, bottom: 20, left: 20 },
+  data: [ { temp: 15 } ],
+  schema: { temp: { type: "quantitative", domain: [0, 30] } },
+  axes: false,
+  features: [
+    // The dot's colour tracks the elicited value as you drag the ramp handle.
+    point({ size: 30, channels: { x: { value: 80 }, y: { value: 95 }, fill: { field: "temp" } } }),
+    // edit.legendValue() adds a handle you drag along the ramp to set `temp`.
+    // A colour scale isn't invertible, so the edit maps the drag to [0,30] by hand.
+    legendColor({ anchor: "right", title: "temp", edit: edit.legendValue() }),
+  ],
+}))
