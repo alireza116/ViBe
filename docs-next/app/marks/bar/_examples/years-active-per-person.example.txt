@@ -11,7 +11,7 @@ mount(Elicit({
     start:  { type: "quantitative", domain: [1820, 2000] },
     end:    { type: "quantitative", domain: [1840, 2000] },
   },
-  features: [
+  marks: [
     barX({
       fill: "#7b2d8b",
       channels: {

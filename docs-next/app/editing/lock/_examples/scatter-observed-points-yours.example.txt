@@ -19,7 +19,7 @@ mount(Elicit({
   // The observed rows are given, not elicited.
   lock: "seed",
   axes: { x: { grid: true }, y: { grid: true } },
-  features: [
+  marks: [
     point({
       size: 7,
       channels: {

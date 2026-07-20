@@ -18,7 +18,7 @@ const chart = Elicit({
   // A dataset invariant: y can never exceed 80. It gates EVERY edit, including the
   // pad drag below — external control is not a bypass.
   constraints: [ clamp({ field: "y", max: 80 }) ],
-  features: [
+  marks: [
     point({
       size: 7,
       channels: {

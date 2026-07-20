@@ -12,7 +12,7 @@ mount(Elicit({
     mag:  { domain: [0, 14] },
     team: { domain: ["A", "B", "C"] },
   },
-  features: [
+  marks: [
     point({
       channels: {
         x: { field: "x" },

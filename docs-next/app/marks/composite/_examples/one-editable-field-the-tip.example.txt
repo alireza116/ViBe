@@ -9,7 +9,7 @@ mount(Elicit({
     g:     { type: "categorical" },
     value: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     composite({
       id: "lollipop",
       parts: [

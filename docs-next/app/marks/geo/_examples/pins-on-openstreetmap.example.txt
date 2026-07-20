@@ -23,7 +23,7 @@ mount(Elicit({
     lat:   { type: "quantitative", domain: [49.20, 49.32] },
     place: { type: "categorical" },
   },
-  features: [
+  marks: [
     geoTile(),   // defaults to OSM standard + its attribution
 
     geoPoint({

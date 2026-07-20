@@ -11,7 +11,7 @@ mount(Elicit({
     party: { type: "categorical" },
     share: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     pie({
       outerRadius: 100,
       channels: {

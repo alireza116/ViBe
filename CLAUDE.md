@@ -47,7 +47,7 @@ Follow the contract documented at the top of `src/plot/mark.js`. Concretely:
 - If the mark groups points into series (a line-family mark), set `seriesKey`, `order`, and `supportsSeries: true` so line-scoped edits and the dev guard work.
 - Export both a bare form (auto-detects orientation/axis) and, where the mark has a natural direction, `...X`/`...Y` variants — every directional mark in this codebase (`bar`, `tick`, `line`, `axis`, `grid`, `rule`) follows that pairing. Don't ship an asymmetric `ruleY`-with-no-`ruleX` again.
 
-**Glyphs: prefer a group of marks over one clever mark.** If a glyph's handles map to distinct *fields* of a row, build it as a `composite` — a group that desugars into ordinary marks (`Elicit` flattens nested arrays in `features`). Each handle is then its own feature, so direct-pick dispatch keeps a drag on one handle from touching another, and each handle edits a plain `y`/`x` channel. Only when several handles must live on **one** feature over **one** datum (their positions are *derived*, not fields — see `trend`'s intercept/slope) do you need the `channel` node tag plus a `when: ctx => ctx.node.channel === '…'` guard to arbitrate. Reach for that pattern last; it was `composite`'s old shape and the group form replaced it.
+**Glyphs: prefer a group of marks over one clever mark.** If a glyph's handles map to distinct *fields* of a row, build it as a `composite` — a group that desugars into ordinary marks (`Elicit` flattens nested arrays in `marks`). Each handle is then its own feature, so direct-pick dispatch keeps a drag on one handle from touching another, and each handle edits a plain `y`/`x` channel. Only when several handles must live on **one** feature over **one** datum (their positions are *derived*, not fields — see `trend`'s intercept/slope) do you need the `channel` node tag plus a `when: ctx => ctx.node.channel === '…'` guard to arbitrate. Reach for that pattern last; it was `composite`'s old shape and the group form replaced it.
 
 ## Adding a new edit
 
@@ -69,6 +69,7 @@ Follow the contract documented at the top of `src/plot/mark.js`. Concretely:
 - `constrain` (edit-scoped, singular) vs `constraints` (plural, the dataset's invariants — canonical on `spec`, accepted on a mark as sugar and promoted) — keep the distinction; don't rename one to match the other.
 - `guide: true` on an `Edit` means "self-draw"; a `Constraint.guide` is a drawer *function*. Same word, deliberately different shapes, both documented in `types.d.ts` — don't try to unify them into one meaning.
 - Don't add a second alias for an existing edit (we removed `youDrawIt` as a redundant alias of `sweep`). One documented name per behavior.
+- `marks` is the public spec key (`ElicitSpec.marks`) and the word used in docs and dev-facing warnings/errors shown to a spec author. `feature`/`FeatureNode`/`featureId` is the internal engine term for one flattened dispatch unit after `composite` desugars a glyph into parts — a mark can expand into several features. Don't blur the two into a single rename: the public surface and dev-facing messages say "mark," internal dispatch code and comments say "feature."
 
 ## Before committing a structural change
 

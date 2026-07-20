@@ -10,7 +10,7 @@ const chart = mount(Elicit({
     n:   { type: "quantitative", domain: [0, 60] },
   },
   onChange: (d) => console.log("elicited", d),
-  features: [
+  marks: [
     bar({
       fill: "#4f46e5",
       channels: {

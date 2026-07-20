@@ -12,7 +12,7 @@ mount(Elicit({
     cat: { type: "categorical" },
     v: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     donut({
       outerRadius: 100, innerRadius: 50,
       edits: [edit.arc.edge()],

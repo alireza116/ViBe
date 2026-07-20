@@ -8,7 +8,7 @@
 //     schema: { valence: { type: 'quantitative', domain: [-1, 1] },
 //               arousal: { type: 'quantitative', domain: [-1, 1] } },
 //     data: [{ valence: 0, arousal: 0 }],
-//     features: [ face() ],            // preset: mouth = valence, eyes = arousal
+//     marks: [ face() ],                // preset: mouth = valence, eyes = arousal
 //   })
 //
 // ── Parameters are CHANNELS ──────────────────────────────────────────────────

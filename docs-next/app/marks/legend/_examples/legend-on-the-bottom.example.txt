@@ -11,7 +11,7 @@ mount(Elicit({
     y: { type: "quantitative", domain: [0, 8] },
     group: { type: "categorical", domain: ["A", "B", "C"] },
   },
-  features: [
+  marks: [
     point({ size: 7, channels: { x: { field: "x" }, y: { field: "y" }, fill: { field: "group" } } }),
     // anchor:'bottom' lays the swatches out in a row and reserves space below
     // the x-axis (offset past the author's bottom margin, so it clears the axis).

@@ -11,7 +11,7 @@ mount(Elicit({
                "LEANING R", "LIKELY R", "VERY LIKELY R"],
     },
   },
-  features: [
+  marks: [
     axisRadial({
       orient: "top", radius: 110, bands: true, bandWidth: 28,
       labelOffset: 16, fontSize: 8,

@@ -12,7 +12,7 @@ mount(Elicit({
     y:     { type: "quantitative", domain: [0, 100] },
     theta: { type: "quantitative", domain: [-180, 180] },
   },
-  features: [
+  marks: [
     point({
       shape: "square",
       fill: "#2563eb", stroke: "#1e3a8a", strokeWidth: 1, size: 10,

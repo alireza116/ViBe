@@ -4,7 +4,7 @@ mount(Elicit({
   axes: false,
   data: [{ n: 50 }],
   schema: { n: { type: "quantitative", domain: [0, 100] } },
-  features: [
+  marks: [
     axisRadial({
       orient: "top", radius: 90, ticks: 6, title: "score",
       channels: { angle: { field: "n", scale: { range: [180, 0] } } },

@@ -820,7 +820,7 @@ export interface ElicitSpec {
   width?: number;
   height?: number;
   margins?: { top: number; right: number; bottom: number; left: number };
-  features?: any[];
+  marks?: any[];
   // THE dataset. A chart elicits exactly one — even a slider elicits a one-row
   // dataset. Seed rows are a starting point; every mark is a view over these rows,
   // encoding some columns and (where it carries an edit) writing them back. Marks

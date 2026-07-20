@@ -53,7 +53,7 @@ export function likert(opts = {}) {
         // The instrument draws its own scale (rings + labels); no chart axes.
         axes: false,
         guides: [prompt(question || ''), optionRings()],
-        features: [
+        marks: [
             point({
                 id: 'likert',
                 size: t.widget.radius - 3,

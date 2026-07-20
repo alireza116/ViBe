@@ -11,7 +11,7 @@ mount(Elicit({
   },
   theme: themes.dark,
   axes: { x: {}, y: { grid: true } },
-  features: [
+  marks: [
     barY({ channels: { x: { field: "cat" }, y: { field: "n", edit: drag() } } }),
   ],
 }));

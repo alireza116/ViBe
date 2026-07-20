@@ -18,7 +18,7 @@ mount(Elicit({
     x: { title: "group" },
     y: { title: "layer", ticks: 2 },
   },
-  features: [
+  marks: [
     // A mini radial axis rings each pivot, so every needle shows the 0→100 span
     // it encodes. Same x/y channels as the needle → one ring per row.
     axisRadial({

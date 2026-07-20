@@ -10,7 +10,7 @@ mount(Elicit({
     day:  { type: "categorical", domain: ["Mon","Tue","Wed","Thu","Fri"] },
     mood: { type: "ordinal", domain: ["bad","ok","good","great"] },
   },
-  features: [
+  marks: [
     point({
       size: 15,
       channels: {

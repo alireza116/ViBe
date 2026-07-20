@@ -7,7 +7,7 @@ mount(Elicit({
   },
   axes: { x: { title: "when" }, y: { title: "belief" } },
   data: [],
-  features: [
+  marks: [
     point({
       size: 7, fill: "#0d9488", stroke: "#0f5c53", strokeWidth: 1,
       channels: {

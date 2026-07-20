@@ -22,7 +22,7 @@ const chart = Elicit({
     brow:  { type: "quantitative", domain: [0, 1] },
   },
   data: [ { smile: 0.7, eyes: 0.5, brow: 0.4 } ],
-  features: [ face({ channels }) ],
+  marks: [ face({ channels }) ],
 });
 mount(chart);
 

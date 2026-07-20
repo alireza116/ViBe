@@ -15,7 +15,7 @@ mount(Elicit({
     n:   { type: "quantitative", domain: [0, 60] },
   },
   // 3. Draw bars; dragging a bar changes its number
-  features: [
+  marks: [
     bar({
       fill: "#4f46e5",
       channels: {

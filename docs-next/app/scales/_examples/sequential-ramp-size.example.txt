@@ -9,7 +9,7 @@ mount(Elicit({
     { h: 150, weight: 48 }, { h: 160, weight: 57 }, { h: 170, weight: 66 },
     { h: 180, weight: 78 }, { h: 190, weight: 92 }, { h: 165, weight: 61 },
   ],
-  features: [
+  marks: [
     point({
       stroke: "#334155", strokeWidth: 1,
       channels: {

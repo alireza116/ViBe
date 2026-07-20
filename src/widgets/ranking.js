@@ -39,7 +39,7 @@ export function ranking(opts = {}) {
         onChange,
         axes: false,
         guides: [prompt(question)],
-        features: [
+        marks: [
             point({
                 id: 'rank-dots',
                 size: t.widget.radius - 2,

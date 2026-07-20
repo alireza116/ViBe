@@ -11,7 +11,7 @@ mount(Elicit({
     y:     { type: "quantitative", domain: [0, 100] },
     theta: { type: "quantitative", domain: [-180, 180] },
   },
-  features: [
+  marks: [
     composite({
       id: "crosshair",
       discreteScale: "point",

@@ -8,7 +8,7 @@ mount(Elicit({
     bin: { type: "categorical", domain: cats },
   },
   scales: { x: { type: "band" } },
-  features: [
+  marks: [
     dotStack({
       channels: { x: { field: "bin" } },
       edits: [ create({ gesture: "click", channels: ["x"] }), remove() ],

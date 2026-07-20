@@ -7,7 +7,7 @@ const chart = Elicit({
     r:      { type: "quantitative", domain: [-1, 1] },
     spread: { type: "quantitative", domain: [0, 1] },
   },
-  features: [
+  marks: [
     cone({
       id: "belief",
       channels: {

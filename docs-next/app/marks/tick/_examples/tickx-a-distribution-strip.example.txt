@@ -8,7 +8,7 @@ mount(Elicit({
   schema: {
     v: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     tickX({
       stroke: "#0d9488", strokeWidth: 2, inset: 10,
       channels: {

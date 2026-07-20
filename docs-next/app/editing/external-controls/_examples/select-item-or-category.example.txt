@@ -17,7 +17,7 @@ const chart = Elicit({
     group: { type: "categorical", domain: ["North", "South"] },
     value: { type: "quantitative", domain: [0, 16] },
   },
-  features: [
+  marks: [
     barY({
       channels: {
         x: { field: "name" },

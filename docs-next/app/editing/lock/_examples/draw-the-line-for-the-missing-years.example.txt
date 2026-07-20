@@ -54,7 +54,7 @@ const chart = mount(Elicit({
                                 scales.y.encode(d.deaths)]),
     }]),
   ],
-  features: [
+  marks: [
     lineY({
       stroke: "#7f9dc9", strokeWidth: 3, curve: "catmullRom", handleSize: 3,
       channels: {

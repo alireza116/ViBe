@@ -5,11 +5,11 @@ export const api: ApiEntry[] = [
     name: "Elicit(spec)",
     summary: (
       <>
-        The entry point (<code className="inline">vibe.Elicit</code>). Returns a DOM element you append. A chart is one <code className="inline">schema</code>, one <code className="inline">data</code>set, and a list of <code className="inline">features</code> (marks) — plus optional constraints, axes, and guides.
+        The entry point (<code className="inline">vibe.Elicit</code>). Returns a DOM element you append. A chart is one <code className="inline">schema</code>, one <code className="inline">data</code>set, and a list of <code className="inline">marks</code> — plus optional constraints, axes, and guides.
       </>
     ),
     signatures: [
-      "Elicit({ schema, data?, features, width?, height?, … }) → ElicitElement",
+      "Elicit({ schema, data?, marks, width?, height?, … }) → ElicitElement",
     ],
     options: [
       {
@@ -33,8 +33,8 @@ export const api: ApiEntry[] = [
         ),
       },
       {
-        name: "features",
-        type: "Feature[]",
+        name: "marks",
+        type: "Mark[]",
         default: "[]",
         desc: (
           <>

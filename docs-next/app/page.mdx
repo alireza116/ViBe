@@ -1,15 +1,15 @@
-import { DocShell } from '../components/DocShell';
-import { Section } from '../components/Section';
-import { Example } from '../components/Example';
-import { Lead } from '../components/Lead';
+import { DocShell } from "../components/DocShell";
+import { Section } from "../components/Section";
+import { Example } from "../components/Example";
+import { Lead } from "../components/Lead";
 
-import allocateABudget from './_examples/allocate-a-budget.example.txt';
-import placeBeliefs from './_examples/place-beliefs.example.txt';
-import drawAForecast from './_examples/draw-a-forecast.example.txt';
-import likelihoodNeedle from './_examples/likelihood-needle.example.txt';
-import pinsOnAMap from './_examples/pins-on-a-map.example.txt';
-import answerAScale from './_examples/answer-a-scale.example.txt';
-import howAChartIsBuilt from './_examples/how-a-chart-is-built.example.txt';
+import allocateABudget from "./_examples/allocate-a-budget.example.txt";
+import placeBeliefs from "./_examples/place-beliefs.example.txt";
+import drawAForecast from "./_examples/draw-a-forecast.example.txt";
+import likelihoodNeedle from "./_examples/likelihood-needle.example.txt";
+import pinsOnAMap from "./_examples/pins-on-a-map.example.txt";
+import answerAScale from "./_examples/answer-a-scale.example.txt";
+import howAChartIsBuilt from "./_examples/how-a-chart-is-built.example.txt";
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -17,7 +17,12 @@ export default function Layout({ children }) {
 
 # What you can elicit
 
-<Lead>VibeJS lets you build charts people can answer with — drag a bar, place a point, turn a dial — and you get structured data back (see the panel next to each chart). Try the questions below.</Lead>
+<Lead>
+  VibeJS lets you build charts you can use to elicit information (beliefs,
+  preferences, and other things) from people. drag a bar, place a point, turn a
+  dial — and you get structured data back (see the panel next to each chart).
+  Try the questions below.
+</Lead>
 
 <Section id="allocate" title="How would you allocate 100% across these categories?" codeMode="collapsed">
 
@@ -27,11 +32,11 @@ Use a bar chart when the pieces have to add up. Drag any bar; the others adjust 
   code={allocateABudget}
   title="Allocate a budget"
   blurb="Drag the bars to split 100% across categories. Raising one lowers the others."
-  try={(
+  try={
     <>
       <b>Drag</b> any bar. The shares always add up to 100.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -44,11 +49,11 @@ Use a scatter plot to ask a two-part question. The chart starts empty — double
   code={placeBeliefs}
   title="Age vs immigration attitude"
   blurb="An empty scatter plot. Double-click to place people; drag to move them. Color runs from red (anti) to green (pro)."
-  try={(
+  try={
     <>
       <b>Double-click</b> to add a person · <b>drag</b> to move them.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -61,11 +66,11 @@ Use a line chart when you want someone to draw a path. Drag across the chart to 
   code={drawAForecast}
   title="Draw the trend you expect"
   blurb="Sketch the line with your mouse — like drawing a forecast by hand."
-  try={(
+  try={
     <>
       <b>Drag</b> left-to-right across the chart to reshape the line.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -78,11 +83,11 @@ Use a needle dial for a single choice on a scale — from “very likely D” to
   code={likelihoodNeedle}
   title="Likelihood gauge"
   blurb="A dial you can turn — drag the needle to pick how likely something feels."
-  try={(
+  try={
     <>
       <b>Drag</b> the needle left or right.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -95,11 +100,11 @@ Place pins on a map to answer. Click to drop a pin; drag one to move it.
   code={pinsOnAMap}
   title="Best place to live"
   blurb="Click the map to drop pins for places you’d live; drag a pin to fine-tune."
-  try={(
+  try={
     <>
       <b>Click</b> to place a pin · <b>drag</b> an existing one.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -112,11 +117,11 @@ Classic survey scales work too. Hover to preview, then click to lock in an answe
   code={answerAScale}
   title="Answer a survey scale"
   blurb="A familiar agree/disagree question — hover, then click your answer."
-  try={(
+  try={
     <>
       Hover across the scale, then <b>click</b> your answer.
     </>
-  )}
+  }
 />
 
 </Section>
@@ -129,11 +134,11 @@ Under the hood it’s a short recipe: starting data, what each field means, and 
   code={howAChartIsBuilt}
   title="One editable bar chart"
   blurb="The chart on the left and the numbers on the right are the same thing — drag a bar and watch the data update."
-  try={(
+  try={
     <>
       <b>Drag</b> a bar — the panel on the right is what your app would read.
     </>
-  )}
+  }
 />
 
 </Section>

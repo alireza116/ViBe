@@ -9,7 +9,7 @@
 // later carry `edits` to become interactive — an editable axis.
 //
 // Two ways to use them:
-//   1. EXPLICITLY compose them:  features: [ axisX({ ticks: 5 }), gridY(), point(...) ]
+//   1. EXPLICITLY compose them:  marks: [ axisX({ ticks: 5 }), gridY(), point(...) ]
 //   2. IMPLICITLY via the global `axes` convenience on Elicit(), which desugars
 //      into these same marks (see core/elicit.js).
 //

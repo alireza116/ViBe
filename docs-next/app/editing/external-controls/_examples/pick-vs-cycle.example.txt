@@ -9,7 +9,7 @@ const chart = Elicit({
     kind: { type: "categorical", domain: ["low", "med", "high"] },
   },
   data: [ { kind: "low" } ],
-  features: [
+  marks: [
     point({
       size: 26,
       channels: {

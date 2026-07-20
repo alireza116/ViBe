@@ -17,7 +17,7 @@ mount(Elicit({
     cat: { type: "categorical", domain: ["A"] },
     n: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     point({
       fill: "#2563eb", size: 10,
       channels: { x: { field: "cat" }, y: { field: "n" } },

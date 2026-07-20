@@ -11,7 +11,7 @@ const chart = Elicit({
     theta: { type: "quantitative", domain: [0, 360] },
   },
   data: [ { x: 50, y: 50, theta: 20 } ],
-  features: [
+  marks: [
     rect({
       channels: {
         x: { field: "x" },

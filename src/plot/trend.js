@@ -16,7 +16,7 @@
 //                      y: { type: 'quantitative', domain: [-10, 10] },
 //                      intercept: {}, slope: {} },
 //            data: [{ intercept: 0, slope: 1 }],
-//            features: [ trend({ interceptStage: 0, slopeStage: 1 }) ] })
+//            marks: [ trend({ interceptStage: 0, slopeStage: 1 }) ] })
 //
 // Trend is the one mark whose positional channels name the plot's AXES rather than
 // fields of its datum: the belief is about the relationship between x and y, while

@@ -15,7 +15,7 @@ mount(Elicit({
     clamp({ min: 0, max: 100, field: "effort" }),
     clamp({ min: 0, max: 100, field: "value" }),
   ],
-  features: [
+  marks: [
     point({
       size: 8, fill: "#2563eb",
       channels: {

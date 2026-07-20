@@ -9,7 +9,7 @@ mount(Elicit({
     cat: { type: "categorical", domain: ["A", "B", "C", "D"] },
     n:   { type: "quantitative", domain: [0, 60] },
   },
-  features: [
+  marks: [
     // Both marks read the same rows — neither owns data.
     bar({
       fill: "#c7d2fe",

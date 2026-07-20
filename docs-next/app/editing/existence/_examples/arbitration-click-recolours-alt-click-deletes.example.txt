@@ -12,7 +12,7 @@ mount(Elicit({
     y:     { type: "quantitative", domain: [0, 100] },
     group: { type: "ordinal", domain: ["alpha", "beta", "gamma"] },
   },
-  features: [
+  marks: [
     point({
       size: 10,
       channels: {

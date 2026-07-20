@@ -12,7 +12,7 @@ mount(Elicit({
     group: { type: "categorical", domain: ["North", "South", "East", "West"] },
     value: { type: "quantitative", domain: [0, 16] },
   },
-  features: [
+  marks: [
     // Click a bar to SELECT it. Selection is pipeline state (no `selected` column);
     // the selected bar gets the highlight outline automatically.
     barY({

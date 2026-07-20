@@ -11,7 +11,7 @@ mount(Elicit({
     { metric: "Churn",        delta: -60 },
     { metric: "Support load", delta: 3 },
   ],
-  features: [
+  marks: [
     point({
       size: 9,
       channels: {

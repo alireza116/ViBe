@@ -9,7 +9,7 @@ mount(Elicit({
     value: { type: "quantitative", domain: [0, 100] },
   },
   scales: { x: { type: "band" } },
-  features: [
+  marks: [
     barY({ fill: "#4f46e5", channels: {
       x: { field: "cat" },
       y: { field: "value", edit: drag() },

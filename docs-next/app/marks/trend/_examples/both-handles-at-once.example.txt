@@ -8,7 +8,7 @@ mount(Elicit({
     slope:     { type: "quantitative" },
   },
   data: [{ intercept: 2, slope: 0.5 }],
-  features: [
+  marks: [
     trend(),
   ],
 }));

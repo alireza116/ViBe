@@ -10,7 +10,7 @@ mount(Elicit({
     fruit: { type: "categorical", domain: ["apples","bananas","cherries"] },
     n:     { type: "quantitative", domain: [0, 12] },
   },
-  features: [
+  marks: [
     waffleY({
       channels: {
         x: { field: "fruit" },

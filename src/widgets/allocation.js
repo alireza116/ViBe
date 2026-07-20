@@ -49,7 +49,7 @@ export function allocation(opts = {}) {
         ],
         onChange,
         guides: [prompt(question)],
-        features: [
+        marks: [
             barY({
                 id: 'alloc',
                 fill: t.widget.accent,

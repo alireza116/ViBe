@@ -11,7 +11,7 @@ mount(Elicit({
     mean: { type: "quantitative", domain: [0, 100] },
     hi:   { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     composite({
       id: "errorbar",
       // Invariant on the DATA: the centre stays within the ends. A cap drag and a

@@ -10,7 +10,7 @@ mount(Elicit({
     x: { type: "quantitative", domain: [0, 7] },
     y: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     lineY({
       stroke: "#7c3aed", strokeWidth: 3, curve: "catmullRom",
       handles: false,   // hide the anchor dots (still editable)

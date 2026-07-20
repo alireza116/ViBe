@@ -7,7 +7,7 @@ mount(Elicit({
   projection: { type: "mercator", domain: vancouver, inset: 6 },
   data: [],
   schema: {},
-  features: [
+  marks: [
     geoBasemap({
       geojson: vancouver,
       fill: "#e8eef5",

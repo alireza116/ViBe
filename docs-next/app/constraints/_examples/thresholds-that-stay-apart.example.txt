@@ -19,7 +19,7 @@ mount(Elicit({
     spacing({ field: "at", min: 8 }),
     clamp({ min: 0, max: 100, field: "at" }),
   ],
-  features: [
+  marks: [
     tickX({
       strokeWidth: 2, stroke: "#2563eb",
       channels: { x: { field: "at", edit: drag() } },

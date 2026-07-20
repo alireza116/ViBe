@@ -9,7 +9,7 @@ const chart = Elicit({
     { q: "Q1", n: 40 }, { q: "Q2", n: 55 },
     { q: "Q3", n: 35 }, { q: "Q4", n: 60 },
   ],
-  features: [
+  marks: [
     barY({ channels: { x: { field: "q" },
                        y: { field: "n", edit: drag() } } }),
   ],

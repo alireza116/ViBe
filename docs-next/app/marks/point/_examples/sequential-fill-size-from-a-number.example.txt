@@ -9,7 +9,7 @@ mount(Elicit({
     h:      { type: "quantitative", domain: [140, 200] },
     weight: { type: "quantitative", domain: [40, 100] },
   },
-  features: [
+  marks: [
     point({
       stroke: "#334155", strokeWidth: 1,
       channels: {

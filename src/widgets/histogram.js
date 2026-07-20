@@ -45,7 +45,7 @@ export function histogram(opts = {}) {
         constraints: [clamp({ min: 0, max, field: 'n' })],
         onChange,
         guides: [prompt(question)],
-        features: [
+        marks: [
             barY({
                 id: 'hist',
                 fill: t.widget.accent,

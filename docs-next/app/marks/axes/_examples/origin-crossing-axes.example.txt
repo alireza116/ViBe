@@ -13,7 +13,7 @@ mount(Elicit({
     x: { type: "quantitative", domain: [-10, 10] },
     y: { type: "quantitative", domain: [-10, 10] },
   },
-  features: [
+  marks: [
     point({
       size: 5, fill: "#4f46e5",
       channels: {

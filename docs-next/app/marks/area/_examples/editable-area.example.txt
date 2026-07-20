@@ -9,7 +9,7 @@ mount(Elicit({
     t: { type: "quantitative", domain: [1, 5] },
     n: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     areaY({
       fill: "#2563eb", stroke: "#2563eb",
       channels: {

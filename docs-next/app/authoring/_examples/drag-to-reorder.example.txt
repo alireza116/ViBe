@@ -10,7 +10,7 @@ mount(Elicit({
     item: { type: "categorical", domain: ["A", "B", "C"] },
     rank: { type: "ordinal", domain: [1, 2, 3] },
   },
-  features: [
+  marks: [
     point({
       fill: "#0d9488", size: 9,
       channels: {

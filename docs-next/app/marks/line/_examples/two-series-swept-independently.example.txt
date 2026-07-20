@@ -11,7 +11,7 @@ mount(Elicit({
     y: { type: "quantitative", domain: [0, 100] },
     g: { type: "ordinal" },
   },
-  features: [
+  marks: [
     lineY({
       strokeWidth: 3, curve: "catmullRom",
       channels: {

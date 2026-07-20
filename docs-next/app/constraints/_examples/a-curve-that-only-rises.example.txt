@@ -18,7 +18,7 @@ mount(Elicit({
     monotonic({ field: "p", along: "year" }),
     clamp({ min: 0, max: 1, field: "p" }),
   ],
-  features: [
+  marks: [
     lineY({
       stroke: "#2563eb", handleSize: 5,
       channels: { x: { field: "year" },

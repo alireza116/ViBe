@@ -14,7 +14,7 @@ mount(Elicit({
     n:  { type: "quantitative", domain: [0, 24] },
   },
   constraints: [clamp({ min: 0, max: 24, field: "n" })],
-  features: [
+  marks: [
     rectY({
       fill: "#0d9488", fillOpacity: 0.75, stroke: "#0f766e",
       channels: {

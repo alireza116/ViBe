@@ -10,7 +10,7 @@
 //
 //   // Elicit({ schema: { r:      { type: 'quantitative', domain: [-1, 1] },
 //   //                    spread: { type: 'quantitative', domain: [0, 1] } },
-//   //          data: [{ r: 0, spread: 0 }], features: [ cone({ … }) ] })
+//   //          data: [{ r: 0, spread: 0 }], marks: [ cone({ … }) ] })
 //   cone({
 //     channels: {
 //       angle:  { field: 'r',      scale: { range: [-45, 45] },

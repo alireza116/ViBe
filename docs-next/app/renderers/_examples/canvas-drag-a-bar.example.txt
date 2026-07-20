@@ -10,7 +10,7 @@ mount(Elicit({
     x: { type: "categorical", domain: ["A", "B", "C", "D"] },
     y: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     bar({
       fill: "#4f46e5",
       channels: {

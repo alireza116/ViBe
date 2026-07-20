@@ -63,7 +63,7 @@ export function matrix(opts = {}) {
         onChange,
         axes: false,
         guides: [prompt(question || '', { y: -38 }), cellGrid()],
-        features: [
+        marks: [
             point({
                 id: 'matrix',
                 size: t.widget.radius - 3,

@@ -7,7 +7,7 @@ mount(Elicit({
     y: { type: "quantitative", domain: [0, 100] },
   },
   axes: false,
-  features: [
+  marks: [
     gridX(), axisY(),
     axisX({ title: "x", grid: true, edit: edit.axis.scale() }),
     point({ fill: "#7c3aed", size: 7,

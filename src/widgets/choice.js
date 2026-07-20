@@ -50,7 +50,7 @@ export function multipleChoice(opts = {}) {
         onChange,
         axes: false,
         guides: [prompt(question || ''), optionRings()],
-        features: [
+        marks: [
             point({
                 id: 'choice',
                 size: t.widget.radius - 3,

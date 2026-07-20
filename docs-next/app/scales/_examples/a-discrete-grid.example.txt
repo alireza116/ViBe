@@ -10,7 +10,7 @@ mount(Elicit({
     { x: "B", y: "Mid", group: "beta" },
     { x: "C", y: "High", group: "gamma" },
   ],
-  features: [
+  marks: [
     point({
       size: 12,
       channels: {

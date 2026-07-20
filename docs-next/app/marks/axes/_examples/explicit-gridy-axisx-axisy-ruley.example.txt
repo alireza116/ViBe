@@ -7,7 +7,7 @@ mount(Elicit({
     x: { type: "quantitative", domain: [0, 100] },
     y: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     gridY({ ticks: 5 }),
     ruleY({ y: 50, stroke: "#e4572e", strokeDasharray: "4 3" }),
     point({

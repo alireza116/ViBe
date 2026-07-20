@@ -8,7 +8,7 @@ const chart = Elicit({
     slope:     { type: "quantitative" },
   },
   data: [{ intercept: 0, slope: 0.6 }],
-  features: [
+  marks: [
     trend({
       interceptStage: 0,
       slopeStage: 1,

@@ -41,7 +41,7 @@ mount(Elicit({
   scales: { x: { type: "band" } },
   constraints: [ count({ max: 1, strategy: "replace" }) ],
   guides: [ prompt("This tool is easy to use"), optionRings() ],
-  features: [
+  marks: [
     point({
       id: "likert",
       size: radius - 3,

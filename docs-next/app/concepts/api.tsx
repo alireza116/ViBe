@@ -26,7 +26,7 @@ export const api: ApiEntry[] = [
         desc: "The one elicited dataset. Every mark reads these rows.",
       },
       {
-        name: "features",
+        name: "marks",
         type: "on Elicit",
         default: "[]",
         desc: "Marks (views) that encode — and optionally edit — columns of that dataset.",

@@ -14,7 +14,7 @@ mount(Elicit({
     mean: { type: "quantitative", domain: [0, 80] },
     hi:   { type: "quantitative", domain: [20, 100] },
   },
-  features: [
+  marks: [
     composite({
       id: "errorbar",
       parts: [

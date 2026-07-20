@@ -11,7 +11,7 @@ mount(Elicit({
   },
   // Dataset invariant — holds for every edit from every mark.
   constraints: [ clamp({ field: "n", min: 10, max: 50 }) ],
-  features: [
+  marks: [
     bar({
       fill: "#4f46e5",
       channels: {

@@ -8,7 +8,7 @@ mount(Elicit({
     y1: { type: "quantitative", domain: [0, 10] },
     y2: { type: "quantitative", domain: [0, 10] },
   },
-  features: [
+  marks: [
     rect({
       fill: "#2563eb", fillOpacity: 0.5, stroke: "#2563eb",
       channels: {

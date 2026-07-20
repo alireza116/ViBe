@@ -16,7 +16,7 @@ mount(Elicit({
     fill: { type: "categorical", domain: ["A", "B", "C"] },
     geometry: { type: "categorical" },
   },
-  features: [
+  marks: [
     geoBasemap({ geojson: vancouver, fill: "#f1f5f9", stroke: "#94a3b8", strokeWidth: 0.7 }),
     geoPolygon({
       stroke: "#0f172a", strokeWidth: 1.2, fillOpacity: 0.75,

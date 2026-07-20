@@ -43,7 +43,7 @@ export function thermometer(opts = {}) {
         constraints,
         onChange,
         guides: [prompt(question)],
-        features: [
+        marks: [
             barY({
                 id: 'thermo',
                 fill: t.widget.accent,

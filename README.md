@@ -166,7 +166,7 @@ const beliefChart = vibe.Elicit({
   // Data invariants — they gate and repair every edit, from any mark.
   constraints: [ clamp({ min: 0 }), maintainSum({ targetSum: 100 }) ],
   onChange: (data) => console.log("elicitation state:", data),
-  features: [
+  marks: [
     // `datum` is a DATA-space constant: it goes through the y scale, so the line
     // lands where y = 50 is. (`value` would mean 50 pixels.)
     vibe.plot.ruleY({ stroke: "red", strokeDasharray: "4", channels: { y: { datum: 50 } } }),

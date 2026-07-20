@@ -10,7 +10,7 @@ mount(Elicit({
     { cat: "A", n: 34 }, { cat: "B", n: 58 },
     { cat: "C", n: 22 }, { cat: "D", n: 47 },
   ],
-  features: [
+  marks: [
     bar({
       fill: "#4f46e5",
       channels: {

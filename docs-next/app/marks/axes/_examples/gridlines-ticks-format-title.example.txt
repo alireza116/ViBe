@@ -13,7 +13,7 @@ mount(Elicit({
     step: { type: "categorical", domain: ["Visit", "Signup", "Active", "Paid"] },
     rate: { type: "quantitative", domain: [0, 1] },
   },
-  features: [
+  marks: [
     bar({
       channels: {
         x: { field: "step" },

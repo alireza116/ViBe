@@ -42,7 +42,7 @@ export function probabilityTokens(opts = {}) {
         constraints: [count({ max: maxTokens, strategy: 'reject' })],
         onChange,
         guides: [prompt(question)],
-        features: [
+        marks: [
             dotStackY({
                 id: 'tokens',
                 fill: t.widget.accent,

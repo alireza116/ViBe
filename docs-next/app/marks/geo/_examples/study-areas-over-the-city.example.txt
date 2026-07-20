@@ -13,7 +13,7 @@ mount(Elicit({
     east:  { type: "quantitative", domain: [-123.27, -123.02] },
     north: { type: "quantitative", domain: [49.20, 49.32] },
   },
-  features: [
+  marks: [
     geoBasemap({ geojson: vancouver, fill: "#eef2f7", stroke: "#94a3b8", strokeWidth: 0.7 }),
     geoRect({
       fill: "rgba(37, 99, 235, 0.18)", stroke: "#1d4ed8", strokeWidth: 1.5,

@@ -14,7 +14,7 @@ mount(Elicit({
       ],
     },
   },
-  features: [
+  marks: [
     axisRadial({
       orient: "top", radius: 110, bands: true, bandWidth: 22,
       tickSize: 0, labelOffset: 18, fontSize: 8,

@@ -12,7 +12,7 @@ mount(Elicit({
     share: { type: "quantitative", domain: [0, 100] },
     label: { type: "categorical" },
   },
-  features: [
+  marks: [
     donut({
       outerRadius: 100, innerRadius: 55,
       channels: {

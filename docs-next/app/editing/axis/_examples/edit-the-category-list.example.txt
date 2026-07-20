@@ -11,7 +11,7 @@ mount(Elicit({
     v:   { type: "quantitative", domain: [0, 12] },
   },
   axes: false,
-  features: [
+  marks: [
     axisY(),
     axisX({ edit: edit.axis.categories() }),
     bar({ fill: "#2563eb",

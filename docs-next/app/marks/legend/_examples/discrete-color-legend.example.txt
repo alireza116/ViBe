@@ -11,7 +11,7 @@ mount(Elicit({
     group: { type: "categorical", domain: ["North", "South", "East", "West"] },
     value: { type: "quantitative", domain: [0, 16] },
   },
-  features: [
+  marks: [
     barY({
       channels: {
         x: { field: "group" },

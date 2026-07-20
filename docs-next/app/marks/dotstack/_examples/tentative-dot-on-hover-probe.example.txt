@@ -8,7 +8,7 @@ const chart = Elicit({
     bin: { type: "categorical", domain: bins },
   },
   scales: { x: { type: "point" } },
-  features: [
+  marks: [
     dotStack({
       id: "tokens",
       channels: { x: { field: "bin" } },

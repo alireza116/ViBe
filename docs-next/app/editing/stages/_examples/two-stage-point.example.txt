@@ -9,7 +9,7 @@ const chart = Elicit({
     x:   { type: "quantitative", domain: [0, 10] },
     mag: { type: "quantitative", domain: [0, 14] },
   },
-  features: [
+  marks: [
     point({
       channels: {
         x: { field: "x", edit: drag({ stage: 0 }) },

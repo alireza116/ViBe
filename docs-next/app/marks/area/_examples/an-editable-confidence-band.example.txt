@@ -12,7 +12,7 @@ mount(Elicit({
   },
   // A dataset invariant: it holds whichever edge you grab.
   constraints: [ ordering({ lower: "lo", upper: "hi" }) ],
-  features: [
+  marks: [
     areaY({
       fill: "#2563eb", stroke: "#2563eb",
       channels: {

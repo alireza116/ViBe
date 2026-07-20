@@ -6,7 +6,7 @@ const chart = Elicit({
   schema: {
     v: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     point({
       id: "belief",
       size: 9, fill: "#2563eb",

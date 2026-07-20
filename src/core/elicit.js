@@ -50,7 +50,7 @@ function warnScopeMismatch(feature, edits) {
         warnedScope.add(key);
         console.warn(
             `[vibe] edit.${e.scope}.${e.type}() is attached to a mark without ${e.scope} support ` +
-            `(feature "${feature.id}"). ${e.scope}-scoped edits expect ${cap.expects}; it may not behave.`
+            `(mark "${feature.id}"). ${e.scope}-scoped edits expect ${cap.expects}; it may not behave.`
         );
     }
 }
@@ -92,7 +92,7 @@ function warnDuplicatePlaneEdits(features, editsOf) {
     warnedPlaneDup = true;
     console.warn(
         `[vibe] ${owners.length} marks carry a plane-pick edit over the one dataset ` +
-        `(features ${owners.map(f => `"${f.id}"`).join(', ')}). A plane gesture fans to all ` +
+        `(marks ${owners.map(f => `"${f.id}"`).join(', ')}). A plane gesture fans to all ` +
         `of them, so a whole-dataset edit (create/remove/rotate/toggle) will apply once per ` +
         `mark. Declare it on exactly one.`
     );
@@ -136,9 +136,9 @@ export function Elicit(spec) {
         // `schema` and `scales` are read straight off the spec by resolveScales:
         // the schema owns each field's data type and DOMAIN, and `scales` is the
         // chart-level per-channel scale override.
-        features: userFeatures = [],
+        marks: userFeatures = [],
         // Global axis convenience: desugars into composable axis/grid marks (see
-        // autoAxes). Explicit axis marks in `features` take precedence per channel.
+        // autoAxes). Explicit axis marks in `marks` take precedence per channel.
         axes,
         guides = [],
         // Interaction-effects layer (grab / proximity-select), customizable and
@@ -171,7 +171,7 @@ export function Elicit(spec) {
     const effects = resolveEffects(effectsSpec, theme.effects);
 
     // Prepend auto-injected axis/grid marks (drawn behind marks via the background
-    // layer). Explicit axis marks the user composed into `features` are preserved.
+    // layer). Explicit axis marks the user composed into `marks` are preserved.
     // A projection chart has no cartesian axes — skip autoAxes unless the caller
     // forced them (axes !== undefined still respected via autoAxes(false)).
     // Flattened because a group mark (composite) desugars to an ARRAY of features.

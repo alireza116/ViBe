@@ -8,7 +8,7 @@ mount(Elicit({
     value: { type: "quantitative", domain: [0, 100] },
   },
   scales: { x: { type: "band" } },
-  features: [
+  marks: [
     waffleY({
       fill: "#16a34a",
       shape: "circle",

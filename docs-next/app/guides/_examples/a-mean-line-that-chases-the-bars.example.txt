@@ -24,7 +24,7 @@ mount(Elicit({
     { x: "C", y: 45 }, { x: "D", y: 70 },
   ],
   constraints: [ clamp({ field: "y", min: 0, max: 100 }) ],
-  features: [
+  marks: [
     bar({
       fill: "#6366f1",
       channels: {

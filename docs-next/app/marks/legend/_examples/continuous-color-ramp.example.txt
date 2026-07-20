@@ -10,7 +10,7 @@ mount(Elicit({
     hour: { type: "quantitative", domain: [0, 24] },
     temp: { type: "quantitative", domain: [0, 30] },
   },
-  features: [
+  marks: [
     point({
       size: 8,
       channels: {

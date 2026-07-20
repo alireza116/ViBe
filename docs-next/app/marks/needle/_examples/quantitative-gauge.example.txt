@@ -4,7 +4,7 @@ mount(Elicit({
   axes: false,
   data: [{ n: 62 }],
   schema: { n: { type: "quantitative", domain: [0, 100] } },
-  features: [
+  marks: [
     composite({
       id: "gauge",
       parts: [

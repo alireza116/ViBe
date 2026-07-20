@@ -10,7 +10,7 @@ mount(Elicit({
     y: { type: "quantitative", domain: [0, 10] },
     label: { type: "categorical", domain: ["drag me", "and me"] },
   },
-  features: [
+  marks: [
     text({ fontSize: 13, fill: "#2563eb",
       channels: {
         x: { field: "x" }, y: { field: "y" },

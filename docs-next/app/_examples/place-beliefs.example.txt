@@ -21,7 +21,7 @@ mount(Elicit({
     },
   },
   data: [],
-  features: [
+  marks: [
     point({
       size: 7, stroke: "#1f2733", strokeWidth: 1,
       channels: {

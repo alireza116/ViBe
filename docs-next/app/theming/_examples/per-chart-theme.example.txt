@@ -15,7 +15,7 @@ mount(Elicit({
     grid: { stroke: "#f1f5f9" },
   },
   axes: { x: {}, y: { grid: true } },
-  features: [
+  marks: [
     barY({ channels: { x: { field: "cat" }, y: { field: "n", edit: drag() } } }),
   ],
 }));

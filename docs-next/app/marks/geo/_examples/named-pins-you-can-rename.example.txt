@@ -12,7 +12,7 @@ mount(Elicit({
     lat:   { type: "quantitative", domain: [49.20, 49.32] },
     place: { type: "categorical" },
   },
-  features: [
+  marks: [
     geoBasemap({ geojson: vancouver, fill: "#eef2f7", stroke: "#94a3b8", strokeWidth: 0.7 }),
 
     geoPoint({

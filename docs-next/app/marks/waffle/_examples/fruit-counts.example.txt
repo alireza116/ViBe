@@ -11,7 +11,7 @@ mount(Elicit({
     value: { type: "quantitative", domain: [0, 320] },
   },
   scales: { x: { type: "band" } },
-  features: [
+  marks: [
     waffleY({
       fill: "#4f46e5",
       channels: {

@@ -4,7 +4,7 @@ mount(Elicit({
   data: [ { temp: 15 } ],
   schema: { temp: { type: "quantitative", domain: [0, 30] } },
   axes: false,
-  features: [
+  marks: [
     // The dot's colour tracks the elicited value as you drag the ramp handle.
     point({ size: 30, channels: { x: { value: 80 }, y: { value: 95 }, fill: { field: "temp" } } }),
     // edit.legendValue() adds a handle you drag along the ramp to set `temp`.

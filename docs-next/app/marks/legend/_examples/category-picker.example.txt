@@ -4,7 +4,7 @@ mount(Elicit({
   data: [ { group: "A" } ],
   schema: { group: { type: "categorical", domain: ["A", "B", "C", "D"] } },
   axes: false,
-  features: [
+  marks: [
     // A one-row belief. The dot's colour reflects the current category.
     point({ size: 26, channels: { x: { value: 90 }, y: { value: 65 }, fill: { field: "group" } } }),
     // edit.legend() makes each swatch a click target that sets `group`.

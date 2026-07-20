@@ -14,7 +14,7 @@ mount(Elicit({
     browH:    { type: "quantitative", domain: [0, 1] },
     browT:    { type: "quantitative", domain: [0, 1] },
   },
-  features: [
+  marks: [
     face({
       channels: {
         mouthCurve: { field: "curve" }, mouthOpen: { field: "open" }, mouthAsym: { field: "smirk" },

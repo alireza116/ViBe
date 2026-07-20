@@ -10,7 +10,7 @@ mount(Elicit({
     { t: 2, w: 20, g: "a" }, { t: 20, w: 55, g: "b" },
     { t: 120, w: 40, g: "c" }, { t: 700, w: 80, g: "a" },
   ],
-  features: [
+  marks: [
     point({
       stroke: "#1f2733",
       channels: {

@@ -47,7 +47,7 @@ export function region(opts = {}) {
         ],
         onChange,
         guides: [prompt(question)],
-        features: [
+        marks: [
             rect({
                 id: 'region',
                 fill: t.widget.accent,

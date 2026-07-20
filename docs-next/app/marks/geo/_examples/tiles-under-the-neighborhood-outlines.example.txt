@@ -10,7 +10,7 @@ mount(Elicit({
     east:  { type: "quantitative", domain: [-123.27, -123.02] },
     north: { type: "quantitative", domain: [49.20, 49.32] },
   },
-  features: [
+  marks: [
     // A lighter, less busy basemap than OSM standard. Any {z}/{x}/{y} server works.
     geoTile({
       url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",

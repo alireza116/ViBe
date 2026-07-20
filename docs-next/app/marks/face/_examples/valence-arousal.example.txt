@@ -6,5 +6,5 @@ mount(Elicit({
     valence: { type: "quantitative", domain: [-1, 1] },
     arousal: { type: "quantitative", domain: [-1, 1] },
   },
-  features: [ face() ],
+  marks: [ face() ],
 }))

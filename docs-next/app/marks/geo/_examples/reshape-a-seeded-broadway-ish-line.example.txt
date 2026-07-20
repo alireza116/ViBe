@@ -14,7 +14,7 @@ mount(Elicit({
   schema: {
     coordinates: { type: "categorical" },
   },
-  features: [
+  marks: [
     geoBasemap({ geojson: vancouver, fill: "#e8eef5", stroke: "#64748b", strokeWidth: 0.8 }),
     geoLine({
       stroke: "#b91c1c", strokeWidth: 2.5, handleSize: 6,

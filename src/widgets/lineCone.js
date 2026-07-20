@@ -64,7 +64,7 @@ export function lineCone(opts = {}) {
         onChange,
         axes: false,
         guides: [prompt(question || '', { y: -32 }), crosshair({ x, y })],
-        features: [
+        marks: [
             cone({
                 id: 'lineCone',
                 channels: {

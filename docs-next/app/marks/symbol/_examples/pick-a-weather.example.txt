@@ -4,7 +4,7 @@ mount(Elicit({
   data: [ { sky: "cloudy" } ],
   schema: { sky: { type: "ordinal", domain: ["sunny","partly","cloudy","rain","storm"] } },
   axes: false,
-  features: [
+  marks: [
     point({
       size: 40,
       channels: {

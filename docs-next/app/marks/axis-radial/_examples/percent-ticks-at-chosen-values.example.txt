@@ -5,7 +5,7 @@ mount(Elicit({
   overflow: "visible",
   data: [{ p: 0.5 }],
   schema: { p: { type: "quantitative", domain: [0, 1] } },
-  features: [
+  marks: [
     axisRadial({
       orient: "top", radius: 95,
       tickValues: [0, 0.25, 0.5, 0.75, 1],

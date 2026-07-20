@@ -12,7 +12,7 @@ mount(Elicit({
     demand: { type: "quantitative", domain: [0, 100] },
   },
   axes: { x: { title: "Month" }, y: { title: "Demand" } },
-  features: [
+  marks: [
     lineY({
       stroke: "#059669", strokeWidth: 3, curve: "catmullRom",
       channels: {

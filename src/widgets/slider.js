@@ -50,7 +50,7 @@ export function slider(opts = {}) {
         onChange,
         axes: false,
         guides: [prompt(question || ''), sliderTrack(format ? { format } : {})],
-        features: [
+        marks: [
             point({
                 id: 'slider',
                 size: t.widget.radius - 2,

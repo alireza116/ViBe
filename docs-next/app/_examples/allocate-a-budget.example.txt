@@ -17,7 +17,7 @@ mount(Elicit({
     category: { type: "categorical", domain: ["Product", "Marketing", "Ops", "R&D"] },
     share: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     bar({
       fill: "#6366f1",
       channels: {

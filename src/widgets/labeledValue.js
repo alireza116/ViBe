@@ -47,7 +47,7 @@ export function labeledValue(opts = {}) {
             onChange,
             axes: false,
             guides: [prompt(question)],
-            features: [
+            marks: [
                 text({
                     id: 'label',
                     fontSize: 18,
@@ -76,7 +76,7 @@ export function labeledValue(opts = {}) {
         constraints: [clamp({ min: domain[0], max: domain[1], field: 'n' })],
         onChange,
         guides: [prompt(question)],
-        features: [
+        marks: [
             text({
                 id: 'readout',
                 fontSize: 22,

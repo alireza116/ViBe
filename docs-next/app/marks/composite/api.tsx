@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "composite(options)",
     summary: (
       <>
-        A glyph: a group of marks over the shared dataset. Import from <code className="inline">vibe.plot</code>. Returns an <b>array of features</b>, which <code className="inline">Elicit</code> flattens into its <code className="inline">features</code> list.
+        A glyph: a group of marks over the shared dataset. Import from <code className="inline">vibe.plot</code>. Returns an <b>array of features</b>, which <code className="inline">Elicit</code> flattens into its <code className="inline">marks</code> list.
       </>
     ),
     signatures: [

@@ -109,7 +109,7 @@ export function interval(opts = {}) {
         ],
         onChange,
         guides: [prompt(question)],
-        features: [
+        marks: [
             composite({
                 id: 'ci',
                 parts: [

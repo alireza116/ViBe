@@ -16,7 +16,7 @@ export default function Layout({ children }) {
 
 # Axis, Grid & Rule
 
-<Lead>Axes and gridlines are composable marks. Configure them the easy way through the global `axes: {…}` convenience (ticks, formats, titles, hiding, free positioning), or add `axisX` / `axisY` / `gridY` / `ruleY` as explicit features for full control.</Lead>
+<Lead>Axes and gridlines are composable marks. Configure them the easy way through the global `axes: {…}` convenience (ticks, formats, titles, hiding, free positioning), or add `axisX` / `axisY` / `gridY` / `ruleY` as explicit marks for full control.</Lead>
 
 <ApiReference entries={api} />
 
@@ -51,12 +51,12 @@ Pass a per-channel config to shape ticks, formats and titles, or a transform to 
 
 <Section id="composable" title="Axis, grid & rule as marks">
 
-Turn the global axes off (axes: false) and add reference marks as features — they render in z-order with your data, so you control exactly what draws and where.
+Turn the global axes off (axes: false) and compose reference marks into `marks` yourself — they render in z-order with your data, so you control exactly what draws and where.
 
 <Example
   code={explicitGridyAxisxAxisyRuley}
   title="Explicit gridY + axisX/axisY + ruleY"
-  blurb="A gridline layer under the dots, a dashed rule at y = 50, and two titled axes — all as features."
+  blurb="A gridline layer under the dots, a dashed rule at y = 50, and two titled axes — all as marks."
 />
 
 </Section>

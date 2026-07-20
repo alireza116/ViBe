@@ -14,7 +14,7 @@ mount(Elicit({
   ],
   // The lock is a property of the row, so it reads straight off the data.
   lock: (d) => d.kind === "actual",
-  features: [
+  marks: [
     barY({
       channels: {
         x: { field: "q" },

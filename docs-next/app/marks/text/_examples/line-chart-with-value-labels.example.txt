@@ -9,7 +9,7 @@ mount(Elicit({
     t: { type: "quantitative", domain: [0, 5] },
     n: { type: "quantitative", domain: [0, 100] },
   },
-  features: [
+  marks: [
     lineY({
       stroke: "#4f46e5", strokeWidth: 2.5, curve: "catmullRom",
       channels: { x: { field: "t" }, y: { field: "n" } },
