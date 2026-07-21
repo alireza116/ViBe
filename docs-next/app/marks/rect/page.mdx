@@ -95,3 +95,9 @@ brushRect() edits all four extents. It is OPT-IN and composable: grab an EDGE to
 />
 
 </Section>
+
+<Section id="creating" title="Creating rects">
+
+A rect is a **data mark**, so it's creatable like any other (see [Create · Remove · Anchors](/editing/existence)) — with one wrinkle unique to an *extent* mark: a click gives a single point, but a rect needs a **size**. So a creator must **seed the extent**. A rect whose axis is a band or a baseline→value length (`rectY`) gets its size from the axis and creates like a `bar`; a 2-D **span** rect (`x1`/`x2`, `y1`/`y2`) must supply the opposite corner through `create({ defaults: { x2, y2 } })`, then let `brushRect()` shape it. Forget the extent and the new row is minted zero-size — invisible — which the dev build warns about (`warnCreateEmptyExtent`). Geo's `edit.geo.createRect()` is the purpose-built version: it mints a box sized from default spans around the click.
+
+</Section>

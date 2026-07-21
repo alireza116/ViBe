@@ -18,6 +18,12 @@ export default function Layout({ children }) {
 
 <ApiReference entries={api} />
 
+<Section id="not-creatable" title="Trend can't be created by a gesture">
+
+Unlike a `point` or `bar`, a trend line is **derived**: its position comes from `intercept`/`slope`, not from an `x`/`y` you could invert a click into. So a plane `create` has nothing to place — trend is one of the two exceptions (with guides) in the [can/can't-create matrix](/editing/existence#what-can-create). You author a trend by editing its two handles, not by adding rows.
+
+</Section>
+
 <Section id="twostep" title="Intercept, then slope">
 
 Domains span both sides of zero so the intercept sits on the y-axis in the middle of the frame. Stage 0: drag the intercept handle to set the level. Stage 1: drag the slope handle to set the trend (rotating about the anchor).

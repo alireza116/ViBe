@@ -111,6 +111,39 @@ export function schemaDefaults(schema) {
 }
 
 /**
+ * Mint ONE new datum — the single seed-and-invert core every creator builds on
+ * (`create`, `toggle`, `anchor`, `draw`'s freehand branch, `geo.create`). Creation
+ * is mark-agnostic: a datum is generated from the scales/axes, then whatever mark
+ * views the dataset encodes it. This is that generation, in one place:
+ *   1. `schemaDefaults(ctx.schema)` — every declared field at its default (else null,
+ *      present-but-unset), so a minted row matches the elicited shape.
+ *   2. `defaults` — the creator's explicit non-positional seed (group, mag, …), AND
+ *      the extent an `rect`/area needs (`width`/`height`, `x2`/`y2`) so it isn't minted
+ *      zero-size. These win over the schema.
+ *   3. `seed` — values a creator already resolved outside the pointer inversion: geo's
+ *      projected lon/lat, a line's series key. These win last and, being present, count
+ *      as "placed" on their own.
+ *   4. the inverted pointer, per positional channel — the exact inverse of `encode`.
+ * Returns the datum, or `undefined` when nothing could be placed (no invertible
+ * positional channel and no `seed`) — the "this mark can't create here" signal a
+ * caller turns into a no-op (see also warnCreateOnNonMark in elicit.js).
+ * @param {import('../types').EditContext} ctx
+ * @param {{ defaults?: Record<string, any>, seed?: Record<string, any> }} [opts]
+ * @returns {Record<string, any> | undefined}
+ */
+export function mintDatum(ctx, { defaults = {}, seed = {} } = {}) {
+    const datum = { ...schemaDefaults(ctx.schema), ...defaults, ...seed };
+    let placed = Object.keys(seed).length > 0;
+    for (const ch of ctx.channels) {
+        const value = invertChannel(ch, ctx.pointer);
+        if (value === undefined) continue;
+        datum[ch.field] = value;
+        placed = true;
+    }
+    return placed ? datum : undefined;
+}
+
+/**
  * The scene node an edit is currently acting on, regardless of pick strategy:
  * `ctx.node` is set for a direct-pick gesture (the DOM element it landed on),
  * but a plane-pick gesture (nearest/sweep) resolves its target by datum index

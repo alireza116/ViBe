@@ -7,7 +7,7 @@
 // An edit is the inverse of encoding: where `encode` maps data -> visual, an
 // edit's apply() maps a gesture -> that channel's data, through the SAME scale.
 
-import { makeEdit, markCenter, schemaDefaults, resolveMarkNode, invertChannel, recenterSpan } from './shared.js';
+import { makeEdit, markCenter, resolveMarkNode, invertChannel, recenterSpan, mintDatum } from './shared.js';
 import { axisOf, pointerDegrees, unwrapDegrees } from '../core/encoding.js';
 
 /**
@@ -347,6 +347,26 @@ export function cycle(options = {}) {
     });
 }
 
+// ── The creator contract ────────────────────────────────────────────────────
+// Creation is mark-agnostic: a datum is generated from the scales/axes, appended
+// to the one dataset, and every mark that views those rows encodes it. Each
+// creator (`create`, `toggle`, `edit.line.anchor`/`newSeries`/`draw`,
+// `edit.geo.create`/`createRect`/`draw`) is a THIN WRAPPER over one shared core,
+// `mintDatum` (shared.js). To add a new creator, copy the pattern — don't grow a
+// mega-function:
+//   1. pick the gesture ('click' / 'dblclick' / 'drag') and `pick`
+//      ('plane' / 'draw'); set `scope: 'line'` if it needs series grouping.
+//   2. resolve the target: none (create), the nearest series (anchor), or a fresh
+//      key (newSeries). Auxiliary fields (a series key) go in `mintDatum`'s
+//      `defaults`; an already-resolved POSITION (geo's lon/lat, a bbox) goes in
+//      `seed` (only `seed` counts toward "did we place a position?").
+//   3. `const datum = mintDatum(ctx, { defaults, seed });`
+//   4. `return datum ? [...ctx.data, datum] : undefined;` — undefined is the "this
+//      mark can't create here" no-op (a guide/derived mark; warnCreateOnNonMark
+//      names it in dev). Set `cardinality: 'append'` when the gesture mints ONE
+//      row (so a constraint resolves around it); leave it null when it seeds many.
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * create — its own declaration (not a channel edit): a plane gesture that mints a
  * NEW datum. It reuses the exact same scale inverses as `drag` — the clicked
@@ -369,22 +389,17 @@ export function create(options = {}) {
         pick: 'plane',
         // The minted row is the one a constraint should resolve around.
         cardinality: 'append',
+        // Rides the descriptor so the create guards can see what fields the author
+        // seeds (warnCreateEmptyExtent checks a rect's span endpoints against it).
+        defaults,
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
-            // Seed every declared schema field first (its `default`, else null —
-            // present-but-unset, editable later), so a minted datum matches the
-            // elicited shape. Explicit create `defaults` then win, and the inverted
-            // pointer wins last for the positional channels below.
-            const datum = { ...schemaDefaults(ctx.schema), ...defaults };
-            let placed = false;
-            for (const ch of ctx.channels) {
-                const value = invertChannel(ch, ctx.pointer);
-                if (value === undefined) continue;
-                datum[ch.field] = value;
-                placed = true;
-            }
-            if (!placed) return undefined; // no positionable channel: nothing to place
-            return [...ctx.data, datum];
+            // The whole of create is one call to the shared minting core: seed the
+            // schema, overlay `defaults`, invert the pointer onto the positional
+            // channels. undefined => no positionable channel, so there is nothing to
+            // append (a guide/derived mark — see warnCreateOnNonMark).
+            const datum = mintDatum(ctx, { defaults });
+            return datum ? [...ctx.data, datum] : undefined;
         }
     });
 }
@@ -416,18 +431,12 @@ export function toggle(options = {}) {
         // No `cardinality`: this gesture mints on an empty slot and drops on a full
         // one, so "the row the gesture touched" has no single answer. Left null,
         // which resolves nothing around it — the honest reading for a slot edit.
+        defaults, // exposed on the descriptor for the create guards (see create)
         ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             // Mint the datum the pointer names — the same inversion `create` does.
-            const datum = { ...schemaDefaults(ctx.schema), ...defaults };
-            let placed = false;
-            for (const ch of ctx.channels) {
-                const value = invertChannel(ch, ctx.pointer);
-                if (value === undefined) continue;
-                datum[ch.field] = value;
-                placed = true;
-            }
-            if (!placed) return undefined; // no positionable channel: no slot named
+            const datum = mintDatum(ctx, { defaults });
+            if (!datum) return undefined; // no positionable channel: no slot named
 
             // The slot's identity is the governed fields' tuple.
             const keys = ctx.channels.map((ch) => ch.field);

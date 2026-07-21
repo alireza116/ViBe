@@ -334,6 +334,62 @@ async function main() {
         check('lock: the free years in that same stroke were repainted',
             repainted.length > 0 && repainted.every((d) => Math.abs(d.deaths - 55000) < 3000));
 
+        // ---- Line authoring: anchor + newSeries (/marks/line) ----------------
+        // The series-aware creators, driven by real gestures (mount-only checks
+        // never fired these). anchor = click one point onto the nearest line;
+        // newSeries = dblclick a whole seeded line. Both mint via the shared core.
+        console.log('\nLine authoring: anchor + newSeries (/marks/line)');
+        await open('/marks/line', '#connected-scatter .chart svg');
+
+        const csAt = await frameOf('connected-scatter', {
+            m: { top: 14, right: 14, bottom: 26, left: 30 }, w: 420, h: 300, xd: [0, 100], yd: [0, 100]
+        });
+        const csBefore = await rowsOf('connected-scatter');
+        check('line.anchor: the path seeds 4 points', csBefore.length === 4, `${csBefore.length} rows`);
+        await page.mouse.click(csAt(60, 55).x, csAt(60, 55).y);   // click near the line -> anchor
+        await page.waitForTimeout(120);
+        const csAfter = await rowsOf('connected-scatter');
+        check('line.anchor: a click appends one anchor', csAfter.length === 5, `${csAfter.length} rows`);
+        check('line.anchor: the anchor joins the nearest series (s=0)', csAfter[4].s === 0,
+            JSON.stringify(csAfter[4]));
+        check('line.anchor: the anchor lands at the pointer (inverse of encode)',
+            Math.abs(csAfter[4].x - 60) < 3 && Math.abs(csAfter[4].y - 55) < 3,
+            `${csAfter[4].x}, ${csAfter[4].y}`);
+
+        const nsAt = await frameOf('samples', {
+            m: { top: 14, right: 14, bottom: 26, left: 30 }, w: 420, h: 300, xd: [0, 10], yd: [0, 100]
+        });
+        const nsBefore = await rowsOf('samples');
+        check('line.newSeries: starts empty', nsBefore.length === 0, `${nsBefore.length} rows`);
+        await page.mouse.dblclick(nsAt(5, 50).x, nsAt(5, 50).y);  // dblclick -> seed a whole line
+        await page.waitForTimeout(140);
+        const nsAfter = await rowsOf('samples');
+        check('line.newSeries: a dblclick seeds 6 samples', nsAfter.length === 6, `${nsAfter.length} rows`);
+        check('line.newSeries: the seeded line is flat at the clicked value',
+            nsAfter.length === 6 && nsAfter.every((d) => Math.abs(d.y - 50) < 5),
+            JSON.stringify(nsAfter.map((d) => d.y)));
+
+        // ---- Composite create (/marks/composite) -----------------------------
+        // Creation is mark-agnostic: create on ONE part of a glyph appends ONE row,
+        // and every part re-derives it — a whole lollipop appears from a dblclick.
+        // The "one row, not one per part" assertion proves the whole-dataset-edit-on-
+        // -exactly-one-mark invariant end to end.
+        console.log('\nComposite create (/marks/composite)');
+        await open('/marks/composite', '#creating .chart svg');
+        const glyphAt = await frameOf('creating', {
+            m: { top: 14, right: 14, bottom: 26, left: 30 }, w: 380, h: 260, xd: [0, 100], yd: [0, 100]
+        });
+        const glyphBefore = await rowsOf('creating');
+        check('composite.create: three glyphs to start', glyphBefore.length === 3, `${glyphBefore.length} rows`);
+        await page.mouse.dblclick(glyphAt(40, 50).x, glyphAt(40, 50).y);   // dblclick -> one lollipop
+        await page.waitForTimeout(140);
+        const glyphAfter = await rowsOf('creating');
+        check('composite.create: a dblclick appends ONE row (not one per part)',
+            glyphAfter.length === 4, `${glyphAfter.length} rows`);
+        check('composite.create: the new glyph lands at the pointer',
+            glyphAfter.length === 4 && Math.abs(glyphAfter[3].x - 40) < 3 && Math.abs(glyphAfter[3].value - 50) < 3,
+            JSON.stringify(glyphAfter[3]));
+
         // ---- Derived fn channel (/concepts) ----------------------------------
         // A derived channel ({ fn }) is computed per datum in visual space and is
         // read-only: the edit lives on the source field (x), and the fill must

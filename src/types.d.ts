@@ -265,6 +265,11 @@ export interface Edit {
   // that both mints and drops (toggle), or appends many rows at once (newSeries,
   // draw), leaves this null: "the touched datum" has no single answer there.
   cardinality?: 'append' | 'delete' | null;
+  // A creator (create/toggle) stamps its `defaults` here so the dev-only create
+  // guards can see which fields the author seeds (e.g. a rect's span endpoints) —
+  // introspection only; the value the datum gets is applied inside `apply` via the
+  // shared `mintDatum` core. Absent on non-creating edits.
+  defaults?: Record<string, any>;
   apply: (ctx: EditContext) => any;
   // Driver-specific knobs (edgeInset, resize, move, …) PASS THROUGH makeEdit onto
   // the descriptor, where the edit's driver reads them (see edgeInsetOf in
@@ -307,7 +312,10 @@ export interface EditOptions {
 }
 
 export interface CreateOptions extends EditOptions {
-  // Values for the non-positional fields of the minted datum (group, mag, …).
+  // Seed values for the minted datum's NON-positional fields (group, mag, …), applied
+  // over the schema defaults and under the inverted pointer by the shared `mintDatum`
+  // core. Also where an EXTENT mark (a rect drawn from x1/x2 or y1/y2 spans) supplies
+  // its size, so a new row isn't minted zero-size (warnCreateEmptyExtent flags a miss).
   defaults?: Record<string, any>;
 }
 

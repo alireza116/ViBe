@@ -8,6 +8,7 @@ import { api } from './api';
 import sequentialFillSizeFromANumber from './_examples/sequential-fill-size-from-a-number.example.txt';
 import constantStyleShorthands from './_examples/constant-style-shorthands.example.txt';
 import ex2dMoveScatter from './_examples/2d-move-scatter.example.txt';
+import clickToAddPoints from './_examples/click-to-add-points.example.txt';
 import scatterOfRotatableSquares from './_examples/scatter-of-rotatable-squares.example.txt';
 import scatterOfRotatableTicks from './_examples/scatter-of-rotatable-ticks.example.txt';
 
@@ -50,6 +51,23 @@ When both x and y carry a drag, a gesture inverts the pointer through both posit
   try={(
     <>
       <b>Drag</b> a dot anywhere.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="creating" title="Adding points">
+
+`point` is the canonical creatable mark: a plane gesture inverts the pointer through the x and y scales to mint a datum, exactly the inverse of how those channels encode it. Because a move-drag lives on the same mark here, the creator uses `gesture: "dblclick"` so it doesn't race the drag. See [Create · Remove · Anchors](/editing/existence) for the full model and the can/can't-create matrix.
+
+<Example
+  code={clickToAddPoints}
+  title="Double-click to add a point"
+  blurb={"create({ gesture: \"dblclick\" }) mints a datum at the pointer; group comes from the schema default; count({ max }) caps the dataset."}
+  try={(
+    <>
+      <b>Double-click</b> empty space to add a point · <b>drag</b> to move it.
     </>
   )}
 />

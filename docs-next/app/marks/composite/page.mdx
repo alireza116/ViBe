@@ -10,6 +10,7 @@ import independentHandlesPerField from './_examples/independent-handles-per-fiel
 import coupledMoveCenterWithinEnds from './_examples/coupled-move-center-within-ends.example.txt';
 import compositeChannelsTrickleDown from './_examples/composite-channels-trickle-down.example.txt';
 import hubPointOwnFillSize from './_examples/hub-point-own-fill-size.example.txt';
+import createAWholeGlyph from './_examples/create-a-whole-glyph.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -88,6 +89,23 @@ Two layers of binding. **Group** `channels` (here `x`, `y`, `angle`) trickle int
   try={(
     <>
       <b>Drag</b> the hub (last part) to spin the whole glyph.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="creating" title="Creating a whole glyph at once">
+
+Creation is [mark-agnostic](/editing/existence#what-can-create): a plane gesture mints one row, and every part of the glyph encodes it — so one create makes a whole composite appear. The rule that a whole-dataset edit belongs on **exactly one mark** is what makes this clean: put `create` on a **single part** (here the tip), and a click appends one row, not one per part. The inert stem re-derives from the same row, so the stem and tip show up together.
+
+<Example
+  code={createAWholeGlyph}
+  title="Double-click to add a lollipop"
+  blurb={"create() lives on the tip only; the stem (an inert ruleX from baseline → value) re-derives from the same new row. One row in, a whole glyph out. count({ max }) caps the dataset."}
+  try={(
+    <>
+      <b>Double-click</b> empty space to add a lollipop · <b>drag</b> a tip to move it.
     </>
   )}
 />

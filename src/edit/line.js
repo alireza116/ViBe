@@ -9,7 +9,7 @@
 //   draw      — author a line by dragging (drag), edit-aware
 //   sweep     — you-draw-it: repaint each point the pointer crosses (drag)
 
-import { makeEdit, schemaDefaults, nextSeriesKey, numOf, invertChannel } from './shared.js';
+import { makeEdit, schemaDefaults, nextSeriesKey, numOf, invertChannel, mintDatum } from './shared.js';
 import { nearestSeries, nearestMark, nearestMarkOnAxis, DEFAULT_PICK_THRESHOLD } from './pick.js';
 import { resolveSamples } from '../core/samples.js';
 import { drag } from './basic.js';
@@ -59,16 +59,12 @@ export function anchor(options = {}) {
             }
             if (seriesVal == null) seriesVal = nextSeriesKey(ctx.data, sField);
 
-            const datum = { ...schemaDefaults(ctx.schema) };
-            if (sField) datum[sField] = seriesVal;
-            let placed = false;
-            for (const ch of ctx.channels) {
-                const v = invertChannel(ch, ctx.pointer);
-                if (v === undefined) continue;
-                datum[ch.field] = v;
-                placed = true;
-            }
-            if (!placed) return undefined;
+            // Same minting core as `create`; anchor's only extra is the resolved
+            // series. It goes in `defaults` (not `seed`): a series key is a grouping,
+            // not a position, so it must NOT count as "placed" — the point still needs
+            // a real inverted position from the channels to exist.
+            const datum = mintDatum(ctx, { defaults: sField ? { [sField]: seriesVal } : {} });
+            if (!datum) return undefined;
             return [...ctx.data, datum];
         }
     });
@@ -211,16 +207,8 @@ export function draw(options = {}) {
                     const moved = Math.hypot(px - st.lastX, py - st.lastY);
                     if (moved < minDist) return undefined; // too close — skip
                 }
-                const datum = { ...schemaDefaults(ctx.schema) };
-                if (sField) datum[sField] = seriesVal;
-                let placed = false;
-                for (const ch of ctx.channels) {
-                    const v = invertChannel(ch, ctx.pointer);
-                    if (v === undefined) continue;
-                    datum[ch.field] = v;
-                    placed = true;
-                }
-                if (!placed) return undefined;
+                const datum = mintDatum(ctx, { defaults: sField ? { [sField]: seriesVal } : {} });
+                if (!datum) return undefined;
                 st.lastX = px; st.lastY = py;
                 return [...ctx.data, datum];
             }

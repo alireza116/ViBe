@@ -98,6 +98,97 @@ function warnDuplicatePlaneEdits(features, editsOf) {
     );
 }
 
+// Edit types that WRITE ROWS to the dataset (mint a datum), as opposed to editing a
+// field on an existing row or the domain. Used by the create guards to tell a
+// datum-minting edit from an ordinary channel edit without branching on type in
+// dispatch (this is a dev warning, not control flow).
+const CREATOR_TYPES = new Set(['create', 'toggle', 'anchor', 'newSeries', 'draw', 'createRect']);
+/** @param {import('../types').Edit} e @returns {boolean} */
+function isDatasetCreator(e) {
+    return e.target !== 'domain' && (CREATOR_TYPES.has(e.type) || e.cardinality === 'append');
+}
+
+const warnedCreateCap = new Set();
+/**
+ * Creation writes dataset ROWS, so it only makes sense on a DATA MARK positioned by an
+ * invertible axis (the mark-agnostic model: mint a datum from the scales, every mark
+ * that views the rows encodes it). Warn (dev only) when a datum-minting edit lands
+ * where that can't happen:
+ *   - a GUIDE (axis/grid): it edits the DOMAIN (edit.axis.*), it has no rows to mint;
+ *   - a mark with no invertible positional channel: the pointer can't be inverted to a
+ *     datum, so mintDatum returns undefined and the create is a silent no-op.
+ * (rule/trend are NOT flagged: they carry invertible x/y and CAN place a datum — that
+ * they read as a guide/derived line is a usage convention the docs matrix covers.)
+ * @param {any} feature
+ * @param {import('../types').Edit[]} edits
+ * @param {import('../types').ScaleMap} scales
+ */
+function warnCreateOnNonMark(feature, edits, scales) {
+    for (const e of edits) {
+        if (!isDatasetCreator(e)) continue;
+        if (feature.supportsGeo) continue; // geo places via the projection, not a channel scale
+        const key = `${feature.id}:nomark:${e.type}`;
+        if (warnedCreateCap.has(key)) continue;
+
+        if (feature.isAxis || feature.isGrid) {
+            warnedCreateCap.add(key);
+            console.warn(
+                `[vibe] a create/${e.type} edit is on "${feature.id}", which is a guide (axis/grid), ` +
+                `not a data mark. Creation mints dataset rows; a guide edits the DOMAIN instead ` +
+                `(edit.axis.*). Move the create to a data mark.`
+            );
+            continue;
+        }
+        const names = e.channels && e.channels.length ? e.channels : ['x', 'y'];
+        const anyInvertible = names.some((n) => {
+            const s = /** @type {any} */ (scales)[n];
+            return s && s.invertible;
+        });
+        if (!anyInvertible) {
+            warnedCreateCap.add(key);
+            console.warn(
+                `[vibe] a create/${e.type} edit is on "${feature.id}", but none of its positional ` +
+                `channels (${names.join(', ')}) has an invertible scale — the pointer can't be ` +
+                `inverted to a datum, so the create is a no-op. Creation needs a data mark on an axis.`
+            );
+        }
+    }
+}
+
+/**
+ * An EXTENT mark (a rect drawn from x1/x2 or y1/y2 SPANS) needs its extent seeded, or a
+ * create mints it with zero size — an invisible row. Warn when a datum-minting edit is
+ * present and neither the field schema nor the creator's own `defaults` supplies the
+ * span endpoints. (A band-sized rect or a point mark has automatic extent, so it is
+ * skipped: no span endpoint channels.)
+ * @param {any} feature
+ * @param {import('../types').Edit[]} edits
+ * @param {Record<string, any> | undefined} schema
+ */
+function warnCreateEmptyExtent(feature, edits, schema) {
+    const ch = feature.channels || {};
+    /** @type {string[]} */
+    const spanFields = [];
+    if (ch.x1 && ch.x2) spanFields.push(ch.x1.field, ch.x2.field);
+    if (ch.y1 && ch.y2) spanFields.push(ch.y1.field, ch.y2.field);
+    if (!spanFields.length) return;
+    for (const e of edits) {
+        if (!isDatasetCreator(e)) continue;
+        const seeded = new Set(Object.keys(e.defaults || {}));
+        const missing = spanFields.filter((f) =>
+            !seeded.has(f) && !(schema && schema[f] && schema[f].default !== undefined));
+        if (!missing.length) continue;
+        const key = `${feature.id}:extent:${e.type}`;
+        if (warnedCreateCap.has(key)) continue;
+        warnedCreateCap.add(key);
+        console.warn(
+            `[vibe] create/${e.type} on the extent mark "${feature.id}" doesn't seed ${missing.join(', ')}, ` +
+            `so a new row is minted with no extent (zero-size, invisible). Seed it via ` +
+            `create({ defaults: { … } }) or a field default in the schema.`
+        );
+    }
+}
+
 // Best-effort measure type for a domain a caller left undeclared but an axis edit
 // just wrote (a numeric range, or a discrete value list). Only used to synthesize a
 // missing schema entry — a declared field keeps its own type.
@@ -554,6 +645,8 @@ export function Elicit(spec) {
 
             if (DEV) warnScopeMismatch(feature, collectEdits(feature));
             if (DEV) warnMisplacedEdits(feature);
+            if (DEV) warnCreateOnNonMark(feature, collectEdits(feature), scales);
+            if (DEV) warnCreateEmptyExtent(feature, collectEdits(feature), liveSpec.schema);
 
             // A feature with an ACTIVE direct-pick edit is interactive on its marks,
             // so the renderer should show an editable cursor on them. Plane-pick

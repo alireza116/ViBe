@@ -4,7 +4,7 @@
 // Namespaced as `edit.geo.*` with `scope: 'geo'` so the engine can warn when
 // these are attached to a non-geo mark.
 
-import { makeEdit, schemaDefaults } from './shared.js';
+import { makeEdit, mintDatum } from './shared.js';
 import { invertPoint } from '../core/projection.js';
 
 /**
@@ -69,13 +69,15 @@ export function create(options = {}) {
             const ll = invertPoint(projectionOf(ctx), ctx.pointer);
             if (!ll) return undefined;
             const keys = lonLatFields(ctx.markChannels || {});
-            const datum = {
-                ...schemaDefaults(ctx.schema),
-                ...defaults,
-                [keys.lon]: ll.lon,
-                [keys.lat]: ll.lat,
-            };
-            return [...ctx.data, datum];
+            // The same minting core, but geo's position comes from the PROJECTION,
+            // not a channel scale — so the inverted lon/lat go through `seed` (which
+            // counts as "placed"), while the pointer-invert loop finds no cartesian
+            // channel to add (geo declares channels: null).
+            const datum = mintDatum(ctx, {
+                defaults,
+                seed: { [keys.lon]: ll.lon, [keys.lat]: ll.lat },
+            });
+            return datum ? [...ctx.data, datum] : undefined;
         },
     });
 }
@@ -201,13 +203,11 @@ export function draw(options = {}) {
                 return ctx.data.map((d, j) => (j === i ? { ...d, [coordsKey]: coords } : d));
             }
 
-            // First sample of a new stroke: mint a row and lock its index on the
-            // session object (same reference the driver holds for the gesture).
-            const datum = {
-                ...schemaDefaults(ctx.schema),
-                ...defaults,
-                [coordsKey]: [[ll.lon, ll.lat]],
-            };
+            // First sample of a new stroke: mint a row (its `coordinates` list is the
+            // position, so it rides `seed`) and lock its index on the session object
+            // (same reference the driver holds for the gesture).
+            const datum = mintDatum(ctx, { defaults, seed: { [coordsKey]: [[ll.lon, ll.lat]] } });
+            if (!datum) return undefined;
             const next = [...ctx.data, datum];
             st.drawIndex = next.length - 1;
             st.lastX = px;
@@ -364,15 +364,18 @@ export function createRect(options = {}) {
             if (!ll) return undefined;
             const f = boundsFields(ctx.markChannels || {});
             const hw = width / 2, hh = height / 2;
-            const datum = {
-                ...schemaDefaults(ctx.schema),
-                ...defaults,
-                [f.west]: ll.lon - hw,
-                [f.east]: ll.lon + hw,
-                [f.south]: ll.lat - hh,
-                [f.north]: ll.lat + hh,
-            };
-            return [...ctx.data, datum];
+            // An extent mark: its position IS the bbox, seeded from the projected
+            // point ± the default spans, so the box is never minted zero-size.
+            const datum = mintDatum(ctx, {
+                defaults,
+                seed: {
+                    [f.west]: ll.lon - hw,
+                    [f.east]: ll.lon + hw,
+                    [f.south]: ll.lat - hh,
+                    [f.north]: ll.lat + hh,
+                },
+            });
+            return datum ? [...ctx.data, datum] : undefined;
         },
     });
 }

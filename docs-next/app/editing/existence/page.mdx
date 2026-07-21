@@ -19,9 +19,43 @@ export default function Layout({ children }) {
 
 # Create · Remove · Anchors
 
-<Lead>Creating and deleting data are edits like any other. `create` is a plane gesture that inverts the pointer through the positional channels to mint a datum; `remove` deletes the target. For connected paths, `edit.line.anchor` adds one point to the nearest line, `edit.line.newSeries` seeds a whole line, `edit.line.draw` lays a line down as you drag, and `edit.line.removeSeries` deletes a whole line. Multiple edits on one gesture are arbitrated by `when`. **Declare a whole-dataset edit on exactly one mark.** A plane gesture carries no node, so it fans out to _every_ mark’s plane-pick edits — put `create` on two marks and one click appends two rows. (Direct-pick edits like `drag` are immune: they route to the mark you actually touched.) The engine warns in dev builds if you do this.</Lead>
+<Lead>**Creation is mark-agnostic.** An edit is the inverse of encoding: where `encode` maps a datum → pixel through a scale, a creator maps the clicked pixel → a datum through the *same* scales, then seeds the rest from the schema. You generate one row and append it to the one dataset; every mark that views those rows — a composite glyph included — then encodes it. That is why a single core (`mintDatum`) serves them all, and why the variants differ on just **three knobs**: *how many rows* (one, a whole series, a drag stream), *how the target series is resolved* (none / nearest / new), and *the gesture* (click / dblclick / drag). `create` is the universal one-row creator; `edit.line.anchor` / `newSeries` / `draw` are the series-aware ones; `edit.geo.create` / `createRect` / `draw` invert a map projection. `remove` / `edit.line.removeSeries` take rows back.</Lead>
+
+<Lead>**Declare a creator on exactly one mark.** A plane gesture carries no node, so it fans out to _every_ mark’s plane-pick edits — put `create` on two marks and one click appends two rows. (Direct-pick edits like `drag` are immune: they route to the mark you actually touched.) The engine warns in dev builds if you do. Multiple edits on one gesture are arbitrated by `when`.</Lead>
 
 <ApiReference entries={api} />
+
+<Section id="what-can-create" title="What can — and can't — be created">
+
+Creation writes dataset **rows**, so it belongs on a **data mark positioned by an invertible axis** — which is nearly every mark. Only **guides** (they carry no per-row data) and **derived** marks (their position is computed from the whole dataset, not one field) are excluded. When you put a creator where it can't place a datum, the dev build warns instead of silently doing nothing.
+
+<div className="api-table-wrap">
+  <table className="api-table">
+    <thead>
+      <tr><th>Mark</th><th>Create?</th><th>How</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>point</code> · <code>dot</code> · <code>symbol</code></td><td>✓</td><td>invert the pointer through x / y directly</td></tr>
+      <tr><td><code>tick</code> · <code>bar</code></td><td>✓</td><td>one axis inverts to a band slot, the value axis to the value</td></tr>
+      <tr><td><code>face</code></td><td>✓</td><td>positioned like a point — on its own axis <b>or</b> in a scatter</td></tr>
+      <tr><td><code>rect</code></td><td>✓</td><td><b>seed an extent</b> (<code>x1</code>/<code>x2</code> or <code>y1</code>/<code>y2</code>) via <code>defaults</code> so it isn't minted zero-size</td></tr>
+      <tr><td><code>dotstack</code></td><td>✓ (special)</td><td>one axis is a slot; the stack position is <i>derived</i> from the count</td></tr>
+      <tr><td><code>composite</code> (glyph)</td><td>✓</td><td>several marks over one dataset — create on <b>one</b> part; the row renders across all</td></tr>
+      <tr><td><code>line</code> · <code>connectedScatter</code></td><td>✓</td><td><code>edit.line.anchor</code> / <code>newSeries</code> / <code>draw</code> — series-aware, needs a series field</td></tr>
+      <tr><td><code>geo*</code></td><td>✓</td><td><code>edit.geo.create</code> / <code>createRect</code> / <code>draw</code> — invert the projection (lon/lat)</td></tr>
+      <tr><td><code>rule</code> · <code>axis</code> · <code>grid</code></td><td>✗</td><td><b>guides</b>, not data — a guide edits the <i>domain</i> (<code>edit.axis.*</code>), not rows</td></tr>
+      <tr><td><code>trend</code></td><td>✗</td><td><b>derived</b>: the line is a fit over every row, so there's no single field to mint</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</Section>
+
+<Section id="gesture-rule" title="Picking the gesture">
+
+`create` defaults to `gesture: "click"`. Give it `gesture: "dblclick"` whenever a **move-drag lives on the same mark**, so a press-and-move reshapes the point you're on instead of racing the create — every "create + move" example below uses `dblclick` for exactly this reason. A plain `click` is right when nothing else claims the plane.
+
+</Section>
 
 <Section id="create" title="Create — click to add">
 
