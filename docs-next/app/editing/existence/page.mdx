@@ -19,15 +19,13 @@ export default function Layout({ children }) {
 
 # Create · Remove · Anchors
 
-<Lead>**Creation is mark-agnostic.** An edit is the inverse of encoding: where `encode` maps a datum → pixel through a scale, a creator maps the clicked pixel → a datum through the *same* scales, then seeds the rest from the schema. You generate one row and append it to the one dataset; every mark that views those rows — a composite glyph included — then encodes it. That is why a single core (`mintDatum`) serves them all, and why the variants differ on just **three knobs**: *how many rows* (one, a whole series, a drag stream), *how the target series is resolved* (none / nearest / new), and *the gesture* (click / dblclick / drag). `create` is the universal one-row creator; `edit.line.anchor` / `newSeries` / `draw` are the series-aware ones; `edit.geo.create` / `createRect` / `draw` invert a map projection. `remove` / `edit.line.removeSeries` take rows back.</Lead>
-
-<Lead>**Declare a creator on exactly one mark.** A plane gesture carries no node, so it fans out to _every_ mark’s plane-pick edits — put `create` on two marks and one click appends two rows. (Direct-pick edits like `drag` are immune: they route to the mark you actually touched.) The engine warns in dev builds if you do. Multiple edits on one gesture are arbitrated by `when`.</Lead>
+<Lead>Create and remove work like any edit: `create` inverts the clicked pixel into a datum through the same scales `encode` uses, then appends it to the dataset — every mark reading those rows encodes it, composite glyphs included. `edit.line.anchor` / `newSeries` / `draw` extend that to connected paths; `edit.geo.create` / `createRect` / `draw` on [Geo](/marks/geo) invert a map projection instead. `remove` and `edit.line.removeSeries` take rows back.</Lead>
 
 <ApiReference entries={api} />
 
 <Section id="what-can-create" title="What can — and can't — be created">
 
-Creation writes dataset **rows**, so it belongs on a **data mark positioned by an invertible axis** — which is nearly every mark. Only **guides** (they carry no per-row data) and **derived** marks (their position is computed from the whole dataset, not one field) are excluded. When you put a creator where it can't place a datum, the dev build warns instead of silently doing nothing.
+Creation writes dataset **rows**, so it belongs on a **data mark positioned by an invertible axis** — which is nearly every mark. Only **guides** (they carry no per-row data) and **derived** marks (their position is computed from the whole dataset, not one field) are excluded. If you put a creator where it can't place a datum, the dev build warns you.
 
 <div className="api-table-wrap">
   <table className="api-table">
@@ -37,7 +35,7 @@ Creation writes dataset **rows**, so it belongs on a **data mark positioned by a
     <tbody>
       <tr><td><code>point</code> · <code>dot</code> · <code>symbol</code></td><td>✓</td><td>invert the pointer through x / y directly</td></tr>
       <tr><td><code>tick</code> · <code>bar</code></td><td>✓</td><td>one axis inverts to a band slot, the value axis to the value</td></tr>
-      <tr><td><code>face</code></td><td>✓</td><td>positioned like a point — on its own axis <b>or</b> in a scatter</td></tr>
+      <tr><td><code>face</code></td><td>✓</td><td>positioned like a point — on its own axis or in a scatter</td></tr>
       <tr><td><code>rect</code></td><td>✓</td><td><b>seed an extent</b> (<code>x1</code>/<code>x2</code> or <code>y1</code>/<code>y2</code>) via <code>defaults</code> so it isn't minted zero-size</td></tr>
       <tr><td><code>dotstack</code></td><td>✓ (special)</td><td>one axis is a slot; the stack position is <i>derived</i> from the count</td></tr>
       <tr><td><code>composite</code> (glyph)</td><td>✓</td><td>several marks over one dataset — create on <b>one</b> part; the row renders across all</td></tr>
@@ -53,13 +51,15 @@ Creation writes dataset **rows**, so it belongs on a **data mark positioned by a
 
 <Section id="gesture-rule" title="Picking the gesture">
 
-`create` defaults to `gesture: "click"`. Give it `gesture: "dblclick"` whenever a **move-drag lives on the same mark**, so a press-and-move reshapes the point you're on instead of racing the create — every "create + move" example below uses `dblclick` for exactly this reason. A plain `click` is right when nothing else claims the plane.
+`create` defaults to `gesture: "click"`. Give it `gesture: "dblclick"` when a move-drag lives on the same mark, so a press-and-move reshapes the point you're on instead of racing the create — every "create + move" example below uses `dblclick` for this reason. A plain `click` works when nothing else claims the plane.
 
 </Section>
 
 <Section id="create" title="Create — click to add">
 
-create is its own edit: a plane click inverts the pointer through the positional channels and appends a datum. Constraints still apply — count(max) caps the total.
+`create` is its own edit: a plane click inverts the pointer through the positional channels and appends a datum. Constraints still apply — `count(max)` caps the total.
+
+Declare a creator on exactly one mark. A plane gesture carries no node, so it fans out to every mark's plane-pick edits — put `create` on two marks and one click appends two rows. Direct-pick edits like `drag` are immune: they route to the mark you actually touched. The dev build warns if you don't. When multiple edits share one gesture, `when` arbitrates which one claims it.
 
 <Example
   code={clickToAddAPoint}
@@ -76,7 +76,7 @@ create is its own edit: a plane click inverts the pointer through the positional
 
 <Section id="existence" title="Create, remove & move together">
 
-Mark-level create (dblclick) + remove (Alt-click) + a move drag, all on one mark. When two edits share a gesture, when decides which claims the event.
+Mark-level create (dblclick) + remove (Alt-click) + a move drag, all on one mark. When two edits share a gesture, `when` decides which claims the event.
 
 <Example
   code={existenceMoveOnOneMark}
@@ -104,7 +104,7 @@ Mark-level create (dblclick) + remove (Alt-click) + a move drag, all on one mark
 
 <Section id="anchors" title="Anchors — building a connected path">
 
-On a line, edit.line.anchor() adds a point to the nearest series (or starts a new one from empty space), and edit.line.newSeries() seeds a whole line from sampled positions. Order is tracked so the path stays reproducible.
+On a line, `edit.line.anchor()` adds a point to the nearest series, or starts a new one from empty space. `edit.line.newSeries()` seeds a whole line from sampled positions. Order is tracked so the path stays reproducible.
 
 <Example
   code={clickToAddAnAnchor}
@@ -131,7 +131,7 @@ On a line, edit.line.anchor() adds a point to the nearest series (or starts a ne
 <Example
   code={freehandDrawAPathAsYouDrag}
   title="Freehand — draw a path as you drag"
-  blurb={"On an order:\"sequence\" line, draw samples the pointer by distance and appends points in creation order. It stays one path: a later drag over the line reshapes it, a drag in empty space extends the same line (in draw order) rather than starting a new one. (Pass into:\"new\" to start fresh lines.)"}
+  blurb={"On an order:\"sequence\" line, draw samples the pointer by distance and appends points in creation order. A later drag over the line reshapes it; a drag in empty space extends the same line rather than starting a new one. Pass into:\"new\" to start fresh lines."}
   try={(
     <>
       <b>Press and drag</b> to draw a path · <b>drag over it</b> to reshape · <b>drag elsewhere</b> to keep extending the same line.
@@ -142,7 +142,7 @@ On a line, edit.line.anchor() adds a point to the nearest series (or starts a ne
 <Example
   code={removeAWholeLine}
   title="Remove a whole line"
-  blurb="remove deletes one anchor; edit.line.removeSeries() deletes the whole line — click any point on a line to remove it. The delete counterpart to anchor / newSeries / draw."
+  blurb="remove (Alt-click) deletes one anchor; edit.line.removeSeries() (click) deletes the whole line — the delete counterpart to anchor / newSeries / draw."
   try={(
     <>
       <b>Alt-click</b> a point to delete just that anchor · <b>click</b> a point to remove its entire line.

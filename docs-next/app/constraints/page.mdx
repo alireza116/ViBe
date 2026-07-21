@@ -19,13 +19,13 @@ export default function Layout({ children }) {
 
 # Constraints
 
-<Lead>A constraint is a pure rule over **the dataset**. It holds no matter which edit fired it, or which _mark_ that edit was declared on — so an invariant written once gates a drag on a bar and a click on a dot alike. It can both **reject** a proposal and **repair** it (return the corrected rows), and because every mark reads those rows, a repair shows up everywhere on the next render. Declare it on the `Elicit` spec (`constraints: [...]`); declaring it on a mark is sugar — the engine promotes it to the dataset either way. `clamp` bounds a field, `maintainSum` fixes a total, `count` caps the size, and `unique` forbids duplicate keys. Three more keep a _shape_ honest: `ordering` holds fields of a row in order (lo ≤ mean ≤ hi), `monotonic` stops a cumulative curve dipping, and `spacing` keeps neighbours from collapsing onto each other.</Lead>
+<Lead>A constraint is a rule over the dataset. It applies to every edit and every mark, regardless of which one declared it. It can reject a proposed change, or repair it by returning corrected rows — a repair shows up everywhere on the next render, since every mark reads the same rows. Declare it in `constraints: [...]` on the `Elicit` spec, or on a mark as shorthand; both end up on the dataset. `clamp` bounds a field, `maintainSum` fixes a total, `count` caps the size, and `unique` forbids duplicate keys. Three more constrain shape: `ordering` keeps a row's fields in order (lo ≤ mean ≤ hi), `monotonic` keeps a cumulative curve from dipping, and `spacing` keeps neighbours from colliding.</Lead>
 
 <ApiReference entries={api} />
 
 <Section id="sum" title="maintainSum — a total held at 100">
 
-The sum rule is a dataset invariant, so it holds for every edit from every mark. Bars give way to keep the total at 100; guide: true draws the live bound.
+The sum rule is a dataset invariant, so it holds for every edit from every mark. Bars give way to keep the total at 100; `guide: true` draws the live bound.
 
 <Example
   code={barsThatCompensate}
@@ -42,7 +42,7 @@ The sum rule is a dataset invariant, so it holds for every edit from every mark.
 
 <Section id="clamp" title="clamp — bound a field">
 
-clamp holds a field inside [min, max]. Pair it with a nearest pick and a self-drawn guide to make the bounds visible while dragging.
+`clamp` holds a field inside `[min, max]`. Pair it with a nearest pick and a self-drawn guide to make the bounds visible while dragging.
 
 <Example
   code={clampedDragWithAGuide}
@@ -59,7 +59,7 @@ clamp holds a field inside [min, max]. Pair it with a nearest pick and a self-dr
 
 <Section id="unique" title="unique — one per key">
 
-unique forbids two data with the same key. A single field guards one axis; an array is a composite key — at most one mark per cell, for both create and move.
+`unique` forbids two rows with the same key. A single field guards one axis; an array is a composite key — at most one mark per cell, for both create and move.
 
 <Example
   code={oneBarPerCategory}
@@ -87,7 +87,7 @@ unique forbids two data with the same key. A single field guards one axis; an ar
 
 <Section id="ordering" title="ordering — fields of a row, in order">
 
-The rule an interval glyph lives or dies by. An error bar’s caps and its mean are separate marks over separate fields of one row, and nothing stops you dragging the low cap above the high one — after which the glyph draws inside-out and the elicited “interval” says the opposite of what the person meant. Being a dataset invariant is what makes it hold whichever handle you grab.
+An error bar's caps and mean are separate marks over separate fields of one row. Without this rule, dragging the low cap above the high one draws the glyph inside-out and reverses what the interval means. `ordering` holds across all three marks, whichever handle you drag.
 
 <Example
   code={anIntervalThatStaysInOrder}
@@ -104,7 +104,7 @@ The rule an interval glyph lives or dies by. An error bar’s caps and its mean 
 
 <Section id="monotonic" title="monotonic — a curve that can’t go back on itself">
 
-A CDF, a survival function, a dose-response. Someone drawing one is not free to dip, but the gesture has no idea, so a you-draw-it stroke happily authors a dip. It repairs by pushing the rows the moved point would have crossed — rejecting instead would make the curve feel jammed against its own history.
+A CDF, a survival function, a dose-response curve — none of these can dip, but a you-draw-it stroke doesn't know that and will draw one anyway. `monotonic` repairs the drag instead of rejecting it: it pushes the rows the moved point would have crossed, rather than freezing the curve against its own history.
 
 <Example
   code={aCurveThatOnlyRises}
@@ -121,7 +121,7 @@ A CDF, a survival function, a dose-response. Someone drawing one is not free to 
 
 <Section id="spacing" title="spacing — neighbours that keep their distance">
 
-For elicitations where “distinct” is part of the claim: thresholds of a scale, breakpoints of a piecewise curve, tiers of a rubric. Two coincident points may be a genuine belief, but far more often they’re a slip of the hand that reads as one point and can never be separated again — the topmost one takes every subsequent grab.
+For elicitations where "distinct" is part of the claim: thresholds of a scale, breakpoints of a piecewise curve, tiers of a rubric. Two coincident points are occasionally a genuine belief, but more often a slip of the hand — and once overlapped, the topmost point takes every subsequent grab and the two can't be separated again.
 
 <Example
   code={thresholdsThatStayApart}

@@ -25,7 +25,7 @@ export default function Layout({ children }) {
 
 <Section id="basics" title="A line & its curve">
 
-lineY draws a value on y over a domain on x (the usual time series). curve sets the interpolation between handles.
+`lineY` draws a value on `y` over a domain on `x` (the usual time series). `curve` sets the interpolation between handles.
 
 <Example
   code={curveCatmullrom}
@@ -37,7 +37,7 @@ lineY draws a value on y over a domain on x (the usual time series). curve sets 
 
 <Section id="you-draw-it" title="You-draw-it (sweep)">
 
-Put edit: drag(\{ pick: "sweep" \}) on the value channel and you get the NYT you-draw-it interaction: press and sweep horizontally to paint each point’s y as the pointer crosses its column. The x positions stay fixed.
+Put `edit: drag(\{ pick: "sweep" \})` on the value channel for the NYT-style "you-draw-it" interaction: press and sweep horizontally to paint each point's `y` as the pointer crosses its column. The `x` positions stay fixed.
 
 <Example
   code={sweepToDrawTheCurve}
@@ -54,7 +54,7 @@ Put edit: drag(\{ pick: "sweep" \}) on the value channel and you get the NYT you
 
 <Section id="handles" title="Hiding the handles">
 
-The per-point handles are optional. handles: false renders them invisible but keeps them for hit-testing, so the line stays fully editable — you just don’t see the dots. handleSize sizes them when shown.
+The per-point handles are optional. `handles: false` renders them invisible but keeps them for hit-testing, so the line stays fully editable — you just don't see the dots. `handleSize` sizes them when shown.
 
 <Example
   code={aCleanLineStillSweepable}
@@ -88,7 +88,7 @@ A stroke field groups points into separate lines (Observable Plot’s z), so one
 
 <Section id="connected-scatter" title="Connected scatter (order: sequence)">
 
-With order: "sequence" the points connect in creation order, not by domain — a connected scatter / free 2D path. Both axes carry a drag, so each point moves in 2D and the links follow. edit.line.anchor() adds a point to the path — near the line or far, it extends the same single line in click order (so the path stays one sequence).
+With `order: "sequence"` the points connect in creation order, not by domain — a connected scatter, or a free 2D path. Both axes carry a drag, so each point moves in 2D and the links follow. `edit.line.anchor()` adds a point to the path — near the line or far, it extends the same single line in click order, so the path stays one sequence.
 
 <Example
   code={a2dPathYouCanReshape}
@@ -105,7 +105,7 @@ With order: "sequence" the points connect in creation order, not by domain — a
 
 <Section id="samples" title="Draw from scratch (samples)">
 
-newSeries seeds a whole line at once — one anchor per sampled domain position (the scale’s ticks by default, or a count / explicit list / time interval), flat at the click value. Double-click empty space to drop a fresh line, then sweep it.
+`newSeries` seeds a whole line at once — one anchor per sampled domain position (the scale's ticks by default, or a count, explicit list, or time interval), flat at the click value. Double-click empty space to drop a fresh line, then sweep it.
 
 <Example
   code={doubleClickToSeedThenSweep}
@@ -122,7 +122,7 @@ newSeries seeds a whole line at once — one anchor per sampled domain position 
 
 <Section id="draw" title="Draw it in one drag (draw)">
 
-draw authors lines by dragging, and it is edit-aware. On a domain-ordered line a drag in empty space is you-draw-it from scratch — the pointer crossing each samples column lays that point down at the pointer value, so one stroke draws the curve. Start a later drag near the drawn line (within threshold) and it reshapes that line with a sweep instead of making a new one; start far away and it draws another. Pass into: "new" to always draw a fresh line.
+`draw` authors lines by dragging, and it's edit-aware. On a domain-ordered line, a drag in empty space is you-draw-it from scratch — the pointer crossing each sample column lays that point down at the pointer value, so one stroke draws the curve. A later drag near the drawn line (within `threshold`) reshapes it with a sweep instead of making a new one; a drag farther away draws another. Pass `into: "new"` to always draw a fresh line.
 
 <Example
   code={drawThenReshape}

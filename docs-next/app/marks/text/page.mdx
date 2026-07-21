@@ -19,7 +19,7 @@ export default function Layout({ children }) {
 
 # Text
 
-<Lead>A per-datum **label** (Observable Plot’s text). It places a string at a positional (x, y); `text`/`fontSize`/`textAnchor`/`lineAnchor`/`dx`/`dy` are read RAW (a field or a constant), `angle` is degrees, and `format` is a d3-format string or function (display-only). A text mark is editable like any other: drag to reposition, drag a value to update a numeric readout, `cycle()` a label, `rotate()` it, or `editText()` to retype its content.</Lead>
+<Lead>A per-datum **label**, as in Observable Plot's `text`. It places a string at a position (x, y); `text`/`fontSize`/`textAnchor`/`lineAnchor`/`dx`/`dy` are read as-is — a field or a constant — `angle` is degrees, and `format` is a d3-format string or function (display-only). A text mark is editable like any other: drag to reposition, drag a value to update a numeric readout, `cycle()` a label, `rotate()` it, or `editText()` to retype its content.</Lead>
 
 <ApiReference entries={api} />
 
@@ -65,7 +65,7 @@ A direct-pick edit makes a label interactive. Reuse the universal edits — noth
 <Example
   code={draggableNumericReadout}
   title="Draggable numeric readout"
-  blurb="The label IS the value: text and y read the same field, and drag() on y rewrites it — so the number updates as you drag. format keeps the display tidy."
+  blurb="The label is the value itself: text and y read the same field, and drag() on y rewrites it — so the number updates as you drag. format keeps the display tidy."
   try={(
     <>
       <b>Drag</b> the number up or down.

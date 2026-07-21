@@ -22,13 +22,13 @@ export default function Layout({ children }) {
 
 # Geo
 
-<Lead>Geographic marks for map elicitation. Set chart-level `projection` (Plot-style: `"mercator"`, `{ type, domain, … }`, or a live d3.geo* instance). Position uses **apply / invert** on that shared projection — not x/y scales. Provide basemap topology with `geoBasemap({ geojson })` (a GeoJSON FeatureCollection / Feature / Geometry). Editable overlays live on the **dataset**. Examples below use Vancouver’s 22 local areas (`vancouver` in the docs scope — replace with your own file).</Lead>
+<Lead>Geographic marks for map elicitation. Set a chart-level `projection` — `"mercator"`, `{ type, domain, … }`, or a live `d3.geo*` instance. Position goes through that projection's apply/invert, not x/y scales. Provide basemap topology with `geoBasemap({ geojson })`, a GeoJSON FeatureCollection, Feature, or Geometry. Editable overlays live on the dataset, like every other mark. Examples below use Vancouver's 22 local areas (`vancouver` in the docs scope) — swap in your own file.</Lead>
 
 <ApiReference entries={api} />
 
 <Section id="basemap" title="Providing basemap data">
 
-The basemap is chrome: pass GeoJSON into geoBasemap. Fit the projection with the same object as domain so the map fills the frame. Below, `vancouver` is the docs sample (22 local areas); your app would import or fetch its own.
+The basemap is chrome. Pass GeoJSON into `geoBasemap`, and fit the projection with that same object as `domain` so the map fills the frame. Below, `vancouver` is the docs sample (22 local areas) — your app would import or fetch its own.
 
 <Example
   code={vancouverLocalAreas}
@@ -40,7 +40,7 @@ The basemap is chrome: pass GeoJSON into geoBasemap. Fit the projection with the
 
 <Section id="tiles" title="Real basemaps (OSM raster tiles)">
 
-For an actual map under your data — streets, water, labels — use `geoTile()`: the Leaflet model, a pyramid of 256px images from a tile server, laid on the plane behind the marks. **It requires `projection: "mercator"`** (unrotated). A tile is a pre-rendered picture baked in Web Mercator, so under any other projection it cannot be made to register with the data; the mark checks the projection's behaviour, draws nothing, and warns rather than showing you a misaligned map. Everything else is unchanged — the same lon/lat marks and the same edit.geo.* gestures ride on top, because they still go through the same projection. **Attribution is a licence condition** of every tile service and is drawn by default. Public OSM tiles are rate-limited and not meant for production traffic: point `url` at your own server or a paid provider when you ship.
+`geoTile()` lays a raster basemap — a pyramid of 256px tiles from a tile server — behind your marks. Tiles are pre-rendered in Web Mercator, so it requires `projection: "mercator"`; other projections draw nothing and log a warning instead of a misaligned map. Your lon/lat marks and `edit.geo.*` gestures work the same on top, since they still go through the same projection. Attribution is a licence condition of every tile service, and is drawn by default. Public OSM tiles are rate-limited — point `url` at your own server or a paid provider in production.
 
 <Example
   code={pinsOnOpenstreetmap}
@@ -68,7 +68,7 @@ For an actual map under your data — streets, water, labels — use `geoTile()`
 
 <Section id="points" title="Place / move points on the map">
 
-geoPoint overlays sit on the same projection. Click empty space to add; drag to move. Lon/lat come back through onChange / getData().
+`geoPoint` overlays sit on the same projection. Click empty space to add; drag to move. Lon/lat come back through `onChange` / `getData()`.
 
 <Example
   code={beliefPinsOnVancouver}
@@ -85,7 +85,7 @@ geoPoint overlays sit on the same projection. Click empty space to add; drag to 
 
 <Section id="labels" title="Label and rename places">
 
-A label on a map is an ordinary **text** mark that happens to be positioned by the projection — so `geoText` is the only geo-specific part, and every text behaviour comes along free: `editText()` to retype the content, `cycle()` to advance a categorical label, `rotate()` on `angle`. Give it its own feature next to a geoPoint and the two read the same rows: drag the dot and the name follows. `dx`/`dy` nudge the glyph off the anchor without touching the lon/lat a drag writes.
+`geoText` is a text mark positioned by the projection instead of x/y scales — that's the only geo-specific part, so every other text behaviour carries over: `editText()` to retype the content, `cycle()` to advance a categorical label, `rotate()` on `angle`. Pair it with a `geoPoint` as a separate mark reading the same rows, and dragging the dot moves the label along with it. `dx`/`dy` offset the glyph from its anchor without touching the lon/lat a drag writes.
 
 <Example
   code={namedPinsYouCanRename}
@@ -100,9 +100,9 @@ A label on a map is an ordinary **text** mark that happens to be positioned by t
 
 </Section>
 
-<Section id="polygons" title="Recolor neighborhoods">
+<Section id="polygons" title="Recolour neighborhoods">
 
-Editable regions are dataset rows with a geometry field — a subset of the basemap features promoted into data. The basemap stays inert chrome underneath.
+Editable regions are dataset rows with a geometry field, a subset of the basemap features promoted into data. The basemap stays inert chrome underneath.
 
 <Example
   code={cycleFillOnSelectedLocalAreas}
@@ -119,7 +119,7 @@ Editable regions are dataset rows with a geometry field — a subset of the base
 
 <Section id="lines" title="Draw lines over the city">
 
-Author a route as [lon, lat] pairs on top of the neighborhoods. Vertex reshape uses edit.geo.dragVertex on a seeded line (keep draw and vertex-drag on separate charts — draw raises the plane above marks).
+Author a route as `[lon, lat]` pairs on top of the neighborhoods. Reshape vertices with `edit.geo.dragVertex` on a seeded line. Keep draw and vertex-drag on separate charts — draw raises the plane above the marks.
 
 <Example
   code={drawAPathAcrossVancouver}
@@ -146,7 +146,7 @@ Author a route as [lon, lat] pairs on top of the neighborhoods. Vertex reshape u
 
 <Section id="connected" title="Connected scatter over the map">
 
-Give geoLine `lon`/`lat` channels instead of `coordinates` and it connects the dataset's **rows** into one path — the geographic sibling of the `path` mark. Points ride on a separate geoPoint feature, so dragging a stop reshapes the trail: the line re-derives from the same rows on the next render. Order defaults to `"sequence"` (array order); pass a field name to sort by it, or `series` to draw one trail per group.
+Give `geoLine` `lon`/`lat` channels instead of `coordinates` and it connects the dataset's rows into one path, the geographic sibling of `path`. Points are a separate `geoPoint` mark reading the same rows, so dragging a stop re-derives the trail on the next render. Order defaults to `"sequence"` (array order); pass a field name to sort by it, or `series` to draw one trail per group.
 
 <Example
   code={aRouteAcrossVancouver}
@@ -163,7 +163,7 @@ Give geoLine `lon`/`lat` channels instead of `coordinates` and it connects the d
 
 <Section id="rects" title="Geographic rectangles">
 
-Boxes are axis-aligned in lon/lat (they may look slightly curved under Mercator). Grab an **edge** or **corner** to reshape, the **body** to move, and click empty space to mint another. The zone you grabbed is latched at dragstart by the `geoBrush` driver and held for the whole gesture, so a move never turns into a resize halfway through; the cursor tells you which zone you're in before you press.
+Boxes are axis-aligned in lon/lat — they can look slightly curved under Mercator. Grab an edge or corner to reshape, the body to move, or click empty space to mint another. The zone you grab is fixed for the whole gesture, so a move never turns into a resize halfway through. The cursor shows which zone you're in before you press.
 
 <Example
   code={studyAreasOverTheCity}

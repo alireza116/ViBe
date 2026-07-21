@@ -33,7 +33,7 @@ export default function Layout({ children }) {
 
 <Section id="likert" title="Likert scale — widget & plain API">
 
-A point on a band of options + create (probe) + count(\{ max: 1, replace \}). Hover to preview the answer, click to fill it. The plain-API twin draws the same look with inline `guides.custom` helpers and the same mark + edit + constraint — the widget is only a shorthand for it.
+A point on a band of options + create (probe) + `count(\{ max: 1, replace \})`. Hover to preview the answer, click to fill it. The plain-API twin draws the same look with inline `guides.custom` helpers and the same mark + edit + constraint — the widget is only a shorthand for it.
 
 <Example
   code={asAWidget}
@@ -53,7 +53,7 @@ A point on a band of options + create (probe) + count(\{ max: 1, replace \}). Ho
 
 <Section id="choice" title="Multiple choice">
 
-toggle() folds create and remove into one gesture: click an empty option to pick it, click your pick to take it back. count() caps the total.
+`toggle()` folds create and remove into one gesture: click an empty option to pick it, click your pick to take it back. `count()` caps the total.
 
 <Example
   code={asAWidgetPick2}
@@ -66,7 +66,7 @@ toggle() folds create and remove into one gesture: click an empty option to pick
 
 <Section id="slider" title="Slider">
 
-A single knob that tracks the pointer and settles on click or drag-release — drag(\{ pick: "probe" \}). snap() lands it on steps.
+A single knob that tracks the pointer and settles on click or drag-release — `drag(\{ pick: "probe" \})`. `snap()` lands it on steps.
 
 <Example
   code={asAWidget2}
@@ -79,7 +79,7 @@ A single knob that tracks the pointer and settles on click or drag-release — d
 
 <Section id="matrix" title="Question matrix">
 
-Band y of questions × band x of options. toggle() on the (x, y) tuple names a cell; unique(\{ field: "question", replace \}) keeps one answer per row.
+Band y of questions × band x of options. `toggle()` on the (x, y) tuple names a cell; `unique(\{ field: "question", replace \})` keeps one answer per row.
 
 <Example
   code={asAWidget3}
@@ -92,7 +92,7 @@ Band y of questions × band x of options. toggle() on the (x, y) tuple names a c
 
 <Section id="linecone" title="Line + Cone">
 
-The two-step correlation instrument: aim the line and click, open the cone and click. getData() → [\{ r, spread \}].
+The two-step correlation instrument: aim the line and click, open the cone and click. `getData()` returns `[\{ r, spread \}]`.
 
 <Example
   code={asAWidget4}
@@ -200,7 +200,7 @@ Ranking, allocation, tokens, intervals, histograms, regions, thermometers, and l
 <Example
   code={labeledValue}
   title="Labeled value"
-  blurb="A draggable numeric readout — the number IS the mark."
+  blurb="A draggable numeric readout — the number is the mark."
   try={(
     <>
       <b>Drag</b> the number up or down.

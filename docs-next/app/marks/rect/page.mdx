@@ -18,7 +18,7 @@ export default function Layout({ children }) {
 
 # Rect
 
-<Lead>The generalized **bar**: each axis independently resolves its extent as a **span** (x1/x2, y1/y2), a categorical **band**, or a baseline→value length — so a rectangle can span BOTH axes at once (Observable Plot’s rect: heatmap cells, 2-D regions, binned histograms, annotation boxes). `rect` spans both axes; `rectX` / `rectY` force one axis to a baseline→value length. Prefer `bar` when one axis is a category band and the other a value (classic elicitation bars); use `rect` when both axes are spans/bands, and pair it with `brushRect()` for edge/corner/body editing.</Lead>
+<Lead>The generalized **bar**: each axis independently resolves its extent as a **span** (`x1`/`x2`, `y1`/`y2`), a categorical **band**, or a baseline→value length — so a rectangle can span both axes at once, as in Observable Plot's `rect` (heatmap cells, 2-D regions, binned histograms, annotation boxes). `rect` spans both axes; `rectX` / `rectY` force one axis to a baseline→value length. Prefer `bar` when one axis is a category band and the other a value (classic elicitation bars); use `rect` when both axes are spans/bands, and pair it with `brushRect()` for edge/corner/body editing.</Lead>
 
 <ApiReference entries={api} />
 
@@ -36,7 +36,7 @@ Give both axes explicit endpoints and each datum draws a rectangle spanning x1�
 
 <Section id="histogram" title="Binned histogram (rectY)">
 
-A histogram is a vertical rect whose **x** is a quantitative bin span (x1/x2) and whose **y** is a count from the baseline — that is exactly `rectY`. Data must already be binned (one row per bin); there is no binning transform. Prefer `barY` when bins are categorical labels instead of numeric edges.
+A histogram is a vertical rect whose `x` is a quantitative bin span (`x1`/`x2`) and whose `y` is a count from the baseline — that is exactly `rectY`. Data must already be binned, one row per bin; there is no binning transform. Prefer `barY` when bins are categorical labels instead of numeric edges.
 
 <Example
   code={preBinnedCounts}
@@ -59,7 +59,7 @@ A histogram is a vertical rect whose **x** is a quantitative bin span (x1/x2) an
 
 <Section id="editing" title="Composable 2-D editing (brushRect)">
 
-brushRect() edits all four extents. It is OPT-IN and composable: grab an EDGE to resize one side, a CORNER to resize two extents, the BODY to move the whole rect. `resize` ('both' | 'x' | 'y' | 'none') picks which axes resize; `move` (bool) toggles body-drag — so you can ship resize-one-axis, move-only, or resize-only.
+`brushRect()` edits all four extents, opt-in and composable: grab an edge to resize one side, a corner to resize two extents, the body to move the whole rect. `resize` (`'both' | 'x' | 'y' | 'none'`) picks which axes resize; `move` (boolean) toggles body-drag — so you can ship resize-one-axis, move-only, or resize-only variants.
 
 <Example
   code={full2DEdgesCornersBody}
@@ -98,6 +98,6 @@ brushRect() edits all four extents. It is OPT-IN and composable: grab an EDGE to
 
 <Section id="creating" title="Creating rects">
 
-A rect is a **data mark**, so it's creatable like any other (see [Create · Remove · Anchors](/editing/existence)) — with one wrinkle unique to an *extent* mark: a click gives a single point, but a rect needs a **size**. So a creator must **seed the extent**. A rect whose axis is a band or a baseline→value length (`rectY`) gets its size from the axis and creates like a `bar`; a 2-D **span** rect (`x1`/`x2`, `y1`/`y2`) must supply the opposite corner through `create({ defaults: { x2, y2 } })`, then let `brushRect()` shape it. Forget the extent and the new row is minted zero-size — invisible — which the dev build warns about (`warnCreateEmptyExtent`). Geo's `edit.geo.createRect()` is the purpose-built version: it mints a box sized from default spans around the click.
+A rect is a **data mark**, so it's creatable like any other (see [Create · Remove · Anchors](/editing/existence)) — with one wrinkle: a click gives a single point, but a rect needs a size, so a creator must seed the extent. A `rectY`-style rect (band or baseline→value length) gets its size from the axis and creates like a `bar`. A 2-D span rect (`x1`/`x2`, `y1`/`y2`) needs the opposite corner supplied through `create({ defaults: { x2, y2 } })`, then `brushRect()` shapes it. Skip the extent and the new row mints zero-size and invisible — the dev build warns you. Geo's `edit.geo.createRect()` is the purpose-built version: it mints a box sized from default spans around the click.
 
 </Section>

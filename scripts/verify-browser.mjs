@@ -390,6 +390,47 @@ async function main() {
             glyphAfter.length === 4 && Math.abs(glyphAfter[3].x - 40) < 3 && Math.abs(glyphAfter[3].value - 50) < 3,
             JSON.stringify(glyphAfter[3]));
 
+        // ---- Face create + unique per day (/marks/face) ----------------------
+        // Create on an ordinal (band) x × numeric y: click an empty day to add a
+        // face; unique({ field:'day' }) rejects a create in an occupied day. The x
+        // axis is a BAND, so band centres are computed directly (frameOf is linear).
+        console.log('\nFace create + unique per day (/marks/face)');
+        await open('/marks/face', '#creating .chart svg');
+        await page.locator('#creating .chart svg').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(200);
+        const faceBox = await page.$eval('#creating .chart svg', (svg) => {
+            const r = svg.getBoundingClientRect();
+            return { left: r.left, top: r.top };
+        });
+        const fm = { top: 16, right: 20, bottom: 32, left: 34 };
+        const fw = 560, fh = 300, days = 7;
+        const fiw = fw - fm.left - fm.right, fih = fh - fm.top - fm.bottom;
+        // Band centre for day index i (padding-agnostic); mood is linear on y in [0,1].
+        const dayAt = (i, mood) => ({
+            x: faceBox.left + fm.left + (i + 0.5) / days * fiw,
+            y: faceBox.top + fm.top + (1 - mood) * fih,
+        });
+        const faceRows = () => page.$eval('#creating .chart > div', (el) => el.getData());
+        const fBefore = await faceRows();
+        check('face.create: three days filled to start', fBefore.length === 3, `${fBefore.length} rows`);
+
+        const sun = dayAt(6, 0.6);   // Sun (index 6) is empty
+        await page.mouse.click(sun.x, sun.y);
+        await page.waitForTimeout(140);
+        let fAfter = await faceRows();
+        check('face.create: clicking an empty day adds one face', fAfter.length === 4, `${fAfter.length} rows`);
+        check('face.create: the new face lands on the clicked day (band invert)',
+            !!fAfter[3] && fAfter[3].day === 'Sun', JSON.stringify(fAfter[3]));
+
+        const mon = dayAt(0, 0.3);   // Mon (index 0) is already filled (mood 0.7); click its empty lower area
+        await page.mouse.click(mon.x, mon.y);
+        await page.waitForTimeout(140);
+        fAfter = await faceRows();
+        check('face.unique: a create in an occupied day is rejected', fAfter.length === 4, `${fAfter.length} rows`);
+        const monRows = fAfter.filter((d) => d.day === 'Mon');
+        check('face.unique: Monday still holds exactly one face at its original mood',
+            monRows.length === 1 && Math.abs(monRows[0].mood - 0.7) < 0.01, JSON.stringify(monRows));
+
         // ---- Derived fn channel (/concepts) ----------------------------------
         // A derived channel ({ fn }) is computed per datum in visual space and is
         // read-only: the edit lives on the source field (x), and the fill must

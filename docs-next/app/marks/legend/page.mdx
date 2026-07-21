@@ -24,7 +24,7 @@ export default function Layout({ children }) {
 
 <Section id="discrete" title="A discrete colour legend">
 
-`legendColor()` reads the `fill` scale and draws a swatch per category. `anchor` picks the side; the engine measures the legend and shrinks the plot so the bars never draw underneath it.
+`legendColor()` reads the `fill` scale and draws a swatch per category. `anchor` sets which side it's on. The plot shrinks to leave room, so the legend never overlaps the marks.
 
 <Example
   code={discreteColorLegend}
@@ -60,7 +60,7 @@ A quantitative `fill` resolves to a **sequential** colour scale, so the same `le
 
 <Section id="picker" title="A category picker">
 
-Pass `edit: edit.legend()` to make each swatch a click target that sets the channel's field on the target row (the first, by default) — a natural fit for a one-row belief.
+Pass `edit: edit.legend()` to make each swatch a click target that sets the channel's field on the target row (the first, by default).
 
 <Example
   code={categoryPicker}

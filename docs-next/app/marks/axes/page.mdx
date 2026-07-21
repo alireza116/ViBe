@@ -22,7 +22,7 @@ export default function Layout({ children }) {
 
 <Section id="global" title={"The global axes:{} convenience"}>
 
-Pass a per-channel config to shape ticks, formats and titles, or a transform to reposition an axis. axes: false drops them entirely.
+Pass a per-channel config to shape ticks, formats and titles, or a transform to reposition an axis. `axes: false` drops them entirely.
 
 <Example
   code={gridlinesTicksFormatTitle}
@@ -51,7 +51,7 @@ Pass a per-channel config to shape ticks, formats and titles, or a transform to 
 
 <Section id="composable" title="Axis, grid & rule as marks">
 
-Turn the global axes off (axes: false) and compose reference marks into `marks` yourself — they render in z-order with your data, so you control exactly what draws and where.
+Turn the global axes off (`axes: false`) and compose reference marks into `marks` yourself — they render in z-order with your data, so you control exactly what draws and where.
 
 <Example
   code={explicitGridyAxisxAxisyRuley}

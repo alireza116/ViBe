@@ -1,0 +1,35 @@
+mount(Elicit({
+  width: 560, height: 300,
+  margins: { top: 16, right: 20, bottom: 32, left: 34 },
+  axes: { x: {}, y: {} },
+  data: [
+    { day: "Mon", mood: 0.7 },
+    { day: "Wed", mood: 0.4 },
+    { day: "Sat", mood: 0.9 },
+  ],
+  schema: {
+    // Ordinal x: the week runs Mon → Sun in this order (a band axis).
+    day:  { type: "ordinal", domain: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] },
+    // Numeric y in [0, 1]: how good the day felt. It also drives the smile.
+    mood: { type: "quantitative", domain: [0, 1] },
+  },
+  marks: [
+    face({
+      size: 24,
+      channels: {
+        x: { field: "day" },
+        y: { field: "mood" },
+        // Bind the smile to the SAME field as y: click higher → happier face,
+        // and a created face's expression derives from the mood create mints —
+        // no extra field to seed.
+        mouthCurve: { field: "mood" },
+      },
+      // A click on an empty day's column inverts the pointer to (day, mood) and
+      // mints one face there. A click that lands ON a face carries a node, so it
+      // never fires the plane create — and a click in a day that's already taken
+      // is rejected by `unique`, so a day can hold at most one face.
+      edits: [ create({ channels: ["x", "y"] }) ],
+      constraints: [ unique({ field: "day" }) ],
+    }),
+  ],
+}))

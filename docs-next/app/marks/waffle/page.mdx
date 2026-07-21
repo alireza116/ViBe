@@ -47,7 +47,7 @@ One category on a 0–1 axis; each cell is 1/50, so 50 cells fill the block. edi
 
 <Section id="shapes-and-click" title="Dots, click-to-set & hidden track">
 
-Cells can be circles (shape: "circle") — uniform squares that touch, packed to fill the band width and height. A click-gesture edit sets the count to the clicked cell in one tap, and showEmpty: false hides the track while keeping it grabbable.
+Cells can be circles (`shape: "circle"`) — uniform squares that touch, packed to fill the band width and height. A click-gesture edit sets the count to the clicked cell in one tap, and `showEmpty: false` hides the track while keeping it grabbable.
 
 <Example
   code={clickADotToSetTheCount}
@@ -60,7 +60,7 @@ Cells can be circles (shape: "circle") — uniform squares that touch, packed to
 
 <Section id="small-counts" title="Small counts (unit = 1)">
 
-With unit: 1 each cell is exactly one item, so small counts read directly — one cell means one. The grid is only as wide as it needs to be (never wider than the band) and is centred, so a category of 1 shows a single cell.
+With `unit: 1` each cell is exactly one item, so small counts read directly — one cell means one. The grid is only as wide as it needs to be, never wider than the band, and is centred, so a category of 1 shows a single cell.
 
 <Example
   code={talliesOf16}

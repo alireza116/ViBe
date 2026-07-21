@@ -15,13 +15,13 @@ export default function Layout({ children }) {
 
 # Drag · Resize · Cycle · Custom
 
-<Lead>Different channels take different gestures. `drag` moves a position, `resize` inverts a radius into a magnitude, `cycle` clicks through a category, and `custom` is the escape hatch for anything else. Several edits can share one mark, separated by `when`.</Lead>
+<Lead>Different channels take different gestures. `drag` moves a position, `resize` inverts a radius into a magnitude, `cycle` clicks through a category, and `custom` covers anything else. Several edits can share one mark, separated by `when`.</Lead>
 
 <ApiReference entries={api} />
 
 <Section id="resize" title="Resize a magnitude">
 
-size: \{ edit: resize() \} — the drag radius from the dot centre inverts to the value, mirroring how size encodes it. The stroke survives the resize.
+`resize()` inverts the drag radius from the dot's centre back into the value, the same relationship `size` uses to encode it (`size: \{ edit: resize() \}`). The stroke stays fixed while you resize.
 
 <Example
   code={dragOutwardToGrow}
@@ -38,7 +38,7 @@ size: \{ edit: resize() \} — the drag radius from the dot centre inverts to th
 
 <Section id="multi" title="One mark, three gestures">
 
-Move, resize, and recolour on a single mark — separated by when. Plain drag moves, Shift-drag resizes, click cycles the category.
+Move, resize, and recolour on one mark, separated by `when`. Plain drag moves, Shift-drag resizes, click cycles the category.
 
 <Example
   code={moveShiftResizeClickCycle}
@@ -53,14 +53,14 @@ Move, resize, and recolour on a single mark — separated by when. Plain drag mo
 
 </Section>
 
-<Section id="custom" title="Custom — the escape hatch">
+<Section id="custom" title="Custom">
 
-custom(fn) wraps fn as apply. The edit still declares its gesture (default drag) — the engine only calls fn when that gesture fires. fn receives the EditContext: ctx.datum is the touched row, ctx.event the raw DOM event, plus the pointer, scales, data, … — see the Editing overview. Return a new datum (or array); every field you set is written into the belief store.
+`custom(fn)` sets `fn` as the edit's `apply`. It fires on a gesture (`drag` by default). `fn` receives an `EditContext`: `ctx.datum` (the touched row), `ctx.event`, plus pointer, scales, and data — see Editing overview for the full shape. Return a new datum, or an array of data; the fields you set are written back.
 
 <Example
   code={invertYYourself}
   title="Invert y yourself"
-  blurb="gesture defaults to drag. ctx.pointer is plot pixels; scales.y.invertValue maps them back to data. touched: true is just another field on the returned datum — it shows up in getData() because you put it there."
+  blurb="gesture defaults to drag. ctx.pointer is plot pixels; scales.y.invertValue maps them back to data. touched: true is just another field on the datum — it appears in getData() because you set it."
   try={(
     <>
       <b>Drag</b> a dot — y follows the pointer; the data panel gains <code className="inline">touched: true</code>.

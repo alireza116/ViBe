@@ -18,7 +18,7 @@ export default function Layout({ children }) {
 
 # Composite
 
-<Lead>A **composite** mark is a glyph: a named **group of ordinary marks** over the chart’s one dataset. Group-level `channels` (and style / `angle` shorthands) **trickle into every part** at desugar time — declare a shared orientation or position once; a part’s own channel for the same name wins; inherited `edit`s attach to the **last** part only (visuals first, handles last). Each part still has its **own** channels and shorthands (arm geometry, per-part stroke, a hub’s fill). Composite is a **desugaring**, not a new kind of feature: it returns its parts as plain features and `Elicit` flattens them. Because each handle is its own mark, dragging one _cannot_ move another — dispatch already routes a gesture to the feature owning the node you touched.</Lead>
+<Lead>A **composite** mark is a glyph: a named group of ordinary marks over the chart's one dataset. Group-level `channels` (and style / `angle` shorthands) trickle into every part at desugar time — declare a shared orientation or position once; a part's own channel for the same name wins; inherited `edit`s attach to the **last** part only (visuals first, handles last). Each part still has its own channels and shorthands: arm geometry, per-part stroke, a hub's fill. Composite is a desugaring, not a new kind of mark — it returns its parts as plain marks, and `Elicit` flattens them. Because each handle is its own mark, dragging one cannot move another: a gesture routes only to the mark you touched.</Lead>
 
 <ApiReference entries={api} />
 
@@ -57,7 +57,7 @@ Three editable fields on one row: `mean` (the dot), `lo` and `hi` (the caps). Ea
 <Example
   code={coupledMoveCenterWithinEnds}
   title="Coupled move + center-within-ends"
-  blurb={"Two behaviours, two layers. The dot uses a joint edit (edit.custom): its new value comes from the pointer and it shifts lo/hi by the same delta, so moving the centre carries the whole bar. The invariant \"centre stays within the ends\" is a CONSTRAINT — a pure data rule on the DATASET. Declared once on the group, it runs on every commit from every part, so a cap can never cross the centre no matter which handle you grabbed."}
+  blurb={"Two behaviours, two layers. The dot uses a joint edit (edit.custom): its new value comes from the pointer, and it shifts lo/hi by the same delta, so moving the centre carries the whole bar. \"Centre stays within the ends\" is a constraint — a pure data rule on the dataset. Declared once on the group, it runs on every commit from every part, so a cap can never cross the centre, no matter which handle you grabbed."}
   try={(
     <>
       <b>Drag the dot</b> — the whole bar travels. <b>Drag a cap</b> past the dot — it stops at the centre.

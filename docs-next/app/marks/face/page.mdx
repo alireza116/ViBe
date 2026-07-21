@@ -8,6 +8,7 @@ import { api } from './api';
 import valenceArousal from './_examples/valence-arousal.example.txt';
 import fullChernoffFace from './_examples/full-chernoff-face.example.txt';
 import aMoodPerPerson from './_examples/a-mood-per-person.example.txt';
+import oneFacePerDay from './_examples/one-face-per-day.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -64,6 +65,23 @@ Give the face an `x` (or `y`) channel and it is placed like a `point` — one ed
   try={(
     <>
       <b>Drag</b> any face's mouth or an eye.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="creating" title="One face per day — click to add">
+
+A face is a data mark, so it's [creatable](/editing/existence#what-can-create) like a `point`: a plane click inverts the pointer through the x and y scales to mint a datum, and the face draws itself from it. Here the week starts with three days filled; click an empty day to add its face — the click's height sets the `mood`, which also drives the smile. `unique({ field: "day" })` makes the day the identity, so each day holds **at most one** face: a click in a day that's already taken is rejected, and clicking directly on a face never creates one — only a click on empty space does.
+
+<Example
+  code={oneFacePerDay}
+  title="Click an empty day to add a face"
+  blurb={"create() on an ordinal x (days) × numeric y (mood); unique({ field: \"day\" }) caps each day at one face. mouthCurve reads the same mood field, so a created face's smile matches where you clicked."}
+  try={(
+    <>
+      <b>Click</b> an empty day to add its face · <b>drag</b> a mouth to adjust the mood.
     </>
   )}
 />

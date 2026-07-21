@@ -20,7 +20,7 @@ export default function Layout({ children }) {
 
 <Section id="drag" title="Drag a value">
 
-The canonical edit: drag() inverts the pointer on each positional channel it governs. On a bar’s y, a drag rewrites the value.
+The canonical edit: `drag()` inverts the pointer on each positional channel it governs. On a bar's `y`, a drag rewrites the value.
 
 <Example
   code={dragAValueBars}
@@ -37,7 +37,7 @@ The canonical edit: drag() inverts the pointer on each positional channel it gov
 
 <Section id="pick" title="Pick — how an edit finds its target">
 
-pick: "direct" uses the mark under the pointer; pick: "nearest" grabs the closest mark within a pixel threshold, so small marks are reachable from nearby empty space. guide: true self-draws the snap ring.
+`pick: "direct"` uses the mark under the pointer; `pick: "nearest"` grabs the closest mark within a pixel threshold, so small marks are reachable from nearby empty space. `guide: true` self-draws the snap ring.
 
 <Example
   code={nearestPickFromEmptySpace}
