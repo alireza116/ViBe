@@ -1,0 +1,30 @@
+mount(Elicit({
+  width: 420, height: 260,
+  margins: { top: 16, right: 84, bottom: 30, left: 56 },
+  data: [
+    { day: "Mon", slot: "AM", load: 4 },  { day: "Mon", slot: "PM", load: 9 },  { day: "Mon", slot: "Eve", load: 6 },
+    { day: "Tue", slot: "AM", load: 7 },  { day: "Tue", slot: "PM", load: 14 }, { day: "Tue", slot: "Eve", load: 8 },
+    { day: "Wed", slot: "AM", load: 12 }, { day: "Wed", slot: "PM", load: 20 }, { day: "Wed", slot: "Eve", load: 11 },
+    { day: "Thu", slot: "AM", load: 6 },  { day: "Thu", slot: "PM", load: 16 }, { day: "Thu", slot: "Eve", load: 10 },
+  ],
+  schema: {
+    day:  { type: "categorical", domain: ["Mon", "Tue", "Wed", "Thu"] },
+    slot: { type: "categorical", domain: ["AM", "PM", "Eve"] },
+    load: { type: "quantitative", domain: [0, 20] },
+  },
+  marks: [
+    // A category on both axes centres one dot per (day, slot). `size` ramps the
+    // radius and `fill` the colour off the same field, so magnitude reads twice.
+    // `size` is invertible, so resize() drags a dot's radius back to a value —
+    // its colour re-derives from the same field on the next render.
+    point({
+      channels: {
+        x:    { field: "day" },
+        y:    { field: "slot" },
+        size: { field: "load", edit: edit.resize() },
+        fill: { field: "load" },
+      },
+    }),
+    legendColor({ anchor: "right", title: "load" }),
+  ],
+}))

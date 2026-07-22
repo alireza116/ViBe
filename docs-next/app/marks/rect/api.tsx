@@ -61,7 +61,20 @@ export const api: ApiEntry[] = [
       {
         name: "x / y",
         type: "band | linear",
-        desc: "A single value (baseline→value) or a band, when that axis isn’t a span.",
+        desc: (
+          <>
+            A single value (baseline→value), or a band cell when that axis is categorical. For a heatmap, add <code className="inline">scale: {"{ padding: 0 }"}</code> so cells touch.
+          </>
+        ),
+      },
+      {
+        name: "width / height",
+        type: "px",
+        desc: (
+          <>
+            Explicit pixel extent — the rect becomes a fixed-size box centred on its <code className="inline">x</code>/<code className="inline">y</code> anchor. Overrides band and baseline→value.
+          </>
+        ),
       },
       {
         name: "fill, stroke, strokeWidth, opacity",

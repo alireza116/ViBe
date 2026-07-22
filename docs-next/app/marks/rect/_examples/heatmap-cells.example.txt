@@ -1,0 +1,33 @@
+mount(Elicit({
+  width: 420, height: 260,
+  margins: { top: 16, right: 84, bottom: 30, left: 56 },
+  data: [
+    { day: "Mon", slot: "AM", load: 4 },  { day: "Mon", slot: "PM", load: 9 },  { day: "Mon", slot: "Eve", load: 6 },
+    { day: "Tue", slot: "AM", load: 7 },  { day: "Tue", slot: "PM", load: 14 }, { day: "Tue", slot: "Eve", load: 8 },
+    { day: "Wed", slot: "AM", load: 12 }, { day: "Wed", slot: "PM", load: 20 }, { day: "Wed", slot: "Eve", load: 11 },
+    { day: "Thu", slot: "AM", load: 6 },  { day: "Thu", slot: "PM", load: 16 }, { day: "Thu", slot: "Eve", load: 10 },
+  ],
+  schema: {
+    day:  { type: "categorical", domain: ["Mon", "Tue", "Wed", "Thu"] },
+    slot: { type: "categorical", domain: ["AM", "PM", "Eve"] },
+    load: { type: "quantitative", domain: [0, 20] },
+  },
+  marks: [
+    // A category on BOTH axes draws one cell per (day, slot). `scale: { padding: 0 }`
+    // removes the band gap so the cells touch, as a heatmap wants. A quantitative
+    // `fill` resolves to a sequential colour ramp.
+    // `select()` makes a cell the target row, so the legend edits the one you click.
+    rect({
+      stroke: "#fff", strokeWidth: 1,
+      edits: [ edit.select() ],
+      channels: {
+        x:    { field: "day",  scale: { padding: 0 } },
+        y:    { field: "slot", scale: { padding: 0 } },
+        fill: { field: "load" },
+      },
+    }),
+    // Colour isn't gesture-invertible, so the ramp handle sets the value by hand.
+    // It tracks the selected cell — click a cell, then drag the handle to set it.
+    legendColor({ anchor: "right", title: "load", edit: edit.legendValue() }),
+  ],
+}))

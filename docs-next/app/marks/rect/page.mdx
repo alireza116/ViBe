@@ -6,6 +6,8 @@ import { Lead } from '../../../components/Lead';
 import { api } from './api';
 
 import regionBoxes from './_examples/region-boxes.example.txt';
+import heatmapCells from './_examples/heatmap-cells.example.txt';
+import fixedSizeBoxes from './_examples/fixed-size-boxes.example.txt';
 import preBinnedCounts from './_examples/pre-binned-counts.example.txt';
 import editableBinHeights from './_examples/editable-bin-heights.example.txt';
 import full2DEdgesCornersBody from './_examples/full-2-d-edges-corners-body.example.txt';
@@ -18,7 +20,7 @@ export default function Layout({ children }) {
 
 # Rect
 
-<Lead>The generalized **bar**: each axis independently resolves its extent as a **span** (`x1`/`x2`, `y1`/`y2`), a categorical **band**, or a baseline→value length — so a rectangle can span both axes at once, as in Observable Plot's `rect` (heatmap cells, 2-D regions, binned histograms, annotation boxes). `rect` spans both axes; `rectX` / `rectY` force one axis to a baseline→value length. Prefer `bar` when one axis is a category band and the other a value (classic elicitation bars); use `rect` when both axes are spans/bands, and pair it with `brushRect()` for edge/corner/body editing.</Lead>
+<Lead>The generalized **bar**: each axis independently resolves its extent as a **span** (`x1`/`x2`, `y1`/`y2`), a fixed pixel **size** (`width`/`height`) centred on an anchor, a categorical **band**, or a baseline→value length — so a rectangle can span both axes at once, as in Observable Plot's `rect` (heatmap cells, 2-D regions, binned histograms, annotation boxes). `rect` spans both axes; `rectX` / `rectY` force one axis to a baseline→value length. Prefer `bar` when one axis is a category band and the other a value (classic elicitation bars); use `rect` when both axes are spans/bands, and pair it with `brushRect()` for edge/corner/body editing.</Lead>
 
 <ApiReference entries={api} />
 
@@ -30,6 +32,40 @@ Give both axes explicit endpoints and each datum draws a rectangle spanning x1�
   code={regionBoxes}
   title="Region boxes"
   blurb="x1/x2 and y1/y2 place each rect; fill by a field."
+/>
+
+</Section>
+
+<Section id="heatmap" title="Heatmap (both axes categorical)">
+
+Put a category on **both** axes and each datum draws one cell at that (x, y) intersection — a heatmap. A quantitative `fill` resolves to a sequential colour ramp; a categorical `fill` to a palette. Band scales pad by default, so set `scale: { padding: 0 }` on each axis to close the gap and let the cells touch. Colour isn't gesture-invertible, so edit a cell's value through the ramp: `select()` on the cells makes the one you click the target row, and `legendColor({ edit: edit.legendValue() })` drags that row's value along the ramp.
+
+<Example
+  code={heatmapCells}
+  title="Coloured cells"
+  blurb="A category on x and y; fill by a quantitative field; padding 0 so cells touch."
+  try={(
+    <>
+      <b>Click</b> a cell to select it, then <b>drag</b> the legend handle to set its value.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="fixed-size" title="Fixed-size boxes (width/height)">
+
+Give an axis an explicit pixel extent with `width` (x) or `height` (y) and the rect becomes a fixed-size box **centred** on its `x`/`y` anchor — the SVG-native parameterisation, alongside `x1`/`x2` spans and band cells. An explicit size overrides the band interval and the baseline→value length. The anchor is a positional channel, so a `drag()` on `x` and `y` moves the whole box.
+
+<Example
+  code={fixedSizeBoxes}
+  title="Boxes at data points"
+  blurb="x/y anchor each box; width/height set a constant 28×28 px size."
+  try={(
+    <>
+      <b>Drag</b> a box to move it (its size stays fixed).
+    </>
+  )}
 />
 
 </Section>

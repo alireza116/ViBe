@@ -250,6 +250,109 @@ async function main() {
             check(`click cell #${k}: filled === value/unit`, filled === value / 5, `filled ${filled}, value/unit ${value / 5}`);
         }
 
+        // ---- Rect heatmap + fixed-size boxes (/marks/rect) ----------------
+        // A category on both axes must tile the plane (band cells), and padding 0
+        // must leave NO gap between cells — the whole point of a heatmap. The
+        // width/height mode must draw a fixed-size box, not a band interval or a
+        // full-range span. Both are pure geometry, so read the rendered rects.
+        console.log('\nRect heatmap + fixed-size boxes (/marks/rect)');
+        await open('/marks/rect', '#heatmap .chart svg rect.mark');
+
+        const rectGeom = (sel) => page.$$eval(sel, (rs) => rs.map((r) => ({
+            x: +r.getAttribute('x'), y: +r.getAttribute('y'),
+            w: +r.getAttribute('width'), h: +r.getAttribute('height'),
+            fill: (r.getAttribute('fill') || r.style.fill || '').toLowerCase(),
+        })));
+
+        const heatCells = await rectGeom('#heatmap .chart svg rect.mark');
+        check('rect heatmap: one cell per (day, slot) — 4×3 = 12',
+            heatCells.length === 12, `got ${heatCells.length}`);
+
+        // padding 0 ⇒ columns touch: the sorted unique left edges step by exactly a
+        // cell width, so there is no gap between adjacent cells.
+        const w0 = heatCells[0]?.w ?? 0;
+        const uniqX = [...new Set(heatCells.map((c) => Math.round(c.x * 10) / 10))].sort((a, b) => a - b);
+        const colGaps = uniqX.slice(1).map((x, i) => x - uniqX[i]);
+        check('rect heatmap: cells touch (padding 0, no column gap)',
+            uniqX.length === 4 && colGaps.every((g) => Math.abs(g - w0) < 0.75),
+            `w ${w0.toFixed(1)}, gaps ${colGaps.map((g) => g.toFixed(1)).join(',')}`);
+
+        // A sequential fill ⇒ the cells span a range of colours, not one flat fill.
+        check('rect heatmap: fill varies with the value field',
+            new Set(heatCells.map((c) => c.fill)).size >= 6,
+            `${new Set(heatCells.map((c) => c.fill)).size} distinct fills`);
+
+        const boxes = await rectGeom('#fixed-size .chart svg rect.mark');
+        check('rect width/height: fixed 28×28 boxes (not band/span)',
+            boxes.length === 4 && boxes.every((b) => Math.abs(b.w - 28) < 0.5 && Math.abs(b.h - 28) < 0.5),
+            boxes.map((b) => `${b.w}×${b.h}`).join(' '));
+
+        // Editing — drive the real gestures and assert the data moved. A local drag
+        // (this block predates the lock section's dragPath helper).
+        const mouseDrag = async (fromX, fromY, toX, toY, steps = 20) => {
+            await page.mouse.move(fromX, fromY);
+            await page.mouse.down();
+            for (let i = 1; i <= steps; i++) {
+                await page.mouse.move(fromX + (toX - fromX) * i / steps, fromY + (toY - fromY) * i / steps);
+                await page.waitForTimeout(6);
+            }
+            await page.mouse.up();
+            await page.waitForTimeout(100);
+        };
+        const centreOf = async (loc) => {
+            await loc.scrollIntoViewIfNeeded();
+            const b = await loc.boundingBox();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        };
+
+        // drag() on x & y moves the whole box: a rightward drag raises the x field.
+        const boxData = () => page.$eval('#fixed-size .chart > div', (el) => el.getData());
+        const boxBefore = await boxData();
+        const bc = await centreOf(page.locator('#fixed-size .chart svg rect.mark').first());
+        await mouseDrag(bc.x, bc.y, bc.x + 60, bc.y);
+        const boxAfter = await boxData();
+        check('rect width/height: drag() moves the box (x rises on a rightward drag)',
+            boxAfter[0].x > boxBefore[0].x + 0.3, `x ${boxBefore[0].x} -> ${boxAfter[0].x}`);
+
+        // select() + legendValue(): click a cell to select it, then drag the ramp
+        // handle to set THAT cell's value (colour isn't invertible, so the ramp does
+        // it by hand). Proves selection targeting and the by-hand invert on a heatmap.
+        const cellData = () => page.$eval('#heatmap .chart > div', (el) => el.getData());
+        const cellSel = () => page.$eval('#heatmap .chart > div', (el) => el.getSelection());
+        const cell5 = await centreOf(page.locator('#heatmap .chart svg rect.mark').nth(5));
+        await page.mouse.click(cell5.x, cell5.y);
+        await page.waitForTimeout(100);
+        check('rect heatmap: clicking a cell selects it (select())',
+            (await cellSel()) === 5, `sel ${await cellSel()}`);
+        // The ramp handle is the only circle.mark in this chart; it appears once a
+        // row is selected. Drag it down (vertical ramp) to lower the selected value.
+        const rampHandle = await page.$$eval('#heatmap .chart svg circle.mark', (cs) => {
+            let best = null;
+            for (const c of cs) { const r = c.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; if (!best || cx > best.cx) best = { cx, cy }; }
+            return best;
+        });
+        check('rect heatmap: a selection renders the ramp handle', rampHandle != null,
+            `handle ${JSON.stringify(rampHandle)}`);
+        if (rampHandle) {
+            const loadBefore = (await cellData())[5].load;
+            await mouseDrag(rampHandle.cx, rampHandle.cy, rampHandle.cx, rampHandle.cy + 55);
+            const loadAfter = (await cellData())[5].load;
+            check('rect heatmap: dragging the ramp sets the SELECTED cell (legendValue)',
+                loadAfter < loadBefore - 2 && loadAfter >= 0, `load ${loadBefore} -> ${loadAfter}`);
+        }
+
+        // point heatmap: resize() on the size channel — drag a dot outward from its
+        // centre to raise its value (the size scale is invertible).
+        console.log('\nPoint heatmap resize (/marks/point)');
+        await open('/marks/point', '#heatmap .chart svg circle.mark');
+        const dotData = () => page.$eval('#heatmap .chart > div', (el) => el.getData());
+        const dotBefore = await dotData();
+        const dc = await centreOf(page.locator('#heatmap .chart svg circle.mark').first());
+        await mouseDrag(dc.x, dc.y, dc.x + 16, dc.y);
+        const dotAfter = await dotData();
+        check('point heatmap: resize() raises the dragged dot’s value',
+            dotAfter[0].load > dotBefore[0].load + 1, `load ${dotBefore[0].load} -> ${dotAfter[0].load}`);
+
         // ---- Locked rows (spec.lock) --------------------------------------
         // The lock is half data-invariant, half pointer policy, and only the second
         // half proves out under real pointer events: a locked mark must be

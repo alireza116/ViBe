@@ -11,6 +11,7 @@ import ex2dMoveScatter from './_examples/2d-move-scatter.example.txt';
 import clickToAddPoints from './_examples/click-to-add-points.example.txt';
 import scatterOfRotatableSquares from './_examples/scatter-of-rotatable-squares.example.txt';
 import scatterOfRotatableTicks from './_examples/scatter-of-rotatable-ticks.example.txt';
+import heatmapOfCircles from './_examples/heatmap-of-circles.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -36,6 +37,23 @@ A numeric field can drive the radius (size) and a continuous colour ramp at once
   code={constantStyleShorthands}
   title="Constant style shorthands"
   blurb="Outlined, semi-transparent dots via top-level stroke / strokeWidth / opacity."
+/>
+
+</Section>
+
+<Section id="heatmap" title="Heatmap of circles / squares">
+
+Put a category on **both** x and y and each dot centres at that intersection — a grid heatmap. `fill` encodes the value as colour and `size` as radius, so magnitude reads twice; `shape: 'square'` swaps circles for centred squares. Reach for `rect` instead when you want filled cells that tile the plane. The `size` scale is invertible, so `resize()` on it drags a dot's radius back to a value — its colour re-derives from the same field.
+
+<Example
+  code={heatmapOfCircles}
+  title="Sized, coloured grid"
+  blurb="Category on x and y; size and fill both ramp off the value field."
+  try={(
+    <>
+      <b>Drag</b> a dot to resize it and set its value.
+    </>
+  )}
 />
 
 </Section>

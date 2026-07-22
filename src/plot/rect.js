@@ -19,10 +19,14 @@ import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf
 //   1. SPAN     both endpoint channels present (x1&x2 / y1&y2) → min/max of the two
 //               encoded pixels. x1/x2 share x's resolved scale via resolve.js's axis
 //               aliasing, so they go through encodeChannel exactly like x.
-//   2. VALUE    this axis is the forced value axis, OR only a single x/y field is
+//   2. SIZE     an explicit pixel extent (width / height) → a fixed-size box centred
+//               on the x/y anchor (SVG-native). Overrides band/value, so a fixed box
+//               wins over the category interval; on a band axis the anchor is the
+//               category centre, so the box sits centred in its cell.
+//   3. VALUE    this axis is the forced value axis, OR only a single x/y field is
 //               given → baseline→value (like a bar's length).
-//   3. BAND     the axis's scale is a band → the category interval (start + bandwidth).
-//   4. EXTENT   nothing positional on this axis → span the full range (a rule-like
+//   4. BAND     the axis's scale is a band → the category interval (start + bandwidth).
+//   5. EXTENT   nothing positional on this axis → span the full range (a rule-like
 //               fallback, so a 1-D rect still draws).
 //
 // Editing: x1/x2/y1/y2 are already registered positional channels, so drag /
@@ -51,6 +55,16 @@ function resolveExtent(axis, channels, scales, scale, datum, key, forcedValue, f
         const v1 = encodeChannel(scales, channels, c1, datum, 0);
         const v2 = encodeChannel(scales, channels, c2, datum, 0);
         return { lo: Math.min(v1, v2), hi: Math.max(v1, v2), band: false };
+    }
+    // 2. SIZE — an explicit pixel extent centred on an x/y anchor (SVG-native w/h).
+    // Wins over band/value so a fixed-size box beats the category interval; the
+    // anchor goes through encodeChannel, so on a band axis it's the category centre.
+    const sizeCh = axis === 'x' ? 'width' : 'height';
+    if (channels[sizeCh]) {
+        const size = encodeChannel(scales, channels, sizeCh, datum, 0);
+        const [rlo, rhi] = scale ? rangeExtent(scale) : [0, fullLength];
+        const center = encodeChannel(scales, channels, axis, datum, (rlo + rhi) / 2);
+        return { lo: center - size / 2, hi: center + size / 2, band: false };
     }
     // 3. BAND — a categorical axis (skipped when this axis is forced to value).
     if (!forcedValue && isBand(scale)) {
