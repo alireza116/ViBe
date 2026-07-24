@@ -17,7 +17,7 @@ export default function Layout({ children }) {
 
 # Authoring SDK
 
-<Lead>Build new elicitation devices without forking the engine. Marks use `plot.encodeChannel` / `resolveStyle`; edits use `edit.makeEdit` + `invertChannel`; multi-event lifecycles register via `edit.registerDriver`. Attach edits on a channel (`y: { field, edit: drag() }`) or at mark level (`edits: [...]`) — never as a fake `channels.edit` key. For the model these extend, see [Core concepts](/concepts); for the stock catalogue, see [Editing](/editing).</Lead>
+<Lead>Build new elicitation devices without forking the engine. Marks use `plot.encodeChannel` / `resolveStyle`; edits use `edit.makeEdit` + `invertChannel`; multi-event lifecycles register via `edit.registerDriver`. Attach edits on a channel (`y: { field, edit: move() }`) or at mark level (`edits: [...]`) — never as a fake `channels.edit` key. For the model these extend, see [Core concepts](/concepts); for the stock catalogue, see [Editing](/editing).</Lead>
 
 <ApiReference entries={api} />
 
@@ -42,7 +42,7 @@ A mark is a view over the chart’s one dataset. The factory returns a feature o
 
 Reach for the smallest tool that fits:
 
-1. **Stock edit** — `drag`, `resize`, `create`, … when the behaviour already exists.
+1. **Stock edit** — `move`, `resize`, `create`, … when the behaviour already exists.
 2. **`custom(fn)`** — one-off `apply`, same gesture/pick defaults.
 3. **`makeEdit(spec)`** — full descriptor control (`type`, `pick`, `cardinality`, `name`, …).
 4. **`registerDriver`** — multi-event lifecycle / a new `pick` value.
@@ -52,7 +52,7 @@ Reach for the smallest tool that fits:
 <Example
   code={customVsMakeedit}
   title="custom(fn) — a one-off apply"
-  blurb="custom wraps fn as apply. Drag rewrites y from the pointer; x still uses stock drag()."
+  blurb="custom wraps fn as apply. Drag rewrites y from the pointer; x still uses stock move()."
   try={(
     <>
       <b>Drag</b> vertically on a dot to set y; drag the dot itself to move in x.

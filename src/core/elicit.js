@@ -1254,7 +1254,7 @@ export function Elicit(spec) {
     el.emit = (/** @type {any} */ event) => handleEvent(event);
 
     // Find the (feature, edit) an external controller addresses by `name` (set via
-    // drag({ name: 'move' }) etc.). Lazy — scanned each call so it tracks re-renders
+    // move({ name: 'move' }) etc.). Lazy — scanned each call so it tracks re-renders
     // and stage changes.
     const findNamedEdit = (/** @type {string} */ name) => {
         /** @type {{ feature: any, edit: any } | null} */

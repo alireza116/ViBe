@@ -3,7 +3,7 @@
 // Plain-chart twin: text + drag and/or editText.
 
 import { text } from '../plot/index.js';
-import { drag, editText } from '../edit/index.js';
+import { move, editText } from '../edit/index.js';
 import { clamp } from '../constraints/index.js';
 import { prompt } from './theme.js';
 import { widgetTheme } from './shared.js';
@@ -57,7 +57,7 @@ export function labeledValue(opts = {}) {
                         y: { field: 'y' },
                         text: { field: 'label', edit: editText() }
                     },
-                    edits: [drag({ channels: ['x', 'y'], stage })]
+                    edits: [move({ channels: ['x', 'y'], stage })]
                 })
             ]
         };
@@ -83,7 +83,7 @@ export function labeledValue(opts = {}) {
                 fill: t.widget.accent,
                 channels: {
                     x: { field: 'cat' },
-                    y: { field: 'n', edit: drag({ guide: true, stage }) },
+                    y: { field: 'n', edit: move({ guide: true, stage }) },
                     text: { field: 'n' }
                 }
             })

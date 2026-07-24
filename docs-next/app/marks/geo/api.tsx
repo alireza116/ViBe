@@ -176,7 +176,7 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "edit.geo.drag() — move a geoPoint",
+      "edit.geo.move() — move a geoPoint",
       "edit.geo.create() — click to place a lon/lat row",
       "edit.geo.draw() — drag to author a coordinates list",
       "edit.geo.dragVertex() — move a geoLine vertex handle",

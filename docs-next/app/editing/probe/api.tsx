@@ -10,7 +10,7 @@ export const api: ApiEntry[] = [
     ),
     signatures: [
       "rotate({ pick: \"probe\", stage: 0 })          // line follows the pointer; click sets it",
-      "drag({ pick: \"probe\", advance: false })      // a knob that tracks then settles",
+      "move({ pick: \"probe\", advance: false })      // a knob that tracks then settles",
       "create({ pick: \"probe\", advance: false })    // a tentative dot, made real on click",
       "toggle({ pick: \"probe\", channels: [\"x\",\"y\"] })  // preview a cell being (un)picked",
     ],

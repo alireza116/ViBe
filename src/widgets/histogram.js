@@ -3,7 +3,7 @@
 // Plain-chart twin: barY or rectY + drag + create into bins.
 
 import { barY } from '../plot/index.js';
-import { drag } from '../edit/index.js';
+import { move } from '../edit/index.js';
 import { clamp } from '../constraints/index.js';
 import { prompt } from './theme.js';
 import { widgetTheme } from './shared.js';
@@ -52,7 +52,7 @@ export function histogram(opts = {}) {
                 fillOpacity: 0.7,
                 channels: {
                     x: { field: 'bin' },
-                    y: { field: 'n', edit: drag({ guide: true, stage }) }
+                    y: { field: 'n', edit: move({ guide: true, stage }) }
                 }
             })
         ]

@@ -234,8 +234,51 @@ export function nudgeTarget(scale, at, dir, coarse = false) {
 export const numOf = (p) => (p instanceof Date ? p.getTime() : p);
 
 /**
+ * Map a pixel position on a straight track [pxAt0 → pxAt1] to a value, LINEARLY
+ * across the channel's domain [loVal → hiVal]. `pxAt0` is the pixel where the
+ * value is `loVal`, `pxAt1` where it is `hiVal`; the position is clamped to the
+ * track, so the value never runs past the domain. This is "drag along an axis =
+ * a value" — the single linear pointer→value mapping the `slide` edit and the
+ * face's direct-manipulation handles both build on, so the two never drift.
+ *
+ * Deliberately domain-linear (not `scale.invertValue`): a `slide` track is an
+ * arbitrary UI segment anchored at the handle, NOT the scale's own pixel range,
+ * so the scale is consulted only for the domain extremes (via `domainConfig`),
+ * never as geometry. For a plain linear channel this equals the scale's own
+ * inversion; for a non-positional [0,1] param (a face channel) it maps the track
+ * straight onto the field's units.
+ * @param {number} px current pixel position on the track
+ * @param {number} pxAt0 the pixel where the value is `loVal`
+ * @param {number} pxAt1 the pixel where the value is `hiVal`
+ * @param {number} loVal domain value at `pxAt0`
+ * @param {number} hiVal domain value at `pxAt1`
+ * @returns {number | undefined} the value, or undefined for a zero-length track
+ */
+export function linearInvert(px, pxAt0, pxAt1, loVal, hiVal) {
+    if (pxAt1 === pxAt0) return undefined;
+    let t = (px - pxAt0) / (pxAt1 - pxAt0);
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return loVal + t * (hiVal - loVal);
+}
+
+/**
+ * The domain extremes [lo, hi] of a resolved channel, read off its scale's
+ * `domainConfig` (the declared field domain). Falls back to [0, 1] — the neutral
+ * range a non-positional param uses — when the channel carries no domain. The
+ * one place `slide` and the face read a channel's value range, so a track always
+ * spans the same [lo, hi] the encoding drew from.
+ * @param {import('../types').ResolvedChannel | { scale?: any } | null | undefined} ch
+ * @returns {[number, number]}
+ */
+export function channelDomain(ch) {
+    const dom = ch && ch.scale && ch.scale.domainConfig;
+    if (Array.isArray(dom) && dom.length) return [dom[0], dom[dom.length - 1]];
+    return [0, 1];
+}
+
+/**
  * Invert the pointer through ONE channel's scale — the single-field half of
- * `drag()`'s move, factored out so `brushSpan`'s edge-zone tick can reuse the
+ * `move()`, factored out so `brushSpan`'s edge-zone tick can reuse the
  * exact same computation instead of a second copy. Pass `center` for radial
  * channels (`size`, `angle`) that need a pivot.
  * @param {import('../types').ResolvedChannel} ch
@@ -253,9 +296,9 @@ export function invertChannel(ch, pointer, center = null) {
 /**
  * Recenter a mark's CURRENT pixel span (read off its rendered node) on the
  * pointer, then invert both new endpoints back to data — the whole-span-move
- * computation `dragSpan` and `brushSpan`/`brushRect`'s body zone both use.
+ * computation `moveSpan` and `brushSpan`/`brushRect`'s body zone both use.
  * Stateless: no dragstart/delta tracking, just "the gesture sets the absolute
- * position", the same model `drag()`/`invertChannel` already use for a single
+ * position", the same model `move()`/`invertChannel` already use for a single
  * field.
  *
  * The span's WIDTH is preserved when the pointer pushes it against the scale's

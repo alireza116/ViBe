@@ -15,7 +15,7 @@
 
 /**
  * Looks like an Edit descriptor (gesture + apply) rather than a ChannelSpec.
- * Used by the DEV misplaced-edit guard — authors sometimes put `edit: drag()` as
+ * Used by the DEV misplaced-edit guard — authors sometimes put `edit: move()` as
  * a sibling channel key instead of on a channel or in `feature.edits`.
  * @param {any} v
  * @returns {boolean}
@@ -66,8 +66,8 @@ export function warnMisplacedEdits(feature) {
             warnedMisplaced.add(key);
             console.warn(
                 `[vibe] mark "${fid}" has a misplaced edit under channels.${name}. ` +
-                `Attach edits on a channel (y: { field, edit: drag() }) or at mark level ` +
-                `(edits: [drag({ channels: ['x','y'] })]). A bare channels.edit key is ignored.`
+                `Attach edits on a channel (y: { field, edit: move() }) or at mark level ` +
+                `(edits: [move({ channels: ['x','y'] })]). A bare channels.edit key is ignored.`
             );
         } else if (chSpec && chSpec.edit && typeof chSpec.fn === 'function' && chSpec.field == null) {
             warnedMisplaced.add(key);
@@ -75,7 +75,7 @@ export function warnMisplacedEdits(feature) {
                 `[vibe] mark "${fid}" puts an edit on the derived channel "${name}" ({ fn }). ` +
                 `A derived channel is read-only — it recomputes from the committed rows on every ` +
                 `render, so the edit is ignored. Attach the edit to the source field's channel ` +
-                `(e.g. x: { field: "x", edit: drag() }); the fn re-derives automatically after each commit.`
+                `(e.g. x: { field: "x", edit: move() }); the fn re-derives automatically after each commit.`
             );
         }
     }

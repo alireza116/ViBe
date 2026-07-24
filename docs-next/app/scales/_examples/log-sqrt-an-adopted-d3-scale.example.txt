@@ -15,7 +15,7 @@ mount(Elicit({
       stroke: "#1f2733",
       channels: {
         x:    { field: "t", scale: "log" },
-        y:    { field: "w", edit: drag() },
+        y:    { field: "w", edit: move() },
         size: { field: "w", scale: { type: "sqrt", range: [5, 16] } },
         fill: { field: "g", scale: d3.scaleOrdinal(d3.schemeTableau10) },
       },

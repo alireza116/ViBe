@@ -5,7 +5,7 @@
 // constraint that keeps the mean between the caps.
 
 import { composite, point, ruleY, tick } from '../plot/index.js';
-import { drag, custom } from '../edit/index.js';
+import { move, custom } from '../edit/index.js';
 import { clamp, defineConstraint } from '../constraints/index.js';
 import { prompt } from './theme.js';
 import { widgetTheme } from './shared.js';
@@ -26,7 +26,7 @@ function orderInterval() {
 
 /**
  * Drag the mean and translate lo/hi by the same delta so the interval moves as a
- * unit. Cap drags stay on plain drag() — only the grabbed end moves. When the
+ * unit. Cap drags stay on plain move() — only the grabbed end moves. When the
  * interval hits a domain wall, the whole interval stops (width preserved) rather
  * than each end clamping independently and collapsing.
  * @param {number} [stage] active-stage gate, forwarded from the widget options
@@ -137,7 +137,7 @@ export function interval(opts = {}) {
                         strokeWidth: 2,
                         channels: {
                             x: { field: 'cat' },
-                            y: { field: 'lo', edit: drag({ stage }) }
+                            y: { field: 'lo', edit: move({ stage }) }
                         }
                     }),
                     tick({
@@ -145,7 +145,7 @@ export function interval(opts = {}) {
                         strokeWidth: 2,
                         channels: {
                             x: { field: 'cat' },
-                            y: { field: 'hi', edit: drag({ stage }) }
+                            y: { field: 'hi', edit: move({ stage }) }
                         }
                     })
                 ]

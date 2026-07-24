@@ -11,7 +11,7 @@ const chart = Elicit({
       id: "belief",
       size: 9, fill: "#2563eb",
       channels: { x: { field: "v",
-                       edit: drag({ pick: "probe", advance: false }) },},
+                       edit: move({ pick: "probe", advance: false }) },},
       constraints: [ clamp({ min: 0, max: 100, field: "v" }) ],
     }),
   ],

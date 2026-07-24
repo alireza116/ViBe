@@ -15,7 +15,7 @@ mount(Elicit({
       channels: {
         x: { field: "v" },
       },
-      edits: [ drag({ channels: ["x"] }) ],
+      edits: [ move({ channels: ["x"] }) ],
     }),
   ],
 }))

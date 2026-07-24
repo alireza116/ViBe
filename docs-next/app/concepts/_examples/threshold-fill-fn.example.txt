@@ -15,7 +15,7 @@ mount(Elicit({
     point({
       stroke: "#1f2733", strokeWidth: 1, size: 10,
       channels: {
-        x: { field: "x", edit: drag() },
+        x: { field: "x", edit: move() },
         y: { field: "y" },
         // Derived channel: computed per datum in VISUAL space (a colour, used
         // as-is). Read-only — the drag lives on x; fill re-derives on commit.

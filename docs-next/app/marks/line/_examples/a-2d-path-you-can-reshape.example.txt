@@ -18,7 +18,7 @@ mount(Elicit({
         y: { field: "y" },
       },
       edits: [
-        drag({ channels: ["x", "y"], pick: "nearest", threshold: 40 }),
+        move({ channels: ["x", "y"], pick: "nearest", threshold: 40 }),
         edit.line.anchor({ into: "nearest", channels: ["x", "y"], series: "s", threshold: 80 }),
       ],
     }),

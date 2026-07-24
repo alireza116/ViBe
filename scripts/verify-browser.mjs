@@ -98,9 +98,37 @@ async function main() {
             '/editing/existence', '/editing/probe', '/editing/stages', '/editing/axis',
             '/editing/external-controls',
             '/editing/history', '/widgets', '/scales', '/schema', '/constraints',
-            '/effects', '/guides', '/theming',
+            '/effects', '/guides', '/theming', '/playground',
         ];
         for (const r of routes) await visit(r);
+
+        // ---- Playground: Build dashboard (reactive) -------------------------
+        // The builder serialises form state to a spec on every change (every
+        // other route just evaluates a hand-written .example.txt), so this is
+        // the one new code path that can emit broken JS. Add a constraint
+        // through the secondary rail and confirm the chart re-renders itself
+        // — no Generate step — then read the generated source back.
+        console.log('\nPlayground Build dashboard (/playground)');
+        await open('/playground', '.area-viz svg');
+        await page.locator('.area-secondary select').first().selectOption('clamp');
+        await page.waitForTimeout(600); // debounce (250ms) + re-eval + redraw
+        const builderErrs = await page.locator('.area-viz .live-error').allTextContents();
+        check('playground: adding a constraint re-renders with no error', builderErrs.length === 0, builderErrs.join(' | '));
+        const builderChartCount = await page.locator('.area-viz svg').count();
+        check('playground: the live spec mounts a chart', builderChartCount === 1, `svg=${builderChartCount}`);
+        await page.getByRole('button', { name: 'Show code' }).click();
+        await page.waitForTimeout(150);
+        const generatedCode = await page.locator('.area-viz .readonly-code').textContent();
+        check('playground: generated code includes the added constraint', (generatedCode || '').includes('clamp('), (generatedCode || '').slice(0, 120));
+
+        // Switching to a line mark carries the x/y bindings over, so the chart
+        // stays populated — and line-scoped edits appear only now.
+        await page.locator('.mark-card', { hasText: 'Line' }).first().click();
+        await page.waitForTimeout(600);
+        const lineErrs = await page.locator('.area-viz .live-error').allTextContents();
+        check('playground: switching to line keeps the chart rendering', lineErrs.length === 0, lineErrs.join(' | '));
+        const lineEditOptions = await page.locator('.area-edits select option').allTextContents();
+        check('playground: line-scoped edits offered on a line mark', lineEditOptions.some((o) => o.includes('edit.line.draw')), lineEditOptions.join(','));
 
         // ---- Responsive sizing --------------------------------------------
         console.log('\nResponsive sizing (/sizing)');
@@ -305,13 +333,13 @@ async function main() {
             return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
         };
 
-        // drag() on x & y moves the whole box: a rightward drag raises the x field.
+        // move() on x & y moves the whole box: a rightward drag raises the x field.
         const boxData = () => page.$eval('#fixed-size .chart > div', (el) => el.getData());
         const boxBefore = await boxData();
         const bc = await centreOf(page.locator('#fixed-size .chart svg rect.mark').first());
         await mouseDrag(bc.x, bc.y, bc.x + 60, bc.y);
         const boxAfter = await boxData();
-        check('rect width/height: drag() moves the box (x rises on a rightward drag)',
+        check('rect width/height: move() moves the box (x rises on a rightward drag)',
             boxAfter[0].x > boxBefore[0].x + 0.3, `x ${boxBefore[0].x} -> ${boxAfter[0].x}`);
 
         // select() + legendValue(): click a cell to select it, then drag the ramp
@@ -352,6 +380,65 @@ async function main() {
         const dotAfter = await dotData();
         check('point heatmap: resize() raises the dragged dot’s value',
             dotAfter[0].load > dotBefore[0].load + 1, `load ${dotBefore[0].load} -> ${dotAfter[0].load}`);
+
+        // ---- slide() — linear-along-axis magnitude (/editing/gestures) -----
+        // slide({ axis:'x', increase:'left' }) on the size channel: dragging LEFT
+        // (toward smaller x) grows the value, unlike resize()'s radial distance.
+        // The face's eye interaction, generalized onto a plain circle.
+        console.log('\nSlide edit (/editing/gestures)');
+        await open('/editing/gestures', '#slide .chart svg circle.mark');
+        const slideData = () => page.$eval('#slide .chart > div', (el) => el.getData());
+        const slBefore = await slideData();
+        const slc = await centreOf(page.locator('#slide .chart svg circle.mark').first());
+        await mouseDrag(slc.x, slc.y, slc.x - 60, slc.y);
+        const slAfter = await slideData();
+        check('slide: dragging LEFT raises the value (increase:"left")',
+            slAfter[0].mag > slBefore[0].mag + 1, `mag ${slBefore[0].mag} -> ${slAfter[0].mag}`);
+        // And the opposite direction lowers it — the mapping is signed, not radial.
+        const slc2 = await centreOf(page.locator('#slide .chart svg circle.mark').first());
+        await mouseDrag(slc2.x, slc2.y, slc2.x + 90, slc2.y);
+        const slAfter2 = await slideData();
+        check('slide: dragging RIGHT lowers the value',
+            slAfter2[0].mag < slAfter[0].mag - 1, `mag ${slAfter[0].mag} -> ${slAfter2[0].mag}`);
+
+        // ---- Face head: move (x+y bound) + slide resize (size bound) --------
+        // The outline is a drag-to-move target when the centre is bound to fields,
+        // and a rim handle resizes the head via an absolute slide. Both are direct
+        // edits that coexist with the eyes/mouth (which carry `dm`).
+        console.log('\nFace head move + resize (/marks/face)');
+        await open('/marks/face', '#head .chart svg path.mark-line');
+        const headData = () => page.$eval('#head .chart > div', (el) => el.getData());
+        // Scroll the chart into view first — mouseDrag uses viewport coords, and this
+        // section sits far down the page (a bbox read while off-screen would miss).
+        await page.locator('#head .chart svg path.mark-line').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        // Move: grab the chin (below the mouth, on the outline fill only) and drag
+        // right. The outline is the FIRST path.mark-line; its bbox gives centre + R.
+        const outline = await page.$eval('#head .chart svg path.mark-line', (p) => {
+            const r = p.getBoundingClientRect();
+            return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, r: Math.min(r.width, r.height) / 2 };
+        });
+        const headBefore = await headData();
+        const chinX = outline.cx, chinY = outline.cy + outline.r * 0.68;
+        await mouseDrag(chinX, chinY, chinX + 55, chinY);
+        const headMoved = await headData();
+        check('face head: dragging the outline moves it (px rises on a rightward drag)',
+            headMoved[0].px > headBefore[0].px + 0.05, `px ${headBefore[0].px} -> ${headMoved[0].px}`);
+        // Resize: the rim handle is the RIGHTMOST circle.mark; drag it further right
+        // to grow the head (mag rises).
+        const rim = await page.$$eval('#head .chart svg circle.mark', (cs) => {
+            let best = null;
+            for (const c of cs) { const r = c.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; if (!best || cx > best.cx) best = { cx, cy }; }
+            return best;
+        });
+        check('face head: a resize handle is present on the rim', rim != null, `${JSON.stringify(rim)}`);
+        if (rim) {
+            const magBefore = (await headData())[0].mag;
+            await mouseDrag(rim.cx, rim.cy, rim.cx + 45, rim.cy);
+            const magAfter = (await headData())[0].mag;
+            check('face head: dragging the rim handle out grows the head (slide on size)',
+                magAfter > magBefore + 1, `mag ${magBefore} -> ${magAfter}`);
+        }
 
         // ---- Locked rows (spec.lock) --------------------------------------
         // The lock is half data-invariant, half pointer policy, and only the second

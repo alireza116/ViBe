@@ -3,7 +3,7 @@
 // Plain-chart twin: barY + probe drag + snap/clamp.
 
 import { barY } from '../plot/index.js';
-import { drag } from '../edit/index.js';
+import { move } from '../edit/index.js';
 import { clamp, snap } from '../constraints/index.js';
 import { prompt } from './theme.js';
 import { widgetTheme } from './shared.js';
@@ -52,7 +52,7 @@ export function thermometer(opts = {}) {
                     x: { field: 'cat' },
                     y: { field: 'value' }
                 },
-                edits: [drag({ pick: 'probe', channels: ['y'], advance: false, guide: true, stage })]
+                edits: [move({ pick: 'probe', channels: ['y'], advance: false, guide: true, stage })]
             })
         ]
     };

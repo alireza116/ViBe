@@ -12,7 +12,7 @@ const chart = Elicit({
   marks: [
     point({
       channels: {
-        x: { field: "x", edit: drag({ stage: 0 }) },
+        x: { field: "x", edit: move({ stage: 0 }) },
         size: { field: "mag", edit: resize({ stage: 1 }) },
       },
     }),

@@ -20,8 +20,8 @@ mount(Elicit({
         // An endpoint PAIR instead of a single value: fill BETWEEN the two
         // fields rather than down to the baseline. Declaring the pair is what
         // picks the value axis, and both edges get handles.
-        y1: { field: "lo", edit: drag({ channels: ["y1"] }) },
-        y2: { field: "hi", edit: drag({ channels: ["y2"] }) },
+        y1: { field: "lo", edit: move({ channels: ["y1"] }) },
+        y2: { field: "hi", edit: move({ channels: ["y2"] }) },
       },
     }),
   ],

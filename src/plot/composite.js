@@ -10,9 +10,9 @@
 //     constraints: [centerWithinEnds],
 //     parts: [
 //       ruleX({ channels: { x: {field:'g'}, y1: {field:'lo'}, y2: {field:'hi'} } }),
-//       point({ channels: { x: {field:'g'}, y:  {field:'mean', edit: drag()} } }),
-//       tick({  channels: { x: {field:'g'}, y:  {field:'lo',   edit: drag()} } }),
-//       tick({  channels: { x: {field:'g'}, y:  {field:'hi',   edit: drag()} } }),
+//       point({ channels: { x: {field:'g'}, y:  {field:'mean', edit: move()} } }),
+//       tick({  channels: { x: {field:'g'}, y:  {field:'lo',   edit: move()} } }),
+//       tick({  channels: { x: {field:'g'}, y:  {field:'hi',   edit: move()} } }),
 //     ],
 //   })
 //

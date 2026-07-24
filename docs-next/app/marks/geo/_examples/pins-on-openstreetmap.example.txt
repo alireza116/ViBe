@@ -32,7 +32,7 @@ mount(Elicit({
         lon: { field: "lon" },
         lat: { field: "lat" },
       },
-      edits: [edit.geo.drag(), edit.geo.create({ defaults: { place: "new pin" } })],
+      edits: [edit.geo.move(), edit.geo.create({ defaults: { place: "new pin" } })],
     }),
   ],
 }));

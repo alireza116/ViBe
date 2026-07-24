@@ -15,7 +15,7 @@ import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf
 // `tick` auto-detects which axis is the value axis from the scale types;
 // `tickY` / `tickX` force one (matching Plot). Editing, proximity pick, create,
 // remove, constraints and the style surface all come from the shared model —
-// a tick with `channels.y.edit = drag()` is draggable with no mark-specific code.
+// a tick with `channels.y.edit = move()` is draggable with no mark-specific code.
 //
 // The span across the band is customizable with `inset` (px shrink each end) or
 // an explicit `length` (px, centred) — see bandSpan in core/scales.js, a

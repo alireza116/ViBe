@@ -22,7 +22,7 @@ mount(Elicit({
     lineY({
       stroke: "#2563eb", handleSize: 5,
       channels: { x: { field: "year" },
-                  y: { field: "p", edit: drag() } },
+                  y: { field: "p", edit: move() } },
     }),
   ],
 }))

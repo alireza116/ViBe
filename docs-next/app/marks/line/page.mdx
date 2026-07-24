@@ -37,7 +37,7 @@ export default function Layout({ children }) {
 
 <Section id="you-draw-it" title="You-draw-it (sweep)">
 
-Put `edit: drag(\{ pick: "sweep" \})` on the value channel for the NYT-style "you-draw-it" interaction: press and sweep horizontally to paint each point's `y` as the pointer crosses its column. The `x` positions stay fixed.
+Put `edit: move(\{ pick: "sweep" \})` on the value channel for the NYT-style "you-draw-it" interaction: press and sweep horizontally to paint each point's `y` as the pointer crosses its column. The `x` positions stay fixed.
 
 <Example
   code={sweepToDrawTheCurve}

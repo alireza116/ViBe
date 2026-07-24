@@ -27,16 +27,16 @@ mount(Elicit({
           fill: "steelblue", size: 6,
           channels: {
             x: { field: "g" },
-            y: { field: "mean", edit: drag() },
+            y: { field: "mean", edit: move() },
           },
         }),
         tick({
           stroke: "#334155", strokeWidth: 2,
-          channels: { x: { field: "g" }, y: { field: "lo", edit: drag() } },
+          channels: { x: { field: "g" }, y: { field: "lo", edit: move() } },
         }),
         tick({
           stroke: "#334155", strokeWidth: 2,
-          channels: { x: { field: "g" }, y: { field: "hi", edit: drag() } },
+          channels: { x: { field: "g" }, y: { field: "hi", edit: move() } },
         }),
       ],
     }),

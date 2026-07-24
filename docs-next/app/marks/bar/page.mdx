@@ -74,12 +74,12 @@ Instead of one value drawn from the baseline, give the value axis two explicit e
 
 <Section id="editing" title="Editing bars">
 
-Put `edit: drag()` on the value channel and a bar drags to rewrite its value. Thin bars are easier to grab with `pick: "nearest"` — grab from anywhere in the column. A bar dragged to the baseline collapses to zero length but stays grabbable: it keeps a minimum grab target there, with either pick mode, so you can always drag it back up.
+Put `edit: move()` on the value channel and a bar drags to rewrite its value. Thin bars are easier to grab with `pick: "nearest"` — grab from anywhere in the column. A bar dragged to the baseline collapses to zero length but stays grabbable: it keeps a minimum grab target there, with either pick mode, so you can always drag it back up.
 
 <Example
   code={dragAValue}
   title="Drag a value"
-  blurb="y carries edit: drag(). Dragging writes y back through the same scale."
+  blurb="y carries edit: move(). Dragging writes y back through the same scale."
   try={<><b>Drag</b> a bar up or down.</>}
 />
 

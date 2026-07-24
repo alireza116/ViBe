@@ -29,7 +29,7 @@ The value flows the opposite way through the same scale. An edit maps a gesture 
 
 <Section id="scatter" title="A picker and a drag pad">
 
-The `<select>` writes the point's category through a `set()` edit; its options come from `control("category", 0).accepts().values`. The pad drives a two-axis `drag` live — `begin() … set({x,y}) … end()` collapses into one undo entry. The `clamp` on `y` gates the pad exactly as it gates a mouse drag: external control is not a bypass.
+The `<select>` writes the point's category through a `set()` edit; its options come from `control("category", 0).accepts().values`. The pad drives a two-axis `move` live — `begin() … set({x,y}) … end()` collapses into one undo entry. The `clamp` on `y` gates the pad exactly as it gates a mouse drag: external control is not a bypass.
 
 <Example
   code={scatterPickerAndHandle}
@@ -42,7 +42,7 @@ The `<select>` writes the point's category through a `set()` edit; its options c
 
 <Section id="pick" title="Pick vs. cycle: driving other gestures">
 
-`.set(value)` covers the value edits (`set`/`editText`) and the positional ones (`drag`/`rotate`/`resize`). The click-triggered edits — `cycle`, `remove`, `toggle` — take no value; they just fire. `.fire()` drives those, dispatching the edit's own gesture on the datum. So one circle can offer a **picker** (`set` — jump straight to a value) *and* a **cycle** (`fire` — step to the next), on the same field, alongside the native click.
+`.set(value)` covers the value edits (`set`/`editText`) and the positional ones (`move`/`rotate`/`resize`). The click-triggered edits — `cycle`, `remove`, `toggle` — take no value; they just fire. `.fire()` drives those, dispatching the edit's own gesture on the datum. So one circle can offer a **picker** (`set` — jump straight to a value) *and* a **cycle** (`fire` — step to the next), on the same field, alongside the native click.
 
 <Example
   code={pickVsCycle}

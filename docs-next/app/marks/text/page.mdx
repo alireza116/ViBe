@@ -54,7 +54,7 @@ A direct-pick edit makes a label interactive. Reuse the universal edits — noth
 <Example
   code={dragToReposition}
   title="Drag to reposition"
-  blurb={"Mark-level drag({ channels: [\"x\",\"y\"] }) moves the label; writes x/y back through the scales. (Do not put <code class=\"inline\">edit</code> as a channel key — attach it on a channel or via <code class=\"inline\">edits</code>.)"}
+  blurb={"Mark-level move({ channels: [\"x\",\"y\"] }) moves the label; writes x/y back through the scales. (Do not put <code class=\"inline\">edit</code> as a channel key — attach it on a channel or via <code class=\"inline\">edits</code>.)"}
   try={(
     <>
       <b>Drag</b> a label to move it.
@@ -65,7 +65,7 @@ A direct-pick edit makes a label interactive. Reuse the universal edits — noth
 <Example
   code={draggableNumericReadout}
   title="Draggable numeric readout"
-  blurb="The label is the value itself: text and y read the same field, and drag() on y rewrites it — so the number updates as you drag. format keeps the display tidy."
+  blurb="The label is the value itself: text and y read the same field, and move() on y rewrites it — so the number updates as you drag. format keeps the display tidy."
   try={(
     <>
       <b>Drag</b> the number up or down.

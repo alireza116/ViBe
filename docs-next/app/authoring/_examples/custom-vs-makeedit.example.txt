@@ -17,7 +17,7 @@ mount(Elicit({
     point({
       fill: "#0d9488", size: 9, stroke: "#1f2733", strokeWidth: 1,
       channels: {
-        x: { field: "x", edit: drag() },
+        x: { field: "x", edit: move() },
         y: { field: "y" },
       },
       edits: [ bumpY ],

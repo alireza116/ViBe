@@ -15,8 +15,8 @@ mount(Elicit({
       fill: "#0d9488",
       size: 8,
       channels: {
-        x: { field: "x", edit: drag() },
-        y: { field: "y", edit: drag() },
+        x: { field: "x", edit: move() },
+        y: { field: "y", edit: move() },
       },
       // dblclick, not click: a plain click would race the move-drag on the same
       // mark. The pointer inverts through x and y to mint the datum; group comes

@@ -230,7 +230,7 @@ export function geoTile(options = {}) {
 }
 
 /**
- * Points at lon/lat. Pair with `edit.geo.drag` / `edit.geo.create`.
+ * Points at lon/lat. Pair with `edit.geo.move` / `edit.geo.create`.
  * @param {any} [options]
  * @returns {any}
  */
@@ -553,7 +553,7 @@ export function geoLine(options = {}) {
  *
  * That means a geoText is editable exactly like a cartesian one:
  *   editText()      — double-click to retype the label's content
- *   edit.geo.drag() — drag the label to a new lon/lat
+ *   edit.geo.move() — drag the label to a new lon/lat
  *   cycle()         — click to advance a categorical label
  * `dx`/`dy` nudge the glyph off the anchor point (e.g. dy: -12 to sit a name above
  * a geoPoint's dot) without moving the lon/lat a drag would write.

@@ -240,7 +240,7 @@ export interface Edit {
   guideColor: string | null;
   // Multi-stage gate: active only when it equals the engine's current stage;
   // null = always active. A uniform filter applied to every edit, like `gesture`
-  // matching — not a mode branch. Set via a factory option: drag({ stage: 1 }).
+  // matching — not a mode branch. Set via a factory option: move({ stage: 1 }).
   stage: number | null;
   // probe-pick only: does a click that settles this edit advance the stage?
   // Default true; `advance: false` commits repeatedly within one stage.
@@ -328,6 +328,21 @@ export interface RotateOptions extends EditOptions {
   fold?: boolean;
   // Another angular channel to measure the absolute angular distance from.
   relativeTo?: string;
+}
+
+export interface SlideOptions extends EditOptions {
+  // Which pointer coordinate drives the value (default 'x').
+  axis?: 'x' | 'y';
+  // The direction that RAISES the value: 'left'|'right' for axis:'x',
+  // 'up'|'down' for axis:'y' (default 'left'/'up').
+  increase?: 'left' | 'right' | 'up' | 'down';
+  // Pixel span that traverses the full domain (default 120).
+  extent?: number;
+  // 'absolute' (default): a fixed track at the mark centre; direct-pick, may jump
+  // to the pointer on grab; coexists with a mark's other direct edits (a face
+  // handle). 'relative': moves by the drag delta (no jump); rides the slide driver
+  // (plane-on-top), so it can't share a chart with direct-pick edits.
+  mode?: 'absolute' | 'relative';
 }
 
 export interface BrushSpanOptions extends EditOptions {
@@ -716,6 +731,12 @@ export interface Session {
   grabValue?: any;
   pxPerUnit?: number;
   cursor?: string;
+  // slide driver (relative mode): the dragstart-locked target datum, the grab
+  // pixel on the edit's axis, and that datum's value when the grab began — the
+  // frozen anchor the value moves relative to (no jump on grab).
+  index?: number | null;
+  startPx?: number;
+  startValue?: number;
 }
 
 // Config for a single positional axis (the `axes` convenience, or an explicit

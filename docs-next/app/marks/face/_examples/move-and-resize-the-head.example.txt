@@ -1,0 +1,26 @@
+mount(Elicit({
+  width: 340, height: 320,
+  margins: { top: 12, right: 12, bottom: 12, left: 12 },
+  data: [ { px: 0.1, py: 0.1, mag: 55, valence: 0.4, arousal: 0.2 } ],
+  schema: {
+    px:      { type: "quantitative", domain: [-1, 1] },
+    py:      { type: "quantitative", domain: [-1, 1] },
+    mag:     { domain: [30, 90] },
+    valence: { type: "quantitative", domain: [-1, 1] },
+    arousal: { type: "quantitative", domain: [-1, 1] },
+  },
+  marks: [
+    face({
+      channels: {
+        // Both x AND y bound -> the head is a MOVE target: grab an empty part of
+        // the face and drag it. size bound -> a resize handle on the right rim
+        // (an absolute-mode slide along x). Give size a radius range (the default
+        // is a small [3,18] dot range) so the head reads as a face. The emotion
+        // preset still binds the mouth/eyes to valence/arousal.
+        x: { field: "px" },
+        y: { field: "py" },
+        size: { field: "mag", scale: { range: [30, 92] } },
+      },
+    }),
+  ],
+}))

@@ -13,7 +13,7 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "drag({ name: \"move\", channels: [\"x\", \"y\"] })   // name an edit",
+      "move({ name: \"move\", channels: [\"x\", \"y\"] })   // name an edit",
       "const h = el.control(\"move\", 0);   // handle bound to the edit + datum 0",
       "h.set(value)          // one-shot write (value edit) …",
       "h.set({ x, y })       // … or a data value per channel (positional edit)",

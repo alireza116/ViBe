@@ -22,7 +22,7 @@ mount(Elicit({
   marks: [
     tickX({
       strokeWidth: 2, stroke: "#2563eb",
-      channels: { x: { field: "at", edit: drag() } },
+      channels: { x: { field: "at", edit: move() } },
     }),
     text({
       dy: -14, fontSize: 11, fill: "#64748b",

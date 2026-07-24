@@ -14,7 +14,7 @@ export default function Layout({ children }) {
 
 # Sweep (you-draw-it)
 
-<Lead>`edit.line.sweep()` is a drag that repaints each point’s value as the pointer crosses its column — the NYT “you draw it” interaction. It is sugar over `drag({ pick: "sweep", guide: true })`, and it is series-scoped: it locks onto the nearest line at drag-start and paints only that one.</Lead>
+<Lead>`edit.line.sweep()` is a drag that repaints each point’s value as the pointer crosses its column — the NYT “you draw it” interaction. It is sugar over `move({ pick: "sweep", guide: true })`, and it is series-scoped: it locks onto the nearest line at drag-start and paints only that one.</Lead>
 
 <ApiReference entries={api} />
 
@@ -25,7 +25,7 @@ Press and drag horizontally; every point the pointer passes takes the pointer’
 <Example
   code={drawACurve}
   title="Draw a curve"
-  blurb={"edit: drag({ pick: \"sweep\" }) on the value channel; the x positions stay fixed."}
+  blurb={"edit: move({ pick: \"sweep\" }) on the value channel; the x positions stay fixed."}
   try={(
     <>
       <b>Sweep</b> left-to-right across the chart.

@@ -53,7 +53,7 @@ export const api: ApiEntry[] = [
         default: "—",
         desc: (
           <>
-            Mark-level edits for joint / multi-channel gestures (<code className="inline">edits: [drag({'{'} channels: ["x","y"] {'}'})]</code>).
+            Mark-level edits for joint / multi-channel gestures (<code className="inline">edits: [move({'{'} channels: ["x","y"] {'}'})]</code>).
           </>
         ),
       },

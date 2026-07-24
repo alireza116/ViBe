@@ -19,7 +19,7 @@ mount(Elicit({
         lon: { field: "lon" },
         lat: { field: "lat" },
       },
-      edits: [edit.geo.drag(), edit.geo.create()],
+      edits: [edit.geo.move(), edit.geo.create()],
     }),
   ],
 }));

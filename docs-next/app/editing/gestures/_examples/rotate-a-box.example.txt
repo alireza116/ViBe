@@ -1,0 +1,28 @@
+mount(Elicit({
+  width: 380, height: 260,
+  margins: { top: 20, right: 20, bottom: 20, left: 20 },
+  schema: {
+    x:     { type: "quantitative", domain: [0, 100] },
+    y:     { type: "quantitative", domain: [0, 100] },
+    theta: { type: "quantitative", domain: [0, 360] },
+  },
+  data: [ { x: 50, y: 50, theta: 20 } ],
+  marks: [
+    rect({
+      channels: {
+        x: { field: "x" },
+        y: { field: "y" },
+        width:  { value: 110 },
+        height: { value: 70 },
+        fill:   { value: "#6366f1" },
+        stroke: { value: "#3730a3" },
+        // rotate() inverts the pointer's angle about the mark centre onto theta.
+        angle: {
+          field: "theta",
+          scale: { range: [0, 360] },
+          edit: rotate({ pick: "direct", pivot: "mark", fold: false }),
+        },
+      },
+    }),
+  ],
+}))

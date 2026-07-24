@@ -14,18 +14,18 @@ export default function Layout({ children }) {
 
 # Editing — the inverse of encoding
 
-<Lead>Attach an edit to a channel and a gesture writes that channel back to the data through the same scale. An edit is a small descriptor — `gesture` (drag / click / dblclick), `pick` (direct / nearest / plane), `when` (arbitration), `constrain`, and `guide`. Place it on a channel (`channels.y.edit`) or at mark level (`edits: [...]`).</Lead>
+<Lead>Attach an edit to a channel and a gesture writes that channel back to the data through the same scale. An edit is a small descriptor — `gesture` (drag / click / dblclick), `pick` (direct / nearest / plane), `when` (arbitration), `constrain`, and `guide` — with an `apply` that does the inverting. The named factories (`move`, `resize`, `rotate`, `cycle`, …) are just presets over `makeEdit` with a fixed `apply`; see [Gestures](/editing/gestures) for the full set. Place an edit on a channel (`channels.y.edit`) or at mark level (`edits: [...]`).</Lead>
 
 <ApiReference entries={api} />
 
-<Section id="drag" title="Drag a value">
+<Section id="move" title="Move a value">
 
-The canonical edit: `drag()` inverts the pointer on each positional channel it governs. On a bar's `y`, a drag rewrites the value.
+The canonical edit: `move()` inverts the pointer on each positional channel it governs. On a bar's `y`, a drag rewrites the value.
 
 <Example
   code={dragAValueBars}
   title="Drag a value (bars)"
-  blurb="y carries edit: drag(). The gesture → data path mirrors the data → height encoding."
+  blurb="y carries edit: move(). The gesture → data path mirrors the data → height encoding."
   try={(
     <>
       <b>Drag</b> a bar up or down.

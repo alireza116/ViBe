@@ -59,7 +59,7 @@ Creation writes dataset **rows**, so it belongs on a **data mark positioned by a
 
 `create` is its own edit: a plane click inverts the pointer through the positional channels and appends a datum. Constraints still apply — `count(max)` caps the total.
 
-Declare a creator on exactly one mark. A plane gesture carries no node, so it fans out to every mark's plane-pick edits — put `create` on two marks and one click appends two rows. Direct-pick edits like `drag` are immune: they route to the mark you actually touched. The dev build warns if you don't. When multiple edits share one gesture, `when` arbitrates which one claims it.
+Declare a creator on exactly one mark. A plane gesture carries no node, so it fans out to every mark's plane-pick edits — put `create` on two marks and one click appends two rows. Direct-pick edits like `move` are immune: they route to the mark you actually touched. The dev build warns if you don't. When multiple edits share one gesture, `when` arbitrates which one claims it.
 
 <Example
   code={clickToAddAPoint}

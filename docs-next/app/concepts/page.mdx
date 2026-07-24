@@ -115,13 +115,13 @@ A derived channel is **read-only**. It is opaque to the edit layer, so it can't 
 
 <Section id="edits" title="Edits">
 
-An edit is the inverse of an encoding. Encoding maps data → visual; an edit maps a gesture → data, back through the same scale. Put it on a channel (`y: { field, edit: drag() }`) to write one field, or at mark level (`edits: [...]`) for a gesture that writes several at once. Full catalogue on [Editing](/editing).
+An edit is the inverse of an encoding. Encoding maps data → visual; an edit maps a gesture → data, back through the same scale. Put it on a channel (`y: { field, edit: move() }`) to write one field, or at mark level (`edits: [...]`) for a gesture that writes several at once. Full catalogue on [Editing](/editing).
 
 <Example
   code={markLevelDrag}
   title="Mark-level drag (x and y together)"
   blurb={
-    'edits: [drag({ channels: ["x", "y"] })] — one gesture writes both fields.'
+    'edits: [move({ channels: ["x", "y"] })] — one gesture writes both fields.'
   }
   try={
     <>

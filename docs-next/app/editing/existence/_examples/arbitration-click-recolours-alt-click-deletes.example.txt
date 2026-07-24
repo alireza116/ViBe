@@ -16,8 +16,8 @@ mount(Elicit({
     point({
       size: 10,
       channels: {
-        x: { field: "x", edit: drag() },
-        y: { field: "y", edit: drag() },
+        x: { field: "x", edit: move() },
+        y: { field: "y", edit: move() },
         fill: { field: "group", edit: cycle({ when: when.noAlt }) },
       },
       edits: [ remove({ when: when.alt }) ],

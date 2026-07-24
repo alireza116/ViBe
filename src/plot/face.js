@@ -53,7 +53,8 @@
 // centre. The outline is a PATH (not a circle) so the mouth path, drawn after it,
 // is not hidden beneath it — the renderer paints all circles above all paths.
 
-import { makeEdit, resolveMarkNode } from '../edit/shared.js';
+import { makeEdit, resolveMarkNode, linearInvert } from '../edit/shared.js';
+import { move } from '../edit/basic.js';
 import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
 
 /** @param {number} x @returns {number} */
@@ -70,8 +71,11 @@ const ellipsePath = (/** @type {number} */ cx, /** @type {number} */ cy, /** @ty
     `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`;
 
 /**
- * Apply a direct-manipulation drag: invert the pointer on each axis the grabbed
- * node binds (`node.dm.x` / `node.dm.y`), through that param's own [0,1] scale.
+ * Apply a direct-manipulation drag: for each axis the grabbed node binds
+ * (`node.dm.x` / `node.dm.y`), map the pointer's position along that axis's track
+ * to the field's value. This is the same linear track→value mapping the universal
+ * `slide` edit uses (`linearInvert`) — a face handle IS an absolute-mode slide,
+ * one per bound param, so the two interactions never diverge.
  * @param {import('../types').EditContext} ctx
  * @returns {any}
  */
@@ -83,13 +87,11 @@ function applyFace(ctx) {
     let changed = false;
     for (const axis of /** @type {const} */ (['x', 'y'])) {
         const spec = node.dm[axis];
-        if (!spec || spec.pxAt1 === spec.pxAt0) continue;
+        if (!spec) continue;
         const px = axis === 'x' ? ctx.pointer.x : ctx.pointer.y;
-        const t = clamp01((px - spec.pxAt0) / (spec.pxAt1 - spec.pxAt0));
-        const scale = ctx.scales[spec.channel];
-        out[spec.field] = scale && scale.invertible
-            ? scale.invertValue(t)
-            : spec.loVal + t * (spec.hiVal - spec.loVal);
+        const v = linearInvert(px, spec.pxAt0, spec.pxAt1, spec.loVal, spec.hiVal);
+        if (v === undefined) continue;
+        out[spec.field] = v;
         changed = true;
     }
     return changed ? out : undefined;
@@ -127,11 +129,26 @@ export function face(options = {}) {
         apply: applyFace,
     });
 
+    // A face positioned in a PLANE (both x AND y bound to fields — an emotion-space
+    // scatter, not a small-multiples row) is MOVABLE: grab the head (its inert area,
+    // away from the feature handles) and drag it. This rides the ordinary `move`
+    // edit, scoped to the outline node so it never fires on an eye/brow/lip handle
+    // (those carry `dm` and go through faceEdit instead). A single-axis face (a face
+    // per category) stays put, so a drag there can't drift it off its slot.
+    const fieldBound = (/** @type {string} */ p) => !!(channels[p] && channels[p].field != null);
+    const movable = fieldBound('x') && fieldBound('y');
+    const outlineDrag = movable
+        ? move({
+            channels: ['x', 'y'],
+            when: (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.role === 'outline'),
+        })
+        : null;
+
     return {
         id,
         channels,
         constraints,
-        edits: [faceEdit, ...(userEdits || [])],
+        edits: [faceEdit, ...(outlineDrag ? [outlineDrag] : []), ...(userEdits || [])],
         xKey: channels.x && channels.x.field,
         yKey: channels.y && channels.y.field,
         /**
@@ -197,14 +214,19 @@ export function face(options = {}) {
                 };
 
                 // ── Outline (a PATH so the mouth, drawn after, isn't hidden under a
-                //    filled circle). Always inert. ──────────────────────────────
-                nodes.push({
+                //    filled circle). Inert, UNLESS the centre is bound to fields — then
+                //    it's the head's move target (the eyes/mouth/brows, drawn later, sit
+                //    on top, so grabbing THEM still resizes/tilts rather than moves). ──
+                /** @type {any} */
+                const outline = {
                     type: 'path', d: ellipsePath(cx, cy, R, R),
                     fill: style.fill || '#FFD666',
                     stroke: style.stroke || '#B7791F',
                     strokeWidth: Math.max(1.5, R * 0.03),
-                    pointerEvents: 'none',
-                });
+                };
+                if (movable) { outline.role = 'outline'; outline.cursor = 'grab'; outline.data = d; outline.index = i; }
+                else outline.pointerEvents = 'none';
+                nodes.push(outline);
 
                 // ── Mouth (path). ↕ = curve (up = smile), ↔ = asymmetry. Open >0.1
                 //    draws a filled cavity, else a stroked curve. ────────────────
@@ -283,6 +305,30 @@ export function face(options = {}) {
                 // Open: lower lip, drag DOWN to open.
                 pushHandle(cx, mouthBaseY + (channels.mouthOpen && pO > 0.1 ? pO * 0.34 * R : 0) + 0.02 * R,
                     axisSpec('mouthOpen', mouthBaseY + 0.02 * R, mouthBaseY + 0.42 * R));
+
+                // Size: a handle on the right rim resizes the head — an absolute-mode
+                // slide along +x (drag OUT to grow). Only when `size` is bound to a
+                // field (a constant size is drawn but not elicited). The track runs
+                // from the rim at the domain's MIN radius to its MAX radius (through
+                // the size scale itself), so the handle — which sits on the current
+                // rim (cx + R) — maps straight back to the current value: no jump on
+                // grab, and the mapping honours whatever range the size scale uses.
+                const sizeCh = channels.size;
+                if (sizeCh && sizeCh.field != null) {
+                    const sScale = scales.size;
+                    const dom = sScale && sScale.domainConfig;
+                    const loVal = Array.isArray(dom) ? dom[0] : 0;
+                    const hiVal = Array.isArray(dom) ? dom[dom.length - 1] : 1;
+                    const rLo = sScale ? sScale.encode(loVal) : 0;
+                    const rHi = sScale ? sScale.encode(hiVal) : defaultR;
+                    const sizeSpec = { channel: 'size', field: sizeCh.field, pxAt0: cx + rLo, pxAt1: cx + rHi, loVal, hiVal };
+                    nodes.push(editable({
+                        type: 'circle', cx: cx + R, cy, r: handleSize,
+                        fill: handles ? 'rgba(15,23,42,0.5)' : 'transparent',
+                        stroke: handles ? '#fff' : 'none', strokeWidth: handles ? 1.25 : 0,
+                        cursor: 'ew-resize',
+                    }, sizeSpec, undefined));
+                }
             });
 
             return nodes;

@@ -45,7 +45,7 @@ const presets = [
       code: sweepCode,
       meta: {
         title: 'Draw a curve',
-        blurb: 'edit: drag({ pick: "sweep" }) on the value channel; the x positions stay fixed.',
+        blurb: 'edit: move({ pick: "sweep" }) on the value channel; the x positions stay fixed.',
         try: (
           <>
             <b>Sweep</b> left-to-right across the chart.

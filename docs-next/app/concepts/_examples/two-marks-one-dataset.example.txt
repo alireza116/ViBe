@@ -22,7 +22,7 @@ mount(Elicit({
       fill: "#4f46e5", stroke: "#1f2733", strokeWidth: 1, size: 7,
       channels: {
         x: { field: "cat" },
-        y: { field: "n", edit: drag() },
+        y: { field: "n", edit: move() },
       },
     }),
   ],

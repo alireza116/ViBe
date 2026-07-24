@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "edit.line.sweep(options)",
     summary: (
       <>
-        Line-scoped (<code className="inline">scope: "line"</code>). Sugar over <code className="inline">drag({'{'} pick: "sweep", guide: true {'}'})</code>: a drag repaints the value of each point the pointer crosses, locked to one series.
+        Line-scoped (<code className="inline">scope: "line"</code>). Sugar over <code className="inline">move({'{'} pick: "sweep", guide: true {'}'})</code>: a drag repaints the value of each point the pointer crosses, locked to one series.
       </>
     ),
     signatures: [

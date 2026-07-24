@@ -9,9 +9,13 @@ type Anchor = { id: string; title: string };
 
 type Props = {
   children: React.ReactNode;
+  /** Drop the site sidebar and let `main` fill the width. The playground's
+   * dashboard is a full-screen surface with its own left-rail navigation, so a
+   * second site nav beside it only competes for space. */
+  chromeless?: boolean;
 };
 
-export function DocShell({ children }: Props) {
+export function DocShell({ children, chromeless }: Props) {
   const pathname = usePathname() || "/";
   const active = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
 
@@ -36,6 +40,14 @@ export function DocShell({ children }: Props) {
 
   const showAnchors =
     anchors.length > 1 || anchors.some((a) => a.id === "api");
+
+  if (chromeless) {
+    return (
+      <div className="layout layout-chromeless">
+        <main className="main-chromeless">{children}</main>
+      </div>
+    );
+  }
 
   return (
     <div className="layout">

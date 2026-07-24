@@ -237,8 +237,14 @@ export function ExampleLive({
     setSource(baseCode);
     setEvalCode(baseCode);
     setEditorKey((k) => k + 1);
+  }, [baseCode]);
+
+  // Keep the code-open state tied to `codeMode` alone. A reactive parent (the
+  // Build dashboard) feeds a fresh `code` on every form change; folding this
+  // into the effect above would slam the "Show code" panel shut mid-edit.
+  useEffect(() => {
     setCodeOpen(codeMode === 'readonly');
-  }, [baseCode, codeMode]);
+  }, [codeMode]);
 
   const onDraftChange = useCallback((value: string) => {
     if (debounceRef.current != null) window.clearTimeout(debounceRef.current);

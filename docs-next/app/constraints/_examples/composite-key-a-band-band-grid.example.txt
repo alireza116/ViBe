@@ -20,7 +20,7 @@ mount(Elicit({
         fill: { field: "group" },
       },
       edits: [
-        drag({ channels: ["x", "y"] }),
+        move({ channels: ["x", "y"] }),
         create({ defaults: { group: "alpha" } }),
         remove({ when: when.alt }),
       ],

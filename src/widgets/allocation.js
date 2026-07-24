@@ -3,7 +3,7 @@
 // Plain-chart twin: barY + drag + maintainSum({ mode: 'redistribute' }) + clamp.
 
 import { barY } from '../plot/index.js';
-import { drag } from '../edit/index.js';
+import { move } from '../edit/index.js';
 import { clamp, maintainSum } from '../constraints/index.js';
 import { prompt } from './theme.js';
 import { widgetTheme } from './shared.js';
@@ -56,7 +56,7 @@ export function allocation(opts = {}) {
                 fillOpacity: 0.75,
                 channels: {
                     x: { field: 'cat' },
-                    y: { field: 'share', edit: drag({ guide: true, stage }) }
+                    y: { field: 'share', edit: move({ guide: true, stage }) }
                 }
             })
         ]

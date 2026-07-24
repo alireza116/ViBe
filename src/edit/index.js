@@ -6,7 +6,8 @@
 // An edit is a descriptor the engine routes to:
 //   { type, gesture, channels, when, pick, scope, threshold, into, constrain,
 //     guide, stage, advance, apply }
-//     gesture   'drag' | 'click' | 'dblclick' | 'commit' — the raw gesture
+//     gesture   'drag' | 'click' | 'dblclick' | 'commit' — the raw gesture the
+//               hand makes (distinct from the transform NAME: a `move` is a 'drag')
 //     channels  channel names it governs; null = inject the channel it's placed on
 //     when      (ctx) => boolean — arbitration (e.g. only on Shift-drag)
 //     pick      'direct' | 'nearest' | 'plane' | 'sweep' | 'draw' | 'brush' |
@@ -28,15 +29,16 @@
 // line.js and are grouped under `edit.line.*` so the scope is visible in the name.
 //
 // Placed on a channel (co-located) for the simple case:
-//   size: { field: "mag", edit: vibe.edit.resize() }
+//   size: { field: "mag", edit: vibe.edit.slide() }   // linear magnitude (preferred)
+//   size: { field: "mag", edit: vibe.edit.resize() }  // radial magnitude
 // Or at mark level for joint / arbitrary edits:
-//   edits: [ vibe.edit.drag({ channels: ["x", "y"] }), vibe.edit.line.anchor() ]
+//   edits: [ vibe.edit.move({ channels: ["x", "y"] }), vibe.edit.line.anchor() ]
 
-export { drag, dragSpan, brushSpan, brushRect, resize, rotate, cycle, create, toggle, remove, set, editText, legend, legendValue, select, custom, rank } from './basic.js';
+export { move, moveSpan, brushSpan, brushRect, slide, resize, rotate, cycle, create, toggle, remove, set, editText, legend, legendValue, select, custom, rank } from './basic.js';
 
 export { when } from './when.js';
 // Authoring kit — public so custom edits / marks can reuse the same primitives.
-export { makeEdit, nextSeriesKey, invertChannel, recenterSpan, markCenter, schemaDefaults } from './shared.js';
+export { makeEdit, nextSeriesKey, invertChannel, recenterSpan, markCenter, schemaDefaults, linearInvert, channelDomain } from './shared.js';
 export { nearestMark, nearestSeries, nearestMarkOnAxis, distanceToMark } from './pick.js';
 export { registerDriver } from './drivers/index.js';
 
@@ -65,7 +67,7 @@ import { fill as waffleFill } from './waffle.js';
 export const waffle = { fill: waffleFill };
 
 import {
-    drag as geoDrag,
+    move as geoMove,
     create as geoCreate,
     draw as geoDraw,
     dragVertex as geoDragVertex,
@@ -76,7 +78,7 @@ import {
 
 // Geo-scoped edits for the geo* mark family (chart `projection` apply/invert).
 export const geo = {
-    drag: geoDrag,
+    move: geoMove,
     create: geoCreate,
     draw: geoDraw,
     dragVertex: geoDragVertex,

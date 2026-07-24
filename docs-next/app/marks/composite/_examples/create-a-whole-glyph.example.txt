@@ -27,7 +27,7 @@ mount(Elicit({
           fill: "steelblue", size: 7,
           channels: {
             x: { field: "x" },
-            y: { field: "value", edit: drag() },
+            y: { field: "value", edit: move() },
           },
           edits: [ create({ gesture: "dblclick", channels: ["x", "y"] }) ],
           constraints: [ count({ max: 8 }) ],

@@ -20,8 +20,8 @@ mount(Elicit({
       size: 8, fill: "#2563eb",
       channels: {
         // A drag on both axes — so both axes take arrow keys, free of charge.
-        x: { field: "effort", edit: drag() },
-        y: { field: "value",  edit: drag() },
+        x: { field: "effort", edit: move() },
+        y: { field: "value",  edit: move() },
       },
     }),
   ],

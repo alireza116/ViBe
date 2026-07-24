@@ -42,7 +42,7 @@ export const SITE: NavGroup[] = [
     group: 'Editing',
     pages: [
       { href: '/editing', title: 'Overview' },
-      { href: '/editing/gestures', title: 'Drag · Resize · Cycle · Custom' },
+      { href: '/editing/gestures', title: 'Move · Resize · Slide · Rotate · Cycle · Custom' },
       { href: '/editing/sweep', title: 'Sweep (you-draw-it)' },
       { href: '/editing/lock', title: 'Locked rows (read-only)' },
       { href: '/editing/existence', title: 'Create · Remove · Anchors' },

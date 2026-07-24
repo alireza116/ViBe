@@ -21,7 +21,7 @@ mount(Elicit({
         // region around zero is. Still continuous and invertible — it drags.
         x: { field: "delta",
              scale: { type: "symlog", constant: 10 },
-             edit: drag() },
+             edit: move() },
         // diverging: colour by distance from a PIVOT. Each side is scaled on
         // its own, so 0 keeps the neutral colour even though the domain is
         // lopsided (-100 vs 1000).

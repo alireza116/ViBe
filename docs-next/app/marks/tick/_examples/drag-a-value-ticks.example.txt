@@ -15,7 +15,7 @@ mount(Elicit({
       channels: {
         x: { field: "x" },
         y: { field: "y",
-             edit: drag({ pick: "nearest" }) },
+             edit: move({ pick: "nearest" }) },
       },
     }),
   ],

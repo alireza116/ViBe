@@ -8,6 +8,7 @@ import { api } from './api';
 import valenceArousal from './_examples/valence-arousal.example.txt';
 import fullChernoffFace from './_examples/full-chernoff-face.example.txt';
 import aMoodPerPerson from './_examples/a-mood-per-person.example.txt';
+import moveAndResizeTheHead from './_examples/move-and-resize-the-head.example.txt';
 import oneFacePerDay from './_examples/one-face-per-day.example.txt';
 
 export default function Layout({ children }) {
@@ -65,6 +66,23 @@ Give the face an `x` (or `y`) channel and it is placed like a `point` — one ed
   try={(
     <>
       <b>Drag</b> any face's mouth or an eye.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="head" title="Move and resize the head">
+
+Bind **both** `x` and `y` to fields and the head itself becomes a **move** target — grab an empty part of the face (away from the feature handles) and drag it through the plane. Bind `size` to a field and a **resize** handle appears on the right rim: drag it out to grow the head, in to shrink it. The resize is a `slide` — the same linear interaction the eyes use — so growing the face reads as a steady drag, not the “outside grows, inside shrinks” of a radius edit.
+
+<Example
+  code={moveAndResizeTheHead}
+  title="Drag to move · rim handle to resize"
+  blurb={"x + y bound makes the outline a drag-to-move target; size bound adds the slide resize handle on the rim. The mouth/eyes still edit the emotion preset."}
+  try={(
+    <>
+      <b>Drag</b> the head to move it · <b>drag the rim handle</b> to resize · the mouth/eyes still work.
     </>
   )}
 />

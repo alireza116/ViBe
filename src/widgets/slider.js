@@ -8,7 +8,7 @@
 // Returns an ElicitSpec: Elicit(slider({ question, domain, step })).
 
 import { point } from '../plot/index.js';
-import { drag } from '../edit/index.js';
+import { move } from '../edit/index.js';
 import { clamp, snap } from '../constraints/index.js';
 import { sliderTrack, prompt } from './theme.js';
 import { widgetTheme } from './shared.js';
@@ -60,7 +60,7 @@ export function slider(opts = {}) {
                 },
                 // The knob tracks the pointer; a click settles it. No `create` — the
                 // value always exists, so there is exactly one knob to move.
-                edits: [drag({ pick: 'probe', channels: ['x'], advance: false, stage })]
+                edits: [move({ pick: 'probe', channels: ['x'], advance: false, stage })]
             })
         ]
     };

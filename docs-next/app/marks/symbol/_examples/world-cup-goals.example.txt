@@ -18,7 +18,7 @@ mount(Elicit({
       symbol: "⚽",                       // one glyph, no mapping — pure identity
       channels: {
         x: { field: "stage" },
-        y: { field: "goals", edit: drag() },
+        y: { field: "goals", edit: move() },
       },
     }),
   ],

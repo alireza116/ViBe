@@ -20,8 +20,8 @@ mount(Elicit({
     rect({
       fill: "#2563eb", fillOpacity: 0.8,
       channels: {
-        x:      { field: "x", edit: edit.drag() },
-        y:      { field: "y", edit: edit.drag() },
+        x:      { field: "x", edit: edit.move() },
+        y:      { field: "y", edit: edit.move() },
         width:  { value: 28 },
         height: { value: 28 },
       },

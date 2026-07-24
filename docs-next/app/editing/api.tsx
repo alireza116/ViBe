@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "The Edit descriptor",
     summary: (
       <>
-        Every edit factory (<code className="inline">vibe.edit.*</code>) returns this shape. <code className="inline">apply(ctx)</code> is pure: given the context it returns a datum (direct edit), a full array (whole-dataset edit), or <code className="inline">undefined</code> (no-op).
+        Every edit factory (<code className="inline">vibe.edit.*</code>) returns this shape, built by <code className="inline">makeEdit</code>. The named factories are presets over it: each fixes a <code className="inline">gesture</code> and an <code className="inline">apply</code> — the inversion that turns the gesture back into data. <code className="inline">apply(ctx)</code> is pure: given the context it returns a datum (direct edit), a full array (whole-dataset edit), or <code className="inline">undefined</code> (no-op).
       </>
     ),
     options: [
@@ -207,31 +207,37 @@ export const api: ApiEntry[] = [
     name: "Edit catalogue",
     summary: (
       <>
-        Universal edits import bare (<code className="inline">vibe.edit.drag</code>); line-scoped ones live under <code className="inline">vibe.edit.line.*</code> so their scope shows in the name.
+        Universal edits import bare (<code className="inline">vibe.edit.move</code>); line-scoped ones live under <code className="inline">vibe.edit.line.*</code> so their scope shows in the name.
       </>
     ),
     options: [
       {
-        name: "drag",
+        name: "move",
         type: "drag",
         default: "gestures",
-        desc: "Move — invert the pointer on each positional channel.",
+        desc: "Position — invert the pointer on each positional channel.",
       },
       {
-        name: "resize",
+        name: "resize / slide",
         type: "drag",
         default: "gestures",
         desc: (
           <>
-            Magnitude — the radius from the mark centre inverts to a value (usually <code className="inline">size</code>).
+            Magnitude — the pointer's radius (<code className="inline">resize</code>) or axial distance (<code className="inline">slide</code>) inverts to a value (usually <code className="inline">size</code>).
           </>
         ),
+      },
+      {
+        name: "rotate",
+        type: "drag",
+        default: "gestures",
+        desc: "Angle — the pointer's angle about a pivot inverts to a value (degrees).",
       },
       {
         name: "cycle",
         type: "click",
         default: "gestures",
-        desc: "Advance a discrete channel to its next domain value.",
+        desc: "Discrete — advance a channel to its next domain value.",
       },
       {
         name: "custom",
@@ -244,7 +250,7 @@ export const api: ApiEntry[] = [
         ),
       },
       {
-        name: "dragSpan / brushSpan",
+        name: "moveSpan / brushSpan",
         type: "drag",
         default: "bar",
         desc: "Move / resize a two-endpoint span (x1·x2 or y1·y2).",

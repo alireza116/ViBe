@@ -17,7 +17,7 @@ mount(Elicit({
       stroke: "#059669", strokeWidth: 3, curve: "catmullRom",
       channels: {
         x: { field: "month" },
-        y: { field: "demand", edit: drag({ pick: "sweep", guide: true }) },
+        y: { field: "demand", edit: move({ pick: "sweep", guide: true }) },
       },
     }),
   ],

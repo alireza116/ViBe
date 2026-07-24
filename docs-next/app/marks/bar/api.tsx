@@ -88,7 +88,7 @@ export const api: ApiEntry[] = [
         desc: (
           <>
             The other axis. The value axis carries{' '}
-            <code className="inline">edit: drag()</code> to make bars draggable.
+            <code className="inline">edit: move()</code> to make bars draggable.
           </>
         ),
       },

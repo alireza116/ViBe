@@ -6,7 +6,7 @@
 //
 //   channels: {
 //     x:    { field: "height" },                  // scale inferred from the schema
-//     y:    { field: "weight", edit: drag() },    // ... and writable
+//     y:    { field: "weight", edit: move() },    // ... and writable
 //     fill: { field: "group" },                   // -> ordinal palette
 //     size: { field: "pop", scale: { range: [4, 20] } },  // -> radius
 //     opacity: { value: 0.8 }                     // a visual constant (no scale)

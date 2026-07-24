@@ -70,7 +70,7 @@ export const api: ApiEntry[] = [
         type: "band | linear",
         desc: (
           <>
-            The other axis; the value axis carries <code className="inline">edit: drag()</code> to drag the tick.
+            The other axis; the value axis carries <code className="inline">edit: move()</code> to drag the tick.
           </>
         ),
       },

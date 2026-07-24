@@ -2,10 +2,10 @@ import type { ApiEntry } from '../../../lib/types';
 
 export const api: ApiEntry[] = [
   {
-    name: "drag(options)",
+    name: "move(options)",
     summary: "Position edit — inverts the pointer on each positional channel. On x+y a 2D move; on y alone a bar drag.",
     signatures: [
-      "drag({ channel, channels, pick, threshold, when, guide, constrain }) → Edit",
+      "move({ channel, channels, pick, threshold, when, guide, constrain }) → Edit",
     ],
     options: [
       {
@@ -74,6 +74,94 @@ export const api: ApiEntry[] = [
     returns: (
       <>
         An <b>Edit</b> returning the datum with the channel field set from the pointer radius.
+      </>
+    ),
+  },
+  {
+    name: "slide(options)",
+    summary: "Magnitude edit — a linear drag along one axis maps onto the channel's domain. The linear alternative to resize (radial).",
+    signatures: [
+      "slide({ axis, increase, extent, mode, channel }) → Edit",
+    ],
+    options: [
+      {
+        name: "axis",
+        type: "'x' | 'y'",
+        default: "'x'",
+        desc: "Which pointer coordinate drives the value.",
+      },
+      {
+        name: "increase",
+        type: "'left'|'right'|'up'|'down'",
+        default: "'left' / 'up'",
+        desc: "The direction that raises the value (left/right for axis x, up/down for axis y).",
+      },
+      {
+        name: "extent",
+        type: "number",
+        default: "120",
+        desc: "Pixel span that traverses the full domain.",
+      },
+      {
+        name: "mode",
+        type: "'absolute' | 'relative'",
+        default: "'absolute'",
+        desc: (
+          <>
+            <code className="inline">absolute</code> — a fixed track at the mark centre; direct-pick, coexists with a mark's other direct edits (a glyph handle), may jump to the pointer on grab. <code className="inline">relative</code> — moves by the drag delta (no jump) via the <code className="inline">slide</code> driver, so it can't share a chart with direct-pick edits.
+          </>
+        ),
+      },
+    ],
+    returns: (
+      <>
+        An <b>Edit</b> returning the datum with the channel field set from the pointer's position along the axis.
+      </>
+    ),
+  },
+  {
+    name: "rotate(options)",
+    summary: "Angle edit — the pointer's angle about a pivot inverts back to the channel value (the scale's range is in degrees).",
+    signatures: [
+      "rotate({ pivot, fold, pick, relativeTo, channel }) → Edit",
+    ],
+    options: [
+      {
+        name: "pivot",
+        type: "'plot' | 'mark'",
+        default: "'plot'",
+        desc: "The centre the angle is measured about — the plot, or the hit mark.",
+      },
+      {
+        name: "fold",
+        type: "boolean",
+        default: "true",
+        desc: (
+          <>
+            <code className="inline">true</code> folds into a direction-agnostic cone; <code className="inline">false</code> uses full-circle degrees (a gauge/dial).
+          </>
+        ),
+      },
+      {
+        name: "pick",
+        type: "'plane' | 'direct'",
+        default: "'plane'",
+        desc: (
+          <>
+            <code className="inline">plane</code> turns the whole dataset; <code className="inline">direct</code> turns the touched datum alone (a needle handle).
+          </>
+        ),
+      },
+      {
+        name: "relativeTo",
+        type: "string",
+        default: "—",
+        desc: "Measure the absolute angular distance from another angular channel (the “open the cone” gesture).",
+      },
+    ],
+    returns: (
+      <>
+        An <b>Edit</b> with the channel field set from the pointer angle through the channel's scale.
       </>
     ),
   },

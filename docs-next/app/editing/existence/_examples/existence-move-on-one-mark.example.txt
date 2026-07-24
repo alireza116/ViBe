@@ -16,7 +16,7 @@ mount(Elicit({
         y: { field: "y" },
       },
       edits: [
-        drag({ channels: ["x", "y"] }),
+        move({ channels: ["x", "y"] }),
         create({ gesture: "dblclick" }),
         remove({ when: when.alt }),
       ],

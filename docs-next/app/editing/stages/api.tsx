@@ -9,7 +9,7 @@ export const api: ApiEntry[] = [
       </>
     ),
     signatures: [
-      "drag({ stage: 1 })            // active only in stage 1",
+      "move({ stage: 1 })            // active only in stage 1",
       "const el = Elicit({ stage: 0, ... });",
       "el.getStage() → number",
       "el.setStage(n)               // set, emit \"stage\", re-render",

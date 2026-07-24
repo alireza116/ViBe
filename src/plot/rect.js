@@ -29,8 +29,8 @@ import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf
 //   5. EXTENT   nothing positional on this axis → span the full range (a rule-like
 //               fallback, so a 1-D rect still draws).
 //
-// Editing: x1/x2/y1/y2 are already registered positional channels, so drag /
-// dragSpan / brushSpan work on a rect for free; brushRect() (edit/basic.js) adds
+// Editing: x1/x2/y1/y2 are already registered positional channels, so move /
+// moveSpan / brushSpan work on a rect for free; brushRect() (edit/basic.js) adds
 // composable 2-D edge/corner/body editing over all four extents at once.
 
 /**

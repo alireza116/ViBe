@@ -18,12 +18,12 @@ The default is `new D3Renderer()`, an SVG backend. `new CanvasRenderer()` implem
 
 <Section id="direct" title="Direct-pick drag, on canvas">
 
-Under SVG, the browser hit-tests: it picks the element under the pointer. A canvas is a single element, so the canvas renderer finds the touched mark **geometrically**, using the same distance math as the `nearest` pick, then dispatches the same `drag` edit. Drag a bar and the gesture inverts through the `y` scale and rewrites the value, as it does under SVG.
+Under SVG, the browser hit-tests: it picks the element under the pointer. A canvas is a single element, so the canvas renderer finds the touched mark **geometrically**, using the same distance math as the `nearest` pick, then dispatches the same `move` edit. Drag a bar and the gesture inverts through the `y` scale and rewrites the value, as it does under SVG.
 
 <Example
   code={canvasDragABar}
   title="Drag a value (canvas)"
-  blurb="renderer: new CanvasRenderer(). y carries edit: drag(); the direct-pick target is hit-tested geometrically against the scene nodes."
+  blurb="renderer: new CanvasRenderer(). y carries edit: move(); the direct-pick target is hit-tested geometrically against the scene nodes."
   try={(
     <>
       <b>Drag</b> a bar up or down.

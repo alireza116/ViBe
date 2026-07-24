@@ -15,7 +15,7 @@ mount(Elicit({
         y: { field: "y" },
       },
       // Joint gesture: one drag writes both channels.
-      edits: [ drag({ channels: ["x", "y"] }) ],
+      edits: [ move({ channels: ["x", "y"] }) ],
     }),
   ],
 }))

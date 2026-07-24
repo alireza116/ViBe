@@ -12,7 +12,7 @@
 import { makeEdit, schemaDefaults, nextSeriesKey, numOf, invertChannel, mintDatum } from './shared.js';
 import { nearestSeries, nearestMark, nearestMarkOnAxis, DEFAULT_PICK_THRESHOLD } from './pick.js';
 import { resolveSamples } from '../core/samples.js';
-import { drag } from './basic.js';
+import { move } from './basic.js';
 
 /**
  * anchor — add ONE point to a connected path (a line's bezier-style anchor). The
@@ -262,12 +262,12 @@ export function draw(options = {}) {
 
 /**
  * sweep — you-draw-it painting: a drag that repaints the value of each point the
- * pointer crosses (series-scoped in the engine). Convenience over `drag`.
+ * pointer crosses (series-scoped in the engine). Convenience over `move`.
  * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
 export function sweep(options = {}) {
-    return drag({ pick: 'sweep', guide: true, scope: 'line', ...options });
+    return move({ pick: 'sweep', guide: true, scope: 'line', ...options });
 }
 
 /**

@@ -30,7 +30,7 @@ mount(Elicit({
       },
       edits: [
         create({ when: when.noAlt }),     // click empty space -> add
-        drag({ channels: ["x", "y"] }),   // drag one of yours in 2D
+        move({ channels: ["x", "y"] }),   // drag one of yours in 2D
         remove({ when: when.alt }),       // alt-click -> gone
       ],
     }),

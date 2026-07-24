@@ -11,7 +11,7 @@ const chart = Elicit({
   ],
   marks: [
     barY({ channels: { x: { field: "q" },
-                       y: { field: "n", edit: drag() } } }),
+                       y: { field: "n", edit: move() } } }),
   ],
 });
 mount(chart);

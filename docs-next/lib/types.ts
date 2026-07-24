@@ -40,3 +40,9 @@ export type ExampleModule = {
 
 export type NavPage = { href: string; title: string };
 export type NavGroup = { group: string; pages: NavPage[] };
+
+export type PlaygroundPreset = {
+  id: string;
+  label: string;
+  example: ExampleModule;
+};

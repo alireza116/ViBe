@@ -17,7 +17,7 @@ mount(Elicit({
       channels: {
         x: { field: "x" },
         y: { field: "y",
-             edit: drag({ pick: "sweep", guide: true }) },
+             edit: move({ pick: "sweep", guide: true }) },
         stroke: { field: "g" }, // groups AND colours the lines
       },
     }),

@@ -17,7 +17,7 @@ mount(Elicit({
     barY({ channels: { x: { field: "cat" }, y: { field: "n" } } }),
     point({
       size: 6,
-      channels: { x: { field: "cat" }, y: { field: "n", edit: drag() } },
+      channels: { x: { field: "cat" }, y: { field: "n", edit: move() } },
     }),
   ],
 }));

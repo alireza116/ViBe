@@ -15,7 +15,7 @@ mount(Elicit({
       fill: "#4f46e5",
       channels: {
         x: { field: "x" },
-        y: { field: "y", edit: drag() },
+        y: { field: "y", edit: move() },
       },
     }),
   ],

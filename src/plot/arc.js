@@ -13,7 +13,7 @@
 //
 // The magnitude channel is `value`, NOT `angle`. Across this library `angle` means
 // a rotation/angular POSITION (needle's direction, text's rotation, axisRadial's
-// angular scale) — it is inverted back to data by rotate()/drag() as an angle. A
+// angular scale) — it is inverted back to data by rotate()/move() as an angle. A
 // slice's `share` is nothing of the sort: it's a quantity that the pie layout
 // normalizes into a sweep. Naming it `angle` made one channel mean two unrelated
 // things depending on the mark, so it's `value` here (see CLAUDE.md, "one

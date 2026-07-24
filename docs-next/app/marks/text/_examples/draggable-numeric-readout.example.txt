@@ -10,7 +10,7 @@ mount(Elicit({
     text({ fontSize: 16, fill: "#0d9488", format: ".1f",
       channels: {
         x: { field: "cat" },
-        y: { field: "n", edit: drag() },
+        y: { field: "n", edit: move() },
         text: { field: "n" },
       } }),
   ],

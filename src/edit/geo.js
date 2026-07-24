@@ -27,14 +27,14 @@ function lonLatFields(markChannels) {
 }
 
 /**
- * drag — move a geoPoint (or any lon/lat row) by inverting the pointer.
+ * move — move a geoPoint (or any lon/lat row) by inverting the pointer.
  * @param {any} [options]
  * @returns {import('../types').Edit}
  */
-export function drag(options = {}) {
+export function move(options = {}) {
     const { ...rest } = options;
     return makeEdit({
-        type: 'drag',
+        type: 'move',
         gesture: 'drag',
         channels: null,
         pick: 'direct',

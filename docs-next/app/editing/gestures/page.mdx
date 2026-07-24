@@ -5,7 +5,10 @@ import { Example } from '../../../components/Example';
 import { Lead } from '../../../components/Lead';
 import { api } from './api';
 
+import moveAPoint from './_examples/move-a-point.example.txt';
 import dragOutwardToGrow from './_examples/drag-outward-to-grow.example.txt';
+import slideAlongAnAxis from './_examples/slide-along-an-axis.example.txt';
+import rotateABox from './_examples/rotate-a-box.example.txt';
 import moveShiftResizeClickCycle from './_examples/move-shift-resize-click-cycle.example.txt';
 import invertYYourself from './_examples/invert-y-yourself.example.txt';
 
@@ -13,15 +16,32 @@ export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
 }
 
-# Drag · Resize · Cycle · Custom
+# Move · Resize · Slide · Rotate · Cycle · Custom
 
-<Lead>Different channels take different gestures. `drag` moves a position, `resize` inverts a radius into a magnitude, `cycle` clicks through a category, and `custom` covers anything else. Several edits can share one mark, separated by `when`.</Lead>
+<Lead>Each edit names what happens to the object. `move` translates a position, `resize` scales a magnitude, `slide` scales it along an axis, `rotate` turns it, `cycle` steps a category, and `custom` covers anything else. They are one descriptor under different inversions: each reads a gesture and writes it back through the same scale the channel encodes with. Existence (`create` / `remove` / `toggle`), value (`set` / `editText`) and line (`sweep` / `draw`) edits round out the vocabulary on their own pages. Several edits can share one mark, separated by `when`.</Lead>
 
 <ApiReference entries={api} />
 
-<Section id="resize" title="Resize a magnitude">
+<Section id="move" title="Position — move">
 
-`resize()` inverts the drag radius from the dot's centre back into the value, the same relationship `size` uses to encode it (`size: \{ edit: resize() \}`). The stroke stays fixed while you resize.
+`move()` inverts the pointer coordinate on each positional channel it governs. On `x` and `y` together it's a 2D translate; on `y` alone it's a bar drag. It is driven by a `drag` gesture — the transform name and the gesture are deliberately different.
+
+<Example
+  code={moveAPoint}
+  title="Move a point"
+  blurb={"edits: [move({ channels: [\"x\", \"y\"] })] — the pointer inverts onto both channels."}
+  try={(
+    <>
+      <b>Drag</b> a dot anywhere.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="resize" title="Magnitude — resize (radial)">
+
+`resize()` inverts the drag radius from the mark's centre back into the value, the same relationship `size` uses to encode it (`size: \{ edit: resize() \}`). The stroke stays fixed while you resize.
 
 <Example
   code={dragOutwardToGrow}
@@ -36,9 +56,45 @@ export default function Layout({ children }) {
 
 </Section>
 
-<Section id="multi" title="One mark, three gestures">
+<Section id="slide" title="Magnitude — slide (linear)">
 
-Move, resize, and recolour on one mark, separated by `when`. Plain drag moves, Shift-drag resizes, click cycles the category.
+`slide()` is the linear counterpart to `resize`: instead of the pointer's *radius* from the centre, it reads how far the pointer has moved along one **axis** and maps that onto the value's domain — the same interaction a face's eye uses to grow. `axis` picks the axis (`'x'`/`'y'`), and `increase` names the direction that raises the value (`'left'`/`'right'`/`'up'`/`'down'`, default `'left'`/`'up'`).
+
+The default `mode: "absolute"` is a direct-pick edit — it shares a mark with other direct edits (which is why a glyph handle uses it). `mode: "relative"` moves by the drag *delta* (no jump on grab) but rides a plane driver, so it can't coexist with direct-pick edits; use it on a standalone magnitude chart.
+
+<Example
+  code={slideAlongAnAxis}
+  title="Slide left to grow"
+  blurb={"size: { edit: slide({ axis: \"x\", increase: \"left\" }) } — drag left grows, right shrinks."}
+  try={(
+    <>
+      <b>Drag</b> the dot left to grow it, right to shrink it.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="rotate" title="Angle — rotate">
+
+`rotate()` inverts the pointer's angle about a pivot onto the value, mirroring how the channel encodes value → degrees. `pivot: "mark"` turns about the mark's own centre; `fold: false` uses full-circle degrees (a dial), `fold: true` folds into a direction-agnostic cone. `pick: "direct"` turns the touched mark alone; the default `pick: "plane"` turns the whole dataset. Gauges and needles build on the same edit — see [Needle](/marks/needle) and [Cone](/marks/cone).
+
+<Example
+  code={rotateABox}
+  title="Turn a box"
+  blurb={"angle carries edit: rotate({ pivot: \"mark\", fold: false }); the pointer angle inverts onto theta."}
+  try={(
+    <>
+      <b>Drag</b> the box to spin it about its centre.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="multi" title="Discrete — cycle, and combining gestures">
+
+`cycle()` advances a channel to the next value in its domain on a `click` — the discrete transform. Here it shares one mark with `move` and `resize`, separated by `when`: plain drag moves, Shift-drag resizes, click cycles the category.
 
 <Example
   code={moveShiftResizeClickCycle}

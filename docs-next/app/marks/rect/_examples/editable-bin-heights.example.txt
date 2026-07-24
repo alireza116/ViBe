@@ -20,7 +20,7 @@ mount(Elicit({
       channels: {
         x1: { field: "x1" },
         x2: { field: "x2" },
-        y:  { field: "n", edit: drag({ guide: true }) },
+        y:  { field: "n", edit: move({ guide: true }) },
       },
     }),
   ],

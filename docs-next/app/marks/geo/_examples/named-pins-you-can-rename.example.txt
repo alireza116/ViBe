@@ -21,7 +21,7 @@ mount(Elicit({
         lon: { field: "lon" },
         lat: { field: "lat" },
       },
-      edits: [edit.geo.drag(), edit.geo.create({ defaults: { place: "new place" } })],
+      edits: [edit.geo.move(), edit.geo.create({ defaults: { place: "new place" } })],
     }),
 
     // The label: same rows, positioned by the same projection, nudged above the dot.

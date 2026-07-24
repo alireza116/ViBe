@@ -55,7 +55,7 @@ Put a category on **both** axes and each datum draws one cell at that (x, y) int
 
 <Section id="fixed-size" title="Fixed-size boxes (width/height)">
 
-Give an axis an explicit pixel extent with `width` (x) or `height` (y) and the rect becomes a fixed-size box **centred** on its `x`/`y` anchor — the SVG-native parameterisation, alongside `x1`/`x2` spans and band cells. An explicit size overrides the band interval and the baseline→value length. The anchor is a positional channel, so a `drag()` on `x` and `y` moves the whole box.
+Give an axis an explicit pixel extent with `width` (x) or `height` (y) and the rect becomes a fixed-size box **centred** on its `x`/`y` anchor — the SVG-native parameterisation, alongside `x1`/`x2` spans and band cells. An explicit size overrides the band interval and the baseline→value length. The anchor is a positional channel, so a `move()` on `x` and `y` moves the whole box.
 
 <Example
   code={fixedSizeBoxes}

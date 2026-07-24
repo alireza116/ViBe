@@ -15,7 +15,7 @@ mount(Elicit({
       fill: "#4f46e5",
       channels: {
         x: { field: "cat" },              // categorical + bar → band
-        y: { field: "n", edit: drag() },  // quantitative      → linear
+        y: { field: "n", edit: move() },  // quantitative      → linear
       },
     }),
   ],

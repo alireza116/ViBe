@@ -29,6 +29,7 @@ import { brushRectDriver } from './brushRect.js';
 import { geoBrushDriver } from './geoBrush.js';
 import { probeDriver } from './probe.js';
 import { axisDragDriver } from './axisDrag.js';
+import { slideDriver } from './slide.js';
 
 /**
  * @typedef {Object} DriverSession
@@ -67,7 +68,7 @@ import { axisDragDriver } from './axisDrag.js';
  */
 
 /** @type {Driver[]} */
-export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, brushRectDriver, geoBrushDriver, probeDriver, axisDragDriver];
+export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, brushDriver, brushRectDriver, geoBrushDriver, probeDriver, axisDragDriver, slideDriver];
 
 /**
  * Register a custom driver (or replace a built-in by the same `name`). The engine

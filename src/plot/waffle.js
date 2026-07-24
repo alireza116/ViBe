@@ -19,7 +19,7 @@
 // so a full waffle reaches the value's height on the axis and rows stay countable.
 //
 // The value's fill LEVEL is still resolved through encodeChannel (the single
-// field->pixel path) so a plain `drag()` on the value channel fills to the
+// field->pixel path) so a plain `move()` on the value channel fills to the
 // pointer; the grid quantizes that level into whole cells. Empty cells (up to the
 // domain top) are drawn too so the whole block is one direct-pick drag target —
 // dragging *up* into them raises the count. `showEmpty: false` keeps them as
@@ -31,7 +31,7 @@
 //
 // Interactions: use `edit.waffle.fill()` on the value channel — it maps the pointer
 // to the exact cell under it (row + column) and fills up to and INCLUDING that cell,
-// consistently for both drag and a single click. (A plain `drag()` inverts the 1D
+// consistently for both drag and a single click. (A plain `move()` inverts the 1D
 // value scale, which can't target a cell in a packed grid, so the fill lands on
 // the wrong row.) Every cell carries the shared grid descriptor `node.grid` that
 // the edit reads — which is what `supportsWaffle` below declares. Add a second

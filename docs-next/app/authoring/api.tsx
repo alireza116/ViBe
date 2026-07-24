@@ -148,7 +148,7 @@ export const api: ApiEntry[] = [
         name: "invertChannel",
         type: "fn",
         default: "—",
-        desc: "Pointer → data for one resolved channel — the same path stock drag uses. Prefer this over hand-rolled scale.invert.",
+        desc: "Pointer → data for one resolved channel — the same path stock move uses. Prefer this over hand-rolled scale.invert.",
       },
     ],
     returns: (

@@ -1,26 +1,33 @@
 // @ts-check
 // basic.js — the universal edits: every one applies to any mark with the
-// channels it governs. `drag` moves, `resize` scales a magnitude, `cycle`
-// advances a discrete channel, `create` mints a datum, `remove` deletes one, and
-// `custom` is the escape hatch. Line-scoped authoring edits live in line.js.
+// channels it governs. The simple transforms name what happens to the object:
+// `move` translates a position, `resize` scales a magnitude (radially), `slide`
+// scales it (linearly), `rotate` turns it, `cycle` advances a discrete channel.
+// `create` mints a datum, `remove` deletes one, and `custom` is the escape
+// hatch. Line-scoped authoring edits live in line.js.
 //
 // An edit is the inverse of encoding: where `encode` maps data -> visual, an
 // edit's apply() maps a gesture -> that channel's data, through the SAME scale.
+// The named factories below are just presets over `makeEdit` (shared.js): each
+// fixes a `gesture` (what the hand does — 'drag'/'click') and an `apply` (the
+// inversion geometry that turns the gesture back into data). The transform name
+// is the object outcome; the gesture string is the physical action — they differ
+// deliberately (a `move` is driven by a 'drag').
 
-import { makeEdit, markCenter, resolveMarkNode, invertChannel, recenterSpan, mintDatum } from './shared.js';
+import { makeEdit, markCenter, resolveMarkNode, invertChannel, recenterSpan, mintDatum, linearInvert, channelDomain } from './shared.js';
 import { axisOf, pointerDegrees, unwrapDegrees } from '../core/encoding.js';
 
 /**
- * drag — position edit: invert the pointer coordinate on each positional channel.
- * On x AND y it's a 2D move; on y alone it's a bar drag. On `angle` (with a mark
- * centre) it is a rotate. Works on any invertible scale (linear pixel, band ->
- * nearest category) via scale.invertValue.
+ * move — position transform. Inversion: cartesian — invert the pointer
+ * coordinate on each positional channel. On x AND y it's a 2D move; on y alone
+ * it's a bar drag. Works on any invertible scale (linear pixel, band -> nearest
+ * category) via scale.invertValue. Driven by a 'drag' gesture.
  * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
-export function drag(options = {}) {
+export function move(options = {}) {
     return makeEdit({
-        type: 'drag',
+        type: 'move',
         gesture: 'drag',
         ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
@@ -36,18 +43,18 @@ export function drag(options = {}) {
 }
 
 /**
- * dragSpan — whole-span move: translate a PAIR of endpoint channels (x1+x2 or
+ * moveSpan — whole-span translate: move a PAIR of endpoint channels (x1+x2 or
  * y1+y2) together, preserving the distance between them, so grabbing a span
- * bar's body shifts both ends rather than editing one. Stateless like `drag`:
+ * bar's body shifts both ends rather than editing one. Stateless like `move`:
  * each tick recenters the mark's CURRENT pixel span on the pointer (no
  * dragstart/delta tracking) — the same "gesture sets the absolute value"
- * model `drag` already uses, just applied to two fields at once.
+ * model `move` already uses, just applied to two fields at once.
  * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
-export function dragSpan(options = {}) {
+export function moveSpan(options = {}) {
     return makeEdit({
-        type: 'dragSpan',
+        type: 'moveSpan',
         gesture: 'drag',
         ...options,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
@@ -62,8 +69,8 @@ export function dragSpan(options = {}) {
 
 /**
  * brushSpan — the combined Gantt-bar interaction: grabbing near one endpoint
- * resizes THAT edge only (like a lone `drag()` on that channel); grabbing the
- * body translates both together (like `dragSpan`). Which zone a gesture means
+ * resizes THAT edge only (like a lone `move()` on that channel); grabbing the
+ * body translates both together (like `moveSpan`). Which zone a gesture means
  * is resolved once, at dragstart, by the `brush` driver (src/edit/drivers/
  * brush.js) — this apply() is stateless per tick, just branching on the
  * driver's lock (`ctx.session.zone`), exactly how `draw()` (line.js) reads
@@ -220,10 +227,92 @@ export function brushRect(options = {}) {
     });
 }
 
+// Which pixel of a pointer an axis reads, and whether the value grows toward
+// smaller pixels. `increase: 'left'|'up'` grow as the pointer moves toward
+// smaller x/y (up is smaller y on screen), matching the natural default.
+/** @param {'x'|'y'} axis @param {string|undefined} increase */
+function slideAxis(axis, increase) {
+    const inc = increase || (axis === 'x' ? 'left' : 'up');
+    return { axis, towardSmaller: inc === 'left' || inc === 'up' };
+}
+
 /**
- * resize — magnitude edit: the gesture's radius (distance from the mark centre)
- * inverts back to the channel's value, mirroring how the channel encodes value
- * -> radius. Usually placed on `size`.
+ * slide — magnitude transform. Inversion: linear — the value tracks how far
+ * the pointer has moved along one axis, mapped through the channel's domain, the
+ * generalized form of the face's eye/param interaction. It is
+ * the linear alternative to `resize` (which reads the pointer's RADIUS from the
+ * centre — "outside grows, inside shrinks"), and the recommended edit for a
+ * magnitude channel like `size`.
+ *
+ * Two modes, same mapping (`linearInvert`), different anchor:
+ *   - `absolute` (default): a fixed track anchored at the mark centre, ±`extent`
+ *     px along `axis`. The value follows the pointer's position on that track, so
+ *     it may JUMP to the pointer on grab. Direct-pick (`pick:'direct'`) — it
+ *     coexists with a mark's other direct edits (this is exactly what the face's
+ *     eyes do), so it is the mode a glyph handle uses.
+ *   - `relative`: the value changes by how far the pointer has moved SINCE the
+ *     grab (no jump). It needs a dragstart snapshot, so it rides the `slide`
+ *     driver (`pick:'slide'`), which raises the plane above the marks. That means
+ *     it CANNOT share a chart with direct-pick edits (the plane silences them) —
+ *     use it for a standalone magnitude chart, and `absolute` inside a glyph.
+ *
+ * `increase` names the direction that raises the value: `'left'|'right'` for
+ * `axis:'x'`, `'up'|'down'` for `axis:'y'` (default `'left'`/`'up'`). `extent`
+ * is the pixel span that traverses the full domain.
+ * @param {import('../types').EditOptions & { axis?: 'x'|'y', increase?: 'left'|'right'|'up'|'down', extent?: number, mode?: 'absolute'|'relative' }} [options]
+ * @returns {import('../types').Edit}
+ */
+export function slide(options = {}) {
+    const { axis = 'x', increase, extent = 120, mode = 'absolute', ...rest } = options;
+    const { towardSmaller } = slideAxis(axis, increase);
+    return makeEdit({
+        type: 'slide',
+        gesture: 'drag',
+        // Relative needs a frozen dragstart anchor, which only a driver can stash
+        // in the session — so it is plane-pick; absolute is a stateless direct edit.
+        pick: mode === 'relative' ? 'slide' : 'direct',
+        // Knobs ride onto the descriptor (makeEdit passes unknown keys through) so
+        // both the apply below and the slide driver read the same configuration.
+        axis, increase, extent, mode,
+        ...rest,
+        apply: (/** @type {import('../types').EditContext} */ ctx) => {
+            const ch = ctx.channels[0];
+            if (!ch || !ch.field) return undefined;
+            const [loVal, hiVal] = channelDomain(ch);
+            const px = axis === 'x' ? ctx.pointer.x : ctx.pointer.y;
+
+            if (mode === 'relative') {
+                // The driver froze the grab pixel + starting value at dragstart; the
+                // value moves proportionally from there, so there is no grab jump.
+                const s = ctx.session;
+                if (!s || s.startPx == null || typeof s.startValue !== 'number') return undefined;
+                const moved = (px - s.startPx) * (towardSmaller ? -1 : 1);
+                const range = hiVal - loVal;
+                const lo = Math.min(loVal, hiVal), hi = Math.max(loVal, hiVal);
+                const v = Math.max(lo, Math.min(hi, s.startValue + (moved / extent) * range));
+                return { ...ctx.datum, [ch.field]: v };
+            }
+
+            // absolute: a track centred on the mark, oriented so `increase` grows
+            // the value; the pointer's position on it maps through the domain.
+            const c = markCenter(resolveMarkNode(ctx));
+            if (!c) return undefined;
+            const centre = axis === 'x' ? c.cx : c.cy;
+            const pxLo = towardSmaller ? centre + extent : centre - extent; // value = loVal here
+            const pxHi = towardSmaller ? centre - extent : centre + extent; // value = hiVal here
+            const v = linearInvert(px, pxLo, pxHi, loVal, hiVal);
+            if (v === undefined) return undefined;
+            return { ...ctx.datum, [ch.field]: v };
+        }
+    });
+}
+
+/**
+ * resize — magnitude transform. Inversion: radial — the gesture's radius
+ * (distance from the mark centre) inverts back to the channel's value, mirroring
+ * how the channel encodes value -> radius. The radial counterpart to `slide`
+ * ("outside grows, inside shrinks"); prefer `slide` for a magnitude channel — it
+ * reads as a linear drag. Usually placed on `size`.
  * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */
@@ -236,7 +325,7 @@ export function resize(options = {}) {
             const ch = ctx.channels[0];
             // resolveMarkNode, not ctx.node: a plane-pick gesture (nearest/sweep)
             // carries no node, so reading ctx.node directly made this universal
-            // edit silently dead under any pick but 'direct'. drag() and rotate()
+            // edit silently dead under any pick but 'direct'. move() and rotate()
             // resolve the same way.
             const c = markCenter(resolveMarkNode(ctx));
             if (!ch || !ch.scale || !ch.scale.invertible || !c) return undefined;
@@ -247,9 +336,10 @@ export function resize(options = {}) {
 }
 
 /**
- * rotate — angular edit: the pointer's ANGLE about a pivot inverts back to the
- * channel's value, mirroring how the channel encodes value -> degrees. It is the
- * angular sibling of `resize` (which inverts the pointer's radius): the
+ * rotate — angular transform. Inversion: angular — the pointer's ANGLE about a
+ * pivot inverts back to the channel's value, mirroring how the channel encodes
+ * value -> degrees. It is the angular sibling of `resize` (which inverts the
+ * pointer's radius): the
  * gesture-geometry half is atan2; the data half goes through the SAME channel
  * scale (its `range` is in degrees), so encode and edit stay exact inverses.
  *
@@ -326,8 +416,9 @@ export function rotate(options = {}) {
 }
 
 /**
- * cycle — discrete edit: advance the channel to the next value in its domain.
- * Usually placed on an ordinal `color`. Needs a stable domain (see notes).
+ * cycle — discrete transform. Inversion: step — advance the channel to the next
+ * value in its domain. Driven by a 'click'. Usually placed on an ordinal
+ * `color`. Needs a stable domain (see notes).
  * @param {import('../types').EditOptions} [options]
  * @returns {import('../types').Edit}
  */

@@ -32,7 +32,7 @@ const chart = Elicit({
         },
       },
       // One drag over BOTH axes, named so a controller can address it.
-      edits: [ drag({ name: "move", channels: ["x", "y"] }) ],
+      edits: [ move({ name: "move", channels: ["x", "y"] }) ],
     }),
   ],
 });
@@ -71,7 +71,7 @@ const placeKnob = () => {
   knob.style.left = ((d.x - dx[0]) / (dx[1] - dx[0]) * 100) + "%";
   knob.style.top = (100 - (d.y - dy[0]) / (dy[1] - dy[0]) * 100) + "%";
 };
-let move = null;
+let handle = null;
 const toData = (ev) => {
   const r = pad.getBoundingClientRect();
   const fx = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
@@ -80,12 +80,12 @@ const toData = (ev) => {
 };
 pad.addEventListener("pointerdown", (ev) => {
   pad.setPointerCapture(ev.pointerId);
-  move = chart.control("move", i);
-  move.begin();
-  move.set(toData(ev));
+  handle = chart.control("move", i);
+  handle.begin();
+  handle.set(toData(ev));
 });
-pad.addEventListener("pointermove", (ev) => { if (move) move.set(toData(ev)); });
-const stop = () => { if (move) { move.end(); move = null; } };
+pad.addEventListener("pointermove", (ev) => { if (handle) handle.set(toData(ev)); });
+const stop = () => { if (handle) { handle.end(); handle = null; } };
 pad.addEventListener("pointerup", stop);
 pad.addEventListener("pointercancel", stop);
 

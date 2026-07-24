@@ -12,8 +12,8 @@ mount(Elicit({
       fill: "#0d9488",
       size: 8,
       channels: {
-        x: { field: "x", edit: drag() },
-        y: { field: "y", edit: drag() },
+        x: { field: "x", edit: move() },
+        y: { field: "y", edit: move() },
       },
       edits: [ create({ defaults: { group: "a" } }) ],
       constraints: [ count({ max: 8 }) ],   // dataset invariant: at most 8

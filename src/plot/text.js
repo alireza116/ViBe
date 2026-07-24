@@ -24,7 +24,7 @@
 //
 // A text mark is EDITABLE like any other: a direct-pick edit on it makes the label
 // interactive (the renderer wires drag + click and, on the content-edit path,
-// double-click to retype). `drag({ channels:['x','y'] })` repositions it; a value
+// double-click to retype). `move({ channels:['x','y'] })` repositions it; a value
 // channel carrying the same field as `text` turns it into a draggable numeric
 // readout; `cycle()` advances a categorical label; `rotate()` on `angle` spins it;
 // `editText()` (edit/basic.js) retypes its content.

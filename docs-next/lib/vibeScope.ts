@@ -2,7 +2,7 @@
 
 /**
  * Live-example scope: what an example on the docs site can name without importing.
- * Universal edits are bare (`drag()`); scoped namespaces stay under `edit.*`.
+ * Universal edits are bare (`move()`); scoped namespaces stay under `edit.*`.
  */
 import * as vibe from '@vibe';
 import * as d3 from 'd3';
