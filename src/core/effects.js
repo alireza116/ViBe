@@ -8,7 +8,12 @@
 //      `stroke`, wiping a mark's own stroke). Effects use only:
 //        · element effects  — CSS `filter`/`transform` on the mark element itself
 //                             (not a style channel, so _applyStyle never touches it)
-//        · overlay effects  — extra `guide` scene nodes drawn around/over the mark
+//        · overlay effects  — extra scene nodes tagged `effect: true` (and
+//                             `guide` so they stay non-interactive) that the
+//                             renderer paints in the topmost layer, above marks
+//                             and guides. Without the `effect` pin, a highlight
+//                             rect would land in the behind-marks guide-region
+//                             layer and draw under the mark it outlines.
 //   2. Customizable — every effect's appearance is data here, merged over the
 //      caller's `effects` spec, so a chart can restyle or disable each one.
 //

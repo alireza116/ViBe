@@ -723,6 +723,9 @@ export interface FeatureNode {
   opacity?: number;
   pointerEvents?: string;
   guide?: boolean;
+  // Marks the node for the topmost paint layer (interaction overlays: proximity
+  // ring, select outline). Drawn above marks and guides. See core/effects.js.
+  effect?: boolean;
   // Marks the node for the background render layer (axes/gridlines), drawn behind
   // interactive marks by the renderer.
   background?: boolean;
@@ -1105,7 +1108,7 @@ export interface RenderContext {
   container: HTMLElement;
   // The scene to draw: `scene.children` is a flat array of FeatureNodes in
   // features/parts array order (later = on top among marks). Renderers may still
-  // pin `background` / `guide` nodes into role layers around that stack.
+  // pin `background` / `guide` / `effect` nodes into role layers around that stack.
   scene: { children: FeatureNode[] };
   width: number;
   height: number;

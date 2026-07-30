@@ -361,13 +361,18 @@ export function selectEffectNodes(info, marks, select) {
     const { color, ring, highlight } = select;
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
+    // `effect: true` pins these into the topmost paint layer (above marks and
+    // guides). `guide: true` keeps them on the non-interactive guide path the
+    // engine already stamps — without `effect`, a highlight rect would fall
+    // into guideRegions and draw *under* the marks.
+    const tag = { guide: true, effect: true, pointerEvents: 'none' };
 
     // Snap zone at the pointer.
     if (info.px != null && info.py != null && info.threshold != null) {
         nodes.push({
             type: 'circle', cx: info.px, cy: info.py, r: info.threshold,
             fill: 'none', stroke: color, strokeDasharray: ring.dash,
-            strokeWidth: ring.width, opacity: ring.opacity, guide: true
+            strokeWidth: ring.width, opacity: ring.opacity, ...tag
         });
     }
 
@@ -383,14 +388,14 @@ export function selectEffectNodes(info, marks, select) {
             nodes.push({
                 type: 'circle', cx: mark.cx, cy: mark.cy, r: (mark.r || 5) + pad,
                 fill: 'none', stroke: color, strokeWidth: highlight.width,
-                opacity: highlight.opacity, guide: true
+                opacity: highlight.opacity, ...tag
             });
         } else if (mark && mark.type === 'rect') {
             nodes.push({
                 type: 'rect', x: mark.x - pad, y: mark.y - pad,
                 width: mark.width + pad * 2, height: mark.height + pad * 2,
                 fill: 'none', stroke: color, strokeWidth: highlight.width,
-                opacity: highlight.opacity, guide: true
+                opacity: highlight.opacity, ...tag
             });
         } else if (mark && mark.type === 'line') {
             // A tick is a line: outline its span (a thin padded box around the
@@ -402,7 +407,7 @@ export function selectEffectNodes(info, marks, select) {
                 width: Math.abs(mark.x2 - mark.x1) + pad * 2,
                 height: Math.abs(mark.y2 - mark.y1) + pad * 2,
                 fill: 'none', stroke: color, strokeWidth: highlight.width,
-                opacity: highlight.opacity, guide: true
+                opacity: highlight.opacity, ...tag
             });
         }
     }

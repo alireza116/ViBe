@@ -88,11 +88,10 @@ export class D3Renderer {
     };
 
     // Role layers are fixed (background → guide regions → marks → guide
-    // front). Within the mark layer, features/parts array order is z-order —
-    // type joins still bind by shape, then we reorder DOM.
-    const { background, guideRegions, marks, guideFront } = partitionScene(
-      scene.children,
-    );
+    // front → effects). Within the mark layer, features/parts array order is
+    // z-order — type joins still bind by shape, then we reorder DOM.
+    const { background, guideRegions, marks, guideFront, effects: effectNodes } =
+      partitionScene(scene.children);
     /** @param {any[]} list @param {string} t */
     const ofType = (list, t) =>
       list.filter((/** @type {any} */ n) => n.type === t);
@@ -135,17 +134,22 @@ export class D3Renderer {
     });
     this._orderMarkLayer(layers.marks, marks);
 
-    // Rules / constraint ticks / proximity rings / guide labels — in front.
+    // Rules / constraint ticks / guide labels — in front of marks.
     this._drawGuideFront(layers.guideFront, guideFront);
 
+    // Interaction overlays (proximity ring, select outline) — above everything.
+    this._drawEffects(layers.effects, effectNodes);
+
     // In plane-on-top (proximity) mode the plane must sit above the marks and
-    // own all pointer events; the marks become purely visual. Guides already
-    // use pointer-events:none, so they remain visible through the plane.
+    // own all pointer events; the marks become purely visual. Guides/effects
+    // already use pointer-events:none, so they remain visible through the plane.
     if (planeOnTop) {
       // Silence the grab overlays too (.mark-hit): in proximity mode the plane owns
       // every gesture, and a leftover hit rect would swallow it just like a mark.
       g.selectAll(".mark, .mark-hit").style("pointer-events", "none");
       plane.raise().style("cursor", planeCursor || "pointer");
+      // Keep effect overlays above the hit plane (they're pointer-transparent).
+      layers.effects.raise();
     }
   }
 
@@ -196,10 +200,12 @@ export class D3Renderer {
       // see plot/axis.js) render here so marks always sit on top of them.
       g.append("g").attr("class", "bg-layer");
       // Guide regions behind marks; mark-layer holds ordinary marks in array
-      // z-order; guide-front holds rules / rings / guide labels on top.
+      // z-order; guide-front holds rules / guide labels; effects hold
+      // interaction overlays (proximity ring / select outline) on top of all.
       g.append("g").attr("class", "guide-back-layer");
       g.append("g").attr("class", "mark-layer");
       g.append("g").attr("class", "guide-front-layer");
+      g.append("g").attr("class", "effects-layer");
     }
 
     // Sizing runs every render (not just on create) so 'reflow' picks up new
@@ -242,11 +248,11 @@ export class D3Renderer {
 
   /**
    * Role-layer groups under the scene container. Order in the DOM is the
-   * paint stack: plane → bg → guide-back → marks → guide-front.
+   * paint stack: plane → bg → guide-back → marks → guide-front → effects.
    * Only mutates the layer list when a group is first created — re-appending
    * every frame would move focused mark nodes and break keyboard editing.
    * @param {any} g scene container
-   * @returns {{ bg: any, guideBack: any, marks: any, guideFront: any }}
+   * @returns {{ bg: any, guideBack: any, marks: any, guideFront: any, effects: any }}
    */
   _sceneLayers(g) {
     const hadMarkLayer = !g.select("g.mark-layer").empty();
@@ -265,6 +271,7 @@ export class D3Renderer {
     const guideBack = ensure("guide-back-layer");
     const marks = ensure("mark-layer");
     const guideFront = ensure("guide-front-layer");
+    const effects = ensure("effects-layer");
     // Pre-layer renderers joined marks as direct children of `g`. Drop those
     // orphans once when the mark-layer is introduced so they can't ghost.
     if (!hadMarkLayer) {
@@ -282,11 +289,12 @@ export class D3Renderer {
         guideBack.node(),
         marks.node(),
         guideFront.node(),
+        effects.node(),
       ]) {
         if (el) root.appendChild(/** @type {Node} */ (el));
       }
     }
-    return { bg, guideBack, marks, guideFront };
+    return { bg, guideBack, marks, guideFront, effects };
   }
 
   /**
@@ -755,8 +763,9 @@ export class D3Renderer {
 
   /**
    * Non-interactive guide annotations in front of marks: lines (rules /
-   * constraint ticks), circles (proximity rings), paths, and text labels.
-   * Drawn in `guideFront` scene order so a rule's line stays with its label.
+   * constraint ticks), paths, and text labels. Drawn in `guideFront` scene
+   * order so a rule's line stays with its label. Interaction overlays
+   * (proximity ring / select outline) live in the effects layer instead.
    * @param {any} layer
    * @param {any[]} nodes
    */
@@ -819,7 +828,7 @@ export class D3Renderer {
     this._applyStyle(textSel, { fill: "black", opacity: 1 });
 
     // Type joins append in call order; restore scene order among guide-front
-    // siblings so a rule's stroke isn't covered by an earlier proximity ring.
+    // siblings so a rule's stroke isn't covered by an earlier circle.
     const order = new Map(
       nodes.map((/** @type {any} */ n, /** @type {number} */ i) => [n, i]),
     );
@@ -827,6 +836,60 @@ export class D3Renderer {
       .selectAll(
         "line.guide-line, circle.guide-circle, path.guide-path, text.guide-label",
       )
+      .filter((/** @type {any} */ d) => order.has(d))
+      .sort(
+        (/** @type {any} */ a, /** @type {any} */ b) =>
+          /** @type {number} */ (order.get(a)) -
+          /** @type {number} */ (order.get(b)),
+      );
+  }
+
+  /**
+   * Interaction-effect overlays (proximity snap ring, select outline). Topmost
+   * paint layer — above marks and guides. Nodes are circles (point highlight /
+   * snap ring) or rects (bar / tick outline); always pointer-transparent.
+   * @param {any} layer
+   * @param {any[]} nodes
+   */
+  _drawEffects(layer, nodes) {
+    /** @param {string} t */
+    const ofType = (t) =>
+      nodes.filter((/** @type {any} */ n) => n.type === t);
+
+    const circleSel = layer
+      .selectAll("circle.effect")
+      .data(ofType("circle"))
+      .join("circle")
+      .attr("class", "effect")
+      .style("pointer-events", "none");
+    this._geomCircle(circleSel);
+    this._applyStyle(circleSel, {
+      fill: "none",
+      stroke: "none",
+      strokeWidth: 1,
+      opacity: 1,
+    });
+
+    const rectSel = layer
+      .selectAll("rect.effect")
+      .data(ofType("rect"))
+      .join("rect")
+      .attr("class", "effect")
+      .style("pointer-events", "none");
+    this._geomRect(rectSel);
+    this._applyStyle(rectSel, {
+      fill: "none",
+      stroke: "none",
+      strokeWidth: 1,
+      opacity: 1,
+    });
+
+    // Type joins append in call order; restore scene order (ring under outline).
+    const order = new Map(
+      nodes.map((/** @type {any} */ n, /** @type {number} */ i) => [n, i]),
+    );
+    layer
+      .selectAll("circle.effect, rect.effect")
       .filter((/** @type {any} */ d) => order.has(d))
       .sort(
         (/** @type {any} */ a, /** @type {any} */ b) =>

@@ -1,5 +1,5 @@
 {
-  "name": "elicit-js",
+  "name": "elicitjs",
   "version": "0.1.0",
   "description": "Declarative, grammar-of-graphics-inspired library for interactive visual belief elicitation.",
   "type": "module",
@@ -28,6 +28,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "prepublishOnly": "npm run build:lib",
     "dev": "npm run dev --prefix ../elicitjs-docs",
     "build:docs": "npm run build --prefix ../elicitjs-docs",
     "start:docs": "npm run start --prefix ../elicitjs-docs",

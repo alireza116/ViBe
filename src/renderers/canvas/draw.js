@@ -237,7 +237,7 @@ function paintMark(ctx, n) {
 }
 
 /**
- * Paint a guide-front node (rules, ticks, rings, labels). Defaults match the
+ * Paint a guide-front node (rules, ticks, labels). Defaults match the
  * D3 guide draws; per-node stroke/fill win via styleOf.
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} n
@@ -262,10 +262,28 @@ function paintGuideFront(ctx, n) {
 }
 
 /**
+ * Paint an interaction-effect overlay (proximity ring / select outline).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {any} n
+ */
+function paintEffect(ctx, n) {
+    switch (n.type) {
+        case 'circle':
+            circle(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 });
+            break;
+        case 'rect':
+            rect(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 });
+            break;
+        default:
+            break;
+    }
+}
+
+/**
  * Paint the whole scene in z-order. Role layers (background → guide regions →
- * marks → guide front) are fixed; within the mark layer, `scene.children` order
- * is z-order (later features / parts on top). Draw order IS z-order on a canvas
- * (last wins).
+ * marks → guide front → effects) are fixed; within the mark layer,
+ * `scene.children` order is z-order (later features / parts on top). Draw
+ * order IS z-order on a canvas (last wins).
  * @param {CanvasRenderingContext2D} ctx
  * @param {any[]} children scene nodes
  * @param {{ images: Map<string, any>, requestRepaint: () => void, theme?: any }} io
@@ -274,7 +292,7 @@ export function paintScene(ctx, children, io) {
     // The theme's font tokens for this pass (read by text()); null family keeps the
     // pre-theme 'sans-serif' default so an un-themed chart is unchanged.
     activeFont = (io && io.theme && io.theme.font) || null;
-    const { background, guideRegions, marks, guideFront } = partitionScene(children);
+    const { background, guideRegions, marks, guideFront, effects } = partitionScene(children);
 
     // Background: tiles (floor), then legend chips/ramps + axis chrome, then
     // vector basemap paths (geoBasemap) so they sit above grids the way they did
@@ -297,6 +315,9 @@ export function paintScene(ctx, children, io) {
     // Ordinary marks in features/parts array order.
     marks.forEach((n) => paintMark(ctx, n));
 
-    // Rules, constraint ticks, proximity rings, guide labels — in scene order.
+    // Rules, constraint ticks, guide labels — in scene order.
     guideFront.forEach((n) => paintGuideFront(ctx, n));
+
+    // Interaction overlays (proximity ring, select outline) — above everything.
+    effects.forEach((n) => paintEffect(ctx, n));
 }

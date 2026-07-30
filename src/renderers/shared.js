@@ -47,21 +47,28 @@ export const STYLE_FIELDS = [
 ];
 
 /**
- * Partition scene nodes into paint layers. Role flags (`background`, `guide`)
- * pin axes and edit guides; among ordinary marks, **array order is z-order**
- * (later features / composite parts / nodes within a feature paint on top).
+ * Partition scene nodes into paint layers. Role flags (`background`, `guide`,
+ * `effect`) pin axes, edit guides, and interaction overlays; among ordinary
+ * marks, **array order is z-order** (later features / composite parts / nodes
+ * within a feature paint on top).
+ *
+ * Paint stack (bottom → top):
+ *   background → guideRegions → marks → guideFront → effects
  *
  * Guide rects (shaded bands) stay behind marks; every other guide node (rules,
- * constraint ticks, proximity rings, labels) goes to `guideFront` in scene order
- * so lines/text aren't dropped. Legend chips/ramps use `background` (same layer
- * as axes) so a non-interactive legend sits behind marks without stealing hits.
+ * constraint ticks, labels) goes to `guideFront` in scene order so lines/text
+ * aren't dropped. Interaction-effect overlays (`effect: true` — proximity ring,
+ * select outline) always paint last, above marks and guides. Legend chips/ramps
+ * use `background` (same layer as axes) so a non-interactive legend sits behind
+ * marks without stealing hits.
  *
  * @param {any[]} children `scene.children`
  * @returns {{
  *   background: any[],
  *   guideRegions: any[],
  *   marks: any[],
- *   guideFront: any[]
+ *   guideFront: any[],
+ *   effects: any[]
  * }}
  */
 export function partitionScene(children) {
@@ -73,9 +80,17 @@ export function partitionScene(children) {
     const marks = [];
     /** @type {any[]} */
     const guideFront = [];
+    /** @type {any[]} */
+    const effects = [];
 
     for (const n of children || []) {
         if (!n) continue;
+        // Effects win over guide/background: a select outline is also tagged
+        // `guide` for the engine's guide pass, but it must paint on top.
+        if (n.effect) {
+            effects.push(n);
+            continue;
+        }
         if (n.background) {
             background.push(n);
             continue;
@@ -87,5 +102,5 @@ export function partitionScene(children) {
         }
         marks.push(n);
     }
-    return { background, guideRegions, marks, guideFront };
+    return { background, guideRegions, marks, guideFront, effects };
 }

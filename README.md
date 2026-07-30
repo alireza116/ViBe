@@ -13,6 +13,8 @@ y: { field: "n", edit: drag() }
 - **Architecture** — see [ARCHITECTURE.md](ARCHITECTURE.md) for how the library is layered and why.
 - **Documentation** — the sibling repo `../elicitjs-docs`, a live-editable docs site that is also the test suite.
 
+> **Alpha.** ElicitJS is pre-1.0 and under active development. Expect breaking changes between minor versions (`0.1.x` → `0.2.0`); patch releases stay compatible. Pin with `~0.1.0` if you want only patches.
+
 ---
 
 ## Install
@@ -20,13 +22,13 @@ y: { field: "n", edit: drag() }
 ElicitJS is ESM and needs a bundler (Vite, webpack, …) or an import map. Runtime dependency: `d3`.
 
 ```bash
-npm install elicit-js
+npm install elicitjs
 # or from a checkout / GitHub:
 # npm install github:elicitjs/elicitjs
 ```
 
 ```javascript
-import * as elicit from "elicit-js";
+import * as elicit from "elicitjs";
 const { Elicit, plot, edit, constraints } = elicit;
 ```
 
@@ -39,7 +41,7 @@ npm run build:lib          # → dist/elicit.js (+ sourcemap); d3 stays external
 ```
 
 ```javascript
-import * as elicit from "elicit-js/dist";
+import * as elicit from "elicitjs/dist";
 ```
 
 ```html
@@ -59,7 +61,7 @@ import * as elicit from "elicit-js/dist";
 A budget allocation: four draggable bars that must always sum to 100.
 
 ```javascript
-import * as elicit from "elicit-js";
+import * as elicit from "elicitjs";
 const { barY, ruleY } = elicit.plot;
 const { drag } = elicit.edit;
 const { clamp, maintainSum } = elicit.constraints;

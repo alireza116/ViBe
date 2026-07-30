@@ -182,7 +182,7 @@ The docs are also the **test suite**: `npm run verify:browser` boots this site, 
 **Reuse in another Next app** (e.g. a lab site): copy components from `elicitjs-docs/`, or (when published) import from a docs-ui export:
 
 ```javascript
-import { DocShell, ExampleLive, Section, SITE, createElicitScope } from "elicit-js/docs-ui";
+import { DocShell, ExampleLive, Section, SITE, createElicitScope } from "elicitjs/docs-ui";
 ```
 
 Chart surfaces are client components (`'use client'`); the lab page that embeds them must be a client boundary too.
