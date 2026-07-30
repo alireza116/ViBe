@@ -55,10 +55,10 @@ function domainExtent(scale) {
 /**
  * @param {any} options
  * @param {string | null} forcedOrientation
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildWaffle(options, forcedOrientation) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'waffle', allow: ['orientation', 'unit', 'multiple', 'gap', 'shape', 'showEmpty', 'emptyFill'] });
     const {
         channels = {},
         id,
@@ -257,7 +257,7 @@ function buildWaffle(options, forcedOrientation) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function waffle(options = {}) {
     return buildWaffle(options, null);
@@ -265,7 +265,7 @@ export function waffle(options = {}) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function waffleY(options = {}) {
     return buildWaffle(options, 'vertical');
@@ -273,7 +273,7 @@ export function waffleY(options = {}) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function waffleX(options = {}) {
     return buildWaffle(options, 'horizontal');

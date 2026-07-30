@@ -8,11 +8,12 @@
     "moduleResolution": "Bundler",
     "target": "ESNext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
-    // Declares ImportMeta.env, so the dev guards can reference `import.meta.env.DEV`
-    // in the PLAIN form Vite statically recognizes. A JSDoc cast around import.meta
-    // hides the reference from Vite's transform, leaving env undefined at runtime and
-    // the guards permanently dead.
-    "types": ["vite/client"]
+    // No ambient @types packages. The library targets the browser and must not
+    // typecheck against Node or Vite globals it won't have at runtime — that is
+    // exactly how the old `import.meta.env.DEV` guards passed tsc while being dead
+    // in every non-Vite consumer. The one deliberate exception is the guarded
+    // `process.env.NODE_ENV` read in core/dev.js, which carries a local @ts-ignore.
+    "types": []
   },
   "include": ["src/**/*"]
 }

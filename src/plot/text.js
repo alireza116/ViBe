@@ -141,10 +141,10 @@ export function textNodeAt(scales, channels, d, i, px, py, opts = {}) {
 /**
  * @param {any} options
  * @param {'x' | 'y' | null} forcedAxis the single positional axis (textX/textY)
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildText(options, forcedAxis) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'text', allow: ['format'] });
     const { channels = {}, id, edits, constraints, format: formatOpt } = opts;
     const canEditText = hasEditText(edits, channels);
     const format = resolveFormat(formatOpt);
@@ -184,7 +184,7 @@ function buildText(options, forcedAxis) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function text(options = {}) {
     return buildText(options, null);
@@ -193,7 +193,7 @@ export function text(options = {}) {
 /**
  * A 1-D label along x: value on x, parked at the vertical centre.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function textX(options = {}) {
     return buildText(options, 'x');
@@ -202,7 +202,7 @@ export function textX(options = {}) {
 /**
  * A 1-D label along y: value on y, parked at the horizontal centre.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function textY(options = {}) {
     return buildText(options, 'y');

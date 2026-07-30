@@ -261,7 +261,15 @@ export function positionOnScale(scale, value, fallback) {
     }
     // Temporal: coerce the value to a Date so string/epoch data still positions.
     if (scale.temporal) return scale(toDate(value));
-    return scale(value);
+    // A row missing this field yields scale(undefined) -> NaN, and an SVG attribute
+    // of NaN is dropped by the browser, so the mark VANISHES with no error. The band
+    // and point branches above already null-check; this one didn't.
+    if (value == null) return fallback;
+    const p = scale(value);
+    // Only a NUMERIC result can be a broken coordinate. This helper also carries
+    // non-positional channels (fill returns "steelblue"), so anything non-numeric
+    // passes through untouched.
+    return typeof p === 'number' && !Number.isFinite(p) ? fallback : p;
 }
 
 /**

@@ -86,10 +86,10 @@ function resolveExtent(axis, channels, scales, scale, datum, key, forcedValue, f
 /**
  * @param {any} options
  * @param {'x' | 'y' | null} forcedValueAxis which axis is forced to baseline→value
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildRect(options, forcedValueAxis) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'rect', allow: [] });
     const { channels = {}, id, edits, constraints } = opts;
 
     const xKey = (channels.x && channels.x.field) || 'x';
@@ -150,7 +150,7 @@ function buildRect(options, forcedValueAxis) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function rect(options = {}) {
     return buildRect(options, null);
@@ -159,7 +159,7 @@ export function rect(options = {}) {
 /**
  * Value on x (baseline→value), the other axis a span/band — a horizontal bar/histogram.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function rectX(options = {}) {
     return buildRect(options, 'x');
@@ -168,7 +168,7 @@ export function rectX(options = {}) {
 /**
  * Value on y (baseline→value), the other axis a span/band — a vertical bar/histogram.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function rectY(options = {}) {
     return buildRect(options, 'y');

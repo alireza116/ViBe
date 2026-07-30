@@ -66,13 +66,13 @@ function stackOffsets(data, catKey, valueKey, seriesField) {
 /**
  * @param {any} options
  * @param {string | null} forcedOrientation
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildBar(options, forcedOrientation) {
     // Desugar top-level style shorthands (e.g. the legacy `fill: 'steelblue'`)
     // into the channels as constant channels, so bar reads style the same way
     // every mark does. Explicit `channels.fill` still wins.
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'bar', allow: ['orientation', 'stack', 'series', 'z'] });
     const {
         channels = {},
         id,
@@ -220,7 +220,7 @@ function buildBar(options, forcedOrientation) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function bar(options = {}) {
     return buildBar(options, null);
@@ -228,7 +228,7 @@ export function bar(options = {}) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function barY(options = {}) {
     return buildBar(options, 'vertical');
@@ -236,7 +236,7 @@ export function barY(options = {}) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function barX(options = {}) {
     return buildBar(options, 'horizontal');

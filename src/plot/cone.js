@@ -65,10 +65,10 @@ const clamp = (/** @type {number} */ v, /** @type {number} */ lo, /** @type {num
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function cone(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'cone', allow: ['samples', 'seed', 'wedge', 'sigma'] });
     const {
         channels = {},
         id,

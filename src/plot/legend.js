@@ -72,7 +72,7 @@ function estimateLabelWidth(values, format, fontSize) {
  * no channel map; its chrome (stroke/fill/fontSize) are plain options resolved
  * against the theme's legend tokens at build time.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function legend(options = {}) {
     const {
@@ -152,6 +152,7 @@ export function legend(options = {}) {
     return {
         id,
         isLegend: true,
+        views: 'scale',
         channel,
         anchor,
         orient,

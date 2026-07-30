@@ -30,12 +30,12 @@ import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
 /**
  * @param {any} options
  * @param {'x' | 'y' | null} forcedValueAxis which axis carries the value
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildRule(options, forcedValueAxis) {
     // Desugar style shorthands (stroke, strokeWidth, opacity) into constant
     // channels, so a rule reads style the same way every mark does.
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'rule', allow: ['strokeDasharray', 'discreteScale'] });
     const { channels = {}, id, edits, constraints, strokeDasharray, discreteScale } = opts;
 
     // Span mode: a pair of endpoint channels on one axis draws a segment between
@@ -140,7 +140,7 @@ function buildRule(options, forcedValueAxis) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function rule(options = {}) {
     return buildRule(options, null);
@@ -149,7 +149,7 @@ export function rule(options = {}) {
 /**
  * A horizontal reference line at a y value (spans the full width).
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function ruleY(options = {}) {
     return buildRule(options, 'y');
@@ -158,7 +158,7 @@ export function ruleY(options = {}) {
 /**
  * A vertical reference line at an x value (spans the full height).
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function ruleX(options = {}) {
     return buildRule(options, 'x');

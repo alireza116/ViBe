@@ -610,6 +610,92 @@ export interface CompositeOptions {
   [key: string]: any;
 }
 
+/**
+ * What a mark factory returns — the feature object the engine consumes.
+ *
+ * This contract used to live ONLY as prose at the top of plot/mark.js, with every
+ * factory annotated `@returns {any}`. That is how `rule` silently dropped `edits`
+ * and `constraints` for a long time: a mark could accept an option and never pass
+ * it on, and nothing caught it. Typing the return makes that a typecheck failure.
+ *
+ * A mark NEVER owns data: `Elicit` owns the chart's one dataset and hands the rows
+ * to `build`. There is deliberately no `data` and no `onChange` here.
+ */
+export interface Mark {
+  /**
+   * The one required method: emit this mark's scene nodes for the current rows.
+   * Resolve every position/style through encodeChannel / resolveStyle.
+   */
+  build(
+    currentData: Datum[],
+    scales: ScaleMap,
+    width: number,
+    height: number
+  ): FeatureNode[];
+
+  /** The channel map — also the source resolveScales reads to build scales. */
+  channels?: Channels;
+  /** Author-supplied id. Optional, so dev messages fall back to `markName`. */
+  id?: string;
+  /** Mark-level (joint / arbitrary) edits; channel-level ones live on the channel. */
+  edits?: Edit[];
+  /** Data invariants; the engine PROMOTES these into the dataset-wide set. */
+  constraints?: Constraint[];
+
+  /**
+   * What this mark needs from a DISCRETE axis: 'band' (bar/tick — an interval) or
+   * 'point' (dot/line — a tick). A mark that merely spans leaves it undefined so a
+   * composite can stamp its own.
+   */
+  discreteScale?: 'band' | 'point';
+  /** Value field names the edit/constraint layer reads back, derived from channels. */
+  xKey?: string;
+  yKey?: string;
+
+  /** The factory name, stamped for dev messages (`bar()` beats `mark "undefined"`). */
+  markName?: string;
+
+  /** Line-family series grouping. See plot/line.js. */
+  seriesKey?: string | null;
+  order?: string;
+  samples?: number;
+  supportsSeries?: boolean;
+
+  /** Capability flags the engine's scope guard reads (see SCOPE_CAPABILITY). */
+  supportsGeo?: boolean;
+  supportsWaffle?: boolean;
+  supportsArc?: boolean;
+
+  /**
+   * What this feature is a view OF.
+   *
+   *   'data'  (default) — a data mark: its channels name COLUMNS of the dataset.
+   *   'scale' — a GUIDE (axis, grid, legend): it draws a scale, not rows. It has
+   *             no channel map and no fields of its own, so an edit attached to it
+   *             recovers its target field from the scale instead.
+   *
+   * The distinction already existed, spelled as three separate booleans tested in
+   * disjunctions across the engine (`isAxis || isGrid || isLegend`). Naming it lets
+   * edit/route.js ask the question directly rather than inferring guide-ness from
+   * an absent channel map.
+   */
+  views?: 'data' | 'scale';
+
+  /** Which guide, for the engine's more specific checks. Implies `views: 'scale'`. */
+  isAxis?: boolean;
+  isGrid?: boolean;
+  isLegend?: boolean;
+
+  /** Paint order hint ('background' puts a guide under the data marks). */
+  layer?: string;
+
+  /**
+   * Open by design: a mark may carry extra fields a driver or the engine reads
+   * (a legend's `measure`, a geo mark's projection hooks).
+   */
+  [key: string]: any;
+}
+
 export interface FeatureNode {
   type: 'circle' | 'rect' | 'line' | 'path' | 'text' | 'image';
   // Connecting-path geometry (line mark): the ordered pixel points and the curve

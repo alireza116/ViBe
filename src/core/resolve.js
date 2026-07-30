@@ -31,18 +31,9 @@ import {
   axisOf,
 } from "./encoding.js";
 
-const DEV = !!(import.meta.env && import.meta.env.DEV);
-
-// Scales re-resolve on every render, so a dev warning would repeat forever. Warn
-// once per offending field/channel, the way elicit.js's guards do.
-/** @type {Set<string>} */
-const warnedOnce = new Set();
-/** @param {string} key @param {string} message */
-function warnOnce(key, message) {
-  if (warnedOnce.has(key)) return;
-  warnedOnce.add(key);
-  console.warn(message);
-}
+// Scales re-resolve on every render, so a warning would repeat forever — `warn`
+// dedups once per key. See core/dev.js for why this is not gated on a build flag.
+import { warn as warnOnce } from "./dev.js";
 
 /**
  * Bring the three forms a `scale` option can take to one shape.
@@ -119,10 +110,10 @@ export function resolveScales(features, dataset, spec, dims) {
       // bucket drop below) so a stray `scale`/`type` on it can't contaminate a
       // shared axis bucket's scaleOpt/measure.
       if (typeof chSpec.fn === "function" && chSpec.field == null) {
-        if (DEV && (chSpec.scale !== undefined || chSpec.type !== undefined)) {
+        if (chSpec.scale !== undefined || chSpec.type !== undefined) {
           warnOnce(
             `fn:${ch}`,
-            `[elicit] channel "${ch}" is derived ({ fn }) — its result is used ` +
+            `channel "${ch}" is derived ({ fn }) — its result is used ` +
               `as-is in visual space, so its "${chSpec.scale !== undefined ? "scale" : "type"}" ` +
               `is ignored. Drop it, or use a field channel if you want a scale.`,
           );
@@ -134,18 +125,16 @@ export function resolveScales(features, dataset, spec, dims) {
       // domain, the scale owns the range. Both used to live here, and a
       // leftover is invisible — the channel silently takes its default range
       // (a cone's degrees collapse to [0, 1]) and the chart draws, wrong.
-      if (DEV) {
-        for (const [key, where] of [
-          ["domain", "the spec's schema"],
-          ["range", "this channel's `scale`"],
-        ]) {
-          if (chSpec[key] === undefined) continue;
-          warnOnce(
-            `stray:${key}:${ch}`,
-            `[elicit] channel "${ch}" declares "${key}", which is ignored. Move it to ` +
-              `${where}: ${key === "range" ? `scale: { range: [...] }` : `schema: { <field>: { domain: [...] } }`}.`,
-          );
-        }
+      for (const [key, where] of [
+        ["domain", "the spec's schema"],
+        ["range", "this channel's `scale`"],
+      ]) {
+        if (chSpec[key] === undefined) continue;
+        warnOnce(
+          `stray:${key}:${ch}`,
+          `channel "${ch}" declares "${key}", which is ignored. Move it to ` +
+            `${where}: ${key === "range" ? `scale: { range: [...] }` : `schema: { <field>: { domain: [...] } }`}.`,
+        );
       }
 
       const a = ensure(bucketOf(ch));
@@ -175,16 +164,14 @@ export function resolveScales(features, dataset, spec, dims) {
     if (!a.fields.length && !hasData) continue;
 
     const entries = a.fields.map((f) => schema[f]).filter(Boolean);
-    if (DEV) {
-      for (const f of a.fields) {
-        if (schema[f]) continue;
-        warnOnce(
-          `schema:${f}:${bucket}`,
-          `[elicit] field "${f}" is encoded on channel "${bucket}" but not declared in ` +
-            `schema; inferring its type and domain from data. Declare it in the Elicit ` +
-            `spec's schema — the schema is the contract of the elicited dataset.`,
-        );
-      }
+    for (const f of a.fields) {
+      if (schema[f]) continue;
+      warnOnce(
+        `schema:${f}:${bucket}`,
+        `field "${f}" is encoded on channel "${bucket}" but not declared in ` +
+          `schema; inferring its type and domain from data. Declare it in the Elicit ` +
+          `spec's schema — the schema is the contract of the elicited dataset.`,
+      );
     }
     if (!entries.length && !hasData) {
       throw new Error(
@@ -202,10 +189,10 @@ export function resolveScales(features, dataset, spec, dims) {
     // 1. What the data IS. An explicit channel type overrides the schema, which
     //    overrides inference. Fields sharing an axis must agree.
     const declared = entries.map((e) => e.type).filter(Boolean);
-    if (DEV && new Set(declared).size > 1) {
+    if (new Set(declared).size > 1) {
       warnOnce(
         `measure:${bucket}`,
-        `[elicit] fields ${a.fields.map((f) => `"${f}"`).join(", ")} share channel "${bucket}" ` +
+        `fields ${a.fields.map((f) => `"${f}"`).join(", ")} share channel "${bucket}" ` +
           `but declare different schema types (${[...new Set(declared)].join(", ")}). ` +
           `Using "${declared[0]}".`,
       );

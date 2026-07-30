@@ -24,10 +24,10 @@ import { arcSpan, needleTriangle } from './polar.js';
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function needle(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'needle', allow: ['length', 'handleSize', 'baseWidth', 'arc', 'orient', 'start', 'end'] });
     const {
         channels = {},
         id,

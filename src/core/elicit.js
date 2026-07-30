@@ -14,12 +14,28 @@ import { resolveTheme } from './theme.js';
 import { autoAxes } from './axes.js';
 import { reserveLegends } from './legends.js';
 import { axisOf, pointerForChannel } from './encoding.js';
+import { warn } from './dev.js';
 
-// Dev-only builds get the capability guards below. `import.meta.env.DEV` must be
-// written PLAINLY: Vite only injects `import.meta.env` into a module that mentions
-// it in this exact form — wrapping `import.meta` in a JSDoc cast hides it from the
-// transform, leaving `env` undefined and every guard silently dead.
-const DEV = !!(import.meta.env && import.meta.env.DEV);
+// The capability guards below report through `warn(key, msg)` from core/dev.js —
+// on by default, deduped once per key, silenced with `setWarnings(false)`. They
+// used to be gated on a Vite-only `import.meta.env.DEV` constant, which made every
+// one of them dead on webpack/Next and stripped them from the built bundle; see
+// the header of core/dev.js. Never re-gate a guard on a bundler-specific global.
+/**
+ * How a mark is named in a dev message. `id` is an OPTIONAL author field, so most
+ * specs leave it unset and every guard that interpolated it read `mark "undefined"`.
+ * Prefer the author's id, fall back to the factory name `defineMark` stamps
+ * (`markName`), and only then to the anonymous form.
+ * @param {any} feature
+ * @returns {string}
+ */
+function markLabel(feature) {
+    if (!feature) return '(unknown mark)';
+    if (feature.id) return `"${feature.id}"`;
+    if (feature.markName) return `${feature.markName}()`;
+    return '(an unnamed mark)';
+}
+
 // Scope goes in the name: `edit.line.draw()` expects a line mark, `edit.arc.edge()`
 // an arc, and so on. Each scope names the mark capability that makes it work; a
 // mismatch is a silent no-op at runtime (the edit's `when` gate never fires), so
@@ -34,8 +50,6 @@ const SCOPE_CAPABILITY = {
     axis: { flag: 'isAxis', expects: 'an axis mark (axisX/axisY/axisRadial)' },
 };
 
-/** @type {Set<string>} */
-const warnedScope = new Set();
 /**
  * @param {any} feature
  * @param {import('../types').Edit[]} edits
@@ -45,17 +59,14 @@ function warnScopeMismatch(feature, edits) {
         if (!e.scope) continue;
         const cap = SCOPE_CAPABILITY[e.scope];
         if (!cap || feature[cap.flag]) continue;
-        const key = `${feature.id}:${e.scope}.${e.type}`;
-        if (warnedScope.has(key)) continue;
-        warnedScope.add(key);
-        console.warn(
-            `[elicit] edit.${e.scope}.${e.type}() is attached to a mark without ${e.scope} support ` +
-            `(mark "${feature.id}"). ${e.scope}-scoped edits expect ${cap.expects}; it may not behave.`
+        warn(
+            `${markLabel(feature)}:${e.scope}.${e.type}`,
+            `edit.${e.scope}.${e.type}() is attached to a mark without ${e.scope} support ` +
+            `(mark ${markLabel(feature)}). ${e.scope}-scoped edits expect ${cap.expects}; it may not behave.`
         );
     }
 }
 
-let warnedProjCartesian = false;
 /**
  * A projection chart replaces x/y placement for geo marks. Mixing ordinary
  * cartesian x/y channels on the same chart is unsupported in v1.
@@ -63,17 +74,17 @@ let warnedProjCartesian = false;
  * @param {import('../types').ScaleMap} scales
  */
 function warnProjectionCartesianMix(features, scales) {
-    if (warnedProjCartesian || !/** @type {any} */ (scales).projection) return;
+    if (!/** @type {any} */ (scales).projection) return;
     const offenders = features.filter((f) => {
         if (f.supportsGeo || f.isAxis || f.isGrid) return false;
         const ch = f.channels || {};
         return Object.keys(ch).some((name) => axisOf(name) && ch[name] && ch[name].scale !== null);
     });
     if (!offenders.length) return;
-    warnedProjCartesian = true;
-    console.warn(
-        `[elicit] spec.projection is set together with cartesian x/y channels on ` +
-        `${offenders.map((f) => `"${f.id}"`).join(', ')}. Projection charts use geo* marks ` +
+    warn(
+        `projcartesian:${offenders.map(markLabel).join(',')}`,
+        `spec.projection is set together with cartesian x/y channels on ` +
+        `${offenders.map(markLabel).join(', ')}. Projection charts use geo* marks ` +
         `(geoPoint, geoLine, …); mixing ordinary positional marks is unsupported.`
     );
 }
@@ -83,16 +94,17 @@ function warnProjectionCartesianMix(features, scales) {
 // click. Direct-pick edits are immune (routed to the touched node's feature alone).
 // So: a whole-dataset edit belongs on exactly one mark. Warn rather than branch —
 // the engine stays ignorant of specific edit types.
-let warnedPlaneDup = false;
 /** @param {any[]} features @param {(f: any) => import('../types').Edit[]} editsOf */
 function warnDuplicatePlaneEdits(features, editsOf) {
-    if (warnedPlaneDup) return;
     const owners = features.filter(f => editsOf(f).some(e => e.pick !== 'direct'));
     if (owners.length < 2) return;
-    warnedPlaneDup = true;
-    console.warn(
-        `[elicit] ${owners.length} marks carry a plane-pick edit over the one dataset ` +
-        `(marks ${owners.map(f => `"${f.id}"`).join(', ')}). A plane gesture fans to all ` +
+    // Keyed by the offending mark set, not a module-level boolean: a docs page
+    // renders many charts, and a single global one-shot meant the second broken
+    // chart on a page never reported at all.
+    warn(
+        `planedup:${owners.map(markLabel).join(',')}`,
+        `${owners.length} marks carry a plane-pick edit over the one dataset ` +
+        `(marks ${owners.map(markLabel).join(', ')}). A plane gesture fans to all ` +
         `of them, so a whole-dataset edit (create/remove/rotate/toggle) will apply once per ` +
         `mark. Declare it on exactly one.`
     );
@@ -108,7 +120,6 @@ function isDatasetCreator(e) {
     return e.target !== 'domain' && (CREATOR_TYPES.has(e.type) || e.cardinality === 'append');
 }
 
-const warnedCreateCap = new Set();
 /**
  * Creation writes dataset ROWS, so it only makes sense on a DATA MARK positioned by an
  * invertible axis (the mark-agnostic model: mint a datum from the scales, every mark
@@ -127,13 +138,12 @@ function warnCreateOnNonMark(feature, edits, scales) {
     for (const e of edits) {
         if (!isDatasetCreator(e)) continue;
         if (feature.supportsGeo) continue; // geo places via the projection, not a channel scale
-        const key = `${feature.id}:nomark:${e.type}`;
-        if (warnedCreateCap.has(key)) continue;
+        const key = `${markLabel(feature)}:nomark:${e.type}`;
 
         if (feature.isAxis || feature.isGrid) {
-            warnedCreateCap.add(key);
-            console.warn(
-                `[elicit] a create/${e.type} edit is on "${feature.id}", which is a guide (axis/grid), ` +
+            warn(
+                key,
+                `a create/${e.type} edit is on ${markLabel(feature)}, which is a guide (axis/grid), ` +
                 `not a data mark. Creation mints dataset rows; a guide edits the DOMAIN instead ` +
                 `(edit.axis.*). Move the create to a data mark.`
             );
@@ -145,9 +155,9 @@ function warnCreateOnNonMark(feature, edits, scales) {
             return s && s.invertible;
         });
         if (!anyInvertible) {
-            warnedCreateCap.add(key);
-            console.warn(
-                `[elicit] a create/${e.type} edit is on "${feature.id}", but none of its positional ` +
+            warn(
+                key,
+                `a create/${e.type} edit is on ${markLabel(feature)}, but none of its positional ` +
                 `channels (${names.join(', ')}) has an invertible scale — the pointer can't be ` +
                 `inverted to a datum, so the create is a no-op. Creation needs a data mark on an axis.`
             );
@@ -169,22 +179,110 @@ function warnCreateEmptyExtent(feature, edits, schema) {
     const ch = feature.channels || {};
     /** @type {string[]} */
     const spanFields = [];
+    // A span channel can exist without a `field` (an x1 given as a {value}); that
+    // endpoint has no field to seed, so drop it rather than printing "doesn't seed
+    // undefined".
     if (ch.x1 && ch.x2) spanFields.push(ch.x1.field, ch.x2.field);
     if (ch.y1 && ch.y2) spanFields.push(ch.y1.field, ch.y2.field);
-    if (!spanFields.length) return;
+    const named = spanFields.filter(Boolean);
+    if (!named.length) return;
     for (const e of edits) {
         if (!isDatasetCreator(e)) continue;
         const seeded = new Set(Object.keys(e.defaults || {}));
-        const missing = spanFields.filter((f) =>
+        const missing = named.filter((f) =>
             !seeded.has(f) && !(schema && schema[f] && schema[f].default !== undefined));
         if (!missing.length) continue;
-        const key = `${feature.id}:extent:${e.type}`;
-        if (warnedCreateCap.has(key)) continue;
-        warnedCreateCap.add(key);
-        console.warn(
-            `[elicit] create/${e.type} on the extent mark "${feature.id}" doesn't seed ${missing.join(', ')}, ` +
+        warn(
+            `${markLabel(feature)}:extent:${e.type}`,
+            `create/${e.type} on the extent mark ${markLabel(feature)} doesn't seed ${missing.join(', ')}, ` +
             `so a new row is minted with no extent (zero-size, invisible). Seed it via ` +
             `create({ defaults: { … } }) or a field default in the schema.`
+        );
+    }
+}
+
+/**
+ * How a constraint names itself in a dev message. `defineConstraint` stamps
+ * `constraintType`; a hand-written one is just a function, so fall back to its
+ * name and then to an anonymous form.
+ * @param {any} constraint
+ * @returns {string}
+ */
+function constraintLabel(constraint) {
+    if (!constraint) return '(unknown)';
+    if (constraint.constraintType) return `${constraint.constraintType}()`;
+    if (constraint.name) return `${constraint.name}()`;
+    return '(an anonymous constraint)';
+}
+
+/**
+ * Short, safe description of an unexpected value for a message — never stringifies
+ * something large or cyclic.
+ * @param {any} v
+ * @returns {string}
+ */
+function describe(v) {
+    if (v === null) return 'null';
+    if (Array.isArray(v)) return 'an array';
+    const t = typeof v;
+    if (t === 'object') return 'an object';
+    if (t === 'string') return `the string ${JSON.stringify(v.slice(0, 20))}`;
+    return `the ${t} ${String(v)}`;
+}
+
+// Edit types that map a POINTER POSITION back through a channel's scale, and so
+// genuinely require that scale to invert. Deliberately an ALLOWLIST: most edits
+// reach a value some other way and are perfectly happy on a non-invertible scale.
+// `cycle` steps scale.domain() (that is how a click cycles an ordinal fill —
+// docs-next/marks/symbol does exactly this), `toggle` flips a flag, `set` takes an
+// external value, `custom` is arbitrary. A denylist would have flagged all of them.
+const INVERTING_TYPES = new Set([
+    'move', 'moveSpan', 'resize', 'slide', 'rotate', 'brushSpan', 'brushRect', 'draw', 'sweep',
+]);
+
+/**
+ * THE dead-drag guard. An edit maps a gesture back through a channel's scale, so
+ * it can only write a value if that scale INVERTS. Attach `move()` to a colour or
+ * symbol channel — or to any scale d3 gives no `invert()` (ordinal, sequential,
+ * diverging) — and `invertChannel` returns undefined, `apply` returns an unchanged
+ * clone, that clone passes every constraint, and a no-op commits. The cursor turns
+ * editable, the drag feels alive, and NOTHING happens or is logged. It is the
+ * quietest failure in the library and the likeliest first-run frustration.
+ *
+ * `warnCreateOnNonMark` above covers this for datum-MINTING edits only, and it
+ * passes if ANY of x/y inverts. This covers the everyday surface (move, resize,
+ * slide, rotate, cycle) and reports per dead channel, so a `move` across x and y
+ * with a dead y is not silenced by a live x.
+ * @param {any} feature
+ * @param {import('../types').Edit[]} edits
+ * @param {import('../types').ScaleMap} scales
+ */
+function warnDeadEditChannels(feature, edits, scales) {
+    const markChannels = feature.channels || {};
+    for (const e of edits) {
+        if (!INVERTING_TYPES.has(e.type)) continue;
+        // A creator mints a whole row rather than inverting one channel, and has
+        // its own guard (warnCreateOnNonMark).
+        if (isDatasetCreator(e)) continue;
+        if (feature.supportsGeo) continue; // placed by the projection, not a channel scale
+        const names = e.channels || [];
+        if (!names.length) continue;
+        const dead = names.filter((n) => {
+            const spec = markChannels[n];
+            // No field means no column to write; warnMisplacedEdits reports that case.
+            if (!spec || spec.field == null) return false;
+            const s = /** @type {any} */ (scales)[n];
+            return s && !s.invertible;
+        });
+        if (!dead.length) continue;
+        warn(
+            `${markLabel(feature)}:dead:${e.type}:${dead.join(',')}`,
+            `${e.type}() on ${markLabel(feature)} edits channel${dead.length > 1 ? 's' : ''} ` +
+            `${dead.map((n) => `"${n}"`).join(', ')}, whose scale cannot be inverted ` +
+            `(${dead.map((n) => /** @type {any} */ (scales)[n].type || 'ordinal').join(', ')}). ` +
+            `An edit runs a gesture BACKWARD through the scale, so a non-invertible channel ` +
+            `silently does nothing. Edit a positional channel (x/y), or give the channel a ` +
+            `continuous, band or point scale.`
         );
     }
 }
@@ -613,7 +711,7 @@ export function Elicit(spec) {
         // reserved non-Scale key, so a legend/mark reads "the selected row" from the
         // same object it already gets, without a widened build() signature.
         /** @type {any} */ (scales).selection = selectionPrimary();
-        if (DEV) warnProjectionCartesianMix(features, scales);
+        warnProjectionCartesianMix(features, scales);
 
         // Plane-on-top mode: when an ACTIVE edit resolves its target from an
         // arbitrary pointer position (nearest/sweep/draw/brush), the plane must sit
@@ -631,7 +729,7 @@ export function Elicit(spec) {
             }
         }
 
-        if (DEV) warnDuplicatePlaneEdits(features, activeEdits);
+        warnDuplicatePlaneEdits(features, activeEdits);
 
         // The committed rows are ALWAYS what the marks draw. A hover/drag preview no
         // longer substitutes the dataset (that made committed marks jump/flicker —
@@ -643,10 +741,12 @@ export function Elicit(spec) {
             const nodes = feature.build(currentData, scales, innerWidth, innerHeight);
             featureNodes[feature.id] = nodes;
 
-            if (DEV) warnScopeMismatch(feature, collectEdits(feature));
-            if (DEV) warnMisplacedEdits(feature);
-            if (DEV) warnCreateOnNonMark(feature, collectEdits(feature), scales);
-            if (DEV) warnCreateEmptyExtent(feature, collectEdits(feature), liveSpec.schema);
+            const declaredEdits = collectEdits(feature);
+            warnScopeMismatch(feature, declaredEdits);
+            warnMisplacedEdits(feature, markLabel);
+            warnCreateOnNonMark(feature, declaredEdits, scales);
+            warnCreateEmptyExtent(feature, declaredEdits, liveSpec.schema);
+            warnDeadEditChannels(feature, declaredEdits, scales);
 
             // A feature with an ACTIVE direct-pick edit is interactive on its marks,
             // so the renderer should show an editable cursor on them. Plane-pick
@@ -795,7 +895,7 @@ export function Elicit(spec) {
     const computeEdit = (feature, edit, event, index) => {
         const currentData = dataset;
         const markChannels = feature.channels || {};
-        const resolved = resolveChannels(edit.channels, markChannels, scales);
+        const resolved = resolveChannels(edit.channels, markChannels, scales, feature.views === 'scale');
         const ctx = {
             data: currentData,
             datum: index != null ? currentData[index] : undefined,
@@ -900,7 +1000,24 @@ export function Elicit(spec) {
         for (const constraint of invariants) {
             const r = constraint(newData, currentData, cctx);
             if (r === false) { rejected = true; break; }
-            if (r !== true && r !== undefined) newData = r;
+            if (r === true || r === undefined) continue;
+            // A constraint may GATE (false) or REPAIR (the corrected rows). Anything
+            // else is a bug in the constraint, and unvalidated it becomes the dataset:
+            // a number or object makes `for (const d of dataset)` throw from inside
+            // resolve.js with nothing naming the culprit, and a string iterates its
+            // CHARACTERS and blanks the chart. Constraints built with defineConstraint
+            // are normalized, so this only catches the hand-written form — which
+            // spec.constraints accepts with no type checking at all.
+            if (!Array.isArray(r)) {
+                warn(
+                    `constraint:return:${constraintLabel(constraint)}`,
+                    `constraint ${constraintLabel(constraint)} returned ${describe(r)}; a constraint must ` +
+                    `return the repaired rows (an array), false to reject the edit, or ` +
+                    `true/undefined to accept it unchanged. Ignoring the return value.`
+                );
+                continue;
+            }
+            newData = r;
         }
         if (rejected) return null;
 
@@ -1265,8 +1382,8 @@ export function Elicit(spec) {
                 if (edit.name === name) { count++; if (!hit) hit = { feature, edit }; }
             }
         }
-        if (DEV && count === 0) console.warn(`[elicit] el.control("${name}"): no edit is named "${name}".`);
-        if (DEV && count > 1) console.warn(`[elicit] el.control("${name}"): ${count} edits share the name "${name}"; driving the first.`);
+        if (count === 0) warn(`control:none:${name}`, `el.control("${name}"): no edit is named "${name}".`);
+        if (count > 1) warn(`control:many:${name}`, `el.control("${name}"): ${count} edits share the name "${name}"; driving the first.`);
         return hit;
     };
 
@@ -1293,7 +1410,7 @@ export function Elicit(spec) {
             // the other axis.
             let x = datum ? encodeChannel(scales, channels, 'x', datum, center ? center.cx : 0) : (center ? center.cx : 0);
             let y = datum ? encodeChannel(scales, channels, 'y', datum, center ? center.cy : 0) : (center ? center.cy : 0);
-            const resolved = resolveChannels(edit.channels, channels, scales);
+            const resolved = resolveChannels(edit.channels, channels, scales, feature.views === 'scale');
             // `value` is either a scalar (single-channel edit) or a { channelName: v }
             // / { field: v } map for a multi-channel edit (a 2-D drag).
             const valueFor = (/** @type {any} */ ch) => {
@@ -1382,7 +1499,7 @@ export function Elicit(spec) {
                 const found = findNamedEdit(name);
                 if (!found) return null;
                 const { feature, edit } = found;
-                const ch = resolveChannels(edit.channels, feature.channels || {}, scales)[0];
+                const ch = resolveChannels(edit.channels, feature.channels || {}, scales, feature.views === 'scale')[0];
                 const scale = /** @type {any} */ (ch && ch.scale);
                 const fieldSpec = (schema && ch && ch.field && schema[ch.field]) || null;
                 const measure = (fieldSpec && fieldSpec.type) || null;

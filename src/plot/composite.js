@@ -89,7 +89,7 @@ function mergeChannels(groupChannels, partChannels, keepEdit) {
 export function composite(options = {}) {
     // Desugar top-level shorthands (fill, angle, size, …) into group channels so
     // `composite({ fill: 'steelblue', angle: 45, parts })` works like a mark.
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'composite', allow: ['parts', 'discreteScale'] });
     const {
         id,
         parts = [],

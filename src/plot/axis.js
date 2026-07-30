@@ -123,7 +123,7 @@ export function tickData(scale, opts = {}) {
 /**
  * The shared axis builder. `axisX`/`axisY` are thin wrappers that pin `channel`.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function axis(options = {}) {
     // No normalizeMarkOptions here, deliberately: an axis encodes no datum. It
@@ -161,6 +161,10 @@ export function axis(options = {}) {
     return {
         id,
         isAxis: true,
+        // A GUIDE: it views the SCALE, not columns of the dataset. See types.d.ts's
+        // Mark.views — the engine and resolveChannels branch on this, not on which
+        // of isAxis/isGrid/isLegend happens to be set.
+        views: 'scale',
         channel,
         layer: 'background',
         // Interactive-axis wiring: the edits the engine collects (mark-level, so
@@ -309,7 +313,7 @@ export function axis(options = {}) {
 /**
  * The shared grid builder — full-span lines across the plot, one per tick.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function grid(options = {}) {
     const {
@@ -327,6 +331,7 @@ export function grid(options = {}) {
     return {
         id,
         isGrid: true,
+        views: 'scale',
         channel,
         layer: 'background',
         /**

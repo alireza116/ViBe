@@ -1,11 +1,12 @@
 {
   "name": "elicit-js",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Declarative, grammar-of-graphics-inspired library for interactive visual belief elicitation.",
   "type": "module",
   "main": "./src/index.js",
   "module": "./src/index.js",
   "types": "./src/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
@@ -13,19 +14,15 @@
       "default": "./src/index.js"
     },
     "./dist": {
+      "types": "./src/index.d.ts",
       "import": "./dist/elicit.js",
       "default": "./dist/elicit.js"
     },
-    "./docs-ui": {
-      "types": "./docs-next/components/index.ts",
-      "import": "./docs-next/components/index.ts",
-      "default": "./docs-next/components/index.ts"
-    }
+    "./package.json": "./package.json"
   },
   "files": [
     "src",
     "dist",
-    "docs-next",
     "README.md",
     "LICENSE"
   ],
@@ -35,11 +32,29 @@
     "start:docs": "next start docs-next",
     "build:lib": "vite build --config vite.lib.config.js",
     "typecheck": "tsc --noEmit",
-    "verify:browser": "node scripts/verify-browser.mjs"
+    "verify:browser": "node scripts/verify-browser.mjs",
+    "check:warnings": "node scripts/check-warnings.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "visualization",
+    "dataviz",
+    "elicitation",
+    "belief-elicitation",
+    "interactive",
+    "grammar-of-graphics",
+    "d3",
+    "svg"
+  ],
+  "author": "Alireza Karduni",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alireza116/ViBe.git"
+  },
+  "homepage": "https://github.com/alireza116/ViBe#readme",
+  "bugs": {
+    "url": "https://github.com/alireza116/ViBe/issues"
+  },
   "dependencies": {
     "d3": "^7.9.0"
   },

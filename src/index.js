@@ -11,6 +11,7 @@ import { D3Renderer } from "./renderers/d3-renderer/index.js";
 import { CanvasRenderer } from "./renderers/canvas/index.js";
 import { setTheme, resolveTheme, DEFAULT_THEME } from "./core/theme.js";
 import { themes } from "./core/themes.js";
+import { setWarnings } from "./core/dev.js";
 
 export {
   Elicit,
@@ -29,4 +30,7 @@ export {
   setTheme,
   resolveTheme,
   DEFAULT_THEME,
+  // Developer warnings are ON by default (and off automatically when a bundler
+  // inlines NODE_ENV=production). Call setWarnings(false) to silence them.
+  setWarnings,
 };

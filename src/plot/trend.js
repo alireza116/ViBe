@@ -93,10 +93,10 @@ function clipLineToPlot(x1, y1, x2, y2, w, h) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function trend(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'trend', allow: ['handleSize', 'interceptStage', 'slopeStage'] });
     const {
         id,
         edits: userEdits,

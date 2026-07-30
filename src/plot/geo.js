@@ -15,19 +15,18 @@
 import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
 import { textNodeAt, hasEditText } from './text.js';
 import { resolveFormat } from '../format.js';
+import { warn } from '../core/dev.js';
 import { projectPoint, projectBounds } from '../core/projection.js';
 import { tileCover, tileUrl } from '../core/tiles.js';
 
 /** Series key for an ungrouped mark (one implicit series). */
 const SINGLE = Symbol('single');
 
-/** Warn once: raster tiles only register under an unrotated Web Mercator. */
-let warnedTiles = false;
+/** Raster tiles only register under an unrotated Web Mercator. */
 function warnTilesNeedMercator() {
-    if (warnedTiles) return;
-    warnedTiles = true;
-    console.warn(
-        '[elicit] geoTile needs projection: "mercator" (unrotated). Tiles are images '
+    warn(
+        'geoTile:mercator',
+        'geoTile needs projection: "mercator" (unrotated). Tiles are images '
         + 'baked in Web Mercator — under another projection they cannot align with '
         + 'the data, so none are drawn. Use geoBasemap({ geojson }) for vector chrome '
         + 'under other projections.'
@@ -60,10 +59,10 @@ function fieldOf(channels, name) {
  * feature so shared boundaries stay visible.
  *
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function geoBasemap(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'geoBasemap', allow: ['geojson', 'features'] });
     const {
         channels = {},
         id,
@@ -152,10 +151,10 @@ export function geoBasemap(options = {}) {
  * provider when you ship.
  *
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function geoTile(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'geoTile', allow: ['url', 'subdomains', 'tileSize', 'minZoom', 'maxZoom', 'zoomOffset', 'attribution', 'attributionSize'] });
     const {
         channels = {},
         id,
@@ -232,10 +231,10 @@ export function geoTile(options = {}) {
 /**
  * Points at lon/lat. Pair with `edit.geo.move` / `edit.geo.create`.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function geoPoint(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'geoPoint', allow: ['shape'] });
     const { channels = {}, id, edits, constraints } = opts;
     const lonKey = fieldOf(channels, 'lon') || 'lon';
     const latKey = fieldOf(channels, 'lat') || 'lat';
@@ -286,10 +285,10 @@ export function geoPoint(options = {}) {
 /**
  * Polygons / MultiPolygons from a geometry field on each row.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function geoPolygon(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'geoPolygon', allow: [] });
     const { channels = {}, id, edits, constraints } = opts;
     const geomKey = fieldOf(channels, 'geometry') || 'geometry';
 
@@ -366,10 +365,10 @@ function orderRows(group, order) {
  *                              trail re-derives on every render.
  *
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function geoLine(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'geoLine', allow: ['curve', 'handleSize', 'order', 'showVertices', 'series', 'z'] });
     const {
         channels = {},
         id,
@@ -559,10 +558,10 @@ export function geoLine(options = {}) {
  * a geoPoint's dot) without moving the lon/lat a drag would write.
  *
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function geoText(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'geoText', allow: ['format'] });
     const { channels = {}, id, edits, constraints, format: formatOpt } = opts;
     const lonKey = fieldOf(channels, 'lon') || 'lon';
     const latKey = fieldOf(channels, 'lat') || 'lat';
@@ -601,10 +600,10 @@ export function geoText(options = {}) {
 /**
  * Geographic axis-aligned bbox as west/south/east/north.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function geoRect(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'geoRect', allow: [] });
     const { channels = {}, id, edits, constraints } = opts;
     const westKey = fieldOf(channels, 'west') || 'west';
     const southKey = fieldOf(channels, 'south') || 'south';

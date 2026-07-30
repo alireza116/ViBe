@@ -48,10 +48,10 @@ function slotsOf(scale, key, data) {
 /**
  * @param {any} options
  * @param {'x' | 'y' | null} forcedAxis  The axis tokens stack ALONG ('y' = up, 'x' = right).
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildDotStack(options, forcedAxis) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'dotStack', allow: ['gap', 'ghost', 'label'] });
     const {
         channels = {},
         id,
@@ -192,7 +192,7 @@ function buildDotStack(options, forcedAxis) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function dotStack(options = {}) {
     return buildDotStack(options, null);
@@ -201,7 +201,7 @@ export function dotStack(options = {}) {
 /**
  * Stack tokens UPWARD (category on x).
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function dotStackY(options = {}) {
     return buildDotStack(options, 'y');
@@ -210,7 +210,7 @@ export function dotStackY(options = {}) {
 /**
  * Stack tokens RIGHTWARD (category on y).
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function dotStackX(options = {}) {
     return buildDotStack(options, 'x');

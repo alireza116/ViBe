@@ -13,6 +13,7 @@
 // d3.geo* instance.
 
 import * as d3 from 'd3';
+import { warn, warningsEnabled } from './dev.js';
 
 /**
  * @typedef {{
@@ -83,7 +84,11 @@ function instantiate(type) {
     return type;
 }
 
-/** Domains already checked for ring winding (warn once per object). */
+/**
+ * Domains already checked for ring winding. Kept as a WeakSet rather than folded
+ * into dev.js's string-keyed dedup because the check itself costs a `d3.geoArea`
+ * per polygon on every render — this remembers the WORK, not just the message.
+ */
 const warnedDomains = new WeakSet();
 
 /**
@@ -94,6 +99,7 @@ const warnedDomains = new WeakSet();
  * @param {any} domain
  */
 function warnInvertedRings(domain) {
+    if (!warningsEnabled()) return;
     if (!domain || typeof domain !== 'object' || warnedDomains.has(domain)) return;
     warnedDomains.add(domain);
 
@@ -111,8 +117,9 @@ function warnInvertedRings(domain) {
         .map((/** @type {any} */ f, /** @type {number} */ i) =>
             (f.properties && (f.properties.name || f.properties.NAME)) || `feature ${i}`)
         .slice(0, 3);
-    console.warn(
-        `[elicit] projection domain has ${inverted.length} polygon(s) with reversed ring ` +
+    warn(
+        `rings:${names.join(',')}`,
+        `projection domain has ${inverted.length} polygon(s) with reversed ring ` +
         `winding (${names.join(', ')}${inverted.length > 3 ? ', …' : ''}). d3 reads these as ` +
         `covering the whole globe, so the map fits the world and your features shrink to a dot. ` +
         `Rewind the exterior rings counterclockwise (RFC 7946).`

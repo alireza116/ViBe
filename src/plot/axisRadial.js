@@ -40,7 +40,7 @@ function anchorFor(x, cx, eps = 1) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function axisRadial(options = {}) {
     // An axis's stroke/fontSize are chrome, not per-datum style, so they stay
@@ -84,6 +84,7 @@ export function axisRadial(options = {}) {
         constraints,
         discreteScale: 'point',
         isAxis: true,
+        views: 'scale',
         /**
          * @param {any[]} currentData
          * @param {any} scales

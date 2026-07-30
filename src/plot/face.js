@@ -99,10 +99,10 @@ function applyFace(ctx) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function face(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'face', allow: ['handleSize', 'handles'] });
     const {
         id,
         edits: userEdits,

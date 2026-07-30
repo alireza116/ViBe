@@ -50,12 +50,12 @@ function resolveSpan(spanAxis, scale, channels, scales, datum, key, fullLength, 
 /**
  * @param {any} options
  * @param {'x' | 'y' | null} forcedValueAxis which axis carries the value
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildTick(options, forcedValueAxis) {
     // Desugar top-level style shorthands (stroke: '…', strokeWidth: …) into the
     // channels so tick reads style the same way every mark does.
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'tick', allow: ['inset', 'length'] });
     const {
         channels = {},
         id,
@@ -148,7 +148,7 @@ function buildTick(options, forcedValueAxis) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function tick(options = {}) {
     return buildTick(options, null);
@@ -157,7 +157,7 @@ export function tick(options = {}) {
 /**
  * Horizontal ticks: value on y, spanning the x band.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function tickY(options = {}) {
     return buildTick(options, 'y');
@@ -166,7 +166,7 @@ export function tickY(options = {}) {
 /**
  * Vertical ticks: value on x, spanning the y band.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function tickX(options = {}) {
     return buildTick(options, 'x');

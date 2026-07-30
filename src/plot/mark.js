@@ -110,12 +110,9 @@ const SHORTHANDS = [
 // core/theme.js for the precedence rules.
 export { themeOf, markDefaults } from '../core/theme.js';
 
-const DEV = !!(import.meta.env && import.meta.env.DEV);
-
 // A derived channel's fn re-runs on every render, so a warning would repeat
-// forever. Warn once per offending channel, the way resolve.js's guards do.
-/** @type {Set<string>} */
-const warnedFn = new Set();
+// forever — `warn` dedups once per key. See core/dev.js.
+import { warn, warningsEnabled } from '../core/dev.js';
 
 /**
  * Evaluate a derived channel's `fn(d, i, data)` in VISUAL space. The result is
@@ -124,7 +121,7 @@ const warnedFn = new Set();
  * a fn that returns null/undefined or throws also falls back, so a bad accessor
  * never blanks the chart.
  * @param {any} spec the channel spec (must have a function `fn`)
- * @param {string} channel channel name, for the DEV warning key
+ * @param {string} channel channel name, for the warning key
  * @param {import('../types').Datum | null} datum
  * @param {number | undefined} index
  * @param {import('../types').Datum[] | undefined} data
@@ -137,11 +134,8 @@ export function callChannelFn(spec, channel, datum, index, data, fallback) {
         const out = spec.fn(datum, index, data);
         return out == null ? fallback : out;
     } catch (err) {
-        if (DEV && !warnedFn.has(channel)) {
-            warnedFn.add(channel);
-            console.warn(`[elicit] fn on channel "${channel}" threw: ` +
-                `${err instanceof Error ? err.message : err}; using the fallback.`);
-        }
+        warn(`fn:${channel}`, `fn on channel "${channel}" threw: ` +
+            `${err instanceof Error ? err.message : err}; using the fallback.`);
         return fallback;
     }
 }
@@ -316,6 +310,76 @@ export function seriesFieldOf(opts, channels = {}) {
 }
 
 /**
+ * Options every mark accepts, whatever it draws.
+ * @type {string[]}
+ */
+const UNIVERSAL_OPTIONS = ['channels', 'id', 'edits', 'constraints'];
+
+/**
+ * Option names that are WRONG in a specific, diagnosable way, each with the
+ * correction. These are the API's own history: every one of them was either a
+ * real name once, or is the name a reasonable person guesses. Silently ignoring
+ * them (which is what `...rest` did) is the worst outcome — the chart renders,
+ * looking almost right, and the author has no idea their option did nothing.
+ * @type {Record<string, string>}
+ */
+const MISTAKEN_OPTIONS = {
+    color: 'there is no `color` channel — use `fill` (or `stroke` for a line).',
+    data: 'a mark never owns data. Put `data` on the Elicit spec; the engine hands the rows to every mark.',
+    onChange: 'put `onChange` on the Elicit spec, not on a mark.',
+    domain: "a domain describes the DATA, so it lives on the spec's schema: schema: { field: { domain: [...] } }.",
+    range: 'a range belongs to the scale: channels.<name>.scale = { range: [...] }.',
+    scale: 'a scale is per channel: channels.<name>.scale, or spec.scales for the whole chart.',
+    channel: 'did you mean `channels`? (Axis/grid/legend marks take a singular `channel`; data marks take a `channels` map.)',
+    edit: 'attach an edit to a channel — y: { field: "…", edit: move() } — or pass several with `edits: [...]`.',
+    r: 'the radius channel is `size` (px), on every mark.',
+    handleRadius: "a sub-element's radius is `handleSize`.",
+    value: 'a constant belongs on a channel: channels.<name> = { value: … } for visual space, { datum: … } for data space.',
+    field: 'a field belongs on a channel: channels.<name> = { field: "…" }.',
+};
+
+/**
+ * Warn about options a mark will silently ignore.
+ *
+ * Unknown keys used to fall into `...rest` and get spread onto the feature, where
+ * nothing reads them — so `color: 'red'`, `channel:` for `channels:`, or a
+ * misspelled `strokeWdith` all "worked" and did nothing at all. That is the
+ * quietest class of authoring bug in the library.
+ *
+ * `allow` is the mark's own option vocabulary. When it is omitted only the
+ * MISTAKEN_OPTIONS check runs — a mark that hasn't declared its vocabulary yet
+ * degrades to no false positives rather than to noise.
+ * @param {string | undefined} mark the factory name, for the message
+ * @param {any} options the RAW options, before shorthands are stripped
+ * @param {string[] | undefined} allow mark-specific option names
+ * @returns {void}
+ */
+export function warnUnknownOptions(mark, options, allow) {
+    if (!options || !warningsEnabled()) return;
+    const name = mark || 'this mark';
+    const known = allow
+        ? new Set([...UNIVERSAL_OPTIONS, ...SHORTHANDS, ...allow])
+        : null;
+    for (const key of Object.keys(options)) {
+        const fix = MISTAKEN_OPTIONS[key];
+        if (fix) {
+            // `channel` is the real option name on axis/grid/legend, and several
+            // marks legitimately take `field`; an explicit allowlist wins over the
+            // generic correction.
+            if (known && known.has(key)) continue;
+            warn(`opt:${name}:${key}`, `${name}({ ${key}: … }): ${fix}`);
+            continue;
+        }
+        if (!known || known.has(key)) continue;
+        warn(
+            `opt:${name}:${key}`,
+            `${name}({ ${key}: … }) is not an option this mark reads, so it is ignored. ` +
+            `Mark options are: ${[...known].sort().join(', ')}.`
+        );
+    }
+}
+
+/**
  * Desugar top-level constant shorthands into `channels`, without clobbering an
  * explicit `channels[ch]` (an explicit channel wins). Keeps
  * `bar({ fill: 'steelblue' })` and `point({ size: 9 })` working through the one
@@ -328,11 +392,16 @@ export function seriesFieldOf(opts, channels = {}) {
  * datum to resolve them against, so turning them into channels would only create
  * a channel nothing reads (and force the mark to reach back into raw options for
  * the real value, which is what axisRadial used to do).
+ * Pass `mark` (the factory name) to get unknown-option diagnostics, and `allow`
+ * to declare the mark's own option vocabulary on top of the universal ones. This
+ * is the one place every mark already funnels through, so validating here reaches
+ * all of them; `defineMark` makes it unskippable rather than voluntary.
  * @param {any} [options]
- * @param {{ except?: string[] }} [opts]
+ * @param {{ except?: string[], mark?: string, allow?: string[] }} [opts]
  * @returns {any}
  */
-export function normalizeMarkOptions(options = {}, { except = [] } = {}) {
+export function normalizeMarkOptions(options = {}, { except = [], mark, allow } = {}) {
+    warnUnknownOptions(mark, options, allow);
     const { channels = {}, ...rest } = options;
     /** @type {Record<string, any>} */
     const merged = { ...channels };

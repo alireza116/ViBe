@@ -30,10 +30,10 @@ import { encodeChannel, encodeAngle, resolveStyle, resolveSymbol, symbolNode, no
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function point(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'point', allow: ['shape'] });
     const { channels = {}, id, edits, constraints, shape = 'circle' } = opts;
 
     return {

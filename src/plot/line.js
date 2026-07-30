@@ -33,12 +33,12 @@ const SINGLE = '__single__'; // group key when no series field is set
  * @param {any} options
  * @param {'x' | 'y' | null} forcedValueAxis which axis carries the value
  * @param {string} [defaultOrder] 'domain' (presets) or 'sequence' (scatter/path)
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
     // Desugar top-level style shorthands (stroke: '…', strokeWidth: …) into the
     // channels so line reads style the same way every mark does.
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, { mark: 'line', allow: ['curve', 'handles', 'handleSize', 'order', 'samples', 'series', 'z'] });
     const {
         channels = {},
         id,
@@ -191,7 +191,7 @@ function orderPoints(group, order, domainAxis, seriesField) {
 
 /**
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function line(options = {}) {
     return buildLine(options, null);
@@ -200,7 +200,7 @@ export function line(options = {}) {
 /**
  * Value on y, domain on x (the usual time series); sweep along x. Domain-ordered.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function lineY(options = {}) {
     return buildLine(options, 'y');
@@ -209,7 +209,7 @@ export function lineY(options = {}) {
 /**
  * Value on x, domain on y; sweep along y. Domain-ordered.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function lineX(options = {}) {
     return buildLine(options, 'x');
@@ -219,7 +219,7 @@ export function lineX(options = {}) {
  * Connected scatter / free 2D path: points connected in creation order, both axes
  * free. Same mark as `line`, with `order: 'sequence'` as the default.
  * @param {any} [options]
- * @returns {any}
+ * @returns {import('../types').Mark}
  */
 export function connectedScatter(options = {}) {
     return buildLine(options, null, 'sequence');
