@@ -77,7 +77,7 @@ Resolution is layered, most specific first: a per-datum **channel** or option be
 To theme a whole application without threading `theme` through every chart, call `setTheme(partial)` once at startup — every chart built afterwards inherits it, and a chart's own `theme` still layers on top. `setTheme(themes.survey)` makes the survey look the default; `setTheme(null)` resets to the built-in.
 
 ```js
-import { setTheme, themes } from "vibe";
+import { setTheme, themes } from "elicit-js";
 
 setTheme(themes.survey);          // app-wide default
 // …every Elicit(...) after this inherits it

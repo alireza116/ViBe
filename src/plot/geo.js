@@ -27,7 +27,7 @@ function warnTilesNeedMercator() {
     if (warnedTiles) return;
     warnedTiles = true;
     console.warn(
-        '[vibe] geoTile needs projection: "mercator" (unrotated). Tiles are images '
+        '[elicit] geoTile needs projection: "mercator" (unrotated). Tiles are images '
         + 'baked in Web Mercator — under another projection they cannot align with '
         + 'the data, so none are drawn. Use geoBasemap({ geojson }) for vector chrome '
         + 'under other projections.'

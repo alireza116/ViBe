@@ -4,7 +4,7 @@
 // model): the engine builds one scale per channel and the mark just looks it up
 // by name. Adding a colour or size channel is data, not new mark code:
 //
-//   vibe.plot.point({
+//   elicit.plot.point({
 //     channels: {
 //       x:    { field: "gdp" },        // linear   (schema: quantitative)
 //       y:    { field: "region" },     // point    (schema: categorical)

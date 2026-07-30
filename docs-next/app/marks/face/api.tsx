@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "face(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. A single-datum glyph (like <code className="inline">trend</code>): the parts derive from the params, and the bound ones are their own drag targets — grab the feature itself, no floating handles. Its centre is placed by the x/y channels when present, else parked at the plot centre.
+        Import from <code className="inline">elicit.plot</code>. A single-datum glyph (like <code className="inline">trend</code>): the parts derive from the params, and the bound ones are their own drag targets — grab the feature itself, no floating handles. Its centre is placed by the x/y channels when present, else parked at the plot centre.
       </>
     ),
     signatures: [

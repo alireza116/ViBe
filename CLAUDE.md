@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repo. VibeJS just went through a consistency pass that unified a previously-duplicated API surface (see `git log` for "API Consistency" era commits). The rules below encode the design decisions from that pass — follow them so the API doesn't re-fragment.
+Guidance for Claude Code when working in this repo. ElicitJS just went through a consistency pass that unified a previously-duplicated API surface (see `git log` for "API Consistency" era commits). The rules below encode the design decisions from that pass — follow them so the API doesn't re-fragment.
 
 ## What this is
 

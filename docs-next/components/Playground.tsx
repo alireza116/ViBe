@@ -33,7 +33,7 @@ export function Playground({ presets }: Props) {
       <div className="playground-page">
         <div className="playground-bar">
           <Link href="/" className="playground-brand">
-            ← VibeJS docs
+            ← ElicitJS docs
           </Link>
           <div className="playground-mode-tabs">
             <button

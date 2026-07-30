@@ -7,7 +7,7 @@ import { api as sweepApi } from '../../app/editing/sweep/api';
 
 export type EditManifestEntry = {
   /** How this edit is reachable in scope: bare (`move`) or namespaced
-   * (`edit.line.draw`) — matches `createVibeScope()`'s exposure exactly. */
+   * (`edit.line.draw`) — matches `createElicitScope()`'s exposure exactly. */
   callPath: string;
   label: string;
   docHref: string;

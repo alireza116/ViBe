@@ -1,6 +1,6 @@
-# VibeJS
+# ElicitJS
 
-VibeJS is a declarative, grammar-of-graphics-inspired JavaScript library for structured, interactive visual **belief elicitation**. Unlike charting libraries that only display static data, VibeJS builds empty or pre-filled charts where users directly construct or modify data points — expressing their beliefs — through intuitive mouse/touch gestures.
+ElicitJS is a declarative, grammar-of-graphics-inspired JavaScript library for structured, interactive visual **belief elicitation**. Unlike charting libraries that only display static data, ElicitJS builds empty or pre-filled charts where users directly construct or modify data points — expressing their beliefs — through intuitive mouse/touch gestures.
 
 The library is decoupled from any single rendering framework. It maintains an internal abstract **Scene Graph** of shapes to draw, which a pluggable renderer (the default is D3/SVG) translates into pixels.
 
@@ -22,9 +22,9 @@ Note what the channel does *not* carry. A field's **data type** and its **domain
 
 ## Architecture
 
-VibeJS is layered for extensibility:
+ElicitJS is layered for extensibility:
 
-1. **Core engine (`vibe.Elicit`)** — the orchestrator (`src/core/elicit.js`). Deep-copies the spec's **one dataset** into a reactive store, resolves one **global scale per channel** (Observable-Plot model), rebuilds the scene each render, and routes gesture events to the matching edits. The unidirectional flow: `gesture → invert through scale → data-space proposal → data invariants → commit → re-render`.
+1. **Core engine (`elicit.Elicit`)** — the orchestrator (`src/core/elicit.js`). Deep-copies the spec's **one dataset** into a reactive store, resolves one **global scale per channel** (Observable-Plot model), rebuilds the scene each render, and routes gesture events to the matching edits. The unidirectional flow: `gesture → invert through scale → data-space proposal → data invariants → commit → re-render`.
 
    **One schema.** The schema is the contract of the elicited dataset: every field's measurement type and domain. It is what lets a chart resolve its scales and mint rows from *zero* starter data. Scales are resolved per channel by **unioning the schema domains of every field on that axis** — so an error bar's `mean`, `lo` and `hi` share one y axis that spans all three.
 
@@ -34,7 +34,7 @@ VibeJS is layered for extensibility:
 
 2. **Abstract scene graph (`src/core/scene.js`)** — a flat, layout-calculated collection of abstract nodes (`circle`, `rect`, `line`, `path`, `text`, `image`), independent of the DOM or any renderer.
 
-3. **Marks (`vibe.plot.*`)** — pure data-to-geometry factories on a shared foundation (`src/plot/mark.js`): every mark resolves its channels through `encodeChannel` and the standard style surface (`fill`, `stroke`, `strokeWidth`, `opacity`, …) the same way. Marks compose across scale types and orientations.
+3. **Marks (`elicit.plot.*`)** — pure data-to-geometry factories on a shared foundation (`src/plot/mark.js`): every mark resolves its channels through `encodeChannel` and the standard style surface (`fill`, `stroke`, `strokeWidth`, `opacity`, …) the same way. Marks compose across scale types and orientations.
    - `point` → `circle` or centred `rect` (`shape: 'circle'|'square'`; scatter; x/y/size/fill/stroke channels). An `angle` channel orients squares (and symbol glyphs) about their centre — circles are rotation-invariant. Add a `symbol` channel and it draws a glyph (emoji / unicode shape) per datum instead of a circle/square.
    - `face` → an expressive, parametric emotion glyph (Chernoff-style): a datum's fields are encoded into a face with seven params (mouth curve/open/asym, eye scale/squint, brow height/tilt), each editable by **directly manipulating the feature** — grab the mouth and pull it into a smile, drag an eye wider, tilt a brow (2-D drags where a feature carries two params; small eyelid/lip dots for squint & open). The seven params are **channels** — bind them in `channels` (`{ mouthCurve: { field: 'valence' }, … }`), exactly like `fill`/`size`; `face()` is the two-field emotion preset. A single-datum glyph like `trend`; its centre is placed by x/y when present, so a plot of faces is a small-multiple or an emotion-space scatter.
    - `bar` / `barY` / `barX` → `rect` (band axis = category + thickness, linear axis = value — or an explicit start/end span via x1/x2 or y1/y2; orientation auto-detected).
@@ -55,7 +55,7 @@ VibeJS is layered for extensibility:
    - `trend` → an intercept-then-slope line: `{ intercept, slope }` with an intercept handle (translate) and a slope handle (rotate about the anchor), stageable.
    - `axis` / `axisX` / `axisY` / `grid` / `gridX` / `gridY` → composable axis & gridline marks (or use the global `axes` convenience). Pass an `edit` to make an axis **interactive** — see `edit.axis.*` below.
 
-4. **Edits (`vibe.edit.*`)** — a gesture that writes a channel back to the data. An edit is a small descriptor `{ gesture, channels, when, pick, scope, constrain, guide, apply }`, declared **co-located** on a channel (`channels.y.edit = drag()`) or at **mark level** (`edits: [...]`).
+4. **Edits (`elicit.edit.*`)** — a gesture that writes a channel back to the data. An edit is a small descriptor `{ gesture, channels, when, pick, scope, constrain, guide, apply }`, declared **co-located** on a channel (`channels.y.edit = drag()`) or at **mark level** (`edits: [...]`).
    - **Universal** edits (any mark): `drag`, `dragSpan` / `brushSpan` (move / edge-resize a 1-D span), `brushRect` (composable 2-D edge/corner/body editing of a rect's four extents), `resize`, `rotate` (pointer angle about the plot centre — or `pivot: 'mark'` — → a channel value; `fold: false` for full-circle dials; `pick: 'direct'` for a needle handle), `cycle`, `create`, `toggle` (click a slot to pick or un-pick it), `remove`, `editText` (retype a text mark's content), `rank` (drag to reorder a ranked slot), `legend` (click a legend swatch to set a discrete field — pair with `guides.legend()`, which shares its layout), `custom`.
    - **Line-scoped** edits, namespaced as `edit.line.*` so their scope is visible: `anchor` (add one point), `newSeries` (seed a whole line), `draw` (author a line by dragging), `sweep` (you-draw-it repaint), `removeSeries` (delete a whole line).
    - **Axis-scoped** edits, namespaced as `edit.axis.*` — the one family that writes the **schema's domain**, not a datum (they carry `target: 'domain'`): `edit.axis.scale()` drags a numeric/temporal axis's end-handle to grow/shrink its range (`mode: 'grow'` resizes the chart instead of rescaling in place); `edit.axis.categories()` adds / renames / removes categories on a discrete axis (reusing the `editText` inline-typing lifecycle; rename relabels matching rows, remove deletes them; `mode: 'grow'` grows the chart by one band-step per category instead of re-dividing it — e.g. extending a 5-point Likert scale to 7). The domain lives on the schema and scales re-resolve every render, so the grid, guides and marks reflow for free. Read the reshaped domain with `el.getSchema()`.
@@ -65,20 +65,20 @@ VibeJS is layered for extensibility:
    - **Scope goes in the name.** A namespaced edit (`edit.line.*`, `edit.arc.*`, `edit.waffle.*`, `edit.geo.*`, `edit.axis.*`) needs the matching mark family, and each declares a `scope` naming the mark capability it requires. Attach one to a mark that lacks the capability and the engine dev-warns rather than leaving you with a gesture that silently does nothing.
    - `pick` selects the target: `direct` (the mark hit), `nearest` (closest within a threshold), `plane` (no target — create), or a driver lifecycle (`sweep` / `draw` / `brush` / `probe`). Multi-event lifecycles live in **self-describing drivers** (`src/edit/drivers/`) — adding an interaction mode is a new driver file, not an engine change.
    - `pick: 'probe'` is the **probe / settle** flow: the pointer probes a value and the proposal follows the cursor as an inert **ghost** (the committed mark stays put — so nothing flickers, even on a matrix), and a **commit** settles it. Two gestures commit, so both natural expectations work — **move-then-click**, and **grab-and-drag** (press on the mark, drag, release). Any edit works this way. Preview and commit run the same `apply` + the same invariants through one code path, so the ghost cannot drift from what a commit writes — and a preview never reaches `onChange` or `getData`. The ghost is drawn by the engine's ghost pass (only the rows a proposal would change, styled by `theme.ghost`).
-   - `when` arbitrates when several edits share a gesture (`vibe.when.alt`, `noAlt`, `shift`, `near`, `far`, …): e.g. plain click recolours, Alt-click deletes.
+   - `when` arbitrates when several edits share a gesture (`elicit.when.alt`, `noAlt`, `shift`, `near`, `far`, …): e.g. plain click recolours, Alt-click deletes.
    - `stage` gates an edit to one step of a multi-stage elicitation ("first X, then Y"). It is a uniform filter applied to every edit — not a new mode. A `probe` click on a staged edit commits that stage's field and advances automatically (freezing it); you can also drive stages yourself with `setStage` / `nextStage`. See `cone` and `trend`.
 
-5. **Constraints (`vibe.constraints.*`)** — **data-layer invariants**: pure rules over the dataset, run on every edit commit (never see pixels). They both *gate* a proposal (return `false` to reject) and *repair* it (return the corrected rows) — and since the rows are shared, a repair propagates to every mark on the next render. Declared on the spec (`constraints: [...]`, the canonical home) or on a mark as sugar, in which case the engine promotes it to the dataset so it still holds for **every** edit from **every** mark. Per-edit sugar is `edit.constrain`. Built-ins fall into three kinds — **bounds**: `clamp({ min, max, field })`, `snap({ field, step, origin })`; **cardinality**: `count({ max, strategy })`, `unique({ field, max })`, `maintainSum({ targetSum, field })`; and **shape**: `ordering({ fields })` keeps fields of a row in order (`lo <= mean <= hi`, so an interval glyph can't be dragged inside-out), `monotonic({ field, along, dir })` stops a curve reversing along an axis (a CDF that dips means negative probability mass), `spacing({ field, min })` keeps adjacent values a minimum distance apart. The shape rules **repair by pushing the neighbours aside**, holding the field you actually dragged — they know which one that is by diffing against the previous rows — so a crossed handle reads as the interval moving rather than as the handle sticking (`ordering`'s `mode: 'block'` rejects instead). Author your own with `constraints.define(reducer, meta?)` — write just the rule against a clean data context and return a number (set the field), object (merge), array (replace dataset), or `false` (reject).
+5. **Constraints (`elicit.constraints.*`)** — **data-layer invariants**: pure rules over the dataset, run on every edit commit (never see pixels). They both *gate* a proposal (return `false` to reject) and *repair* it (return the corrected rows) — and since the rows are shared, a repair propagates to every mark on the next render. Declared on the spec (`constraints: [...]`, the canonical home) or on a mark as sugar, in which case the engine promotes it to the dataset so it still holds for **every** edit from **every** mark. Per-edit sugar is `edit.constrain`. Built-ins fall into three kinds — **bounds**: `clamp({ min, max, field })`, `snap({ field, step, origin })`; **cardinality**: `count({ max, strategy })`, `unique({ field, max })`, `maintainSum({ targetSum, field })`; and **shape**: `ordering({ fields })` keeps fields of a row in order (`lo <= mean <= hi`, so an interval glyph can't be dragged inside-out), `monotonic({ field, along, dir })` stops a curve reversing along an axis (a CDF that dips means negative probability mass), `spacing({ field, min })` keeps adjacent values a minimum distance apart. The shape rules **repair by pushing the neighbours aside**, holding the field you actually dragged — they know which one that is by diffing against the previous rows — so a crossed handle reads as the interval moving rather than as the handle sticking (`ordering`'s `mode: 'block'` rejects instead). Author your own with `constraints.define(reducer, meta?)` — write just the rule against a clean data context and return a number (set the field), object (merge), array (replace dataset), or `false` (reject).
 
-6. **Guides (`vibe.guides.*`)** — non-interactive annotations, rebuilt every render so they track live data. `guides.rule` (reference line), `guides.region` (shaded band), `guides.proximity` (nearest-pick selection), `guides.custom(fn)` (draw arbitrary nodes from the render context). An edit's own constraint bounds + snap ring draw automatically when it declares `guide: true`. Guide nodes never capture the pointer, which is why the survey widgets' affordances live here.
+6. **Guides (`elicit.guides.*`)** — non-interactive annotations, rebuilt every render so they track live data. `guides.rule` (reference line), `guides.region` (shaded band), `guides.proximity` (nearest-pick selection), `guides.custom(fn)` (draw arbitrary nodes from the render context). An edit's own constraint bounds + snap ring draw automatically when it declares `guide: true`. Guide nodes never capture the pointer, which is why the survey widgets' affordances live here.
 
-7. **Format (`vibe.format.*`)** — display formatters for text marks (and anywhere a value is shown as a string). A mark's `format` option takes a d3-format string or `(v) => string`; helpers mint common ones (`format.number('.1f')`, `format.percent()`, `format.si()`, `format.time('%b %Y')`, `format.prefix('$')`, `format.suffix(' kg')`). Display-only — the underlying field stays the raw value.
+7. **Format (`elicit.format.*`)** — display formatters for text marks (and anywhere a value is shown as a string). A mark's `format` option takes a d3-format string or `(v) => string`; helpers mint common ones (`format.number('.1f')`, `format.percent()`, `format.si()`, `format.time('%b %Y')`, `format.prefix('$')`, `format.suffix(' kg')`). Display-only — the underlying field stays the raw value.
 
-8. **Widgets (`vibe.widgets.*`)** — higher-level named elicitations, each a pure recipe over the core API (no new interaction surface): `likert`, `multipleChoice`, `slider`, `matrix`, `lineCone`, `ranking`, `allocation`, `probabilityTokens`, `interval` (alias `ci`), `histogram`, `region`, `thermometer`, `labeledValue`. Each returns an **ElicitSpec** you pass straight to `Elicit(widgets.likert({…}))`. They share one option contract — `question`, `value`/`values`, `onChange`, `width`/`height`, `stage`, and `theme` — and look like survey instruments rather than charts (option rings, a cell grid, a track), but that styling is *only* the guide layer (`optionRings`, `cellGrid`, `sliderTrack`, `crosshair`), so each has a plain-chart twin built from the same mark, edit and constraint. Pass `theme: themes.survey` (or any partial) and the whole family restyles at once.
+8. **Widgets (`elicit.widgets.*`)** — higher-level named elicitations, each a pure recipe over the core API (no new interaction surface): `likert`, `multipleChoice`, `slider`, `matrix`, `lineCone`, `ranking`, `allocation`, `probabilityTokens`, `interval` (alias `ci`), `histogram`, `region`, `thermometer`, `labeledValue`. Each returns an **ElicitSpec** you pass straight to `Elicit(widgets.likert({…}))`. They share one option contract — `question`, `value`/`values`, `onChange`, `width`/`height`, `stage`, and `theme` — and look like survey instruments rather than charts (option rings, a cell grid, a track), but that styling is *only* the guide layer (`optionRings`, `cellGrid`, `sliderTrack`, `crosshair`), so each has a plain-chart twin built from the same mark, edit and constraint. Pass `theme: themes.survey` (or any partial) and the whole family restyles at once.
 
-9. **Theme (`vibe.themes`, `setTheme`, `spec.theme`)** — the **style layer**: one data object of default colours, fonts, a `background`, and affordance tokens, deep-merged over the built-in `DEFAULT_THEME`. It supplies the *defaults* marks/chrome/renderers draw with (a per-datum paint channel still wins, and per-mark `theme.marks[name]` overrides sit in between). Resolved once per chart the way `effects` is (`spec.theme → resolveTheme → ctx.theme`, threaded to marks on the scale map), so it never adds a second style path. Built-ins: `themes.survey` (a professional survey look) and `themes.dark` (a self-contained dark mode — its `background` token paints the chart's own surface). `setTheme(partial)` sets an app-wide default. See `/theming`.
+9. **Theme (`elicit.themes`, `setTheme`, `spec.theme`)** — the **style layer**: one data object of default colours, fonts, a `background`, and affordance tokens, deep-merged over the built-in `DEFAULT_THEME`. It supplies the *defaults* marks/chrome/renderers draw with (a per-datum paint channel still wins, and per-mark `theme.marks[name]` overrides sit in between). Resolved once per chart the way `effects` is (`spec.theme → resolveTheme → ctx.theme`, threaded to marks on the scale map), so it never adds a second style path. Built-ins: `themes.survey` (a professional survey look) and `themes.dark` (a self-contained dark mode — its `background` token paints the chart's own surface). `setTheme(partial)` sets an app-wide default. See `/theming`.
 
-10. **Renderer (`vibe.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
+10. **Renderer (`elicit.D3Renderer`)** — draws the scene graph to SVG via D3, binding drag/click. Swappable for Canvas/WebGL/etc.
 
 **Reading data out.** `Elicit(spec)` returns the chart element augmented with a small observation API: `getData()` (a deep copy of the committed belief dataset), `getSchema()` (a deep copy of the engine-owned schema, including any domain an editable axis reshaped — the caller's `spec.schema` is never mutated), `setData(data)` (seed/reset + re-render; also clears the undo history, since a reseed is a new starting point rather than an edit), and `on("change" | "stage", cb)` (subscribe; returns an unsubscribe). This is in addition to the spec's `onChange`.
 
@@ -93,7 +93,7 @@ VibeJS is layered for extensibility:
 ## Project structure
 
 ```text
-vibe-js/
+elicit-js/
 ├── src/
 │   ├── core/
 │   │   ├── elicit.js       # Engine: state store, scale resolution, event routing, render loop
@@ -135,7 +135,7 @@ vibe-js/
 ├── docs-next/              # The docs: Next.js site with editable examples
 ├── scripts/
 │   └── verify-browser.mjs  # The regression gate: real Chromium over the docs
-├── vite.lib.config.js      # Library build → dist/vibe.js
+├── vite.lib.config.js      # Library build → dist/elicit.js
 └── package.json
 ```
 
@@ -144,12 +144,12 @@ vibe-js/
 ## Example
 
 ```javascript
-import * as vibe from "vibe-js";
-const { barY } = vibe.plot;
-const { drag } = vibe.edit;
-const { clamp, maintainSum } = vibe.constraints;
+import * as elicit from "elicit-js";
+const { barY } = elicit.plot;
+const { drag } = elicit.edit;
+const { clamp, maintainSum } = elicit.constraints;
 
-const beliefChart = vibe.Elicit({
+const beliefChart = elicit.Elicit({
   width: 600,
   height: 400,
   // The contract of the elicited dataset: what each field IS, and its domain.
@@ -169,7 +169,7 @@ const beliefChart = vibe.Elicit({
   marks: [
     // `datum` is a DATA-space constant: it goes through the y scale, so the line
     // lands where y = 50 is. (`value` would mean 50 pixels.)
-    vibe.plot.ruleY({ stroke: "red", strokeDasharray: "4", channels: { y: { datum: 50 } } }),
+    elicit.plot.ruleY({ stroke: "red", strokeDasharray: "4", channels: { y: { datum: 50 } } }),
     barY({
       id: "elicited-probabilities",
       fill: "purple",
@@ -189,21 +189,21 @@ document.getElementById("chart-container").appendChild(beliefChart);
 
 ## Install & use
 
-VibeJS is ESM. Consumers need a bundler (Vite, webpack, etc.) or a browser that can resolve bare imports via import maps. Runtime dependency: `d3`.
+ElicitJS is ESM. Consumers need a bundler (Vite, webpack, etc.) or a browser that can resolve bare imports via import maps. Runtime dependency: `d3`.
 
 ### From source (default — works off `main` with no build)
 
 Clone or install the package and import the public API from the package root. `package.json` points `exports` / `main` at `src/index.js`, so a normal install resolves to source:
 
 ```bash
-npm install vibe-js
+npm install elicit-js
 # or, from a checkout / GitHub:
 # npm install github:alireza116/ViBe
 ```
 
 ```javascript
-import * as vibe from "vibe-js";
-const { Elicit, plot, edit, constraints } = vibe;
+import * as elicit from "elicit-js";
+const { Elicit, plot, edit, constraints } = elicit;
 ```
 
 Types ship from `src/types.d.ts` (`"types"` in `package.json`).
@@ -214,14 +214,14 @@ If you want a single ESM file (CDN, simpler packaging, or to avoid resolving the
 
 ```bash
 npm install
-npm run build:lib   # → dist/vibe.js (+ sourcemap); d3 stays external
+npm run build:lib   # → dist/elicit.js (+ sourcemap); d3 stays external
 ```
 
 Then either:
 
 ```javascript
 // After publishing / packing with dist/ included:
-import * as vibe from "vibe-js/dist";
+import * as elicit from "elicit-js/dist";
 ```
 
 ```html
@@ -230,7 +230,7 @@ import * as vibe from "vibe-js/dist";
   { "imports": { "d3": "https://cdn.jsdelivr.net/npm/d3@7/+esm" } }
 </script>
 <script type="module">
-  import * as vibe from "./dist/vibe.js";
+  import * as elicit from "./dist/elicit.js";
 </script>
 ```
 
@@ -241,7 +241,7 @@ import * as vibe from "vibe-js/dist";
 ## Development
 
 ```bash
-cd vibe-js
+cd elicit-js
 npm install
 npm run dev            # the docs, live (http://localhost:3000)
 npm run typecheck      # tsc --noEmit against types.d.ts
@@ -253,7 +253,7 @@ npm run verify:browser # the regression gate: real Chromium over the docs
 | Command | Config | Output | What it is |
 |---|---|---|---|
 | `npm run dev` | `docs-next/` | http://localhost:3000 | The docs, live |
-| `npm run build:lib` | `vite.lib.config.js` | `dist/vibe.js` | Publishable ESM library (`d3` external) |
+| `npm run build:lib` | `vite.lib.config.js` | `dist/elicit.js` | Publishable ESM library (`d3` external) |
 | `npm run build:docs` | `docs-next/` | `docs-next/.next/` | The docs site |
 | `npm run start:docs` | — | — | Serve the docs production build |
 | `npm run typecheck` | `tsconfig.json` | — | `tsc --noEmit` against `src/types.d.ts` |
@@ -283,7 +283,7 @@ The band axis slots the bars; the linear axis sets their length from a baseline.
 </Section>
 ```
 
-`_examples/` is a Next private folder, so it never becomes a route. The `.txt` extension is deliberate: it stops the bundler parsing a chart body as a module, which would inject dev HMR / `import.meta` into the string the editor evals. `docs-next/lib/nav.ts` is the sidebar; a page's in-page anchors are read from its `<Section>` ids. `@vibe` aliases `src/index.js`, so every example on the site runs against the source.
+`_examples/` is a Next private folder, so it never becomes a route. The `.txt` extension is deliberate: it stops the bundler parsing a chart body as a module, which would inject dev HMR / `import.meta` into the string the editor evals. `docs-next/lib/nav.ts` is the sidebar; a page's in-page anchors are read from its `<Section>` ids. `@elicit` aliases `src/index.js`, so every example on the site runs against the source.
 
 Two rules worth knowing before editing the docs UI:
 
@@ -295,7 +295,7 @@ The docs are also the **test suite**. `npm run verify:browser` boots this site, 
 **Reuse in another Next app** (e.g. a lab site): import the docs UI from the package export, or copy `docs-next/`:
 
 ```javascript
-import { DocShell, ExampleLive, Section, SITE, createVibeScope } from "vibe-js/docs-ui";
+import { DocShell, ExampleLive, Section, SITE, createElicitScope } from "elicit-js/docs-ui";
 ```
 
 Chart surfaces are client components (`'use client'`); the lab page that embeds them must be a client boundary too.

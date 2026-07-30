@@ -4,12 +4,12 @@
  * Live-example scope: what an example on the docs site can name without importing.
  * Universal edits are bare (`move()`); scoped namespaces stay under `edit.*`.
  */
-import * as vibe from '@vibe';
+import * as elicit from '@elicit';
 import * as d3 from 'd3';
 import vancouver from '../data/vancouver.js';
 
 // The scoped namespaces are held back so they don't shadow the same-named MARKS
-// spread from vibe.plot (axis / arc / waffle / line).
+// spread from elicit.plot (axis / arc / waffle / line).
 const {
   line: _editLine,
   axis: _editAxis,
@@ -17,35 +17,35 @@ const {
   geo: _editGeo,
   waffle: _editWaffle,
   // The legend pickers stay under `edit.*` so the same-named `legend` MARK (from
-  // vibe.plot) — and its `legendColor`/`legendSize`/`legendSymbol` siblings — win
+  // elicit.plot) — and its `legendColor`/`legendSize`/`legendSymbol` siblings — win
   // the bare name, the way axis/arc/waffle marks win over their edit namespaces.
   legend: _editLegend,
   legendValue: _editLegendValue,
   nextSeriesKey: _nsk,
   when: _editWhen,
   ...universalEdits
-} = vibe.edit;
+} = elicit.edit;
 
-export function createVibeScope() {
+export function createElicitScope() {
   return {
-    ...vibe.plot,
-    ...vibe.constraints,
+    ...elicit.plot,
+    ...elicit.constraints,
     ...universalEdits,
-    Elicit: vibe.Elicit,
-    when: vibe.when,
-    edit: vibe.edit,
-    guides: vibe.guides,
-    widgets: vibe.widgets,
-    format: vibe.format,
-    D3Renderer: vibe.D3Renderer,
-    CanvasRenderer: vibe.CanvasRenderer,
+    Elicit: elicit.Elicit,
+    when: elicit.when,
+    edit: elicit.edit,
+    guides: elicit.guides,
+    widgets: elicit.widgets,
+    format: elicit.format,
+    D3Renderer: elicit.D3Renderer,
+    CanvasRenderer: elicit.CanvasRenderer,
     // Theme layer: `themes` (built-ins), `setTheme` (app-wide), `resolveTheme`.
-    themes: vibe.themes,
-    setTheme: vibe.setTheme,
-    resolveTheme: vibe.resolveTheme,
+    themes: elicit.themes,
+    setTheme: elicit.setTheme,
+    resolveTheme: elicit.resolveTheme,
     d3,
     vancouver,
   };
 }
 
-export type VibeScope = ReturnType<typeof createVibeScope>;
+export type ElicitScope = ReturnType<typeof createElicitScope>;

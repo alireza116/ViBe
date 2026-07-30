@@ -1,7 +1,7 @@
 # Writing docs-next
 
 Target: the terseness and directness of Observable Plot's and Vega-Lite's mark
-docs. A reader is building an elicitation chart, not extending VibeJS — write
+docs. A reader is building an elicitation chart, not extending ElicitJS — write
 for the API they call, not the engine behind it. `concepts/page.mdx` is the
 calibration page — its density and tone is the target for every other page.
 
@@ -125,6 +125,6 @@ escape hatch" from the section title itself, not just the prose:
 - `<Section id="...">` values — `scripts/verify-browser.mjs` roots
   assertions on them.
 - `_examples/*.example.txt` and `api.tsx` — code and data, not prose.
-- `authoring` and `renderers` target SDK authors extending VibeJS, not
+- `authoring` and `renderers` target SDK authors extending ElicitJS, not
   chart authors — architecture vocabulary there is correct, not verbose.
   Tighten sentences; don't strip the depth.

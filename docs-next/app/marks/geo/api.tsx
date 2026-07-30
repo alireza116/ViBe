@@ -105,7 +105,7 @@ export const api: ApiEntry[] = [
     name: "geoPoint / geoPolygon / geoLine / geoText / geoRect",
     summary: (
       <>
-        Editable overlays. Import from <code className="inline">vibe.plot</code>. <code className="inline">geoText</code> is <code className="inline">text</code> with the projection doing the placement — it shares the node shape, so <code className="inline">editText</code> / <code className="inline">cycle</code> / <code className="inline">rotate</code> work on it unchanged.
+        Editable overlays. Import from <code className="inline">elicit.plot</code>. <code className="inline">geoText</code> is <code className="inline">text</code> with the projection doing the placement — it shares the node shape, so <code className="inline">editText</code> / <code className="inline">cycle</code> / <code className="inline">rotate</code> work on it unchanged.
       </>
     ),
     signatures: [

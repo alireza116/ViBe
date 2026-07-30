@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "The Edit descriptor",
     summary: (
       <>
-        Every edit factory (<code className="inline">vibe.edit.*</code>) returns this shape, built by <code className="inline">makeEdit</code>. The named factories are presets over it: each fixes a <code className="inline">gesture</code> and an <code className="inline">apply</code> — the inversion that turns the gesture back into data. <code className="inline">apply(ctx)</code> is pure: given the context it returns a datum (direct edit), a full array (whole-dataset edit), or <code className="inline">undefined</code> (no-op).
+        Every edit factory (<code className="inline">elicit.edit.*</code>) returns this shape, built by <code className="inline">makeEdit</code>. The named factories are presets over it: each fixes a <code className="inline">gesture</code> and an <code className="inline">apply</code> — the inversion that turns the gesture back into data. <code className="inline">apply(ctx)</code> is pure: given the context it returns a datum (direct edit), a full array (whole-dataset edit), or <code className="inline">undefined</code> (no-op).
       </>
     ),
     options: [
@@ -31,7 +31,7 @@ export const api: ApiEntry[] = [
         default: "null",
         desc: (
           <>
-            Arbitration — whether this edit claims the gesture (e.g. only on Shift). See <code className="inline">vibe.when</code>.
+            Arbitration — whether this edit claims the gesture (e.g. only on Shift). See <code className="inline">elicit.when</code>.
           </>
         ),
       },
@@ -170,7 +170,7 @@ export const api: ApiEntry[] = [
         default: "—",
         desc: (
           <>
-            The raw DOM event (for modifiers like <code className="inline">shiftKey</code>). Prefer <code className="inline">vibe.when</code> for arbitration when you can.
+            The raw DOM event (for modifiers like <code className="inline">shiftKey</code>). Prefer <code className="inline">elicit.when</code> for arbitration when you can.
           </>
         ),
       },
@@ -207,7 +207,7 @@ export const api: ApiEntry[] = [
     name: "Edit catalogue",
     summary: (
       <>
-        Universal edits import bare (<code className="inline">vibe.edit.move</code>); line-scoped ones live under <code className="inline">vibe.edit.line.*</code> so their scope shows in the name.
+        Universal edits import bare (<code className="inline">elicit.edit.move</code>); line-scoped ones live under <code className="inline">elicit.edit.line.*</code> so their scope shows in the name.
       </>
     ),
     options: [

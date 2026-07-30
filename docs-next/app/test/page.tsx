@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DocShell } from "../../components/DocShell";
-import { Elicit, plot, edit } from "@vibe";
+import { Elicit, plot, edit } from "@elicit";
 import { legend } from "../../../src/plot";
 
 const { bar, tickX, tickY } = plot;

@@ -4,9 +4,9 @@
 // space through scale.encode, so it composes across scale types, and any option
 // may be a function of the guide context (see guides/shared.js).
 //
-//   vibe.guides.region({ y: [40, 60] })          // horizontal band, y in [40,60]
-//   vibe.guides.region({ x: ["Agree", "Strongly agree"] })
-//   vibe.guides.region({ y: ({ data }) => [min(data), max(data)] })
+//   elicit.guides.region({ y: [40, 60] })          // horizontal band, y in [40,60]
+//   elicit.guides.region({ x: ["Agree", "Strongly agree"] })
+//   elicit.guides.region({ y: ({ data }) => [min(data), max(data)] })
 
 import { resolveGuideOptions } from './shared.js';
 

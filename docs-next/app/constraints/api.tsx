@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "Built-in constraints",
     summary: (
       <>
-        Import from <code className="inline">vibe.constraints</code> and pass on the <code className="inline">Elicit</code> spec’s <code className="inline">constraints: [...]</code> (a mark accepts them too, as sugar, and the engine promotes them). All are pure data invariants — they run on every commit and never see pixels.
+        Import from <code className="inline">elicit.constraints</code> and pass on the <code className="inline">Elicit</code> spec’s <code className="inline">constraints: [...]</code> (a mark accepts them too, as sugar, and the engine promotes them). All are pure data invariants — they run on every commit and never see pixels.
       </>
     ),
     signatures: [

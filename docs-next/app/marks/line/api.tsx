@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "line · lineY · lineX · connectedScatter · path",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. One non-interactive connector path per series, drawn under one draggable <code className="inline">circle</code> handle per datum. <code className="inline">lineY</code>/<code className="inline">lineX</code> pin the value axis; <code className="inline">connectedScatter</code> and <code className="inline">path</code> default to <code className="inline">order:"sequence"</code>.
+        Import from <code className="inline">elicit.plot</code>. One non-interactive connector path per series, drawn under one draggable <code className="inline">circle</code> handle per datum. <code className="inline">lineY</code>/<code className="inline">lineX</code> pin the value axis; <code className="inline">connectedScatter</code> and <code className="inline">path</code> default to <code className="inline">order:"sequence"</code>.
       </>
     ),
     signatures: [

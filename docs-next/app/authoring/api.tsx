@@ -2,7 +2,7 @@ import type { ApiEntry } from '../../lib/types';
 
 export const api: ApiEntry[] = [
   {
-    name: "Mark SDK — vibe.plot",
+    name: "Mark SDK — elicit.plot",
     summary: (
       <>
         Shared foundation every mark factory uses. Import as <code className="inline">plot.encodeChannel</code> (or the bare name in these docs). A mark never owns <code className="inline">data</code> or a domain — <code className="inline">Elicit</code> owns both.
@@ -71,7 +71,7 @@ export const api: ApiEntry[] = [
     ),
   },
   {
-    name: "Edit SDK — vibe.edit",
+    name: "Edit SDK — elicit.edit",
     summary: (
       <>
         Build descriptors and reuse the same invert/pick helpers the stock edits use. Prefer the ladder: stock edit → <code className="inline">custom</code> → <code className="inline">makeEdit</code> → <code className="inline">registerDriver</code>.

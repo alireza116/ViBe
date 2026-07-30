@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "arc(options) · pie(options) · donut(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. <code className="inline">pie</code> / <code className="inline">donut</code> are thin wrappers.
+        Import from <code className="inline">elicit.plot</code>. <code className="inline">pie</code> / <code className="inline">donut</code> are thin wrappers.
       </>
     ),
     signatures: [

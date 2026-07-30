@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "guides.rule · guides.region · guides.proximity",
     summary: (
       <>
-        Import from <code className="inline">vibe.guides</code> and pass in the chart’s <code className="inline">guides: [...]</code>. All position in <b>data space</b> through the same <code className="inline">scale.encode()</code> a mark uses, so they compose across scale types. Non-interactive.
+        Import from <code className="inline">elicit.guides</code> and pass in the chart’s <code className="inline">guides: [...]</code>. All position in <b>data space</b> through the same <code className="inline">scale.encode()</code> a mark uses, so they compose across scale types. Non-interactive.
       </>
     ),
     signatures: [

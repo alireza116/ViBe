@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "dotStack(options) · dotStackY(options) · dotStackX(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. The category axis is a band/point scale over the discrete slots. <code className="inline">dotStackY</code> stacks upward (category on x); <code className="inline">dotStackX</code> rightward (category on y); <code className="inline">dotStack</code> auto-detects.
+        Import from <code className="inline">elicit.plot</code>. The category axis is a band/point scale over the discrete slots. <code className="inline">dotStackY</code> stacks upward (category on x); <code className="inline">dotStackX</code> rightward (category on y); <code className="inline">dotStack</code> auto-detects.
       </>
     ),
     signatures: [

@@ -64,7 +64,7 @@ export function resolveLock(lock, seedCount) {
     if (typeof lock === 'function') return (d, i) => !!lock(d, i);
     if (lock === true || lock === 'seed') return (_d, i) => i < seedCount();
     console.warn(
-        `[vibe] spec.lock: expected "seed", true, or a (datum, index) => boolean ` +
+        `[elicit] spec.lock: expected "seed", true, or a (datum, index) => boolean ` +
         `predicate; got ${JSON.stringify(lock)}. Nothing is locked.`
     );
     return null;

@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "widgets.likert · multipleChoice · slider · matrix · lineCone · ranking · allocation · …",
     summary: (
       <>
-        Import from <code className="inline">vibe.widgets</code>. Each returns an ElicitSpec; pass it straight to <code className="inline">Elicit</code>. The chart elicits one dataset, so <code className="inline">getData()</code> reads the answer.
+        Import from <code className="inline">elicit.widgets</code>. Each returns an ElicitSpec; pass it straight to <code className="inline">Elicit</code>. The chart elicits one dataset, so <code className="inline">getData()</code> reads the answer.
       </>
     ),
     signatures: [

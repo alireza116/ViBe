@@ -1,5 +1,5 @@
 {
-  "name": "vibe-js",
+  "name": "elicit-js",
   "version": "1.0.0",
   "description": "Declarative, grammar-of-graphics-inspired library for interactive visual belief elicitation.",
   "type": "module",
@@ -13,8 +13,8 @@
       "default": "./src/index.js"
     },
     "./dist": {
-      "import": "./dist/vibe.js",
-      "default": "./dist/vibe.js"
+      "import": "./dist/elicit.js",
+      "default": "./dist/elicit.js"
     },
     "./docs-ui": {
       "types": "./docs-next/components/index.ts",

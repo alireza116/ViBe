@@ -3,7 +3,7 @@
 // a positional (x, y) and reads its label, size, anchor and rotation from channels,
 // so a label is data like every other mark's encoding:
 //
-//   vibe.plot.text({
+//   elicit.plot.text({
 //     channels: {
 //       x:    { field: "gdp" },       // linear position
 //       y:    { field: "life" },      // linear position

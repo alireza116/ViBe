@@ -8,7 +8,7 @@ export { Lead } from './Lead';
 export { Playground } from './Playground';
 export type { PlaygroundPreset } from './Playground';
 export { SITE } from '../lib/nav';
-export { createVibeScope } from '../lib/vibeScope';
+export { createElicitScope } from '../lib/elicitScope';
 export type {
   CodeMode,
   Prose,

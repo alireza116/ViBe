@@ -280,7 +280,7 @@ export interface Edit {
 }
 
 // ---------------------------------------------------------------------------
-// Edit factory options — what a caller passes to vibe.edit.* factories. Every
+// Edit factory options — what a caller passes to elicit.edit.* factories. Every
 // factory takes EditOptions; the ones with extra knobs extend it below. Any
 // canonical Edit field may be overridden here (gesture, pick, when, stage, …);
 // keys the descriptor doesn't know pass through onto it for a driver to read
@@ -532,7 +532,7 @@ export interface MarkOptions {
   // Orientation shorthand (math degrees) — desugars to channels.angle.
   angle?: number | ChannelFn;
   // Text-mark display formatter: a d3-format string or `(value) => string`.
-  // Display-only — the underlying field stays the raw value. See `vibe.format`.
+  // Display-only — the underlying field stays the raw value. See `elicit.format`.
   format?: string | ((v: any) => string);
   id?: string;
   edits?: any[];

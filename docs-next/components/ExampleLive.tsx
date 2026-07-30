@@ -12,7 +12,7 @@ import {
 import { Highlight, themes } from 'prism-react-renderer';
 import { Editor } from 'react-live';
 import type { CodeMode, ExampleMeta, Prose } from '../lib/types';
-import { createVibeScope } from '../lib/vibeScope';
+import { createElicitScope } from '../lib/elicitScope';
 
 const EVAL_DEBOUNCE_MS = 280;
 
@@ -227,7 +227,7 @@ export function ExampleLive({
   const chartRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<ElicitEl | null>(null);
   const debounceRef = useRef<number | null>(null);
-  const scope = useMemo(() => createVibeScope(), []);
+  const scope = useMemo(() => createElicitScope(), []);
 
   const isEditable = codeMode === 'editable';
   const isVisual = codeMode === 'collapsed' || codeMode === 'readonly';

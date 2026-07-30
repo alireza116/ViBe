@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "point(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. A circle or square per datum; every channel — positional or not — resolves through the global scales.
+        Import from <code className="inline">elicit.plot</code>. A circle or square per datum; every channel — positional or not — resolves through the global scales.
       </>
     ),
     signatures: [

@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "trend(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. A single-datum glyph; the fitted line is non-interactive and each handle is a draggable circle scoped to its own field.
+        Import from <code className="inline">elicit.plot</code>. A single-datum glyph; the fitted line is non-interactive and each handle is a draggable circle scoped to its own field.
       </>
     ),
     signatures: [

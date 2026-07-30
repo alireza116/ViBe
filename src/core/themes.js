@@ -1,5 +1,5 @@
 // @ts-check
-// themes.js — the built-in themes, exposed publicly as `vibe.themes`. Each is a
+// themes.js — the built-in themes, exposed publicly as `elicit.themes`. Each is a
 // PARTIAL theme (deep-merged over DEFAULT_THEME by resolveTheme), so a theme only
 // names the tokens it changes and inherits the rest.
 //

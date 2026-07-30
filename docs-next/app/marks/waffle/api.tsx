@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "waffle(options) · waffleY(options) · waffleX(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. <code className="inline">waffle</code> auto-detects orientation from which axis is a band; <code className="inline">waffleY</code> forces vertical, <code className="inline">waffleX</code> horizontal.
+        Import from <code className="inline">elicit.plot</code>. <code className="inline">waffle</code> auto-detects orientation from which axis is a band; <code className="inline">waffleY</code> forces vertical, <code className="inline">waffleX</code> horizontal.
       </>
     ),
     signatures: [

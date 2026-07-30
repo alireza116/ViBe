@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "legend · legendColor · legendSize · legendSymbol",
     summary: (
       <>
-        A legend for a non-positional channel (<code className="inline">fill</code>, <code className="inline">stroke</code>, <code className="inline">size</code>, <code className="inline">symbol</code>). It reads the channel’s global scale and draws either discrete swatches or a continuous colour ramp. Like an axis, it is a composable mark — but it <b>reserves space</b> on its side, shrinking the plot so it never overlaps the marks. Import from <code className="inline">vibe.plot</code>.
+        A legend for a non-positional channel (<code className="inline">fill</code>, <code className="inline">stroke</code>, <code className="inline">size</code>, <code className="inline">symbol</code>). It reads the channel’s global scale and draws either discrete swatches or a continuous colour ramp. Like an axis, it is a composable mark — but it <b>reserves space</b> on its side, shrinking the plot so it never overlaps the marks. Import from <code className="inline">elicit.plot</code>.
       </>
     ),
     signatures: [

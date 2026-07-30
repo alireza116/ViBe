@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "needle(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. One needle (+ hub) per datum.
+        Import from <code className="inline">elicit.plot</code>. One needle (+ hub) per datum.
       </>
     ),
     signatures: [

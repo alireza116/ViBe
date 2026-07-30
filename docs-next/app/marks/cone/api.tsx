@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "cone(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. A single-datum glyph; all nodes are non-interactive (the whole plane is the gesture surface).
+        Import from <code className="inline">elicit.plot</code>. A single-datum glyph; all nodes are non-interactive (the whole plane is the gesture surface).
       </>
     ),
     signatures: [

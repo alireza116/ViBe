@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: 'bar(options) · barY(options) · barX(options)',
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>.{' '}
+        Import from <code className="inline">elicit.plot</code>.{' '}
         <code className="inline">bar</code> infers orientation from which axis is a
         band; <code className="inline">barY</code> forces vertical,{' '}
         <code className="inline">barX</code> horizontal. All three share these

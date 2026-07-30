@@ -65,14 +65,14 @@ export function warnMisplacedEdits(feature) {
         if (name === 'edit' || looksLikeEdit(chSpec)) {
             warnedMisplaced.add(key);
             console.warn(
-                `[vibe] mark "${fid}" has a misplaced edit under channels.${name}. ` +
+                `[elicit] mark "${fid}" has a misplaced edit under channels.${name}. ` +
                 `Attach edits on a channel (y: { field, edit: move() }) or at mark level ` +
                 `(edits: [move({ channels: ['x','y'] })]). A bare channels.edit key is ignored.`
             );
         } else if (chSpec && chSpec.edit && typeof chSpec.fn === 'function' && chSpec.field == null) {
             warnedMisplaced.add(key);
             console.warn(
-                `[vibe] mark "${fid}" puts an edit on the derived channel "${name}" ({ fn }). ` +
+                `[elicit] mark "${fid}" puts an edit on the derived channel "${name}" ({ fn }). ` +
                 `A derived channel is read-only — it recomputes from the committed rows on every ` +
                 `render, so the edit is ignored. Attach the edit to the source field's channel ` +
                 `(e.g. x: { field: "x", edit: move() }); the fn re-derives automatically after each commit.`

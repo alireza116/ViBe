@@ -139,7 +139,7 @@ export function callChannelFn(spec, channel, datum, index, data, fallback) {
     } catch (err) {
         if (DEV && !warnedFn.has(channel)) {
             warnedFn.add(channel);
-            console.warn(`[vibe] fn on channel "${channel}" threw: ` +
+            console.warn(`[elicit] fn on channel "${channel}" threw: ` +
                 `${err instanceof Error ? err.message : err}; using the fallback.`);
         }
         return fallback;

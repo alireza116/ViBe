@@ -3,7 +3,7 @@ import '../styles/docs.css';
 import '../styles/next-docs.css';
 
 export const metadata: Metadata = {
-  title: 'VibeJS Docs',
+  title: 'ElicitJS Docs',
   description: 'Declarative visual belief elicitation — documentation',
 };
 

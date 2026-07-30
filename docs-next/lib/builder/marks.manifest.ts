@@ -28,7 +28,7 @@ export type MarkManifestEntry = {
   category: string;
   docHref: string;
   api: ApiEntry[];
-  /** Bare/X/Y (or equivalent) factory names, exactly as they exist on `vibe.plot`. */
+  /** Bare/X/Y (or equivalent) factory names, exactly as they exist on `elicit.plot`. */
   factoryNames: { auto: string; x?: string; y?: string };
   /** Buildable marks get a full form (position + style channels). Non-buildable
    * marks (polar geometry, nested parts, projections) stay in the catalog for

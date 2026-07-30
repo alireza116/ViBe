@@ -77,7 +77,7 @@ export const drivers = [planeDriver, nearestDriver, sweepDriver, drawDriver, bru
  */
 export function registerDriver(driver) {
     if (!driver || !driver.name || typeof driver.wants !== 'function' || typeof driver.onEvent !== 'function') {
-        throw new Error('[vibe] registerDriver expects { name, wants(edit), onEvent(ctx) }');
+        throw new Error('[elicit] registerDriver expects { name, wants(edit), onEvent(ctx) }');
     }
     const i = drivers.findIndex((d) => d.name === driver.name);
     if (i >= 0) drivers[i] = driver;

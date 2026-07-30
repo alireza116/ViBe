@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "text(options) · textX(options) · textY(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. <code className="inline">text</code> positions from x AND y; <code className="inline">textX</code> / <code className="inline">textY</code> are 1-D labels along one axis (the other parks at centre).
+        Import from <code className="inline">elicit.plot</code>. <code className="inline">text</code> positions from x AND y; <code className="inline">textX</code> / <code className="inline">textY</code> are 1-D labels along one axis (the other parks at centre).
       </>
     ),
     signatures: [

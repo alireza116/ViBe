@@ -4,7 +4,7 @@ import createMDX from '@next/mdx';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
-const vibeEntry = path.join(repoRoot, 'src/index.js');
+const elicitEntry = path.join(repoRoot, 'src/index.js');
 const rawLoader = path.join(__dirname, 'loaders/raw-string-loader.cjs');
 
 /** @type {import('next').NextConfig} */
@@ -16,7 +16,7 @@ const nextConfig = {
     root: repoRoot,
     resolveAlias: {
       // Relative alias — absolute paths break Turbopack ("server relative imports").
-      '@vibe': '../src/index.js',
+      '@elicit': '../src/index.js',
     },
     rules: {
       '*.example.txt': {
@@ -28,7 +28,7 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@vibe': vibeEntry,
+      '@elicit': elicitEntry,
     };
     // Plain text chart bodies — never parsed as JS (avoids dev HMR / import.meta in eval strings).
     config.module.rules.unshift({

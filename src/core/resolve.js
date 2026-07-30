@@ -122,7 +122,7 @@ export function resolveScales(features, dataset, spec, dims) {
         if (DEV && (chSpec.scale !== undefined || chSpec.type !== undefined)) {
           warnOnce(
             `fn:${ch}`,
-            `[vibe] channel "${ch}" is derived ({ fn }) — its result is used ` +
+            `[elicit] channel "${ch}" is derived ({ fn }) — its result is used ` +
               `as-is in visual space, so its "${chSpec.scale !== undefined ? "scale" : "type"}" ` +
               `is ignored. Drop it, or use a field channel if you want a scale.`,
           );
@@ -142,7 +142,7 @@ export function resolveScales(features, dataset, spec, dims) {
           if (chSpec[key] === undefined) continue;
           warnOnce(
             `stray:${key}:${ch}`,
-            `[vibe] channel "${ch}" declares "${key}", which is ignored. Move it to ` +
+            `[elicit] channel "${ch}" declares "${key}", which is ignored. Move it to ` +
               `${where}: ${key === "range" ? `scale: { range: [...] }` : `schema: { <field>: { domain: [...] } }`}.`,
           );
         }
@@ -180,7 +180,7 @@ export function resolveScales(features, dataset, spec, dims) {
         if (schema[f]) continue;
         warnOnce(
           `schema:${f}:${bucket}`,
-          `[vibe] field "${f}" is encoded on channel "${bucket}" but not declared in ` +
+          `[elicit] field "${f}" is encoded on channel "${bucket}" but not declared in ` +
             `schema; inferring its type and domain from data. Declare it in the Elicit ` +
             `spec's schema — the schema is the contract of the elicited dataset.`,
         );
@@ -188,7 +188,7 @@ export function resolveScales(features, dataset, spec, dims) {
     }
     if (!entries.length && !hasData) {
       throw new Error(
-        `[vibe] cannot resolve a scale for channel "${bucket}": field(s) ` +
+        `[elicit] cannot resolve a scale for channel "${bucket}": field(s) ` +
           `${a.fields.map((f) => `"${f}"`).join(", ")} have no schema entry and there is no data ` +
           `to infer from. Declare them in the Elicit spec's schema.`,
       );
@@ -205,7 +205,7 @@ export function resolveScales(features, dataset, spec, dims) {
     if (DEV && new Set(declared).size > 1) {
       warnOnce(
         `measure:${bucket}`,
-        `[vibe] fields ${a.fields.map((f) => `"${f}"`).join(", ")} share channel "${bucket}" ` +
+        `[elicit] fields ${a.fields.map((f) => `"${f}"`).join(", ")} share channel "${bucket}" ` +
           `but declare different schema types (${[...new Set(declared)].join(", ")}). ` +
           `Using "${declared[0]}".`,
       );

@@ -53,7 +53,7 @@ export function DocShell({ children, chromeless }: Props) {
     <div className="layout">
       <nav>
         <div className="brand">
-          <Link href="/">VibeJS</Link>
+          <Link href="/">ElicitJS</Link>
         </div>
         <div className="tag">declarative visual belief elicitation</div>
         {SITE.map((grp) => (

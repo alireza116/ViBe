@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "axis · axisX · axisY",
     summary: (
       <>
-        A spine, ticks, labels and an optional title for one channel’s scale. Import from <code className="inline">vibe.plot</code>, or configure implicitly via the global <code className="inline">axes:{'{'}…{'}'}</code> on <code className="inline">Elicit</code> (which desugars into these).
+        A spine, ticks, labels and an optional title for one channel’s scale. Import from <code className="inline">elicit.plot</code>, or configure implicitly via the global <code className="inline">axes:{'{'}…{'}'}</code> on <code className="inline">Elicit</code> (which desugars into these).
       </>
     ),
     signatures: [

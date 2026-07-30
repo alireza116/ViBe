@@ -68,7 +68,7 @@ export function ordering(options = {}) {
 
     if (order.length < 2) {
         throw new Error(
-            '[vibe] ordering() needs at least two fields, in order — e.g. ' +
+            '[elicit] ordering() needs at least two fields, in order — e.g. ' +
             "ordering({ fields: ['lo', 'mean', 'hi'] }) or ordering({ lower: 'lo', upper: 'hi' })"
         );
     }

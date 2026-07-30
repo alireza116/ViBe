@@ -1,5 +1,5 @@
 /**
- * Public API typings for `vibe-js` / `@vibe`.
+ * Public API typings for `elicit-js` / `@elicit`.
  * Shape interfaces live in `./types`; this file declares the callable surface.
  */
 import type {

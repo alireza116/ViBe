@@ -76,7 +76,7 @@ function instantiate(type) {
     if (typeof type === 'string') {
         const key = type.toLowerCase();
         const factory = NAMED[key];
-        if (!factory) throw new Error(`[vibe] unknown projection type: ${type}`);
+        if (!factory) throw new Error(`[elicit] unknown projection type: ${type}`);
         return factory();
     }
     // Live d3 projection (has .stream).
@@ -112,7 +112,7 @@ function warnInvertedRings(domain) {
             (f.properties && (f.properties.name || f.properties.NAME)) || `feature ${i}`)
         .slice(0, 3);
     console.warn(
-        `[vibe] projection domain has ${inverted.length} polygon(s) with reversed ring ` +
+        `[elicit] projection domain has ${inverted.length} polygon(s) with reversed ring ` +
         `winding (${names.join(', ')}${inverted.length > 3 ? ', …' : ''}). d3 reads these as ` +
         `covering the whole globe, so the map fits the world and your features shrink to a dot. ` +
         `Rewind the exterior rings counterclockwise (RFC 7946).`

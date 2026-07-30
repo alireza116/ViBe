@@ -49,7 +49,7 @@ function warnScopeMismatch(feature, edits) {
         if (warnedScope.has(key)) continue;
         warnedScope.add(key);
         console.warn(
-            `[vibe] edit.${e.scope}.${e.type}() is attached to a mark without ${e.scope} support ` +
+            `[elicit] edit.${e.scope}.${e.type}() is attached to a mark without ${e.scope} support ` +
             `(mark "${feature.id}"). ${e.scope}-scoped edits expect ${cap.expects}; it may not behave.`
         );
     }
@@ -72,7 +72,7 @@ function warnProjectionCartesianMix(features, scales) {
     if (!offenders.length) return;
     warnedProjCartesian = true;
     console.warn(
-        `[vibe] spec.projection is set together with cartesian x/y channels on ` +
+        `[elicit] spec.projection is set together with cartesian x/y channels on ` +
         `${offenders.map((f) => `"${f.id}"`).join(', ')}. Projection charts use geo* marks ` +
         `(geoPoint, geoLine, …); mixing ordinary positional marks is unsupported.`
     );
@@ -91,7 +91,7 @@ function warnDuplicatePlaneEdits(features, editsOf) {
     if (owners.length < 2) return;
     warnedPlaneDup = true;
     console.warn(
-        `[vibe] ${owners.length} marks carry a plane-pick edit over the one dataset ` +
+        `[elicit] ${owners.length} marks carry a plane-pick edit over the one dataset ` +
         `(marks ${owners.map(f => `"${f.id}"`).join(', ')}). A plane gesture fans to all ` +
         `of them, so a whole-dataset edit (create/remove/rotate/toggle) will apply once per ` +
         `mark. Declare it on exactly one.`
@@ -133,7 +133,7 @@ function warnCreateOnNonMark(feature, edits, scales) {
         if (feature.isAxis || feature.isGrid) {
             warnedCreateCap.add(key);
             console.warn(
-                `[vibe] a create/${e.type} edit is on "${feature.id}", which is a guide (axis/grid), ` +
+                `[elicit] a create/${e.type} edit is on "${feature.id}", which is a guide (axis/grid), ` +
                 `not a data mark. Creation mints dataset rows; a guide edits the DOMAIN instead ` +
                 `(edit.axis.*). Move the create to a data mark.`
             );
@@ -147,7 +147,7 @@ function warnCreateOnNonMark(feature, edits, scales) {
         if (!anyInvertible) {
             warnedCreateCap.add(key);
             console.warn(
-                `[vibe] a create/${e.type} edit is on "${feature.id}", but none of its positional ` +
+                `[elicit] a create/${e.type} edit is on "${feature.id}", but none of its positional ` +
                 `channels (${names.join(', ')}) has an invertible scale — the pointer can't be ` +
                 `inverted to a datum, so the create is a no-op. Creation needs a data mark on an axis.`
             );
@@ -182,7 +182,7 @@ function warnCreateEmptyExtent(feature, edits, schema) {
         if (warnedCreateCap.has(key)) continue;
         warnedCreateCap.add(key);
         console.warn(
-            `[vibe] create/${e.type} on the extent mark "${feature.id}" doesn't seed ${missing.join(', ')}, ` +
+            `[elicit] create/${e.type} on the extent mark "${feature.id}" doesn't seed ${missing.join(', ')}, ` +
             `so a new row is minted with no extent (zero-size, invisible). Seed it via ` +
             `create({ defaults: { … } }) or a field default in the schema.`
         );
@@ -1265,8 +1265,8 @@ export function Elicit(spec) {
                 if (edit.name === name) { count++; if (!hit) hit = { feature, edit }; }
             }
         }
-        if (DEV && count === 0) console.warn(`[vibe] el.control("${name}"): no edit is named "${name}".`);
-        if (DEV && count > 1) console.warn(`[vibe] el.control("${name}"): ${count} edits share the name "${name}"; driving the first.`);
+        if (DEV && count === 0) console.warn(`[elicit] el.control("${name}"): no edit is named "${name}".`);
+        if (DEV && count > 1) console.warn(`[elicit] el.control("${name}"): ${count} edits share the name "${name}"; driving the first.`);
         return hit;
     };
 

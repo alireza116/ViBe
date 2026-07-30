@@ -7,7 +7,7 @@
 //     an outline for bars). If nothing is within threshold, only the ring shows.
 //
 // Added automatically when a proximityDrag has `highlight: true`, or declared
-// explicitly: vibe.guides.proximity({ target: "my-feature" }).
+// explicitly: elicit.guides.proximity({ target: "my-feature" }).
 //
 // This is the legacy standalone form of the `select` interaction effect; it now
 // delegates to the shared builder so it looks identical to the edit-owned guide

@@ -4,13 +4,13 @@
 // channel and it draws a line across the plot at that position, using the SAME
 // scale.encode() a mark would. Non-interactive.
 //
-//   vibe.guides.rule({ y: 50, label: "target" })   // horizontal line at y = 50
-//   vibe.guides.rule({ x: "Neutral" })             // vertical line at a category
+//   elicit.guides.rule({ y: 50, label: "target" })   // horizontal line at y = 50
+//   elicit.guides.rule({ x: "Neutral" })             // vertical line at a category
 //
 // Any option may instead be a function of the guide context, so a reference line
 // can be DERIVED from the elicited data rather than fixed:
 //
-//   vibe.guides.rule({ y: ({ data }) => d3.mean(data, (d) => d.y), label: "mean" })
+//   elicit.guides.rule({ y: ({ data }) => d3.mean(data, (d) => d.y), label: "mean" })
 //
 // Because it positions through scale.encode, it works on any scale type (linear
 // pixel, band centre) with no special-casing — a reference line on a Likert band

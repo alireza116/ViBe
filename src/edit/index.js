@@ -29,10 +29,10 @@
 // line.js and are grouped under `edit.line.*` so the scope is visible in the name.
 //
 // Placed on a channel (co-located) for the simple case:
-//   size: { field: "mag", edit: vibe.edit.slide() }   // linear magnitude (preferred)
-//   size: { field: "mag", edit: vibe.edit.resize() }  // radial magnitude
+//   size: { field: "mag", edit: elicit.edit.slide() }   // linear magnitude (preferred)
+//   size: { field: "mag", edit: elicit.edit.resize() }  // radial magnitude
 // Or at mark level for joint / arbitrary edits:
-//   edits: [ vibe.edit.move({ channels: ["x", "y"] }), vibe.edit.line.anchor() ]
+//   edits: [ elicit.edit.move({ channels: ["x", "y"] }), elicit.edit.line.anchor() ]
 
 export { move, moveSpan, brushSpan, brushRect, slide, resize, rotate, cycle, create, toggle, remove, set, editText, legend, legendValue, select, custom, rank } from './basic.js';
 

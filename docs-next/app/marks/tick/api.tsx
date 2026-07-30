@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "tick(options) · tickY(options) · tickX(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>. <code className="inline">tick</code> infers the value axis from which axis is a band; <code className="inline">tickY</code> marks a value on y (spans the x band), <code className="inline">tickX</code> on x.
+        Import from <code className="inline">elicit.plot</code>. <code className="inline">tick</code> infers the value axis from which axis is a band; <code className="inline">tickY</code> marks a value on y (spans the x band), <code className="inline">tickX</code> on x.
       </>
     ),
     signatures: [

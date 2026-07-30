@@ -5,7 +5,7 @@ export const api: ApiEntry[] = [
     name: "axisRadial(options)",
     summary: (
       <>
-        Import from <code className="inline">vibe.plot</code>.
+        Import from <code className="inline">elicit.plot</code>.
       </>
     ),
     signatures: [
