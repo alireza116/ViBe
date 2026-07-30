@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repo. ElicitJS just went through a
 
 A declarative viz library for interactive belief elicitation. `Elicit(spec)` renders an SVG chart where gestures write back to data. The core idea: **an edit is the inverse of encoding** — `encode` maps data → visual through a channel's scale; an edit's `apply()` maps a gesture → data through the *same* scale.
 
-Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/plot/mark.js` (shared mark foundation), `src/edit/index.js` (edit barrel). Read `README.md` for the architecture map before making structural changes.
+Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/plot/mark.js` (shared mark foundation), `src/edit/index.js` (edit barrel). Read `ARCHITECTURE.md` for the architecture map before making structural changes (`README.md` is the short front door: what it is, install, one example, how to run it).
 
 ## Non-negotiable invariants
 
@@ -81,11 +81,11 @@ The contract is the `Mark` interface in `src/types.d.ts` (prose version at the t
 ## Before committing a structural change
 
 1. `npm run typecheck` (`tsc --noEmit` against `src/types.d.ts`) must stay clean.
-2. `npm run verify:browser` must stay green. It boots `docs-next`, drives real Chromium, and asserts actual gesture outcomes. If you touched dispatch, marks, or edits, add a check there — the driver/session state machines only prove out under real pointer events, and every interaction bug this repo has shipped was invisible to typecheck. To drive a gesture by hand: `npm run dev`, then load the route.
+2. `npm run verify:browser` must stay green. It boots the sibling `../elicitjs-docs` site, drives real Chromium, and asserts actual gesture outcomes. If you touched dispatch, marks, or edits, add a check there — the driver/session state machines only prove out under real pointer events, and every interaction bug this repo has shipped was invisible to typecheck. To drive a gesture by hand: `npm run dev` (or `cd ../elicitjs-docs && npm run dev`), then load the route.
 3. `npm run check:warnings` must stay green. The second gate (there is still no unit-test suite): it visits every documented route under **Next.js/webpack** and fails on any `[elicit]` warning. Every docs example is a spec that should be correct, so a warning is either a broken example or a false positive in a guard. It found two examples passing `ruleY({ y: 50 })` — a form `rule` doesn't read — which had been drawing reference lines at a fallback position for a long time; `verify:browser` cannot catch that, because the page renders fine. Note what it does *not* prove: silence could also mean the diagnostics got disabled again, so after touching `core/dev.js` also confirm the warning strings survive `npm run build:lib` (grep `dist/elicit.js`).
-4. **`docs-next/` is the documentation.** Update it if the public surface changed — the docs are the regression surface, and a feature with no page effectively doesn't exist. The old `docs/` tree was retired on 2026-07-16; don't recreate an HTML-and-harness docs site beside the Next one.
+4. **`../elicitjs-docs` is the documentation** (sibling repo). Update it if the public surface changed — the docs are the regression surface, and a feature with no page effectively doesn't exist. The old `docs/` tree was retired on 2026-07-16; don't recreate an HTML-and-harness docs site inside this library repo.
 5. `src/types.d.ts` is the source of truth for shapes (`Mark`, `Edit`, `Constraint`, `FeatureNode`, `Session`, …) — update it alongside any descriptor change.
-6. If you touched packaging, `npm pack --dry-run` must stay small (~0.6 MB). `files` once included `docs-next`, whose `.next` build output is 1.4 GB — the tarball was over 1 GB and the publish would simply have failed.
+6. If you touched packaging, `npm pack --dry-run` must stay small (~0.6 MB). `files` once included the docs app, whose `.next` build output is 1.4 GB — the tarball was over 1 GB and the publish would simply have failed. Docs now live in `../elicitjs-docs` and must stay out of this package's `files`.
 
 ## Don't reintroduce
 
@@ -103,4 +103,4 @@ The contract is the `Mark` interface in `src/types.d.ts` (prose version at the t
 - A mark factory that accepts `edits` / `constraints` and drops them.
 - A diagnostic gated on `import.meta.env.DEV` or any other bundler-specific global, or a `console.warn` that bypasses `core/dev.js`'s `warn()`.
 - A `@returns {any}` on a mark factory. The `Mark` interface exists now.
-- `docs-next` (or anything else generated) in `package.json`'s `files`.
+- Docs (`../elicitjs-docs`) or anything generated in `package.json`'s `files`.

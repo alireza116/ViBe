@@ -1,11 +1,11 @@
 // verify-browser.mjs — real-browser checks for behaviour the typechecker can't see.
-// Starts a throwaway Next dev server over docs-next, drives Chromium via Playwright,
-// asserts, tears down.
+// Starts a throwaway Next dev server over the sibling elicitjs-docs site, drives
+// Chromium via Playwright, asserts, tears down.
 //
 //   node scripts/verify-browser.mjs        (or: npm run verify:browser)
 //
 // This is the repo's only regression gate: there is no unit-test suite, and the
-// docs are the regression surface. It drives docs-next, which is the documentation
+// docs are the regression surface. It drives ../elicitjs-docs, which is the documentation
 // — an example that mounts but no longer does what its prose claims is exactly the
 // drift worth catching, so these assert BEHAVIOUR (drag this, and the data must say
 // that), not that a page rendered.
@@ -20,8 +20,12 @@
 //
 // Exits non-zero on any failed assertion so it can gate a commit.
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
+
+const docsRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../elicitjs-docs');
 
 const PORT = 3111;
 const BASE = `http://localhost:${PORT}`;
@@ -44,8 +48,8 @@ async function waitForServer(url, timeoutMs = 120000) {
 }
 
 async function main() {
-    const next = spawn('npx', ['next', 'dev', 'docs-next', '-p', String(PORT)], {
-        stdio: 'ignore', detached: true
+    const next = spawn('npx', ['next', 'dev', '-p', String(PORT)], {
+        cwd: docsRoot, stdio: 'ignore', detached: true
     });
     const stopNext = () => { try { process.kill(-next.pid); } catch { /* already gone */ } };
 
@@ -86,7 +90,7 @@ async function main() {
         };
 
         // ---- Every documented route mounts -------------------------------
-        console.log('\nAll routes (docs-next)');
+        console.log('\nAll routes (elicitjs-docs)');
         const routes = [
             '/', '/overview', '/concepts', '/sizing', '/renderers', '/authoring',
             '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',

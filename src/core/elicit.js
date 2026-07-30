@@ -234,7 +234,7 @@ function describe(v) {
 // genuinely require that scale to invert. Deliberately an ALLOWLIST: most edits
 // reach a value some other way and are perfectly happy on a non-invertible scale.
 // `cycle` steps scale.domain() (that is how a click cycles an ordinal fill —
-// docs-next/marks/symbol does exactly this), `toggle` flips a flag, `set` takes an
+// elicitjs-docs marks/symbol does exactly this), `toggle` flips a flag, `set` takes an
 // external value, `custom` is arbitrary. A denylist would have flagged all of them.
 const INVERTING_TYPES = new Set([
     'move', 'moveSpan', 'resize', 'slide', 'rotate', 'brushSpan', 'brushRect', 'draw', 'sweep',

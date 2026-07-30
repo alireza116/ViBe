@@ -30,8 +30,12 @@
 //
 // Exits non-zero on any warning.
 
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
+
+const docsRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../elicitjs-docs');
 
 const PORT = 3123;
 const BASE = `http://localhost:${PORT}`;
@@ -60,8 +64,8 @@ async function waitForServer(url, timeoutMs = 120000) {
 }
 
 async function main() {
-    const next = spawn('npx', ['next', 'dev', 'docs-next', '-p', String(PORT)], {
-        stdio: 'ignore', detached: true
+    const next = spawn('npx', ['next', 'dev', '-p', String(PORT)], {
+        cwd: docsRoot, stdio: 'ignore', detached: true
     });
     const stopNext = () => { try { process.kill(-next.pid); } catch { /* already gone */ } };
 
