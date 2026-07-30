@@ -9,6 +9,7 @@ import partyShares from './_examples/party-shares.example.txt';
 import donutWithCenterText from './_examples/donut-with-center-text.example.txt';
 import dragAnyBoundary from './_examples/drag-any-boundary.example.txt';
 import donutFourSlices from './_examples/donut-four-slices.example.txt';
+import donutGrid from './_examples/donut-grid.example.txt';
 
 export default function Layout({ children }) {
   return <DocShell>{children}</DocShell>;
@@ -66,6 +67,25 @@ Wire `edit.arc.edge()` and **every** boundary gets a draggable handle — includ
   try={(
     <>
       <b>Drag</b> any edge — the two adjacent slices rebalance.
+    </>
+  )}
+/>
+
+</Section>
+
+<Section id="grid" title="A grid of donuts">
+
+A donut is a view over a **group** of rows the way a `face` is a view over one row — so it scatters into the plane the same way. Bind `x` (and optionally `y`) to a field and each distinct value becomes a **slot** holding its own donut; the rows at that slot are its slices. There is no group transform — the **encoding is the grouping**. (A `size` field scales each donut independently; `outerRadius` pins one radius for all; otherwise the radius fits the slot.)
+
+Here `x: { field: 'state' }` gives a band axis, so `IL` / `NY` / `NC` each get a donut of their own party split. A boundary drag redistributes share **within that state only** — the per-slot sum a pie holds by construction — and never disturbs another state.
+
+<Example
+  code={donutGrid}
+  title="Party split per state"
+  blurb="One donut per band-axis category; each state's boundaries redistribute within that state alone."
+  try={(
+    <>
+      <b>Drag</b> a boundary in one state — only that state’s shares rebalance.
     </>
   )}
 />

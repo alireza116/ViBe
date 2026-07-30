@@ -696,6 +696,55 @@ async function main() {
         check('arc: the pair-shift holds the total fixed',
             Math.abs(sumAfter - sumBefore) < 0.01, `${sumBefore} -> ${sumAfter}`);
 
+        // ---- A GRID of donuts: one per band category, scoped edge -----------
+        // Binding x to a categorical field partitions the dataset into one donut per
+        // slot (state) — the face model, one level up. The two things that only prove
+        // out under real gestures: the grouping actually splits the rows into separate
+        // donuts (not one merged pie), and an edge drag stays SCOPED to the donut it
+        // grabbed — dragging IL's boundary must leave NC's shares byte-for-byte alone.
+        console.log('\nArc grid: one donut per band category, scoped edge (/marks/arc #grid)');
+        await open('/marks/arc', '#grid svg path');
+        const gridSvg = page.locator('#grid svg').first();
+        const gridSlices = await gridSvg.locator('path').count();
+        check('arc grid: a donut per state (>= 9 slices for 3x3)', gridSlices >= 9, `${gridSlices} slice paths`);
+        const gridHandles = await gridSvg.locator('circle').count();
+        check('arc grid: each donut carries its own boundary handles', gridHandles >= 6, `${gridHandles} handles`);
+
+        const gridEl = '#grid .chart > div';
+        const gridRows = () => page.$eval(gridEl, (e) => e.getData());
+        const sharesFor = (rows, st) => rows.filter((r) => r.state === st).map((r) => Number(r.share));
+        const gBefore = await gridRows();
+
+        // The first circle is an IL boundary (IL is drawn first, leftmost). Spin it
+        // about IL's centre — approximated as the left third of the SVG, y-centred
+        // (y is unbound, so every donut sits on the vertical midline). The pivot only
+        // needs to be close enough to make the drag ANGULAR; NC being untouched is
+        // guaranteed by the edit reading the handle's stamped `members`, not the pivot.
+        const gHandle = gridSvg.locator('circle').first();
+        await gHandle.scrollIntoViewIfNeeded();
+        const gHandleBox = await gHandle.boundingBox();
+        const gsvgBox = await gridSvg.boundingBox();
+        const gPivot = { x: gsvgBox.x + gsvgBox.width / 6, y: gsvgBox.y + gsvgBox.height / 2 };
+        const gStart = { x: gHandleBox.x + gHandleBox.width / 2, y: gHandleBox.y + gHandleBox.height / 2 };
+        const gSpin = (deg) => {
+            const a = (deg * Math.PI) / 180;
+            const dx = gStart.x - gPivot.x, dy = gStart.y - gPivot.y;
+            return { x: gPivot.x + dx * Math.cos(a) - dy * Math.sin(a), y: gPivot.y + dx * Math.sin(a) + dy * Math.cos(a) };
+        };
+        await page.mouse.move(gStart.x, gStart.y);
+        await page.mouse.down();
+        for (let i = 1; i <= 12; i++) { const p = gSpin((28 * i) / 12); await page.mouse.move(p.x, p.y); }
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const gAfter = await gridRows();
+
+        const ilBefore = sharesFor(gBefore, 'IL'), ilAfter = sharesFor(gAfter, 'IL');
+        const ncBefore = sharesFor(gBefore, 'NC'), ncAfter = sharesFor(gAfter, 'NC');
+        const sum = (a) => a.reduce((x, y) => x + y, 0);
+        check('arc grid: dragging IL rebalances IL', JSON.stringify(ilBefore) !== JSON.stringify(ilAfter), `${ilBefore} -> ${ilAfter}`);
+        check('arc grid: IL total held fixed by the pair-shift', Math.abs(sum(ilBefore) - sum(ilAfter)) < 0.01, `${sum(ilBefore)} -> ${sum(ilAfter)}`);
+        check('arc grid: NC untouched — edge is scoped per donut', JSON.stringify(ncBefore) === JSON.stringify(ncAfter), `${ncBefore} -> ${ncAfter}`);
+
         // ---- Keyboard editing + undo/redo ---------------------------------
         // Both are gesture-shaped and only prove out under real input: the nudge has
         // to step from where the datum's VALUE is (a bar's node centre is halfway up

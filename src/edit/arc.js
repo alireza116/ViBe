@@ -10,6 +10,13 @@
 // Namespaced under `edit.arc.*` (mirroring `edit.axis.*` / `edit.line.*`) so the
 // scope shows in the name. Whole-dataset apply (returns the full array, never
 // mutates ctx.data), direct-pick (routes to the touched handle's feature only).
+//
+// When the arc mark is GRIDDED (x/y bound to a field → one donut per slot), each
+// boundary handle carries its slot's `members` (the global indices of that donut's
+// slices). The pair-shift then reads total/span from those members alone, so a drag
+// redistributes within one donut and leaves every other slot untouched — the
+// per-slot sum a pie holds by construction. A lone donut stamps every row, so the
+// single-pie path is exactly the members === all-rows case.
 
 import { makeEdit } from './shared.js';
 import { pointerDegrees } from '../core/encoding.js';
@@ -45,25 +52,39 @@ export function edge(options = {}) {
             const hi = node.hiIndex;
             if (lo == null || hi == null) return undefined;
 
+            // The slices of THIS donut, as GLOBAL dataset indices in slice order. A
+            // gridded donut mark stamps its slot's members here, so the layout math
+            // (total, usable span, the lo slice's leading edge) is scoped to ONE
+            // donut and a boundary drag redistributes within it alone — never across
+            // slots. A lone donut stamps every row; an older handle with no stamp
+            // falls back to the whole dataset (the pre-grid behaviour).
+            const members = Array.isArray(node.members) && node.members.length
+                ? node.members
+                : data.map((/** @type {any} */ _d, /** @type {number} */ i) => i);
+            const loLocal = members.indexOf(lo);
+            const hiLocal = members.indexOf(hi);
+            if (loLocal < 0 || hiLocal < 0) return undefined;
+
             const cx = node.pivotX;
             const cy = node.pivotY;
             const spanStart = node.spanStart;
             const spanEnd = node.spanEnd;
             const pad = node.pad || 0;
 
-            // Magnitudes in data units (pie layout normalizes by their sum).
-            const mags = data.map((/** @type {any} */ d) => {
-                const v = Number(d[field]);
+            // Magnitudes in data units (pie layout normalizes by their sum), over this
+            // donut's members only.
+            const mags = members.map((/** @type {number} */ gi) => {
+                const v = Number(data[gi][field]);
                 return Number.isFinite(v) && v > 0 ? v : 0;
             });
             const total = mags.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0);
             if (total <= 0) return undefined;
-            const n = data.length;
+            const n = members.length;
             const span = spanEnd - spanStart;
             const usable = span - pad * n;
             if (usable === 0) return undefined;
 
-            const pairSum = mags[lo] + mags[hi];
+            const pairSum = mags[loLocal] + mags[hiLocal];
             if (pairSum <= 0) return undefined;
             const pairSweep = usable * pairSum / total; // signed degrees the pair spans
             const sweepMag = Math.abs(pairSweep);
@@ -72,9 +93,9 @@ export function edge(options = {}) {
             // Leading edge (start angle) of the lo slice — the fixed anchor the pointer
             // fraction is measured from. Stable through the drag because a pair edit
             // holds cumBefore(lo) and pairSum constant, so it re-derives identically
-            // each tick.
-            const cumBeforeLo = mags.slice(0, lo).reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0);
-            const a0Lo = spanStart + pad / 2 + lo * pad + usable * (cumBeforeLo / total);
+            // each tick. Positions are LOCAL to the donut (its own slice order).
+            const cumBeforeLo = mags.slice(0, loLocal).reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0);
+            const a0Lo = spanStart + pad / 2 + loLocal * pad + usable * (cumBeforeLo / total);
 
             // Fraction of the pair the lo slice should occupy, from the pointer angle.
             // Measure the angular distance from a0Lo in the layout's sweep direction,

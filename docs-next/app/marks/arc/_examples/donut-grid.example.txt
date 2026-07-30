@@ -1,0 +1,31 @@
+mount(Elicit({
+  width: 520, height: 260,
+  margins: { top: 20, right: 20, bottom: 30, left: 20 },
+  data: [
+    { state: "IL", party: "D", share: 55 },
+    { state: "IL", party: "R", share: 38 },
+    { state: "IL", party: "O", share: 7 },
+    { state: "NY", party: "D", share: 60 },
+    { state: "NY", party: "R", share: 33 },
+    { state: "NY", party: "O", share: 7 },
+    { state: "NC", party: "D", share: 47 },
+    { state: "NC", party: "R", share: 48 },
+    { state: "NC", party: "O", share: 5 },
+  ],
+  schema: {
+    party: { type: "categorical" },
+    share: { type: "quantitative", domain: [0, 100] },
+    state: { type: "categorical", domain: ["IL", "NY", "NC"] },
+  },
+  marks: [
+    donut({
+      edits: [edit.arc.edge()],
+      handleSize: 6,
+      channels: {
+        x: { field: "state" },          // band axis → one donut per state
+        value: { field: "share" },      // party's share within its state
+        fill: { field: "party" },
+      },
+    }),
+  ],
+}));
