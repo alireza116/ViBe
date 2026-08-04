@@ -53,9 +53,7 @@
 // centre. The outline is a PATH (not a circle) so the mouth path, drawn after it,
 // is not hidden beneath it — the renderer paints all circles above all paths.
 
-import { makeEdit, resolveMarkNode, linearInvert } from '../edit/shared.js';
-import { move } from '../edit/basic.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults, positionalKeys, resolveHandles } from './mark.js';
 
 /** @param {number} x @returns {number} */
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -71,44 +69,18 @@ const ellipsePath = (/** @type {number} */ cx, /** @type {number} */ cy, /** @ty
     `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`;
 
 /**
- * Apply a direct-manipulation drag: for each axis the grabbed node binds
- * (`node.dm.x` / `node.dm.y`), map the pointer's position along that axis's track
- * to the field's value. This is the same linear track→value mapping the universal
- * `slide` edit uses (`linearInvert`) — a face handle IS an absolute-mode slide,
- * one per bound param, so the two interactions never diverge.
- * @param {import('../types').EditContext} ctx
- * @returns {any}
- */
-function applyFace(ctx) {
-    const node = resolveMarkNode(ctx);
-    const d = ctx.datum;
-    if (!node || !node.dm || !d) return undefined;
-    const out = { ...d };
-    let changed = false;
-    for (const axis of /** @type {const} */ (['x', 'y'])) {
-        const spec = node.dm[axis];
-        if (!spec) continue;
-        const px = axis === 'x' ? ctx.pointer.x : ctx.pointer.y;
-        const v = linearInvert(px, spec.pxAt0, spec.pxAt1, spec.loVal, spec.hiVal);
-        if (v === undefined) continue;
-        out[spec.field] = v;
-        changed = true;
-    }
-    return changed ? out : undefined;
-}
-
-/**
  * @param {any} [options]
  * @returns {import('../types').Mark}
  */
 export function face(options = {}) {
-    const opts = normalizeMarkOptions(options, { mark: 'face', allow: ['handleSize', 'handles'] });
+    const opts = normalizeMarkOptions(options, { mark: 'face', allow: ['handles', 'handleSize', 'handleColor'] });
     const {
         id,
-        edits: userEdits,
+        edits,
         constraints,
-        handleSize = 5,
         handles = true,
+        handleSize,
+        handleColor,
     } = opts;
 
     // The params are ordinary channels (declared in `channels`, or via the x/y
@@ -122,35 +94,28 @@ export function face(options = {}) {
         channels.eyeScale = { field: 'arousal' };
     }
 
-    const faceEdit = makeEdit({
-        type: 'face',
-        gesture: 'drag',
-        when: (/** @type {import('../types').EditContext} */ ctx) => !!ctx.node && !!ctx.node.dm,
-        apply: applyFace,
-    });
-
     // A face positioned in a PLANE (both x AND y bound to fields — an emotion-space
-    // scatter, not a small-multiples row) is MOVABLE: grab the head (its inert area,
-    // away from the feature handles) and drag it. This rides the ordinary `move`
-    // edit, scoped to the outline node so it never fires on an eye/brow/lip handle
-    // (those carry `dm` and go through faceEdit instead). A single-axis face (a face
-    // per category) stays put, so a drag there can't drift it off its slot.
+    // scatter, not a small-multiples row) can be MOVED by dragging the head. That is
+    // a property of the ENCODING, so the mark still decides whether to draw a
+    // grabbable outline; whether a drag there actually writes is up to the author's
+    // `edit.face.move()`. A single-axis face (a face per category) has nowhere to
+    // move to, so its outline stays inert and a stray drag can't drift it off slot.
     const fieldBound = (/** @type {string} */ p) => !!(channels[p] && channels[p].field != null);
     const movable = fieldBound('x') && fieldBound('y');
-    const outlineDrag = movable
-        ? move({
-            channels: ['x', 'y'],
-            when: (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.role === 'outline'),
-        })
-        : null;
 
     return {
         id,
+        markName: 'face',
         channels,
         constraints,
-        edits: [faceEdit, ...(outlineDrag ? [outlineDrag] : []), ...(userEdits || [])],
-        xKey: channels.x && channels.x.field,
-        yKey: channels.y && channels.y.field,
+        // Verbatim, like every other mark. A face draws its handles but writes
+        // nothing until `edit.face.expression()` / `edit.face.move()` says which
+        // columns a gesture touches — see the header.
+        edits,
+        // Capability flag for the engine's scope guard (SCOPE_CAPABILITY): this mark
+        // is what stamps the `dm` drag tracks edit.face.expression reads.
+        supportsFace: true,
+        ...positionalKeys(channels),
         /**
          * @param {any[]} currentData
          * @param {import('../types').ScaleMap} scales
@@ -185,11 +150,16 @@ export function face(options = {}) {
 
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
+            // The shared handle contract (plot/mark.js): one radius default, one
+            // meaning per `handles` value, and paint from the theme. A face's dots
+            // used to be a literal 'rgba(15,23,42,0.5)' on '#fff', which is
+            // invisible on a dark theme and unreachable from the API.
+            const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor });
 
             currentData.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
-                const cx = encodeChannel(scales, channels, 'x', d, width / 2);
-                const cy = encodeChannel(scales, channels, 'y', d, height / 2);
-                const R = encodeChannel(scales, channels, 'size', d, defaultR);
+                const cx = encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
+                const cy = encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                const R = encodeChannel(scales, channels, 'size', d, defaultR, i, currentData);
                 // Every feature is drawn relative to R, so the ink scales with the
                 // face rather than turning spidery on a big one / blotting a small one.
                 const stroke = Math.max(2, R * 0.055);
@@ -197,7 +167,7 @@ export function face(options = {}) {
 
                 // Each param in [0,1] through its scale; unbound -> 0.5 (neutral).
                 /** @param {string} p */
-                const P = (p) => clamp01(encodeChannel(scales, channels, p, d, 0.5));
+                const P = (p) => clamp01(encodeChannel(scales, channels, p, d, 0.5, i, currentData));
                 const pC = P('mouthCurve'), pO = P('mouthOpen'), pAs = P('mouthAsym');
                 const pS = P('eyeScale'), pSq = P('eyeSquint');
                 const pH = P('browHeight'), pT = P('browTilt');
@@ -295,9 +265,10 @@ export function face(options = {}) {
                 const pushHandle = (hx, hy, dmY) => {
                     if (!dmY) return;
                     nodes.push(editable({
-                        type: 'circle', cx: hx, cy: hy, r: handleSize,
-                        fill: handles ? 'rgba(15,23,42,0.5)' : 'transparent',
-                        stroke: handles ? '#fff' : 'none', strokeWidth: handles ? 1.25 : 0,
+                        type: 'circle', cx: hx, cy: hy, r: handleStyle.size,
+                        fill: handleStyle.visible ? handleStyle.fill : 'transparent',
+                        stroke: handleStyle.visible ? handleStyle.stroke : 'none',
+                        strokeWidth: handleStyle.visible ? handleStyle.strokeWidth : 0,
                     }, undefined, dmY));
                 };
                 // Squint: eyelid of the right eye, drag DOWN to squint.
@@ -323,9 +294,10 @@ export function face(options = {}) {
                     const rHi = sScale ? sScale.encode(hiVal) : defaultR;
                     const sizeSpec = { channel: 'size', field: sizeCh.field, pxAt0: cx + rLo, pxAt1: cx + rHi, loVal, hiVal };
                     nodes.push(editable({
-                        type: 'circle', cx: cx + R, cy, r: handleSize,
-                        fill: handles ? 'rgba(15,23,42,0.5)' : 'transparent',
-                        stroke: handles ? '#fff' : 'none', strokeWidth: handles ? 1.25 : 0,
+                        type: 'circle', cx: cx + R, cy, r: handleStyle.size,
+                        fill: handleStyle.visible ? handleStyle.fill : 'transparent',
+                        stroke: handleStyle.visible ? handleStyle.stroke : 'none',
+                        strokeWidth: handleStyle.visible ? handleStyle.strokeWidth : 0,
                         cursor: 'ew-resize',
                     }, sizeSpec, undefined));
                 }

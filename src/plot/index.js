@@ -10,7 +10,6 @@ export { face } from './face.js';
 export { text, textX, textY } from './text.js';
 export { dotStack, dotStackX, dotStackY } from './dotStack.js';
 export { waffle, waffleX, waffleY } from './waffle.js';
-export { cone } from './cone.js';
 export { needle } from './needle.js';
 export { axisRadial } from './axisRadial.js';
 export { arc, pie, donut } from './arc.js';
@@ -19,13 +18,20 @@ export { axis, axisX, axisY, grid, gridX, gridY } from './axis.js';
 export { legend, legendColor, legendSize, legendSymbol } from './legend.js';
 // Shared mark foundation — for authoring new marks (channel resolution + the
 // standard style surface). See mark.js.
-export { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, STANDARD_STYLE_CHANNELS } from './mark.js';
+export { encodeChannel, encodeValue, encodeAngle, resolveStyle, normalizeMarkOptions, STANDARD_STYLE_CHANNELS } from './mark.js';
 export {
     polarToXY, arcPath, arcSpine, arcSpan, angularBand, needleTriangle, degToRad,
     ORIENT_SPAN,
 } from './polar.js';
 
 export { trend } from './trend.js';
+export { trendBand } from './trendBand.js';
+// The parametric-line geometry `trend` and `trendBand` share — for authoring a
+// mark over the same model. See trendGeometry.js.
+export {
+    paramChannels, readParams, anchorsOf, valueAt, lineSegment,
+    envelopePolygon, nestedEnvelopes, sampleLines,
+} from './trendGeometry.js';
 export { geoBasemap, geoTile, geoPoint, geoPolygon, geoLine, geoText, geoRect } from './geo.js';
 export { tileCover, tileUrl, isWebMercator } from '../core/tiles.js';
 export { projectPoint, invertPoint, projectBounds, createProjection } from '../core/projection.js';

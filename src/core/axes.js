@@ -3,7 +3,24 @@
 // global `axes` convenience into composable axis/grid marks. Kept out of the
 // engine so elicit.js stays setup + render loop.
 
-import { axisX, axisY, gridX, gridY } from '../plot/axis.js';
+import { axisX, axisY, gridX, gridY, GRID_OPTIONS } from '../plot/axis.js';
+
+/**
+ * The subset of an axis config a GRID reads. `axes: { y: { grid: true, ticks: 8,
+ * title: '…' } }` is one config describing both, so forwarding it wholesale would
+ * hand the grid `title`/`anchor`/`tickFormat` — options it does not read, which its
+ * option validation would (correctly) report as unknown.
+ * @param {any} opts
+ * @returns {any}
+ */
+function gridOptionsOf(opts) {
+    /** @type {any} */
+    const out = {};
+    for (const key of GRID_OPTIONS) {
+        if (opts[key] !== undefined) out[key] = opts[key];
+    }
+    return out;
+}
 
 /**
  * Flatten nested feature arrays (composite / a mark that returns parts) so
@@ -71,7 +88,7 @@ export function autoAxes(features, axesOpt) {
             opts.transform = originTransform(ch);
         }
         injected.push(builders[ch].axis(opts));
-        if (opts.grid) injected.push(builders[ch].grid(opts));
+        if (opts.grid) injected.push(builders[ch].grid(gridOptionsOf(opts)));
     }
     return injected;
 }

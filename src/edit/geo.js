@@ -4,7 +4,7 @@
 // Namespaced as `edit.geo.*` with `scope: 'geo'` so the engine can warn when
 // these are attached to a non-geo mark.
 
-import { makeEdit, mintDatum } from './shared.js';
+import { makeEdit, mintDatum, claimPick } from './shared.js';
 import { invertPoint } from '../core/projection.js';
 
 /**
@@ -251,7 +251,7 @@ export function brush(options = {}) {
     // `edgeInset` / `move` are driver-only knobs: makeEdit passes them through
     // onto the descriptor, where the driver reads them (as edgeInsetOf does).
     // `move` is re-stated so its default lands even when the caller omits it.
-    const { move = true, pick: _pick, ...rest } = options;
+    const { move = true, ...rest } = claimPick(options, 'geo.brush', 'geoBrush');
     return makeEdit({
         type: 'brush',
         gesture: 'drag',

@@ -20,6 +20,25 @@
 import * as d3 from 'd3';
 import { positionOnScale, isDiscrete } from '../core/scales.js';
 import { themeOf } from '../core/theme.js';
+import { warnUnknownElementOptions, HANDLE_DEFAULTS } from './mark.js';
+
+/**
+ * `axis`'s own option vocabulary, on top of the universal chart-element options
+ * (id / edit / edits / constraints / field). Exported so core/axes.js can hand a
+ * grid only the options a grid reads, instead of forwarding the whole axis config.
+ * Keep in sync with the destructure in `axis` below.
+ * @type {string[]}
+ */
+export const AXIS_OPTIONS = [
+    'channel', 'anchor', 'transform', 'ticks', 'tickValues', 'tickFormat', 'tickSize',
+    'title', 'stroke', 'fill', 'fontSize', 'grid', 'handleColor', 'handleSize',
+];
+
+/**
+ * `grid`'s option vocabulary. Keep in sync with the destructure in `grid` below.
+ * @type {string[]}
+ */
+export const GRID_OPTIONS = ['channel', 'ticks', 'tickValues', 'stroke', 'strokeWidth'];
 
 /** Numeric view of a domain value (a Date sorts by its timestamp). */
 const numOf = (/** @type {any} */ v) => (v instanceof Date ? v.getTime() : v);
@@ -129,7 +148,10 @@ export function axis(options = {}) {
     // No normalizeMarkOptions here, deliberately: an axis encodes no datum. It
     // draws a SCALE (picked by `channel`), so it has no channel map and its
     // stroke/fill/fontSize are chrome — plain options, like axisRadial's
-    // AXIS_CHROME set. There is nothing to desugar.
+    // AXIS_CHROME set. There is nothing to desugar. But there IS something to
+    // VALIDATE, which is a separate job: warnUnknownElementOptions is the
+    // diagnostics half on its own (see plot/mark.js).
+    warnUnknownElementOptions('axis', options, AXIS_OPTIONS);
     const {
         channel = 'x',
         anchor = channel === 'x' ? 'bottom' : 'left',
@@ -151,7 +173,11 @@ export function axis(options = {}) {
         edit,
         field,
         handleColor: handleColorOpt,
-        id
+        handleSize: handleSizeOpt,
+        id,
+        // Forwarded, not dropped — the engine promotes a feature's constraints into
+        // the one dataset-wide set.
+        constraints
     } = options;
 
     const isX = channel === 'x';
@@ -160,6 +186,8 @@ export function axis(options = {}) {
 
     return {
         id,
+        markName: 'axis',
+        constraints,
         isAxis: true,
         // A GUIDE: it views the SCALE, not columns of the dataset. See types.d.ts's
         // Mark.views — the engine and resolveChannels branch on this, not on which
@@ -191,7 +219,13 @@ export function axis(options = {}) {
             const stroke = strokeOpt ?? thm.axis.stroke;
             const fill = fillOpt ?? thm.axis.labelFill;
             const fontSize = fontSizeOpt ?? thm.axis.fontSize;
-            const handleColor = handleColorOpt ?? thm.axis.handle;
+            const handleColor = handleColorOpt ?? thm.axis.handle ?? thm.handle;
+            // The shared handle radius default (plot/mark.js). An axis used to
+            // hard-code 5 and expose only the colour, while arc/face/geo exposed only
+            // the radius and hard-coded the colour — the same sub-element, adjustable
+            // in a different half depending on which mark drew it.
+            const handleSize = handleSizeOpt ?? HANDLE_DEFAULTS.size;
+            const handleStroke = thm.handleStroke;
 
             const base = baseTranslate(anchor, width, height);
             const t = transform
@@ -279,7 +313,9 @@ export function axis(options = {}) {
                         type: 'circle',
                         cx: isX ? t.x + positionOnScale(scale, gV) : t.x,
                         cy: isX ? t.y : t.y + positionOnScale(scale, gV),
-                        r: 5, fill: handleColor, stroke: '#fff', strokeWidth: 1.5,
+                        // Placement: at the domain's two extremes — the values a
+                        // rescale drag moves.
+                        r: handleSize, fill: handleColor, stroke: handleStroke, strokeWidth: 1.5,
                         axisHandle: true, handle: end, axis: channel,
                         anchorPixel: aPix, anchorValue: aV, grabPixel: gPix, grabValue: gV,
                         pxPerUnit: (gPix - aPix) / denom,
@@ -316,6 +352,7 @@ export function axis(options = {}) {
  * @returns {import('../types').Mark}
  */
 export function grid(options = {}) {
+    warnUnknownElementOptions('grid', options, GRID_OPTIONS);
     const {
         channel = 'x',
         ticks = 5,
@@ -323,13 +360,19 @@ export function grid(options = {}) {
         // Grid line colour/width default to the theme's grid tokens (build-time).
         stroke: strokeOpt,
         strokeWidth: strokeWidthOpt,
-        id
+        id,
+        // A grid draws a scale, not rows — but it accepts `constraints` like any
+        // other feature and the engine promotes them to the dataset's set, so
+        // forward rather than silently drop (axis/grid/legend all used to drop it).
+        constraints
     } = options;
 
     const isX = channel === 'x';
 
     return {
         id,
+        markName: 'grid',
+        constraints,
         isGrid: true,
         views: 'scale',
         channel,
@@ -371,11 +414,11 @@ export function grid(options = {}) {
     };
 }
 
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export const axisX = (options = {}) => axis({ ...options, channel: 'x' });
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export const axisY = (options = {}) => axis({ ...options, channel: 'y' });
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export const gridX = (options = {}) => grid({ ...options, channel: 'x' });
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export const gridY = (options = {}) => grid({ ...options, channel: 'y' });

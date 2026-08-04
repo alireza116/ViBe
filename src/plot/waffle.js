@@ -39,7 +39,8 @@
 // drag-to-fill.
 
 import { isBand, bandwidthOf, bandStartOf, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions, themeOf, markDefaults } from './mark.js';
+import { warn } from '../core/dev.js';
+import { encodeChannel, categoryOf, resolveStyle, resolveSymbol, symbolNode, normalizeMarkOptions, themeOf, markDefaults, positionalKeys } from './mark.js';
 
 /** @param {any} scale @returns {[number, number]} */
 function domainExtent(scale) {
@@ -49,6 +50,16 @@ function domainExtent(scale) {
         const hi = Math.max(d[0], d[d.length - 1]);
         return [lo, hi];
     }
+    // The cell COUNT is domainSpan / unit, so a missing domain doesn't just move the
+    // waffle — it silently makes every block one cell tall over [0,1]. That reads as
+    // a rendering choice rather than a missing declaration, so say it.
+    warn(
+        'waffle:domain',
+        'a waffle needs a declared DOMAIN on its value axis — one cell is a fixed '
+        + 'quantity, so the number of cells is (domain span / unit). Without it the '
+        + 'domain falls back to [0, 1] and the grid stops being countable. Declare it: '
+        + 'schema: { <field>: { type: "quantitative", domain: [0, max] } }.'
+    );
     return [0, 1];
 }
 
@@ -73,17 +84,30 @@ function buildWaffle(options, forcedOrientation) {
         emptyFill = '#eee'
     } = opts;
 
-    const xKey = (channels.x && channels.x.field) || 'x';
-    const yKey = (channels.y && channels.y.field) || 'y';
+    const { xKey, yKey } = positionalKeys(channels);
 
     return {
         id,
+        markName: 'waffle',
         channels,
         edits,
         constraints,
         discreteScale: 'band',
         xKey,
         yKey,
+        // What this mark NEEDS from the scales, checked by the engine
+        // (warnScaleRequirements). A waffle is the most scale-dependent mark here:
+        // its cell pitch comes from the band's width and its cell COUNT from the
+        // value scale's declared domain. Without a band axis every block silently
+        // becomes 20px wide (bandwidthOf's fallback) and the grid stops meaning
+        // "one cell = one unit", which is the entire point of a waffle.
+        requires: [{
+            channels: ['x', 'y'],
+            kind: 'discrete',
+            mode: 'any',
+            why: 'a waffle tiles ONE category\'s block into countable cells, so its '
+                + 'category axis has to be a band (an interval to tile).',
+        }],
         // Capability flag: this mark stamps `node.grid`, which is what
         // edit.waffle.fill reads (see SCOPE_CAPABILITY in core/elicit.js).
         supportsWaffle: true,
@@ -112,8 +136,8 @@ function buildWaffle(options, forcedOrientation) {
                 // A `symbol` channel (or shape:'symbol') fills the block with glyph
                 // cells — an emoji waffle (🍎🍎🍎 for a count of 3). Every cell of a
                 // datum shares its glyph; empty cells stay faint but grabbable.
-                const glyph = shape === 'symbol' ? (resolveSymbol(scales, channels, d) || '·')
-                    : resolveSymbol(scales, channels, d);
+                const glyph = shape === 'symbol' ? (resolveSymbol(scales, channels, d, i, currentData) || '·')
+                    : resolveSymbol(scales, channels, d, i, currentData);
 
                 // Band (category) geometry vs value (length) geometry — the same
                 // split bar makes. `bandStart`/`thickness` place the block across
@@ -123,7 +147,11 @@ function buildWaffle(options, forcedOrientation) {
                 const valueScale = vertical ? yScale : xScale;
                 const bandKey = vertical ? xKey : yKey;
 
-                const bandStart = bandStartOf(bandScale, d[bandKey], 0);
+                const bandStart = bandStartOf(
+                    bandScale,
+                    categoryOf(channels, vertical ? 'x' : 'y', d, bandKey, i, currentData),
+                    0
+                );
                 const thickness = bandwidthOf(bandScale, 20);
                 const baseline = baselineOf(valueScale);
 
@@ -173,7 +201,7 @@ function buildWaffle(options, forcedOrientation) {
                 // Fill LEVEL through encodeChannel (the one field->pixel path),
                 // quantized into whole cells so the count is exact and the top of
                 // the filled cells lines up with `value` on the axis.
-                const level = encodeChannel(scales, channels, valueChannel, d, baseline);
+                const level = encodeChannel(scales, channels, valueChannel, d, baseline, i, currentData);
                 const fillFraction = Math.abs(baseline - level) / blockLen;
                 const filled = Math.max(0, Math.min(totalCells, Math.round(fillFraction * totalCells)));
 

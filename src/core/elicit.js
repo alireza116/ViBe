@@ -7,12 +7,13 @@ import { collectEdits, resolveChannels, warnMisplacedEdits } from '../edit/route
 import { markCenter, nudgeTarget } from '../edit/shared.js';
 import { encodeChannel } from '../plot/mark.js';
 import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
-import { autoEditGuides, selectEffectNodes } from '../edit/guide.js';
+import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer/index.js';
-import { resolveEffects } from './effects.js';
+import { resolveEffects, stateEffectNodes } from './effects.js';
 import { resolveTheme } from './theme.js';
 import { autoAxes } from './axes.js';
-import { reserveLegends } from './legends.js';
+import { reserveLegends, autoLegends } from './legends.js';
+import { validateDataset, inferMeasureOfDomain } from './schema.js';
 import { axisOf, pointerForChannel } from './encoding.js';
 import { warn } from './dev.js';
 
@@ -31,9 +32,12 @@ import { warn } from './dev.js';
  */
 function markLabel(feature) {
     if (!feature) return '(unknown mark)';
-    if (feature.id) return `"${feature.id}"`;
+    // An author-chosen id is the most specific thing we can say. An engine-assigned
+    // one (`autoId`) is just a position, so prefer the factory name when the mark
+    // stamped one, and fall back to the placeholder only when it didn't.
+    if (feature.id && !feature.autoId) return `"${feature.id}"`;
     if (feature.markName) return `${feature.markName}()`;
-    return '(an unnamed mark)';
+    return feature.id ? `"${feature.id}"` : '(an unnamed mark)';
 }
 
 // Scope goes in the name: `edit.line.draw()` expects a line mark, `edit.arc.edge()`
@@ -48,7 +52,65 @@ const SCOPE_CAPABILITY = {
     arc: { flag: 'supportsArc', expects: 'an arc mark (arc/pie/donut)' },
     waffle: { flag: 'supportsWaffle', expects: 'a waffle mark' },
     axis: { flag: 'isAxis', expects: 'an axis mark (axisX/axisY/axisRadial)' },
+    trend: { flag: 'supportsTrend', expects: 'a trend mark (trend/trendBand)' },
+    face: { flag: 'supportsFace', expects: 'a face mark' },
 };
+
+// What a scale `kind` satisfies. A mark declares the CAPABILITY it needs, never a
+// scale type — the same rule the rest of the engine follows (see core/scales.js).
+/** @type {Record<string, (kind: string) => boolean>} */
+const KIND_SATISFIES = {
+    discrete: (k) => k === 'band' || k === 'point',
+    band: (k) => k === 'band',
+    point: (k) => k === 'point',
+    continuous: (k) => k === 'continuous',
+};
+
+/**
+ * A mark that needs something specific from a scale says so (`Mark.requires`), and
+ * this reports the mismatch instead of letting the mark degrade in silence.
+ *
+ * Silent degradation is the worst failure mode this library has, because the chart
+ * still draws: a waffle with no band scale falls back to 20px-wide blocks over a
+ * [0,1] domain and looks like a deliberate design; a trend with a missing scale
+ * returns no nodes at all and looks like a spec that "just didn't render". Neither
+ * said anything. The declaration lives on the MARK (it knows what its geometry
+ * needs) and the check lives here (it knows what the scales resolved to).
+ * @param {any} feature
+ * @param {import('../types').ScaleMap} scales
+ */
+function warnScaleRequirements(feature, scales) {
+    const reqs = feature && feature.requires;
+    if (!Array.isArray(reqs)) return;
+    for (const req of reqs) {
+        const test = KIND_SATISFIES[req.kind];
+        if (!test) continue;
+        const channels = req.channels || [];
+        /** @param {string} ch */
+        const ok = (ch) => {
+            const scale = /** @type {any} */ (scales)[ch];
+            return !!(scale && test(scale.kind));
+        };
+        const satisfied = req.mode === 'any' ? channels.some(ok) : channels.every(ok);
+        if (satisfied) continue;
+        const which = req.mode === 'any'
+            ? `one of ${channels.map((/** @type {string} */ c) => `"${c}"`).join(' / ')}`
+            : channels.map((/** @type {string} */ c) => `"${c}"`).join(' and ');
+        const got = channels
+            .map((/** @type {string} */ c) => {
+                const s = /** @type {any} */ (scales)[c];
+                return `${c}: ${s ? s.kind : 'no scale'}`;
+            })
+            .join(', ');
+        warn(
+            `requires:${markLabel(feature)}:${req.kind}:${channels.join(',')}`,
+            `mark ${markLabel(feature)} needs a ${req.kind} scale on ${which}, but got ` +
+            `${got}. ${req.why || ''} It will still draw, using fallback geometry that is ` +
+            `not meaningful — declare the field's type on the spec's schema so the right ` +
+            `scale resolves.`
+        );
+    }
+}
 
 /**
  * @param {any} feature
@@ -76,7 +138,7 @@ function warnScopeMismatch(feature, edits) {
 function warnProjectionCartesianMix(features, scales) {
     if (!/** @type {any} */ (scales).projection) return;
     const offenders = features.filter((f) => {
-        if (f.supportsGeo || f.isAxis || f.isGrid) return false;
+        if (f.supportsGeo || f.views === 'scale') return false;
         const ch = f.channels || {};
         return Object.keys(ch).some((name) => axisOf(name) && ch[name] && ch[name].scale !== null);
     });
@@ -140,10 +202,11 @@ function warnCreateOnNonMark(feature, edits, scales) {
         if (feature.supportsGeo) continue; // geo places via the projection, not a channel scale
         const key = `${markLabel(feature)}:nomark:${e.type}`;
 
-        if (feature.isAxis || feature.isGrid) {
+        if (feature.views === 'scale') {
             warn(
                 key,
-                `a create/${e.type} edit is on ${markLabel(feature)}, which is a guide (axis/grid), ` +
+                `a create/${e.type} edit is on ${markLabel(feature)}, which is a chart element ` +
+                `(axis/grid/legend), ` +
                 `not a data mark. Creation mints dataset rows; a guide edits the DOMAIN instead ` +
                 `(edit.axis.*). Move the create to a data mark.`
             );
@@ -287,17 +350,6 @@ function warnDeadEditChannels(feature, edits, scales) {
     }
 }
 
-// Best-effort measure type for a domain a caller left undeclared but an axis edit
-// just wrote (a numeric range, or a discrete value list). Only used to synthesize a
-// missing schema entry — a declared field keeps its own type.
-/** @param {any[]} domain @returns {import('../types').MeasureType} */
-function inferMeasureOfDomain(domain) {
-    const vals = domain || [];
-    if (vals.some((v) => v instanceof Date)) return 'temporal';
-    if (vals.every((v) => typeof v === 'number')) return 'quantitative';
-    return 'categorical';
-}
-
 /**
  * Dim a ghost-preview node in place. Multiplies its existing opacity by the theme's
  * ghost opacity (so an already-faint mark stays proportionally faint) and, when the
@@ -329,6 +381,11 @@ export function Elicit(spec) {
         // Global axis convenience: desugars into composable axis/grid marks (see
         // autoAxes). Explicit axis marks in `marks` take precedence per channel.
         axes,
+        // The legend counterpart to `axes`: `true` for one legend per bound
+        // non-positional scale, or a per-channel config ({ fill: {...}, size: false }).
+        // Defaults to none — unlike axes, because a legend RESERVES layout space and
+        // silently shrinking the plot because a `fill` channel exists would surprise.
+        legends,
         guides = [],
         // Interaction-effects layer (grab / proximity-select), customizable and
         // kept separate from mark style channels. See core/effects.js.
@@ -365,7 +422,16 @@ export function Elicit(spec) {
     // forced them (axes !== undefined still respected via autoAxes(false)).
     // Flattened because a group mark (composite) desugars to an ARRAY of features.
     const axesOpt = spec.projection != null && axes === undefined ? false : axes;
-    const features = [...autoAxes(userFeatures, axesOpt), ...userFeatures].flat(Infinity);
+    // …and append auto-injected LEGEND marks, the same IMPLICIT layer for the
+    // non-positional scales (core/legends.js). `axes` had this convenience and
+    // `legends` did not, so an axis was one spec key and a legend was a mark you had
+    // to compose by hand. Appended (not prepended) because a legend draws its own
+    // reserved band beside the plot rather than behind the marks.
+    const features = [
+        ...autoAxes(userFeatures, axesOpt),
+        ...userFeatures,
+        ...autoLegends(userFeatures, legends),
+    ].flat(Infinity);
     // Whether any feature is a space-reserving legend (core/legends.js). Static —
     // the feature set doesn't change — so the reservation step is skipped entirely
     // for the common no-legend chart.
@@ -389,7 +455,11 @@ export function Elicit(spec) {
     let innerHeight = curH - effectiveMargins.top - effectiveMargins.bottom;
 
     features.forEach((feature, index) => {
-        if (!feature.id) feature.id = `feature-${index}`;
+        // `autoId` marks the id as ENGINE-assigned, so a diagnostic can tell an id the
+        // author chose (worth quoting back) from a positional placeholder (worth
+        // naming the factory instead). Without it every guard reported
+        // `mark "feature-3"`, since `id` is optional and most specs omit it.
+        if (!feature.id) { feature.id = `feature-${index}`; feature.autoId = true; }
     });
 
     // 1. The belief store: ONE dataset for the chart. A chart elicits exactly one
@@ -417,6 +487,11 @@ export function Elicit(spec) {
     // resolver sees (spec.scales and the rest pass through untouched).
     /** @type {Record<string, import('../types').FieldSchema>} */
     const schema = structuredClone(spec.schema || {});
+    // Check the SEED rows against that contract once, here (see core/schema.js for
+    // the checks and why each is a defect). Seed rows are the only place a mismatch
+    // can originate: an edit mints from schemaDefaults and writes through a channel's
+    // own field, so it cannot introduce an undeclared column.
+    validateDataset(schema, dataset);
     // The resolver sees the RESOLVED theme (not the raw spec.theme partial), so its
     // colour-scale range fallback can read theme.palette/ramp/diverging.
     const liveSpec = { ...spec, schema, theme };
@@ -463,6 +538,7 @@ export function Elicit(spec) {
         currentStage = n;
         ui.session = {};
         ui.preview = null;
+        ui.hover = null;
         ui.selection.clear(); // selection is per-stage transient, like the session
         for (const cb of listeners.stage) cb(currentStage, stageLabelOf(currentStage));
     };
@@ -485,8 +561,13 @@ export function Elicit(spec) {
     // selection commit path (edit.select / el.select), reset on setData/stage
     // change, and stamped onto the scale map each render (scales.selection) so a
     // legend/mark can target "the selected row" without a widened build signature.
-    /** @type {{ session: Record<string, any>, preview: Record<string, any[]> | null, selection: Set<number> }} */
-    const ui = { session: {}, preview: null, selection: new Set() };
+    // `hover` is the OTHER transient pointer state: which feature+row the pointer is
+    // currently over, written by the renderer's hover/hoverout events on any editable
+    // node. It feeds the same `hovered` effect a proximity driver's session does, so
+    // "this is the mark you are about to touch" looks the same however it was
+    // resolved. Cleared on hoverout, stage change and reseed, like `session`.
+    /** @type {{ session: Record<string, any>, preview: Record<string, any[]> | null, selection: Set<number>, hover: { featureId: string, index: number } | null }} */
+    const ui = { session: {}, preview: null, selection: new Set(), hover: null };
 
     // The primary selected datum index (the sole member under single-exclusive
     // selection), or null. Stale indices — a selected row later removed — read as
@@ -742,6 +823,7 @@ export function Elicit(spec) {
             featureNodes[feature.id] = nodes;
 
             const declaredEdits = collectEdits(feature);
+            warnScaleRequirements(feature, scales);
             warnScopeMismatch(feature, declaredEdits);
             warnMisplacedEdits(feature, markLabel);
             warnCreateOnNonMark(feature, declaredEdits, scales);
@@ -786,9 +868,23 @@ export function Elicit(spec) {
         // tentative. Building every feature from the proposal keeps "the ghost is
         // exactly what a commit would draw" across sibling marks and constraint repairs.
         if (ui.preview) {
+            // A proposal is about the DATASET, not about the mark that produced it:
+            // every feature is a view over the same rows, so a SIBLING has to ghost
+            // it too. Splitting a glyph into two marks otherwise leaves half of it
+            // frozen until the click — a trendBand whose spread is being probed on
+            // the trend line shows no feedback at all while the pointer moves.
+            //
+            // The parking spot stays keyed by feature id (two probe marks must not
+            // clobber each other's ghost); this only decides who DRAWS one. With
+            // exactly one proposal in flight it is THE proposal and every feature
+            // renders it. With two, each proposing feature keeps its own — there is
+            // no single answer for a bystander, so it stays out of it.
+            const inFlight = Object.values(ui.preview);
+            const sole = inFlight.length === 1 ? inFlight[0] : null;
             for (const feature of features) {
-                if (feature.isAxis || feature.isGrid) continue;
-                const proposed = ui.preview[feature.id];
+                // A chart element draws a SCALE, not rows, so it has no ghost to show.
+                if (feature.views === 'scale') continue;
+                const proposed = ui.preview[feature.id] || sole;
                 if (!proposed) continue;
 
                 // Which rows the proposal changes, by reference identity.
@@ -840,18 +936,45 @@ export function Elicit(spec) {
             });
         });
 
-        // Selection highlight: reuse the `select` EFFECT (the outline effects.js
-        // already draws for a proximity/nearest hover) to mark the selected row, so
-        // an explicit selection reads identically to a hover selection. Drawn for
-        // every non-chrome feature carrying a node at the selected index — one
-        // dataset, so a bar and its label both light up. `highlight`-only info (no
-        // px/threshold) means no snap ring, just the outline.
-        const selIndex = selectionPrimary();
-        if (selIndex != null && effects.select && effects.select.enabled !== false) {
-            for (const feature of features) {
-                if (feature.isAxis || feature.isGrid || feature.isLegend) continue;
-                const marks = featureNodes[feature.id] || [];
-                selectEffectNodes({ activeIndex: selIndex }, marks, effects.select)
+        // ── The interaction-STATE pass ───────────────────────────────────────
+        // One place decides what `hovered` and `selected` look like, for every
+        // feature, however the state arose. That matters most for HOVER, which has
+        // two sources that must be indistinguishable to a reader:
+        //
+        //   · a proximity driver resolved this row as the one a gesture would take
+        //     (session.activeIndex ?? session.hoverIndex), and
+        //   · the pointer is simply over the mark (ui.hover, from the renderer).
+        //
+        // Both mean "this is the mark you are about to touch", so both feed the same
+        // effect rather than one being a driver's private guide and the other not
+        // existing at all. Selection is the committed answer and outranks hover, so a
+        // selected row is not also drawn as hovered.
+        //
+        // Drawn per FEATURE and keyed by DATUM index — one dataset, so hovering a bar
+        // lights its label up too.
+        const selected = new Set(ui.selection);
+        for (const feature of features) {
+            if (feature.views === 'scale') continue;
+            const marks = featureNodes[feature.id] || [];
+
+            /** @type {Set<number>} */
+            const hovered = new Set();
+            const session = ui.session && ui.session[feature.id];
+            const viaProximity = session
+                ? (session.activeIndex != null ? session.activeIndex : session.hoverIndex)
+                : null;
+            if (viaProximity != null) hovered.add(viaProximity);
+            if (ui.hover && ui.hover.featureId === feature.id && ui.hover.index != null) {
+                hovered.add(ui.hover.index);
+            }
+            for (const i of selected) hovered.delete(i);
+
+            for (const [indices, state] of /** @type {[Set<number>, any][]} */ ([
+                [hovered, effects.hovered],
+                [selected, effects.selected],
+            ])) {
+                if (!indices.size) continue;
+                stateEffectNodes(marks, indices, state)
                     .forEach((/** @type {any} */ node) => { node.guide = true; scene.add(node); });
             }
         }
@@ -1219,6 +1342,28 @@ export function Elicit(spec) {
     const handleEvent = (event) => {
         let shouldRender = false;
 
+        // Pointer-over/out on an editable mark. Pure interaction STATE — it never
+        // reaches an edit, opens no undo transaction and writes no data; it only
+        // records which row the pointer is on so the state pass can draw the
+        // `hovered` effect (see core/effects.js). Handled before everything else so
+        // it can't be mistaken for a gesture.
+        //
+        // This is the counterpart to a proximity driver's session: both answer "which
+        // mark would a gesture take?", and they feed the same effect, so a direct-pick
+        // mark now signals that before you press it instead of only changing the
+        // cursor.
+        if (event.type === 'pointerover' || event.type === 'pointerout') {
+            const node = event.node;
+            const next = event.type === 'pointerover' && node && node.index != null
+                ? { featureId: node.featureId, index: node.index }
+                : null;
+            /** @param {any} a @param {any} b */
+            const same = (a, b) => (!a && !b)
+                || !!(a && b && a.featureId === b.featureId && a.index === b.index);
+            if (!same(ui.hover, next)) { ui.hover = next; update(); }
+            return;
+        }
+
         // A keyboard nudge is INPUT NORMALIZATION, not an interaction mode: the
         // renderer reports "one step this way" and we resolve it into the pixel a
         // pointer would have been at, so it arrives as an ordinary `drag`. Every
@@ -1299,8 +1444,11 @@ export function Elicit(spec) {
     // the rows it hands in become the new read-only seed.
     el.setData = (/** @type {any[]} */ data) => {
         dataset = structuredClone(data);
+        // A reseed is new seed data, so it gets the same contract check as spec.data.
+        validateDataset(schema, dataset, 'setData()');
         seedCount = dataset.length;
         ui.preview = null;
+        ui.hover = null;   // the pointer's row index is new too
         ui.selection.clear(); // a reseed's row indices are new; drop the old selection
         // A reseed is a new starting point, not an edit: there is nothing sensible
         // to undo BACK to (and undoing past it would resurrect rows the caller

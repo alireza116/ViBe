@@ -19,7 +19,7 @@
 // categorical or linear axis (many small needles across a chart).
 // discreteScale is 'point' so categorical fields land on ticks.
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, markDefaults, resolveHandles } from './mark.js';
 import { arcSpan, needleTriangle } from './polar.js';
 
 /**
@@ -27,7 +27,7 @@ import { arcSpan, needleTriangle } from './polar.js';
  * @returns {import('../types').Mark}
  */
 export function needle(options = {}) {
-    const opts = normalizeMarkOptions(options, { mark: 'needle', allow: ['length', 'handleSize', 'baseWidth', 'arc', 'orient', 'start', 'end'] });
+    const opts = normalizeMarkOptions(options, { mark: 'needle', allow: ['length', 'handles', 'handleSize', 'handleColor', 'baseWidth', 'arc', 'orient', 'start', 'end'] });
     const {
         channels = {},
         id,
@@ -37,7 +37,9 @@ export function needle(options = {}) {
         // The hub is this needle's handle (the pivot you grab), so it takes the
         // library-wide sub-element radius name — `handleSize`, as on line/area/
         // trend/arc/face — not a per-mark synonym.
-        handleSize = 5,
+        handles = true,
+        handleSize,
+        handleColor,
         baseWidth = 10,
         arc: arcOpt,
         orient,
@@ -53,6 +55,7 @@ export function needle(options = {}) {
 
     return {
         id,
+        markName: 'needle',
         channels,
         edits,
         constraints,
@@ -69,14 +72,21 @@ export function needle(options = {}) {
         build: (currentData, scales, width, height) => {
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
+            // Shared handle contract (plot/mark.js). The hub IS this mark's handle,
+            // so it takes the same radius default and themed paint as every other.
+            const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor });
 
             currentData.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
-                const cx = encodeChannel(scales, channels, 'x', d, width / 2);
-                const cy = encodeChannel(scales, channels, 'y', d, height / 2);
-                const deg = encodeChannel(scales, channels, 'angle', d, 0);
+                const cx = encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
+                const cy = encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                // Through encodeAngle like every other angle-reading mark, so a scaled
+                // angle field inverts exactly under rotate() and an unscaled one still
+                // reads as raw degrees. (needle used to call encodeChannel directly —
+                // the only mark that read this channel a different way.)
+                const deg = encodeAngle(scales, channels, d, 0, i, currentData);
                 const len = lengthOpt != null
                     ? lengthOpt
-                    : encodeChannel(scales, channels, 'size', d, Math.min(width, height) * 0.4);
+                    : encodeChannel(scales, channels, 'size', d, Math.min(width, height) * 0.4, i, currentData);
                 const style = resolveStyle(scales, channels, d,
                     markDefaults(scales, 'needle', { fill: '#1e293b', stroke: '#1e293b', strokeWidth: 1 }), i, currentData);
                 const pts = needleTriangle(cx, cy, len, deg, baseWidth);
@@ -94,7 +104,7 @@ export function needle(options = {}) {
                 nodes.push({
                     type: 'circle',
                     cx, cy,
-                    r: handleSize,
+                    r: handleStyle.size,
                     ...style,
                     stroke: style.stroke || '#0f172a',
                     strokeWidth: 1,

@@ -24,6 +24,19 @@
 import * as d3 from 'd3';
 import { themeOf } from '../core/theme.js';
 import { tickData } from './axis.js';
+import { warnUnknownElementOptions, HANDLE_DEFAULTS } from './mark.js';
+
+/**
+ * `legend`'s own option vocabulary, on top of the universal chart-element options
+ * (id / edit / edits / constraints / field). Keep in sync with the destructure in
+ * `legend` below — a wrong entry is a false positive, which is worse than none.
+ * @type {string[]}
+ */
+export const LEGEND_OPTIONS = [
+    'channel', 'anchor', 'orient', 'swatchSize', 'gap', 'labelWidth', 'rampLength',
+    'rampThickness', 'ticks', 'tickFormat', 'title', 'row', 'stroke', 'fill',
+    'fontSize', 'handleColor', 'handleSize',
+];
 
 /** Normalize the `edit` option to a flat list, injecting the legend channel. */
 function flatEdits(/** @type {any} */ edit, /** @type {string} */ channel) {
@@ -75,6 +88,10 @@ function estimateLabelWidth(values, format, fontSize) {
  * @returns {import('../types').Mark}
  */
 export function legend(options = {}) {
+    // Validation without desugaring: a legend has no channel map to desugar INTO,
+    // but it takes a dozen options and used to check none of them (see
+    // plot/mark.js's warnUnknownElementOptions).
+    warnUnknownElementOptions('legend', options, LEGEND_OPTIONS);
     const {
         channel = 'fill',
         anchor = 'right',
@@ -101,11 +118,15 @@ export function legend(options = {}) {
         fill: fillOpt,
         fontSize: fontSizeOpt,
         handleColor: handleColorOpt,
+        handleSize: handleSizeOpt,
         // Opt-in interactivity: edit.legend() (discrete category pick) or
         // edit.legendValue() (continuous value pick), or a list.
         edit,
         field,
         id,
+        // Forwarded, not dropped — the engine promotes a feature's constraints into
+        // the one dataset-wide set.
+        constraints,
     } = options;
 
     const orient = orientOpt || (anchor === 'left' || anchor === 'right' ? 'vertical' : 'horizontal');
@@ -151,6 +172,8 @@ export function legend(options = {}) {
 
     return {
         id,
+        markName: 'legend',
+        constraints,
         isLegend: true,
         views: 'scale',
         channel,
@@ -203,7 +226,10 @@ export function legend(options = {}) {
             const thm = themeOf(scales);
             const swatchStroke = strokeOpt ?? (thm.guide.legend.stroke || '#374151');
             const labelFill = fillOpt ?? (thm.guide.legend.labelFill || '#374151');
-            const handleColor = handleColorOpt ?? (thm.axis.handle || '#2563eb');
+            const handleColor = handleColorOpt ?? thm.axis.handle ?? thm.handle;
+            // Shared radius default rather than a hard-coded 6 (see plot/mark.js).
+            const handleSize = handleSizeOpt ?? HANDLE_DEFAULTS.size;
+            const handleStroke = thm.handleStroke;
             const { ramp, values, format, labelW, fontSize } = readScale(scale, thm);
             const across = place.size || (this.measure(scales) || { width: 0, height: 0 })[vertical ? 'width' : 'height'];
 
@@ -240,7 +266,7 @@ export function legend(options = {}) {
                 buildRamp(nodes, {
                     scale, values, format, cx0, cy0: contentTop, vertical, anchor,
                     rampLength, rampThickness, fontSize, swatchStroke, labelFill,
-                    handleColor, editable, data, targetRow, field, channel,
+                    handleColor, handleSize, handleStroke, editable, data, targetRow, field, channel,
                 });
             } else {
                 buildSwatches(nodes, {
@@ -318,7 +344,8 @@ function buildSwatches(nodes, o) {
  */
 function buildRamp(nodes, o) {
     const { scale, values, format, cx0, cy0, vertical, rampLength, rampThickness,
-        fontSize, swatchStroke, labelFill, handleColor, editable, data, targetRow, channel } = o;
+        fontSize, swatchStroke, labelFill, handleColor, handleSize, handleStroke,
+        editable, data, targetRow, channel } = o;
     const dom = scale.domain();
     const lo = Math.min(...dom.map(numOf));
     const hi = Math.max(...dom.map(numOf));
@@ -384,16 +411,18 @@ function buildRamp(nodes, o) {
         const hx = vertical ? cx0 + rampThickness / 2 : cx0 + t * rampLength;
         const hy = vertical ? cy0 + (1 - t) * rampLength : cy0 + rampThickness / 2;
         nodes.push({
-            type: 'circle', cx: hx, cy: hy, r: 6, fill: handleColor, stroke: '#fff', strokeWidth: 1.5,
+            // Placement: along the ramp at the target row's current value.
+            type: 'circle', cx: hx, cy: hy, r: handleSize, fill: handleColor,
+            stroke: handleStroke, strokeWidth: 1.5,
             index: targetRow, along, rampStart, rampEnd, loValue: lo, hiValue: hi,
             cursor: vertical ? 'ns-resize' : 'ew-resize',
         });
     }
 }
 
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export const legendColor = (options = {}) => legend({ ...options, channel: options.channel || 'fill' });
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export const legendSize = (options = {}) => legend({ ...options, channel: 'size' });
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export const legendSymbol = (options = {}) => legend({ ...options, channel: 'symbol' });

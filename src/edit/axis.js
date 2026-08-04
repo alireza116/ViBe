@@ -15,7 +15,7 @@
 // `edit.line.*`. The axis mark wires them (plot/axis.js): it forwards the edit and,
 // per the scale's kind, emits the handle / label / add / remove affordance nodes.
 
-import { makeEdit, numOf } from './shared.js';
+import { makeEdit, numOf, andWhen } from './shared.js';
 import { axisOf } from '../core/encoding.js';
 
 /**
@@ -78,7 +78,7 @@ function domainsFor(fields, domain) {
  * @returns {import('../types').Edit}
  */
 export function scale(options = {}) {
-    const { field, mode = 'rescale' } = options;
+    const { field, mode = 'rescale', ...rest } = options;
     const MIN_PX = 6; // guard: never divide by a near-zero anchor→pointer distance
     return makeEdit({
         type: 'axisScale',
@@ -86,6 +86,11 @@ export function scale(options = {}) {
         pick: 'axisDrag',
         scope: 'axis',
         target: 'domain',
+        // The rest of the caller's options — `name` (so el.control() can drive it),
+        // `stage`, `guide`, `constrain`, `when`. This factory used to read only
+        // `field`/`mode` and drop everything else without a word, so an axis edit
+        // could not be staged, named or guided at all.
+        ...rest,
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const lock = ctx.session;
             const ch = ctx.channels[0];
@@ -156,11 +161,14 @@ export function scale(options = {}) {
  * bands re-divide it (thinner as you add); 'grow' keeps each band the same pixel
  * size and grows/shrinks the CHART by a step per category added/removed — the right
  * feel for extending a Likert scale from 5 points to 7.
- * @param {{ field?: string, mode?: 'rescale' | 'grow' }} [options]
+ * Options other than `field`/`mode` (`stage`, `guide`, `name`, `constrain`, `when`)
+ * are forwarded to all three edits. Each keeps its own structural guard — which node
+ * kind it fires on — and an author `when` narrows rather than replaces it (andWhen).
+ * @param {any} [options]
  * @returns {import('../types').Edit[]}
  */
 export function categories(options = {}) {
-    const { field, mode = 'rescale' } = options;
+    const { field, mode = 'rescale', when: userWhen, ...rest } = options;
     const grow = mode === 'grow';
 
     /** @param {import('../types').EditContext} ctx @returns {string | undefined} */
@@ -180,7 +188,8 @@ export function categories(options = {}) {
         pick: 'direct',
         scope: 'axis',
         target: 'domain',
-        when: (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.addCategory),
+        ...rest,
+        when: andWhen((/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.addCategory), userWhen),
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const f = fieldOf(ctx);
             const name = ctx.value != null ? String(ctx.value).trim() : '';
@@ -200,7 +209,8 @@ export function categories(options = {}) {
         pick: 'direct',
         scope: 'axis',
         target: 'domain',
-        when: (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.category != null),
+        ...rest,
+        when: andWhen((/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.category != null), userWhen),
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const f = fieldOf(ctx);
             const from = ctx.node && ctx.node.category;
@@ -222,7 +232,8 @@ export function categories(options = {}) {
         pick: 'direct',
         scope: 'axis',
         target: 'domain',
-        when: (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.removeCategory != null),
+        ...rest,
+        when: andWhen((/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.removeCategory != null), userWhen),
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const f = fieldOf(ctx);
             const cat = ctx.node && ctx.node.removeCategory;

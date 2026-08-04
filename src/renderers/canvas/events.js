@@ -30,6 +30,12 @@ const PLANE_DRAG_THRESHOLD = 3;
 export function bindCanvasEvents(canvas, getCtx) {
     /** @type {any} */
     let gesture = null;      // { mode, node?, sx, sy, dragging, moved }
+    // Which mark the pointer is currently over, as `featureId:index`. A canvas has
+    // no elements to hang pointerenter/leave on, so the enter/leave EDGE has to be
+    // derived: emit only when the hit test's answer changes, or the engine would get
+    // a pointerover on every pixel of movement.
+    /** @type {string | null} */
+    let hoverKey = null;
     let suppressClick = false; // swallow the native click that trails a drag / mark-click
 
     canvas.style.touchAction = 'none';
@@ -81,13 +87,27 @@ export function bindCanvasEvents(canvas, getCtx) {
         const [x, y] = toInner(e);
 
         if (!gesture) {
-            // Hover only exists in plane-on-top mode (a probe / proximity affordance);
-            // otherwise idle movement just updates the cursor.
             if (ctx.planeOnTop) {
+                // Plane-on-top: the plane owns the pointer, and `hover` is what a
+                // proximity / probe driver tracks.
                 ctx.onEvent({ type: 'hover', x, y, rawEvent: e });
                 canvas.style.cursor = ctx.planeCursor || 'pointer';
             } else {
-                canvas.style.cursor = hitTest(ctx.scene.children, x, y) ? 'move' : 'default';
+                // Direct-pick: report which editable mark the pointer is over, as
+                // interaction STATE (pointerover/pointerout — never routed to an edit).
+                // Mirrors the D3 renderer's per-node pointerenter/leave; on a canvas
+                // there are no elements to bind to, so the hit test IS the enter/leave
+                // boundary. Without this a direct-pick mark had no pre-press signal at
+                // all beyond the cursor — see core/effects.js's `hovered` state.
+                const node = hitTest(ctx.scene.children, x, y);
+                const key = node ? `${node.featureId}:${node.index}` : null;
+                if (key !== hoverKey) {
+                    hoverKey = key;
+                    ctx.onEvent(node
+                        ? { type: 'pointerover', node, rawEvent: e }
+                        : { type: 'pointerout', rawEvent: e });
+                }
+                canvas.style.cursor = node ? (node.cursor || 'move') : 'default';
             }
             return;
         }
@@ -128,6 +148,7 @@ export function bindCanvasEvents(canvas, getCtx) {
         if (!gesture) {
             const ctx = getCtx();
             if (ctx.planeOnTop) ctx.onEvent({ type: 'hoverout', rawEvent: e });
+            else if (hoverKey !== null) { hoverKey = null; ctx.onEvent({ type: 'pointerout', rawEvent: e }); }
         }
     });
 

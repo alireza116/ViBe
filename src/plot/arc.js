@@ -46,7 +46,7 @@
 // polar form). Slice boundaries are draggable via edit.arc.edge(); sibling controls
 // work with maintainSum.
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults, resolveHandles } from './mark.js';
 import { arcSpan, arcPath, polarToXY } from './polar.js';
 import { isBand, bandwidthOf } from '../core/scales.js';
 
@@ -55,7 +55,13 @@ import { isBand, bandwidthOf } from '../core/scales.js';
  * @returns {import('../types').Mark}
  */
 export function arc(options = {}) {
-    const opts = normalizeMarkOptions(options);
+    const opts = normalizeMarkOptions(options, {
+        mark: 'arc',
+        allow: [
+            'outerRadius', 'innerRadius', 'padAngle', 'arc', 'start', 'end',
+            'handles', 'handleSize', 'handleColor',
+        ],
+    });
     const {
         channels = {},
         id,
@@ -72,7 +78,8 @@ export function arc(options = {}) {
         // radius (also the invisible grab target). Only emitted when an edge edit is
         // wired (see markEdits below).
         handles = true,
-        handleSize = 5,
+        handleSize,
+        handleColor,
     } = opts;
 
     const markEdits = edits || [];
@@ -87,6 +94,7 @@ export function arc(options = {}) {
 
     return {
         id,
+        markName: 'arc',
         channels,
         edits: markEdits,
         constraints,
@@ -157,16 +165,24 @@ export function arc(options = {}) {
 
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
+            // One handle contract for every mark that draws one: shared radius
+            // default, one meaning per `handles` value, paint from the theme rather
+            // than the literals ('#0f172a' / '#fff') that used to live here and made
+            // an arc's boundary handles invisible on a dark theme.
+            const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor });
 
             bucketList.forEach((bucket) => {
                 const rep = bucket.rep;
                 const members = bucket.members;
-                const cx = encodeChannel(scales, channels, 'x', rep, width / 2);
-                const cy = encodeChannel(scales, channels, 'y', rep, height / 2);
+                // A slot's position/radius resolve from its REPRESENTATIVE row, so a
+                // derived ({ fn }) channel gets that row's own global index.
+                const repIndex = members[0];
+                const cx = encodeChannel(scales, channels, 'x', rep, width / 2, repIndex, currentData);
+                const cy = encodeChannel(scales, channels, 'y', rep, height / 2, repIndex, currentData);
                 // Outer radius: explicit px > per-donut `size` field > fit default.
                 const outer = outerOpt != null
                     ? outerOpt
-                    : (channels.size ? encodeChannel(scales, channels, 'size', rep, fitR) : fitR);
+                    : (channels.size ? encodeChannel(scales, channels, 'size', rep, fitR, repIndex, currentData) : fitR);
                 // innerRadius in (0,1] is a RATIO of outer (so a data-driven radius
                 // keeps its ring proportional); >1 is absolute px, clamped inside.
                 const innerR = innerRadius > 0 && innerRadius <= 1
@@ -181,7 +197,7 @@ export function arc(options = {}) {
                         const v = Number(d[valueField]);
                         return Number.isFinite(v) && v > 0 ? v : 0;
                     }
-                    const enc = encodeChannel(scales, channels, 'value', d, 0);
+                    const enc = encodeChannel(scales, channels, 'value', d, 0, gi, currentData);
                     return Number.isFinite(enc) && enc > 0 ? Number(enc) : 0;
                 });
                 const total = mags.reduce((/** @type {number} */ a, /** @type {number} */ b) => a + b, 0);
@@ -216,8 +232,15 @@ export function arc(options = {}) {
                         ...style,
                         cx, cy,
                         index: gi,
-                        // Slice boundary angles: mid for labels, a0/a1 for edge editing.
-                        angle: (a0 + a1) / 2,
+                        // Slice boundary angles: `midAngle` for labels, a0/a1 for edge
+                        // editing. NOT `angle` — across this library `FeatureNode.angle`
+                        // means a ROTATION the renderer applies about the node's centre
+                        // (see types.d.ts and the `angle` channel). Stamping a slice's
+                        // mid-angle there was harmless only under the SVG renderer,
+                        // which skips the rotate for paths; the canvas renderer applies
+                        // it to every node type (renderers/canvas/draw.js's withAngle),
+                        // so every slice was being spun about its own centre.
+                        midAngle: (a0 + a1) / 2,
                         a0, a1,
                     });
                 });
@@ -230,17 +253,20 @@ export function arc(options = {}) {
                 // seam is the fixed layout anchor at spanStart, so it is intentionally
                 // not a handle: with a fixed orientation and total, n slices have
                 // exactly n−1 independently movable boundaries.
-                if (editable && total > 0 && nSlices > 1) {
+                if (editable && handleStyle.grabbable && total > 0 && nSlices > 1) {
                     for (let local = 0; local < nSlices - 1; local++) {
                         const angle = edgeAngle[local] + pad / 2;
                         const p = polarToXY(cx, cy, outer, angle);
                         nodes.push({
                             type: 'circle',
                             cx: p.x, cy: p.y,
-                            r: handleSize,
-                            fill: handles ? '#0f172a' : 'transparent',
-                            stroke: handles ? '#fff' : 'none',
-                            strokeWidth: handles ? 1.5 : 0,
+                            // Placement: on the OUTER rim, at the boundary angle plus
+                            // half the pad — i.e. exactly on the gap between the two
+                            // slices it redistributes.
+                            r: handleStyle.size,
+                            fill: handleStyle.visible ? handleStyle.fill : 'transparent',
+                            stroke: handleStyle.visible ? handleStyle.stroke : 'none',
+                            strokeWidth: handleStyle.visible ? handleStyle.strokeWidth : 0,
                             cursor: 'grab',
                             index: members[local],
                             // Edge-edit payload (read by edit.arc.edge's apply / when).
@@ -260,9 +286,13 @@ export function arc(options = {}) {
     };
 }
 
-/** Donut convenience: arc with a default inner radius. When no outerRadius is
- *  pinned (so the radius is chosen per slot — a fit default or a `size` field),
- *  the inner radius is a RATIO of the outer, keeping every ring proportional. */
+/**
+ * Donut convenience: arc with a default inner radius. When no outerRadius is
+ * pinned (so the radius is chosen per slot — a fit default or a `size` field),
+ * the inner radius is a RATIO of the outer, keeping every ring proportional.
+ * @param {any} [options]
+ * @returns {import('../types').Mark}
+ */
 export function donut(/** @type {any} */ options = {}) {
     const inner = options.innerRadius != null
         ? options.innerRadius
@@ -270,7 +300,11 @@ export function donut(/** @type {any} */ options = {}) {
     return arc({ ...options, arc: options.arc || 'full', innerRadius: inner });
 }
 
-/** Pie convenience: arc with innerRadius 0. */
+/**
+ * Pie convenience: arc with innerRadius 0.
+ * @param {any} [options]
+ * @returns {import('../types').Mark}
+ */
 export function pie(/** @type {any} */ options = {}) {
     return arc({ ...options, arc: options.arc || 'full', innerRadius: 0 });
 }

@@ -111,8 +111,11 @@ export function resolveScales(features, dataset, spec, dims) {
       // shared axis bucket's scaleOpt/measure.
       if (typeof chSpec.fn === "function" && chSpec.field == null) {
         if (chSpec.scale !== undefined || chSpec.type !== undefined) {
+          // Key is `fnopt:`, not `fn:` — plot/mark.js already owns `fn:<channel>`
+          // for "this derived channel's fn threw". Sharing the namespace meant
+          // whichever fired first silenced the other for the rest of the page.
           warnOnce(
-            `fn:${ch}`,
+            `fnopt:${ch}`,
             `channel "${ch}" is derived ({ fn }) — its result is used ` +
               `as-is in visual space, so its "${chSpec.scale !== undefined ? "scale" : "type"}" ` +
               `is ignored. Drop it, or use a field channel if you want a scale.`,
@@ -124,7 +127,7 @@ export function resolveScales(features, dataset, spec, dims) {
       // `domain` and `range` are not channel options: the schema owns the
       // domain, the scale owns the range. Both used to live here, and a
       // leftover is invisible — the channel silently takes its default range
-      // (a cone's degrees collapse to [0, 1]) and the chart draws, wrong.
+      // (a needle's degrees collapse to [0, 1]) and the chart draws, wrong.
       for (const [key, where] of [
         ["domain", "the spec's schema"],
         ["range", "this channel's `scale`"],

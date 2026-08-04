@@ -25,7 +25,7 @@
 // handle's drag while an editable one still receives its own.
 
 import { baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, positionalKeys } from './mark.js';
 
 /**
  * @param {any} options
@@ -58,14 +58,14 @@ function buildRule(options, forcedValueAxis) {
 
     return {
         id,
+        markName: 'rule',
         channels,
         edits,
         constraints,
         // A rule spans; it has no opinion about the discrete scale of the axis it
         // crosses. Left undefined so a composite can stamp its own onto it.
         discreteScale,
-        xKey: (channels.x && channels.x.field) || 'x',
-        yKey: (channels.y && channels.y.field) || 'y',
+        ...positionalKeys(channels),
         /**
          * @param {any[]} currentData
          * @param {import('../types').ScaleMap} scales
@@ -81,7 +81,7 @@ function buildRule(options, forcedValueAxis) {
             const emit = (datum, index) => {
                 const style = resolveStyle(scales, channels, datum || {}, {
                     stroke: 'black', strokeWidth: 1
-                });
+                }, index, currentData);
 
                 // Span mode: a segment between two endpoints on spanAxis, at the
                 // datum's category on the other axis. Endpoints resolve through
@@ -92,12 +92,12 @@ function buildRule(options, forcedValueAxis) {
                     const posLen = posAxis === 'x' ? width : height;
                     const baseline = baselineOf(scales[spanAxis]);
                     const [c1, c2] = spanAxis === 'y' ? ['y1', 'y2'] : ['x1', 'x2'];
-                    const a = channels[c1] ? encodeChannel(scales, channels, c1, datum, baseline) : baseline;
-                    const b = channels[c2] ? encodeChannel(scales, channels, c2, datum, baseline) : baseline;
+                    const a = channels[c1] ? encodeChannel(scales, channels, c1, datum, baseline, index, currentData) : baseline;
+                    const b = channels[c2] ? encodeChannel(scales, channels, c2, datum, baseline, index, currentData) : baseline;
                     if (a === undefined || b === undefined) return;
                     // Perpendicular position: the datum's category centre, else centre.
                     const posAt = channels[posAxis]
-                        ? encodeChannel(scales, channels, posAxis, datum, posLen / 2)
+                        ? encodeChannel(scales, channels, posAxis, datum, posLen / 2, index, currentData)
                         : posLen / 2;
                     /** @type {import('../types').FeatureNode} */
                     const spanNode = {
@@ -114,7 +114,7 @@ function buildRule(options, forcedValueAxis) {
                     return;
                 }
 
-                const at = encodeChannel(scales, channels, valueAxis, datum, undefined);
+                const at = encodeChannel(scales, channels, valueAxis, datum, undefined, index, currentData);
                 if (at === undefined) return;
 
                 /** @type {import('../types').FeatureNode} */

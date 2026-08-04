@@ -12,7 +12,7 @@
 //   geoLine     — coordinate lists / MultiLineString paths + vertex handles
 //   geoRect     — geographic AABB (west/south/east/north)
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults, resolveHandles } from './mark.js';
 import { textNodeAt, hasEditText } from './text.js';
 import { resolveFormat } from '../format.js';
 import { warn } from '../core/dev.js';
@@ -78,6 +78,7 @@ export function geoBasemap(options = {}) {
 
     return {
         id,
+        markName: 'geoBasemap',
         channels,
         edits,
         constraints,
@@ -171,6 +172,7 @@ export function geoTile(options = {}) {
 
     return {
         id,
+        markName: 'geoTile',
         channels,
         supportsGeo: true,
         /**
@@ -241,6 +243,7 @@ export function geoPoint(options = {}) {
 
     return {
         id,
+        markName: 'geoPoint',
         channels,
         edits,
         constraints,
@@ -294,6 +297,7 @@ export function geoPolygon(options = {}) {
 
     return {
         id,
+        markName: 'geoPolygon',
         channels,
         edits,
         constraints,
@@ -368,14 +372,16 @@ function orderRows(group, order) {
  * @returns {import('../types').Mark}
  */
 export function geoLine(options = {}) {
-    const opts = normalizeMarkOptions(options, { mark: 'geoLine', allow: ['curve', 'handleSize', 'order', 'showVertices', 'series', 'z'] });
+    const opts = normalizeMarkOptions(options, { mark: 'geoLine', allow: ['curve', 'handles', 'handleSize', 'handleColor', 'order', 'showVertices', 'series', 'z'] });
     const {
         channels = {},
         id,
         edits,
         constraints,
         curve = 'linear',
-        handleSize = 4,
+        handles = true,
+        handleSize,
+        handleColor,
     } = opts;
     const coordsKey = fieldOf(channels, 'coordinates') || 'coordinates';
     const geomKey = fieldOf(channels, 'geometry') || null;
@@ -430,6 +436,7 @@ export function geoLine(options = {}) {
 
                 /** @type {import('../types').FeatureNode[]} */
                 const nodes = [];
+                const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor });
                 for (const group of groups.values()) {
                     if (group.length < 2) continue; // nothing to connect
                     const pts = orderRows(group, order);
@@ -455,8 +462,8 @@ export function geoLine(options = {}) {
                             type: 'circle',
                             cx: p.x,
                             cy: p.y,
-                            r: handleSize,
-                            fill: '#1d4ed8',
+                            r: handleStyle.size,
+                            fill: handleStyle.visible ? handleStyle.fill : 'transparent',
                             stroke: '#fff',
                             strokeWidth: 1,
                             data: p.d,
@@ -471,6 +478,7 @@ export function geoLine(options = {}) {
 
     return {
         id,
+        markName: 'geoLine',
         channels,
         edits,
         constraints,
@@ -488,6 +496,7 @@ export function geoLine(options = {}) {
             if (!projection) return [];
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
+            const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor });
             currentData.forEach((d, i) => {
                 /** @type {[number, number][] | null} */
                 let coords = null;
@@ -527,8 +536,8 @@ export function geoLine(options = {}) {
                             type: 'circle',
                             cx: pt.x,
                             cy: pt.y,
-                            r: handleSize,
-                            fill: style.stroke || '#1d4ed8',
+                            r: handleStyle.size,
+                            fill: handleStyle.visible ? (handleColor || style.stroke || handleStyle.fill) : 'transparent',
                             stroke: '#fff',
                             strokeWidth: 1,
                             data: d,
@@ -570,6 +579,7 @@ export function geoText(options = {}) {
 
     return {
         id,
+        markName: 'geoText',
         channels,
         edits,
         constraints,
@@ -590,7 +600,7 @@ export function geoText(options = {}) {
             currentData.forEach((d, i) => {
                 const pt = projectPoint(projection, d[lonKey], d[latKey]);
                 if (!pt) return;
-                nodes.push(textNodeAt(scales, channels, d, i, pt.x, pt.y, { format, canEditText }));
+                nodes.push(textNodeAt(scales, channels, d, i, pt.x, pt.y, { format, canEditText, data: currentData }));
             });
             return nodes;
         },
@@ -612,6 +622,7 @@ export function geoRect(options = {}) {
 
     return {
         id,
+        markName: 'geoRect',
         channels,
         edits,
         constraints,

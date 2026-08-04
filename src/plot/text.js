@@ -33,7 +33,8 @@
 //   textX — value on x, y parked at the vertical centre (a 1-D label along x)
 //   textY — value on y, x parked at the horizontal centre (a 1-D label along y)
 
-import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, callChannelFn, markDefaults } from './mark.js';
+import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, callChannelFn, markDefaults, positionalKeys } from './mark.js';
+import { warn } from '../core/dev.js';
 import { resolveFormat } from '../format.js';
 
 /**
@@ -59,20 +60,32 @@ function dominantBaselineOf(anchor) {
  * @param {any} datum
  * @param {any} fallback
  * @param {number} [index] row index, passed to a derived channel's fn
+ * @param {import('../types').Datum[]} [data] the dataset, passed to a derived fn
  * @returns {any}
  */
-function rawChannel(channels, name, datum, fallback, index) {
+function rawChannel(channels, name, datum, fallback, index, data) {
     const spec = channels[name];
     if (!spec) return fallback;
     if (spec.field != null) {
         const v = datum[spec.field];
         return v == null ? fallback : v;
     }
-    // Derived channel — fn(d, i) computed in visual space (no scale here anyway).
+    // Derived channel — fn(d, i, data) computed in visual space (no scale here anyway).
     if (typeof spec.fn === 'function') {
-        return callChannelFn(spec, name, datum, index, undefined, fallback);
+        return callChannelFn(spec, name, datum, index, data, fallback);
     }
     if (spec.value !== undefined) return spec.value;
+    // `{ datum }` means "a constant in DATA space — put it through the scale". These
+    // channels have no scale (a label's string, its font size, its dx nudge are the
+    // output already), so `{ datum }` and `{ value }` would be two spellings of one
+    // thing. Say so rather than silently accepting either.
+    if (spec.datum !== undefined) {
+        warn(
+            `rawdatum:${name}`,
+            `channel "${name}" on a text mark has no scale — its value IS the output — so ` +
+            `{ datum: … } has nothing to go through. Use { value: … } for a constant.`
+        );
+    }
     return fallback;
 }
 
@@ -104,30 +117,30 @@ export function hasEditText(edits, channels) {
  * @param {any} d the datum
  * @param {number} i its index in the dataset
  * @param {number} px @param {number} py resolved position, before dx/dy
- * @param {{ format?: (v: any) => any, canEditText?: boolean }} [opts]
+ * @param {{ format?: (v: any) => any, canEditText?: boolean, data?: import('../types').Datum[] }} [opts]
  * @returns {import('../types').FeatureNode}
  */
 export function textNodeAt(scales, channels, d, i, px, py, opts = {}) {
-    const { format = (/** @type {any} */ v) => v, canEditText = false } = opts;
-    const style = resolveStyle(scales, channels, d, markDefaults(scales, 'text', { fill: '#111' }), i);
+    const { format = (/** @type {any} */ v) => v, canEditText = false, data } = opts;
+    const style = resolveStyle(scales, channels, d, markDefaults(scales, 'text', { fill: '#111' }), i, data);
 
-    const dx = +rawChannel(channels, 'dx', d, 0, i) || 0;
-    const dy = +rawChannel(channels, 'dy', d, 0, i) || 0;
+    const dx = +rawChannel(channels, 'dx', d, 0, i, data) || 0;
+    const dy = +rawChannel(channels, 'dy', d, 0, i, data) || 0;
 
     // Angle: math degrees via the shared encodeAngle path (scaled when a scale
     // exists so rotate() is an exact inverse; else raw). The renderer converts
     // to SVG with rotate(-deg) about the label's anchor.
-    const angle = encodeAngle(scales, channels, d, 0, i);
+    const angle = encodeAngle(scales, channels, d, 0, i, data);
 
-    const lineAnchor = rawChannel(channels, 'lineAnchor', d, 'middle', i);
+    const lineAnchor = rawChannel(channels, 'lineAnchor', d, 'middle', i, data);
 
     return {
         type: 'text',
         x: px + dx,
         y: py + dy,
-        text: format(rawChannel(channels, 'text', d, '', i)),
-        fontSize: rawChannel(channels, 'fontSize', d, 12, i),
-        textAnchor: rawChannel(channels, 'textAnchor', d, 'middle', i),
+        text: format(rawChannel(channels, 'text', d, '', i, data)),
+        fontSize: rawChannel(channels, 'fontSize', d, 12, i, data),
+        textAnchor: rawChannel(channels, 'textAnchor', d, 'middle', i, data),
         lineAnchor,
         dominantBaseline: dominantBaselineOf(lineAnchor),
         ...(angle ? { angle } : {}),
@@ -151,13 +164,13 @@ function buildText(options, forcedAxis) {
 
     return {
         id,
+        markName: 'text',
         channels,
         edits,
         constraints,
         // A label sits AT a category (a tick, no interval) when an axis is discrete.
         discreteScale: 'point',
-        xKey: channels.x && channels.x.field,
-        yKey: channels.y && channels.y.field,
+        ...positionalKeys(channels),
 
         /**
          * @param {any[]} currentData
@@ -172,11 +185,11 @@ function buildText(options, forcedAxis) {
                 // when the axis isn't used (textX/textY force the counter-axis centre).
                 const x = forcedAxis === 'y'
                     ? width / 2
-                    : encodeChannel(scales, channels, 'x', d, width / 2);
+                    : encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
                 const y = forcedAxis === 'x'
                     ? height / 2
-                    : encodeChannel(scales, channels, 'y', d, height / 2);
-                return textNodeAt(scales, channels, d, i, x, y, { format, canEditText });
+                    : encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                return textNodeAt(scales, channels, d, i, x, y, { format, canEditText, data: currentData });
             });
         }
     };

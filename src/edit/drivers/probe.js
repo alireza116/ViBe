@@ -33,7 +33,7 @@ import { nearestMark, pickThreshold } from '../pick.js';
 /**
  * The datum a probe gesture targets. Whole-dataset edits (rotate, create) ignore
  * it; a per-datum edit (drag) needs one, so resolve the nearest mark — and treat
- * a single-datum feature (a cone, a trend line) as always being the target, since
+ * a single-datum feature (a trend line, a face) as always being the target, since
  * its glyph is drawn from that one belief and carries no pickable node.
  * @param {any} ctx
  * @param {import('../../types').Edit} edit

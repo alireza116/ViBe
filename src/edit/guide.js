@@ -13,11 +13,87 @@
 // Rebuilt every render (via the engine), so bounds track live data.
 import { resolveChannels, collectEdits } from './route.js';
 import { driverFor } from './drivers/index.js';
-import { DEFAULT_EFFECTS } from '../core/effects.js';
 import { isBand, isDiscrete, rangeExtent } from '../core/scales.js';
 import { axisOf } from '../core/encoding.js';
 
 const DEFAULT_CONSTRAINT_COLOR = '#e4572e';
+
+/**
+ * The parts a guide can draw, with their default appearance.
+ *
+ * A GUIDE shows a RULE — what you may do — as distinct from an EFFECT, which shows
+ * interaction STATE (see core/effects.js). `guide: true` used to draw two unrelated
+ * things (constraint bounds AND the proximity ring + selected-mark outline) with
+ * every dash, width, opacity and offset hard-coded and only `guideColor` adjustable.
+ * Naming the parts is what makes each one addressable:
+ *
+ *   guide: true                        bounds + catchment, at these defaults
+ *   guide: false                       nothing
+ *   guide: { bounds: true }            only the constraint bounds
+ *   guide: { catchment: { opacity: 1 } }   keep the rest, restyle the ring
+ *   guide: { color: '#0ea5e9' }        one colour for every part
+ *
+ * `bounds`   — the constraint boundaries on the edit's own value channel: a clamp's
+ *              band and limit lines, a snap's stops, a maintainSum cap.
+ * `catchment`— the reach of a proximity pick: the radius within which a free
+ *              pointer resolves to a mark. Only drawn by drivers that select one.
+ * `track`    — where a handle can travel. Marks that derive a handle's range
+ *              (face, trend, arc, axis, legend) compute it already; this draws it.
+ * @type {any}
+ */
+const GUIDE_PARTS = {
+    bounds: {
+        dash: '4 4', width: 1, opacity: 0.9,
+        // The shaded allowed region behind a clamp's limits, and the tick labels.
+        bandOpacity: 0.07, fontSize: 10, labelOpacity: 0.95,
+        // Snap stops: a short tick per stop at the plot edge.
+        tickLength: 6, tickOpacity: 0.5,
+    },
+    catchment: { dash: '2 4', width: 1, opacity: 0.45 },
+    track: { dash: '3 3', width: 2, opacity: 0.35 },
+};
+
+/** Which parts `guide: true` turns on. `track` is opt-in — it is extra ink on a
+ *  chart that already shows the handle, and only reads as help when the travel
+ *  range isn't obvious from the mark itself. */
+const GUIDE_TRUE_PARTS = ['bounds', 'catchment'];
+
+/**
+ * Resolve an edit's `guide` into one config per part, or `null` for a part that is
+ * off. Colour precedence: the part's own > the guide's > the edit's legacy
+ * `guideColor` > the theme's constraint colour > the built-in default.
+ * @param {import('../types').Edit} edit
+ * @param {any} ctx
+ * @returns {{ bounds: any, catchment: any, track: any }}
+ */
+export function resolveGuide(edit, ctx) {
+    const spec = /** @type {any} */ (edit && edit.guide);
+    const themeColor = ctx && ctx.theme && ctx.theme.constraint && ctx.theme.constraint.color;
+    const baseColor = (spec && typeof spec === 'object' && spec.color)
+        || (edit && edit.guideColor)
+        || themeColor
+        || DEFAULT_CONSTRAINT_COLOR;
+
+    /** @param {string} part @returns {any} */
+    const resolvePart = (part) => {
+        /** @type {any} */
+        const on = spec === true
+            ? GUIDE_TRUE_PARTS.includes(part)
+            : (spec && typeof spec === 'object' ? /** @type {any} */ (spec)[part] : false);
+        if (!on) return null;
+        return {
+            color: baseColor,
+            ...GUIDE_PARTS[part],
+            ...(typeof on === 'object' ? on : {}),
+        };
+    };
+
+    return {
+        bounds: resolvePart('bounds'),
+        catchment: resolvePart('catchment'),
+        track: resolvePart('track'),
+    };
+}
 
 /**
  * Collect the auto-guides for every feature: an edit declared `guide: true`
@@ -55,14 +131,11 @@ export function autoEditGuides(features) {
  * @returns {import('../types').FeatureNode[]}
  */
 export function buildEditGuide(feature, edit, ctx) {
-    const { scales, data, constraints, ui, width, height, featureNodes } = ctx;
+    const { scales, data, constraints, width, height } = ctx;
     const markChannels = feature.channels || {};
     const resolved = resolveChannels(edit.channels, markChannels, scales);
     const primary = resolved[0];
-    // The guide colour: the edit's own `guideColor` wins; otherwise the theme's
-    // constraint colour (falls back to the historical default if no theme in ctx).
-    const themeColor = ctx.theme && ctx.theme.constraint && ctx.theme.constraint.color;
-    const color = edit.guideColor || themeColor || DEFAULT_CONSTRAINT_COLOR;
+    const parts = resolveGuide(edit, ctx);
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
 
@@ -70,32 +143,86 @@ export function buildEditGuide(feature, edit, ctx) {
     // invariants, so an edit draws every one whose field matches its primary channel
     // — including constraints declared on a sibling mark, since they gate this edit
     // too. Plus any edit-scoped guard sugar.
-    if (primary && primary.scale) {
+    if (parts.bounds && primary && primary.scale) {
+        const style = parts.bounds;
         const invariants = [...(constraints || []), ...edit.constrain];
         for (const constraint of invariants) {
             if (constraint.field && primary.field && constraint.field !== primary.field) continue;
             nodes.push(...constraintGuide(constraint, {
-                feature, data, scales, width, height, primary, color
+                feature, data, scales, width, height, primary, color: style.color, style
             }));
         }
         // 2-D clamp box when this edit governs both axes and each has a clamp.
         if (resolved.length >= 2) {
             nodes.push(...clampBoxGuide(invariants, resolved, {
-                feature, data, scales, width, height, primary, color
+                feature, data, scales, width, height, primary, color: style.color, style
             }));
         }
     }
 
-    // Snap ring + mark highlight (the `select` effect) for any edit whose driver
-    // resolves a target from an arbitrary pointer position and records it. Asked of
-    // the driver registry (`selects`) rather than matched against a list of pick
+    // The pick's CATCHMENT — how far a free pointer reaches to find a mark — for any
+    // edit whose driver resolves a target from an arbitrary pointer position. Asked
+    // of the driver registry (`selects`) rather than matched against a list of pick
     // names here — that list had drifted, covering `brush` but not its 2-D siblings
     // brushRect/geoBrush, which keep the same hover state and so drew nothing.
+    //
+    // The mark HIGHLIGHT that used to be drawn alongside it is gone from here: which
+    // mark a pointer has resolved is interaction STATE, not a rule, so it is now the
+    // `hovered` effect — and it looks the same whether the mark was found by
+    // proximity or by pointing straight at it (see core/elicit.js's effects pass).
     const driver = driverFor(edit);
     if (driver && driver.selects) {
-        nodes.push(...proximityGuide(feature, ctx));
+        nodes.push(...catchmentGuide(feature, edit, ctx));
     }
 
+    // Where each of this feature's handles can travel.
+    if (parts.track) nodes.push(...trackGuide(feature, edit, ctx, parts.track));
+
+    return nodes;
+}
+
+/**
+ * Draw the TRACK each of a feature's handles moves along.
+ *
+ * A handle declares its own travel range by stamping `node.dm` — `{ x?, y? }`, each
+ * `{ channel, field, pxAt0, pxAt1, loVal, hiVal }`, the descriptor `linearInvert`
+ * already uses to map a pointer back to a value. So the track is not re-derived
+ * here: it IS the mapping the edit will use, drawn.
+ *
+ * `face` stamps these today (seven parameters, each with a derived range that no
+ * scale describes). Any mark with a handle whose range isn't obvious from the chart
+ * can opt in the same way — which is the point of making it a declared contract
+ * rather than a per-mark drawing.
+ * @param {any} feature
+ * @param {import('../types').Edit} edit
+ * @param {any} ctx
+ * @param {any} style the resolved `track` guide config
+ * @returns {import('../types').FeatureNode[]}
+ */
+function trackGuide(feature, edit, ctx, style) {
+    const marks = (ctx.featureNodes && ctx.featureNodes[feature.id]) || [];
+    // When the edit names channels, draw only the tracks it can actually write —
+    // otherwise a guide on one parameter would advertise every handle's range.
+    const claims = edit.channels && edit.channels.length ? edit.channels : null;
+    /** @type {import('../types').FeatureNode[]} */
+    const nodes = [];
+    const paint = {
+        stroke: style.color, strokeWidth: style.width,
+        strokeDasharray: style.dash, opacity: style.opacity,
+        fill: 'none', guide: true, pointerEvents: 'none',
+    };
+    for (const mark of marks) {
+        const dm = mark && mark.dm;
+        if (!dm) continue;
+        for (const axis of /** @type {const} */ (['x', 'y'])) {
+            const spec = dm[axis];
+            if (!spec || spec.pxAt0 == null || spec.pxAt1 == null) continue;
+            if (claims && !claims.includes(spec.channel)) continue;
+            nodes.push(axis === 'x'
+                ? { type: 'line', x1: spec.pxAt0, x2: spec.pxAt1, y1: mark.cy, y2: mark.cy, ...paint }
+                : { type: 'line', x1: mark.cx, x2: mark.cx, y1: spec.pxAt0, y2: spec.pxAt1, ...paint });
+        }
+    }
     return nodes;
 }
 
@@ -143,7 +270,7 @@ const MAX_SNAP_TICKS = 200;
  * @returns {import('../types').FeatureNode[]}
  */
 function snapGuide({ step = 1, origin = 0 }, gctx) {
-    const { primary, width, height, color } = gctx;
+    const { primary, width, height, color, style } = gctx;
     const scale = primary.scale;
     if (!scale || !(step > 0) || isDiscrete(scale)) return [];
 
@@ -155,7 +282,11 @@ function snapGuide({ step = 1, origin = 0 }, gctx) {
 
     const onX = axisOf(primary.name) === 'x';
     const [rLo, rHi] = rangeExtent(scale);
-    const len = 6;
+    // A stop's tick sits at the plot edge, which is also where the axis spine is,
+    // so the default is short and faint deliberately — raise `bounds.tickLength` /
+    // `bounds.tickOpacity` to pull the stops clear of the axis.
+    const len = (style && style.tickLength) || 6;
+    const tickOpacity = (style && style.tickOpacity) != null ? style.tickOpacity : 0.5;
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
 
@@ -168,10 +299,10 @@ function snapGuide({ step = 1, origin = 0 }, gctx) {
         if (!Number.isFinite(at) || at < rLo - 0.5 || at > rHi + 0.5) continue;
         nodes.push(onX
             ? { type: 'line', x1: at, x2: at, y1: height, y2: height - len,
-                stroke: color, strokeWidth: 1, opacity: 0.5,
+                stroke: color, strokeWidth: 1, opacity: tickOpacity,
                 pointerEvents: 'none', guide: true }
             : { type: 'line', x1: 0, x2: len, y1: at, y2: at,
-                stroke: color, strokeWidth: 1, opacity: 0.5,
+                stroke: color, strokeWidth: 1, opacity: tickOpacity,
                 pointerEvents: 'none', guide: true });
     }
     return nodes;
@@ -186,33 +317,28 @@ function snapGuide({ step = 1, origin = 0 }, gctx) {
  * @returns {import('../types').FeatureNode[]}
  */
 function boundaryLine(value, label, gctx) {
-    const { primary, width, height, color } = gctx;
+    const { primary, width, height, color, style } = gctx;
     if (value === undefined) return [];
     const at = primary.scale(value);
+    // Appearance comes from the RESOLVED guide (resolveGuide), so `guide: { bounds:
+    // { dash, width, opacity, fontSize } }` reaches the ink. These were literals.
+    const st = style || {};
+    const line = {
+        stroke: color, strokeDasharray: st.dash, strokeWidth: st.width,
+        opacity: st.opacity, pointerEvents: 'none', guide: true,
+    };
+    const text = {
+        fill: color, fontSize: st.fontSize, opacity: st.labelOpacity,
+        pointerEvents: 'none', guide: true,
+    };
     /** @type {import('../types').FeatureNode[]} */
     const nodes = [];
     if (axisOf(primary.name) === 'x') {
-        nodes.push({
-            type: 'line', x1: at, x2: at, y1: 0, y2: height,
-            stroke: color, strokeDasharray: '4 4', strokeWidth: 1,
-            opacity: 0.9, pointerEvents: 'none', guide: true
-        });
-        nodes.push({
-            type: 'text', x: at + 4, y: 12, text: label,
-            fill: color, fontSize: 10, textAnchor: 'start',
-            opacity: 0.95, pointerEvents: 'none', guide: true
-        });
+        nodes.push({ type: 'line', x1: at, x2: at, y1: 0, y2: height, ...line });
+        nodes.push({ type: 'text', x: at + 4, y: 12, text: label, textAnchor: 'start', ...text });
     } else {
-        nodes.push({
-            type: 'line', x1: 0, x2: width, y1: at, y2: at,
-            stroke: color, strokeDasharray: '4 4', strokeWidth: 1,
-            opacity: 0.9, pointerEvents: 'none', guide: true
-        });
-        nodes.push({
-            type: 'text', x: width - 4, y: at - 4, text: label,
-            fill: color, fontSize: 10, textAnchor: 'end',
-            opacity: 0.95, pointerEvents: 'none', guide: true
-        });
+        nodes.push({ type: 'line', x1: 0, x2: width, y1: at, y2: at, ...line });
+        nodes.push({ type: 'text', x: width - 4, y: at - 4, text: label, textAnchor: 'end', ...text });
     }
     return nodes;
 }
@@ -233,11 +359,13 @@ function clampGuide({ min, max }, gctx) {
         const a = primary.scale(min);
         const b = primary.scale(max);
         const lo = Math.min(a, b), hi = Math.max(a, b);
+        const bandOpacity = (gctx.style && gctx.style.bandOpacity) != null
+            ? gctx.style.bandOpacity : 0.07;
         nodes.push(onX
             ? { type: 'rect', x: lo, y: 0, width: hi - lo, height,
-                fill: color, opacity: 0.07, pointerEvents: 'none', guide: true }
+                fill: color, opacity: bandOpacity, pointerEvents: 'none', guide: true }
             : { type: 'rect', x: 0, y: lo, width, height: hi - lo,
-                fill: color, opacity: 0.07, pointerEvents: 'none', guide: true });
+                fill: color, opacity: bandOpacity, pointerEvents: 'none', guide: true });
     }
 
     nodes.push(...boundaryLine(min, `min ${min}`, gctx));
@@ -271,10 +399,10 @@ function clampBoxGuide(invariants, resolved, gctx) {
         width: Math.abs(x1 - x0),
         height: Math.abs(y1 - y0),
         fill: color,
-        opacity: 0.08,
+        opacity: (gctx.style && gctx.style.bandOpacity) != null ? gctx.style.bandOpacity : 0.08,
         stroke: color,
-        strokeWidth: 1,
-        strokeDasharray: '4 4',
+        strokeWidth: (gctx.style && gctx.style.width) || 1,
+        strokeDasharray: (gctx.style && gctx.style.dash) || '4 4',
         pointerEvents: 'none',
         guide: true
     }];
@@ -319,13 +447,16 @@ function maintainSumGuide({ targetSum }, gctx) {
 
         const catPos = catScale(d[catKey]);
         const at = valueScale(cap);
+        const cap$ = {
+            stroke: color,
+            strokeDasharray: (gctx.style && gctx.style.dash) || '3 3',
+            strokeWidth: ((gctx.style && gctx.style.width) || 1) * 1.5,
+            opacity: (gctx.style && gctx.style.opacity) != null ? gctx.style.opacity : 0.9,
+            pointerEvents: 'none', guide: true,
+        };
         nodes.push(valueAxis === 'y'
-            ? { type: 'line', x1: catPos - 2, x2: catPos + band + 2, y1: at, y2: at,
-                stroke: color, strokeDasharray: '3 3', strokeWidth: 1.5,
-                opacity: 0.9, pointerEvents: 'none', guide: true }
-            : { type: 'line', x1: at, x2: at, y1: catPos - 2, y2: catPos + band + 2,
-                stroke: color, strokeDasharray: '3 3', strokeWidth: 1.5,
-                opacity: 0.9, pointerEvents: 'none', guide: true });
+            ? { type: 'line', x1: catPos - 2, x2: catPos + band + 2, y1: at, y2: at, ...cap$ }
+            : { type: 'line', x1: at, x2: at, y1: catPos - 2, y2: catPos + band + 2, ...cap$ });
     });
     return nodes;
 }
@@ -334,83 +465,22 @@ function maintainSumGuide({ targetSum }, gctx) {
  * The `select` interaction effect: a snap ring at the pointer + a highlight
  * outline around the selected mark, read from the transient nearest-selection
  * state the drivers write into ui.session. Appearance comes from the customizable
- * effects layer (ctx.effects.select).
+ * appearance comes from the edit's own `guide.catchment`.
  * @param {any} feature
+ * @param {import('../types').Edit} edit
  * @param {any} ctx
  * @returns {import('../types').FeatureNode[]}
  */
-function proximityGuide(feature, ctx) {
+function catchmentGuide(feature, edit, ctx) {
     const info = ctx.ui && ctx.ui.session && ctx.ui.session[feature.id];
-    if (!info) return [];
-    return selectEffectNodes(info, (ctx.featureNodes && ctx.featureNodes[feature.id]) || [],
-        (ctx.effects && ctx.effects.select) || DEFAULT_EFFECTS.select);
-}
-
-/**
- * Build the `select` effect's scene nodes (ring + mark outline) from a proximity
- * selection and the resolved `select` effect config. Shared by the edit-owned
- * guide and the legacy standalone proximity guide so both look identical and
- * honour the same customization.
- * @param {any} info the ui.session[featureId] selection
- * @param {any[]} marks the feature's current scene nodes
- * @param {any} select the resolved effects.select config
- * @returns {import('../types').FeatureNode[]}
- */
-export function selectEffectNodes(info, marks, select) {
-    if (!info || (select && select.enabled === false)) return [];
-    const { color, ring, highlight } = select;
-    /** @type {import('../types').FeatureNode[]} */
-    const nodes = [];
-    // `effect: true` pins these into the topmost paint layer (above marks and
-    // guides). `guide: true` keeps them on the non-interactive guide path the
-    // engine already stamps — without `effect`, a highlight rect would fall
-    // into guideRegions and draw *under* the marks.
-    const tag = { guide: true, effect: true, pointerEvents: 'none' };
-
-    // Snap zone at the pointer.
-    if (info.px != null && info.py != null && info.threshold != null) {
-        nodes.push({
-            type: 'circle', cx: info.px, cy: info.py, r: info.threshold,
-            fill: 'none', stroke: color, strokeDasharray: ring.dash,
-            strokeWidth: ring.width, opacity: ring.opacity, ...tag
-        });
-    }
-
-    // Outline around the selected mark (active drag selection wins over hover).
-    // `index` is a DATUM index; find the node carrying it rather than indexing by
-    // position, since a feature may emit extra nodes (e.g. a line's path) that
-    // offset the handles from their datum index.
-    const index = info.activeIndex != null ? info.activeIndex : info.hoverIndex;
-    if (index != null) {
-        const mark = marks.find(m => m && m.index === index) || marks[index];
-        const pad = highlight.pad;
-        if (mark && mark.type === 'circle') {
-            nodes.push({
-                type: 'circle', cx: mark.cx, cy: mark.cy, r: (mark.r || 5) + pad,
-                fill: 'none', stroke: color, strokeWidth: highlight.width,
-                opacity: highlight.opacity, ...tag
-            });
-        } else if (mark && mark.type === 'rect') {
-            nodes.push({
-                type: 'rect', x: mark.x - pad, y: mark.y - pad,
-                width: mark.width + pad * 2, height: mark.height + pad * 2,
-                fill: 'none', stroke: color, strokeWidth: highlight.width,
-                opacity: highlight.opacity, ...tag
-            });
-        } else if (mark && mark.type === 'line') {
-            // A tick is a line: outline its span (a thin padded box around the
-            // segment), so the selected tick reads the same as a highlighted bar.
-            const lx = Math.min(mark.x1, mark.x2);
-            const ly = Math.min(mark.y1, mark.y2);
-            nodes.push({
-                type: 'rect', x: lx - pad, y: ly - pad,
-                width: Math.abs(mark.x2 - mark.x1) + pad * 2,
-                height: Math.abs(mark.y2 - mark.y1) + pad * 2,
-                fill: 'none', stroke: color, strokeWidth: highlight.width,
-                opacity: highlight.opacity, ...tag
-            });
-        }
-    }
-    return nodes;
+    if (!info || info.px == null || info.py == null || info.threshold == null) return [];
+    const spec = resolveGuide(edit, ctx).catchment;
+    if (!spec) return [];
+    return [{
+        type: 'circle', cx: info.px, cy: info.py, r: info.threshold,
+        fill: 'none', stroke: spec.color, strokeDasharray: spec.dash,
+        strokeWidth: spec.width, opacity: spec.opacity,
+        guide: true, effect: true, pointerEvents: 'none',
+    }];
 }
 

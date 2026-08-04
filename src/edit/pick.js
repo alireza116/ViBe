@@ -258,11 +258,31 @@ function containsPoint(mark, px, py) {
 export const DEFAULT_PICK_THRESHOLD = 40;
 
 /**
- * @param {import('../types').Edit} edit
+ * An explicit positive threshold, else the fallback. The ONE place "did the author
+ * set a threshold?" is decided, so a driver or edit that wants a different default
+ * says so by passing one rather than re-implementing the test.
+ * @param {number | undefined | null} value
+ * @param {number} [fallback]
  * @returns {number}
  */
-export function pickThreshold(edit) {
-    return edit.threshold && edit.threshold > 0 ? edit.threshold : DEFAULT_PICK_THRESHOLD;
+export function resolveThreshold(value, fallback = DEFAULT_PICK_THRESHOLD) {
+    return value && value > 0 ? value : fallback;
+}
+
+/**
+ * The snap radius for an edit, with an optional driver-specific default.
+ *
+ * `fallback` matters: a driver whose grab target is a small fixed handle wants a
+ * tighter radius than a free proximity pick. axisDrag and slide each declared one
+ * and then wrote `pickThreshold(edit) || THEIRS` — which can never reach the `||`,
+ * because pickThreshold always returns at least 40. Both constants were dead, and
+ * an axis handle was being grabbed from 40px away instead of 14.
+ * @param {import('../types').Edit} edit
+ * @param {number} [fallback]
+ * @returns {number}
+ */
+export function pickThreshold(edit, fallback = DEFAULT_PICK_THRESHOLD) {
+    return resolveThreshold(edit.threshold, fallback);
 }
 
 // A brush's edge zone needs a usable px radius; 0 would mean "the exact pixel

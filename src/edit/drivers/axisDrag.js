@@ -59,7 +59,7 @@ export const axisDragDriver = {
     wants: (e) => e.pick === 'axisDrag',
     onEvent({ event, edits, marks, session, runEdit }) {
         const edit = edits[0];
-        const threshold = pickThreshold(edit) || HANDLE_THRESHOLD;
+        const threshold = pickThreshold(edit, HANDLE_THRESHOLD);
         let changed = false;
 
         if (event.type === 'hover') {

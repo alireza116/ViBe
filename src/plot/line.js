@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults, positionalKeys, resolveHandles } from './mark.js';
 
 // line: a connected-path mark over an ordered set of points. It is deliberately
 // GENERAL — a you-draw-it curve, a multi-series line chart, a connected scatter
@@ -38,7 +38,7 @@ const SINGLE = '__single__'; // group key when no series field is set
 function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
     // Desugar top-level style shorthands (stroke: '…', strokeWidth: …) into the
     // channels so line reads style the same way every mark does.
-    const opts = normalizeMarkOptions(options, { mark: 'line', allow: ['curve', 'handles', 'handleSize', 'order', 'samples', 'series', 'z'] });
+    const opts = normalizeMarkOptions(options, { mark: 'line', allow: ['curve', 'handles', 'handleSize', 'handleColor', 'order', 'samples', 'series', 'z'] });
     const {
         channels = {},
         id,
@@ -46,18 +46,19 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
         constraints,
         curve = 'linear',
         handles = true,
-        handleSize = 4,
+        handleSize,
+        handleColor,
         order = defaultOrder,
         samples
     } = opts;
 
-    const xKey = (channels.x && channels.x.field) || 'x';
-    const yKey = (channels.y && channels.y.field) || 'y';
+    const { xKey, yKey } = positionalKeys(channels);
 
     const seriesField = seriesFieldOf(opts, channels);
 
     return {
         id,
+        markName: 'line',
         channels,
         edits,
         constraints,
@@ -103,8 +104,8 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             const placed = currentData.map((d, i) => ({
                 d,
                 i,
-                cx: encodeChannel(scales, channels, 'x', d, width / 2),
-                cy: encodeChannel(scales, channels, 'y', d, height / 2),
+                cx: encodeChannel(scales, channels, 'x', d, width / 2, i, currentData),
+                cy: encodeChannel(scales, channels, 'y', d, height / 2, i, currentData),
                 series: seriesField ? d[seriesField] : SINGLE
             }));
 
@@ -126,7 +127,7 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             for (const group of groups.values()) {
                 if (group.length < 2) continue; // nothing to connect
                 const pts = orderPoints(group, order, domainAxis, seriesField);
-                const style = resolveStyle(scales, channels, group[0].d, lineDefaults);
+                const style = resolveStyle(scales, channels, group[0].d, lineDefaults, group[0].i, currentData);
                 nodes.push({
                     type: 'path',
                     points: pts.map(p => /** @type {[number, number]} */([p.cx, p.cy])),
@@ -143,15 +144,23 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
 
             // Handles: an ordinary circle per datum, so edits/pick reuse the mark
             // machinery. Tagged with `series` so a sweep can scope to one line.
+            const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor },
+                { fill: lineDefaults.stroke });
             placed.forEach(({ d, i, cx, cy, series }) => {
-                const style = resolveStyle(scales, channels, d, { fill: lineDefaults.stroke }, i, currentData);
+                if (!handleStyle.grabbable) return;
+                const style = resolveStyle(scales, channels, d, { fill: handleStyle.fill }, i, currentData);
                 nodes.push({
                     type: 'circle',
                     cx,
                     cy,
-                    r: handles ? handleSize : 0,
+                    // One `handles` vocabulary across marks (plot/mark.js): `false` is
+                    // neither drawn nor grabbable — it used to be r:0 + opacity:0 here,
+                    // opacity:0 + inert on area, and transparent-but-grabbable on
+                    // arc/face, i.e. three behaviours behind one option name. An
+                    // invisible-but-grabbable handle is now spelled `handles: 'hit'`.
+                    r: handleStyle.size,
                     ...style,
-                    ...(handles ? {} : { opacity: 0 }),
+                    ...(handleStyle.visible ? {} : { opacity: 0 }),
                     data: d,
                     index: i,
                     series,

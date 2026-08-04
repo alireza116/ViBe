@@ -12,11 +12,57 @@ Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/p
 
 **The schema owns the data type and the DOMAIN; a mark owns neither.** A field's measurement type (`quantitative`/`categorical`/`ordinal`/`temporal`) and its domain describe the *data*, so they live once on `spec.schema`. A channel's `type` is the **data** type (an override for a field the schema doesn't cover), never a scale type. A channel's `scale` is the scale — a name, a `ScaleSpec`, a live d3 scale, or `null`. There is no `domain` or `range` on a channel. `resolveScales` picks a scale via `scaleTypeFor(channel, measure, discretePref)` and takes the axis domain as the **union of the schema domains of every field bucketed onto it** (`unionDomains`) — that union is why an error bar's `mean`/`lo`/`hi` share one y axis. Don't re-add a per-channel domain "just for this chart"; declare the field.
 
+`src/core/schema.js` is the schema's OWNER — declaration, inference, creation defaults (`schemaDefaults`) and, since the consistency audit, VALIDATION. `validateDataset(schema, data)` runs once per `Elicit()` and per `setData()` and reports five things the library previously accepted in silence: `data` with no schema, a data column the schema doesn't declare, a `FieldSchema` with a domain but no `type`, a value contradicting its declared type, and a value outside its declared domain. Add a check there, not in a mark. Note what it deliberately does NOT check: a discrete field's runtime type, because any value can be a category key (a geo mark legitimately declares a GeoJSON geometry as `categorical`) — the domain is the real constraint for those.
+
 **Never branch on `scale.type`.** `type` is a label. Control flow reads the capability flags `createScale`/`adoptScale` stamp on every scale: `kind` (`band` | `point` | `continuous` | `discrete`), `temporal`, `invertible`. A `log` scale behaves exactly like a `linear` one everywhere it matters, and a user-supplied `d3.scaleBand()` has no `type` at all — an allowlist of type strings silently marks it non-invertible, so the chart draws and **every edit on that channel dies with no error**. Adding a scale type means adding a case in `core/scales.js` and nowhere else.
 
 **One dataset. `Elicit` owns it; marks never do.** A chart elicits exactly one dataset — even a slider elicits a one-row dataset. `data` lives on `ElicitSpec`; the engine holds it as a single array (`dataset` in `elicit.js`). A mark is a *view* over those rows: it encodes some columns and, where a channel carries an `edit`, writes them back. Do not add a `data` (or `onChange`) option to a mark factory, and do not reintroduce a per-feature data store keyed by feature id — that model made two marks over the same rows impossible and is what forced `composite` to fake a glyph inside one feature.
 
 **A whole-dataset edit belongs on exactly one mark.** A plane gesture carries no node, so it fans to *every* feature's plane-pick edits (`dispatchPlaneEdits`). With one dataset that means `create()` on two marks appends twice per click, and two `rotate()`s rotate twice. Direct-pick edits are immune — they route to the touched node's feature alone. The engine dev-warns (`warnDuplicatePlaneEdits`) rather than branching; keep it that way. Sequential composition of *direct* edits within one event is intended: a coupled edit writes fields, sibling marks re-derive on the next render.
+
+**A PROPOSAL is about the dataset, so every mark ghosts it.** `ui.preview` is keyed by feature id only so two probe marks can't clobber each other's parked proposal — it is not a statement about who *draws* one. When exactly one proposal is in flight, `update()`'s ghost pass builds **every** feature from it (see the `sole` fallback). This is load-bearing for any glyph split across marks: `trendBand` reads a spread that `trend` carries the edit for, and keying the ghost to the editing feature alone left the band frozen until the click, with no feedback while the reader aimed. Don't "optimize" the ghost pass back to the owning feature.
+
+**A mark is INERT until an edit names the column it writes.** No mark attaches an
+edit of its own — not even one whose whole point is manipulation. `trend` used to
+inject `edit.trend.intercept()` + `edit.trend.slope()` unconditionally and `face` an
+internal (unexported, therefore unreplaceable) expression edit plus a `move`, so
+`trend({ edits: [] })` was still fully draggable and nothing in the spec said which
+columns a gesture would write. Which column an interaction writes is the one thing
+the channel map exists to state, and a default that cannot be turned off is not a
+default. `edit.face.*` was exported to make face's handles reachable; staging goes on
+the edit (`edit.trend.slope({ stage: 1 })`), never on the mark.
+
+**A mark declares what it needs from a scale (`Mark.requires`); it never degrades in
+silence.** Silent degradation is the worst failure mode available here, because the
+chart still draws: a waffle with no band scale quietly becomes 20px blocks over a
+`[0,1]` domain, and a trend with a missing scale emits no nodes at all and reads as
+"the spec didn't render". Declare the capability (`kind: 'discrete' | 'band' |
+'point' | 'continuous'`, `mode: 'all' | 'any'`) and the engine's `warnScaleRequirements`
+reports the mismatch. Declare a CAPABILITY, never a scale type — same rule as the
+rest of the engine.
+
+**GUIDES are rules; EFFECTS are states; neither may touch data-driven paint.** Three
+kinds of visual statement, three homes: STYLE is what the data is (channels); a GUIDE
+is what the RULE is (`edit.guide` — `bounds`, `catchment`, `track`); an EFFECT is what
+is HAPPENING (`spec.effects` — `hovered`, `selected`, `grabbed`). `guide: true` used to
+draw a rule AND a state, `effects.select` overlapped the second half, and every dash,
+width and opacity was a literal with only `guideColor` adjustable. An effect paints
+either as a CSS style PROPERTY on the element (which overrides the presentation
+attribute `_applyStyle` writes, and vanishes cleanly) or as an overlay node tagged
+`effect: true` — never as a paint attribute, which is how a grab highlight once wiped
+a mark's own stroke. Hover has two sources — a proximity driver's session and the
+renderer's per-node `pointerover` — and both feed the ONE `hovered` effect, so "this
+is the mark you are about to touch" reads identically either way.
+
+**One handle contract.** `resolveHandles` (`plot/mark.js`) is where a handle's radius,
+paint and visibility come from: `HANDLE_DEFAULTS.size`, `theme.handle`/`theme.handleStroke`,
+and `handles: true | false | 'hit'` — drawn+grabbable / neither / invisible-but-grabbable.
+Every mark that draws a handle takes both `handleSize` AND `handleColor`. Before this,
+the radius defaulted to 4, 5 or 6 by mark and was hard-coded on axis and legend; the
+colour was themed on some and a literal on others; and `handles: false` meant three
+different things. A handle whose travel range isn't a scale declares it as `node.dm`
+(the same descriptor `linearInvert` inverts through), which is what `guide: { track: true }`
+draws — so the line the author sees IS the mapping, not a redrawing of it.
 
 **A mark with no direct-pick edit is pointer-transparent.** The engine sets `pointerEvents:'none'` on such a mark's nodes unless the mark set a value itself. This is load-bearing, not cosmetic: the renderer defaults nodes to `pointer-events:auto` and draws lines *after* circles, so an inert rule (a glyph's whisker) sits above a sibling's handle and would swallow its drag. Don't "optimize" this away.
 
@@ -28,13 +74,13 @@ Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/p
 
 **Scope goes in the name.** An edit that only works on marks with series grouping (a `line` family capability) belongs under `edit.line.*` and must set `scope: 'line'` in its descriptor (the engine dev-warns on a scope mismatch — see `warnScopeMismatch` and the `SCOPE_CAPABILITY` table in `elicit.js`). A genuinely universal edit (works on any mark) stays top-level in `edit.*`. Don't add a mark-specific edit to the top-level namespace "because it's simpler" — that's the flat-namespace problem the namespacing fixed.
 
-**One positional-resolution path.** Every mark resolves a datum → pixel through `encodeChannel` (`src/plot/mark.js`) for its value axis, or the band-geometry helpers (`bandwidthOf`/`baselineOf`/`isBand`/`isDiscrete` in `core/scales.js`) for its category axis. Do not call `scale(d[key])` directly in a new mark — that reintroduces the "four different ways to place a point" inconsistency that existed across `bar`/`dot`/`rule` before the cleanup. `core/encoding.js` once carried a whole *second*, unused resolution path (`resolveChannel`/`resolveEncoding`/`adjustDatum`/`assignChannel`/`datumFromPointer`); it was deleted. Don't grow another.
+**One positional-resolution path.** Every mark resolves a datum → pixel through `encodeChannel` (`src/plot/mark.js`) for its value axis, and a datum → CATEGORY through `categoryOf` for its category axis, before handing that category to the band-geometry helpers (`bandwidthOf`/`bandStartOf`/`baselineOf`/`isBand`/`isDiscrete` in `core/scales.js`). `categoryOf` exists because the band axis used to read `datum[key]` raw in every band mark, so `{ fn }`/`{ datum }` worked on a bar's value axis and were silently ignored on its category axis. It also owns the last-resort "column named after the channel" fallback (and warns when it is used), which used to be spelled `(channels.x && channels.x.field) || 'x'` four different ways — see `positionalKeys`, the one source of `xKey`/`yKey` now. Pass `index`/`data` to every `encodeChannel`/`resolveStyle`/`resolveSymbol` call: a derived `{ fn }` channel takes `(d, i, data)`, and ten marks used to hand it `undefined` for the last two. Do not call `scale(d[key])` directly in a new mark — that reintroduces the "four different ways to place a point" inconsistency that existed across `bar`/`dot`/`rule` before the cleanup. `core/encoding.js` once carried a whole *second*, unused resolution path (`resolveChannel`/`resolveEncoding`/`adjustDatum`/`assignChannel`/`datumFromPointer`); it was deleted. Don't grow another.
 
 **`value` is visual space; `datum` is data space.** On a channel, `{ value: 25 }` is the output — it skips the scale, so on `y` it means pixel 25. `{ datum: 25 }` is in the field's own units and goes *through* the scale, so it lands where y = 25 is. Top-level constant shorthands (`fill: 'red'`, `size: 9`) desugar to `{ value }` via `normalizeMarkOptions`. Keep `SHORTHANDS` (what desugars) distinct from `STANDARD_STYLE_CHANNELS` (what `resolveStyle` sweeps onto a node): `size` belongs to the first only, because marks read it themselves.
 
 **Diagnostics go through `core/dev.js`, are ON by default, and are never gated on a bundler flag.** `warn(key, message)` is the only way the library talks to a spec author; it adds the `[elicit]` prefix and dedups once per `key`. `setWarnings(false)` (exported from the package root) is the off switch, and a consumer's production build goes quiet on its own because `detect()` reads `process.env.NODE_ENV` — which must stay written in that literal form, since bundlers string-replace exactly that expression. **This rule exists because it was violated.** Every guard used to be gated on `const DEV = !!(import.meta.env && import.meta.env.DEV)`, duplicated in three modules. Only Vite injects `import.meta.env`, so all 14 diagnostics were dead on webpack/Next (including this repo's own docs site) and, because the constant folded to a literal `false`, Rollup stripped them from `dist` entirely. A diagnostic that only fires in the author's own bundler is not a diagnostic. Don't reintroduce a per-module dedup `Set` either — `warn`'s key does that.
 
-**A guide is not a data mark.** `axis`, `axisRadial`, `grid` and `legend` set `views: 'scale'`: they draw a SCALE, not columns, so they carry no channel map and no fields of their own. Data marks are `views: 'data'` (the default). This is why `edit/route.js`'s `resolveChannels` drops a channel with no field for a data mark but falls back to `scale.fields[0]` for a guide — a legend legitimately has no field of its own. Read `views`, not the `isAxis || isGrid || isLegend` disjunction, when you mean "is this a guide"; the specific flags stay for the cases that genuinely need to tell axes from legends.
+**A guide is not a data mark.** `axis`, `axisRadial`, `grid` and `legend` set `views: 'scale'`: they draw a SCALE, not columns, so they carry no channel map and no fields of their own. Data marks are `views: 'data'` (the default). This is why `edit/route.js`'s `resolveChannels` drops a channel with no field for a data mark but falls back to `scale.fields[0]` for a guide — a legend legitimately has no field of its own. Read `views`, not the `isAxis || isGrid || isLegend` disjunction, when you mean "is this a chart element"; the specific flags stay for the cases that genuinely need to tell axes from legends. The contract is the `ChartElement` interface in `src/types.d.ts`. Because an element has no channel map there is nothing for `normalizeMarkOptions` to desugar, but there IS something to validate: call `warnUnknownElementOptions(name, options, ALLOW)` — the diagnostics half on its own. Routing an element through `normalizeMarkOptions` instead would be wrong in the other direction, since that accepts every style SHORTHAND (`dy`, `symbol`, `size`) on an axis. Both halves have an implicit spec layer: `axes` (`core/axes.js`) for the positional scales, `legends` (`core/legends.js`'s `autoLegends`) for the rest. `legends` defaults OFF where `axes` defaults on, because a legend reserves layout space.
 
 **An edit writes to a COLUMN.** `resolveChannels` drops any channel the mark doesn't encode as a field, because every `apply()` ends in some form of `datum[ch.field] = value`. Without that, an edit on a constant (`{ value }`) channel writes to the key `undefined` — usually inert, but if another mark puts a field on the same axis the scale exists and inverts, and dragging appends a column literally named `"undefined"` to the elicited dataset. For a belief-elicitation library, silently corrupting the elicited data is the worst failure available; don't add a write site that skips this.
 
@@ -47,14 +93,17 @@ Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/p
 The contract is the `Mark` interface in `src/types.d.ts` (prose version at the top of `src/plot/mark.js`). Annotate your factory `@returns {import('../types').Mark}` — not `any`. Concretely:
 - `build(currentData, scales, width, height) -> FeatureNode[]` is the one required method. `currentData` is the chart's dataset, handed in by the engine — the mark takes no `data` option and no `onChange`.
 - Call `normalizeMarkOptions(options, { mark: 'yourMark', allow: [...] })`. `allow` is your mark's own option vocabulary on top of the universal ones (`channels`/`id`/`edits`/`constraints`) and the style shorthands; it drives the unknown-option warning, so an author's `color:` or a typo gets told rather than silently dropped into `...rest`. **Keep `allow` in sync when you add an option** — and note the warning is only as good as the list: a wrong entry produces a false positive, which is worse than none. `npm run check:warnings` is what catches that.
-- Resolve position/style through `encodeChannel` / `resolveStyle` — don't hand-roll scale lookups.
-- Set `discreteScale: 'band'` (bar/tick — needs an interval) or `'point'` (point/line — needs a tick), plus `xKey`/`yKey`. This says what the mark needs for *discrete* data; the schema says which fields are discrete. A mark that merely spans (like `rule`) should leave it undefined so a `composite` can stamp its own.
-- Return `edits`, `constraints`, `xKey`, `yKey` from the factory. `rule` silently dropped all four for a long time, which made a draggable whisker impossible; if a mark accepts an option, it must pass it on.
+- Resolve position/style through `encodeChannel` / `resolveStyle` (value axis) and `categoryOf` (category axis) — don't hand-roll scale lookups or read `datum[key]` raw. Pass `index` and `currentData` to every one of those calls so a derived `{ fn }` channel gets its full `(d, i, data)`.
+- Set `discreteScale: 'band'` (bar/tick — needs an interval) or `'point'` (point/line — needs a tick), and take `xKey`/`yKey` from `positionalKeys(channels)`. This says what the mark needs for *discrete* data; the schema says which fields are discrete. A mark that merely spans (like `rule`) should leave `discreteScale` undefined so a `composite` can stamp its own.
+- Declare `requires` when your geometry genuinely needs a scale capability, rather than letting a fallback stand in for it (see the requires invariant).
+- Stamp `markName: 'yourMark'`, so every dev message says `yourMark()` instead of the engine's positional `feature-3` placeholder.
+- If you draw a handle, go through `resolveHandles` and accept `handles` / `handleSize` / `handleColor`. Where its travel range isn't a scale, stamp `node.dm` so `guide: { track: true }` can draw it.
+- Return `edits`, `constraints`, `xKey`, `yKey` from the factory — VERBATIM. `rule` silently dropped all four for a long time, which made a draggable whisker impossible; `trend` and `face` went the other way and injected their own. If a mark accepts an option, it must pass it on unchanged.
 - Don't set `pointerEvents` on your nodes to make them inert — leave it, and the engine silences any mark with no direct-pick edit (see the pointer-transparency invariant). Setting it yourself also disables the mark when it *does* carry an edit.
 - If the mark groups points into series (a line-family mark), set `seriesKey`, `order`, and `supportsSeries: true` so line-scoped edits and the dev guard work.
 - Export both a bare form (auto-detects orientation/axis) and, where the mark has a natural direction, `...X`/`...Y` variants — every directional mark in this codebase (`bar`, `tick`, `line`, `axis`, `grid`, `rule`) follows that pairing. Don't ship an asymmetric `ruleY`-with-no-`ruleX` again.
 
-**Glyphs: prefer a group of marks over one clever mark.** If a glyph's handles map to distinct *fields* of a row, build it as a `composite` — a group that desugars into ordinary marks (`Elicit` flattens nested arrays in `marks`). Each handle is then its own feature, so direct-pick dispatch keeps a drag on one handle from touching another, and each handle edits a plain `y`/`x` channel. Only when several handles must live on **one** feature over **one** datum (their positions are *derived*, not fields — see `trend`'s intercept/slope) do you need the `channel` node tag plus a `when: ctx => ctx.node.channel === '…'` guard to arbitrate. Reach for that pattern last; it was `composite`'s old shape and the group form replaced it.
+**Glyphs: prefer a group of marks over one clever mark.** If a glyph's handles map to distinct *fields* of a row, build it as a `composite` — a group that desugars into ordinary marks (`Elicit` flattens nested arrays in `marks`). Each handle is then its own feature, so direct-pick dispatch keeps a drag on one handle from touching another, and each handle edits a plain `y`/`x` channel. Only when several handles must live on **one** feature over **one** datum (their positions are *derived*, not fields — see `trend`'s intercept/slope, `area`'s span edges) do you need the `channel` node tag to arbitrate. Use `claimEdge(edit, name)` from `src/edit/shared.js` for that guard, never a hand-written `when: ctx => ctx.node.channel === '…'`: `claimEdge` rejects only a *differently* tagged node, so an untagged node (a mark-level edit spanning both handles) and an **absent** one still pass. That second case is load-bearing — a `plane`/`probe`-pick edit carries no node at all, so a guard that demands one silently kills every gesture on it. Reach for the whole pattern last; it was `composite`'s old shape and the group form replaced it.
 
 ## Adding a new edit
 
@@ -104,3 +153,16 @@ The contract is the `Mark` interface in `src/types.d.ts` (prose version at the t
 - A diagnostic gated on `import.meta.env.DEV` or any other bundler-specific global, or a `console.warn` that bypasses `core/dev.js`'s `warn()`.
 - A `@returns {any}` on a mark factory. The `Mark` interface exists now.
 - Docs (`../elicitjs-docs`) or anything generated in `package.json`'s `files`.
+- A mark that attaches its own `edit`. Inert until the spec names the column.
+- `normalizeMarkOptions` with a `mark` but no `allow` — that silently disables every
+  unknown-option check, and now warns. A chart element uses `warnUnknownElementOptions`.
+- A raw `datum[xKey]` read for a category axis instead of `categoryOf`, or a fifth
+  spelling of the `xKey`/`yKey` default instead of `positionalKeys`.
+- A hard-coded handle radius or colour. `resolveHandles` + `theme.handle`.
+- A literal dash/width/opacity inside a guide, or an effect written as a paint
+  ATTRIBUTE. Guides resolve through `resolveGuide`; effects are CSS properties or
+  overlay nodes.
+- A second `hover` path for direct-pick marks. `ui.hover` and a proximity driver's
+  session both feed the one `hovered` effect.
+- A `fn:`-style warn key that collides with another module's namespace (`resolve.js`
+  and `mark.js` shared `fn:<channel>` and silenced each other).

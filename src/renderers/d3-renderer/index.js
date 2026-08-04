@@ -1,9 +1,16 @@
 // @ts-check
 import * as d3 from "d3";
-import { DEFAULT_EFFECTS } from "../../core/effects.js";
+import { DEFAULT_EFFECTS, elementEffectOf } from "../../core/effects.js";
 import { markCenter } from "../../edit/shared.js";
 import { rectHitBox, MIN_GRAB } from "../../edit/pick.js";
 import { resolveCurve, STYLE_FIELDS, partitionScene } from "../shared.js";
+
+// A camelCase effect property -> its CSS property name (strokeWidth ->
+// stroke-width). Effects are applied as CSS PROPERTIES rather than SVG
+// presentation attributes, so they override the mark's own paint while set and
+// vanish cleanly when removed — see core/effects.js.
+const cssProp = (/** @type {string} */ k) =>
+  k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
 
 export class D3Renderer {
   constructor() {
@@ -75,7 +82,10 @@ export class D3Renderer {
 
     this._bindPlaneGestures(plane, pointer, onEvent, planeOnTop);
 
-    const drag = this._makeDrag(onEvent, effects.grab);
+    const drag = this._makeDrag(onEvent, effects.grabbed);
+    // Hover rides along with drag: the same nodes, so anything you can grab
+    // responds before you press it. See _makeHover.
+    const hover = this._makeHover(onEvent, effects.hovered);
     // Keyboard access rides along with drag: same nodes, same edits.
     const keys = this._makeKeyboard(onEvent);
     // A mark-scoped click (routed to the mark's click edits, e.g. cycle /
@@ -115,22 +125,25 @@ export class D3Renderer {
       drag,
       markClick,
       keys,
+      hover,
     });
     this._drawMarks(
       layers.marks,
       ofType(marks, "rect"),
       ofType(marks, "circle"),
-      { drag, markClick, keys },
+      { drag, markClick, keys, hover },
     );
     this._drawLines(layers.marks, ofType(marks, "line"), {
       drag,
       markClick,
       keys,
+      hover,
     });
     this._drawTextMarks(layers.marks, ofType(marks, "text"), {
       drag,
       markClick,
       keys,
+      hover,
     });
     this._orderMarkLayer(layers.marks, marks);
 
@@ -490,6 +503,55 @@ export class D3Renderer {
    * click on any movement), so mark-click editors fire reliably alongside drag.
    * @param {(e: any) => void} onEvent
    * @param {any} [grab] the resolved `grab` effect ({ filter } | null-filter to disable)
+   * @returns {any}
+   */
+  /**
+   * Hover feedback on a MARK. The counterpart to _makeDrag, attached to exactly the
+   * same nodes, so anything grabbable answers the pointer before it is pressed.
+   *
+   * Before this, hover existed only in plane-on-top mode (a proximity/sweep driver
+   * needs pointer tracking over the whole plane), which meant a direct-pick mark —
+   * a draggable bar, a trend handle — gave no pre-press signal at all. A cursor
+   * change was the entire vocabulary.
+   *
+   * Two halves, matching the effects layer's two mechanisms:
+   *   · element effects here, as CSS style PROPERTIES, so they override the
+   *     presentation attributes `_applyStyle` writes and vanish cleanly on exit
+   *     without touching the mark's real paint.
+   *   · an `pointerover`/`pointerout` event to the engine, which records ui.hover
+   *     and draws the overlay half (the outline) in its state pass — the same one
+   *     a proximity driver's selection feeds.
+   * @param {(e: any) => void} onEvent
+   * @param {any} hovered the resolved `hovered` effect config
+   * @returns {(sel: any) => void}
+   */
+  _makeHover(onEvent, hovered) {
+    const props = elementEffectOf(hovered);
+    const enabled = !hovered || hovered.enabled !== false;
+    return (sel) => {
+      sel
+        .on("pointerenter", /** @this {any} */ function (/** @type {any} */ _event, /** @type {any} */ d) {
+          if (!enabled || !d || !d.editable) return;
+          if (props) {
+            const el = d3.select(this);
+            for (const [k, v] of Object.entries(props)) el.style(cssProp(k), v);
+          }
+          onEvent({ type: "pointerover", node: d });
+        })
+        .on("pointerleave", /** @this {any} */ function (/** @type {any} */ _event, /** @type {any} */ d) {
+          if (!enabled || !d || !d.editable) return;
+          if (props) {
+            const el = d3.select(this);
+            for (const k of Object.keys(props)) el.style(cssProp(k), null);
+          }
+          onEvent({ type: "pointerout", node: d });
+        });
+    };
+  }
+
+  /**
+   * @param {(e: any) => void} onEvent
+   * @param {any} grab
    * @returns {any}
    */
   _makeDrag(onEvent, grab) {
@@ -906,9 +968,9 @@ export class D3Renderer {
    * @param {any} layer
    * @param {any[]} markRects
    * @param {any[]} markCircles
-   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
+   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void, hover: (sel: any) => void }} io
    */
-  _drawMarks(layer, markRects, markCircles, { drag, markClick, keys }) {
+  _drawMarks(layer, markRects, markCircles, { drag, markClick, keys, hover }) {
     // A mark may opt OUT of the pointer (pointerEvents: 'none') — a ghost/affordance
     // node, or a glyph part that must not swallow the plane's hover/click. Without
     // this a decorative circle would eat the gesture the plane driver needs, the
@@ -927,6 +989,7 @@ export class D3Renderer {
       )
       .on("click", markClick)
       .call(drag)
+      .call(hover)
       .call(keys);
     this._geomRect(rectSel);
     this._applyStyle(rectSel, { fill: "black" });
@@ -957,7 +1020,8 @@ export class D3Renderer {
       .attr("width", (/** @type {any} */ d) => rectHitBox(d).w)
       .attr("height", (/** @type {any} */ d) => rectHitBox(d).h)
       .on("click", markClick)
-      .call(drag);
+      .call(drag)
+      .call(hover);
     hitSel.raise();
 
     const circleSel = layer
@@ -969,11 +1033,16 @@ export class D3Renderer {
         "pointer-events",
         (/** @type {any} */ d) => d.pointerEvents || "auto",
       )
+      // `d.cursor` is honoured here like it is on every other node type. Circles
+      // alone hard-coded "move", so a mark that set a cursor to say what its handle
+      // does — face's 'grab', an axis end's 'ew-resize' — was ignored on exactly the
+      // shape most handles are drawn as.
       .style("cursor", (/** @type {any} */ d) =>
-        d.editable ? "move" : "default",
+        d.editable ? d.cursor || "move" : "default",
       )
       .on("click", markClick)
       .call(drag)
+      .call(hover)
       .call(keys);
     this._geomCircle(circleSel);
     this._applyStyle(circleSel, { fill: "black" });
@@ -988,9 +1057,9 @@ export class D3Renderer {
    *     interactive cursor; d3.drag is inert on the rest.
    * @param {any} layer
    * @param {any[]} lines
-   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
+   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void, hover: (sel: any) => void }} io
    */
-  _drawLines(layer, lines, { drag, markClick, keys }) {
+  _drawLines(layer, lines, { drag, markClick, keys, hover }) {
     const sel = layer
       .selectAll("line.mark")
       .data(lines)
@@ -1005,6 +1074,7 @@ export class D3Renderer {
       )
       .on("click", markClick)
       .call(drag)
+      .call(hover)
       .call(keys);
     this._geomLine(sel);
     this._applyStyle(sel, { stroke: "black", strokeWidth: 1, opacity: 1 });
@@ -1017,7 +1087,7 @@ export class D3Renderer {
    * gets the same click + drag wiring as other marks.
    * @param {any} layer
    * @param {any[]} paths
-   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} [io]
+   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void, hover: (sel: any) => void }} [io]
    */
   _drawPaths(layer, paths, io) {
     const sel = layer
@@ -1044,7 +1114,7 @@ export class D3Renderer {
       opacity: 1,
     });
     if (io) {
-      sel.on("click", io.markClick).call(io.drag).call(io.keys);
+      sel.on("click", io.markClick).call(io.drag).call(io.hover).call(io.keys);
     }
   }
 
@@ -1054,9 +1124,9 @@ export class D3Renderer {
    * Double-click opens an inline editor for content editing (see _editText).
    * @param {any} layer
    * @param {any[]} texts
-   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void }} io
+   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void, hover: (sel: any) => void }} io
    */
-  _drawTextMarks(layer, texts, { drag, markClick, keys }) {
+  _drawTextMarks(layer, texts, { drag, markClick, keys, hover }) {
     const sel = layer
       .selectAll("text.mark")
       .data(texts)
@@ -1078,6 +1148,7 @@ export class D3Renderer {
         this._editText(event, d);
       })
       .call(drag)
+      .call(hover)
       .call(keys);
     this._geomText(sel, "middle");
     this._applyStyle(sel, { fill: "black", opacity: 1 });

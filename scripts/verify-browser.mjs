@@ -95,7 +95,7 @@ async function main() {
             '/', '/overview', '/concepts', '/sizing', '/renderers', '/authoring',
             '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',
             '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
-            '/marks/dotstack', '/marks/waffle', '/marks/cone', '/marks/needle',
+            '/marks/dotstack', '/marks/waffle', '/marks/needle',
             '/marks/axis-radial', '/marks/arc', '/marks/geo', '/marks/trend', '/marks/axes',
             '/marks/legend',
             '/editing', '/editing/gestures', '/editing/sweep', '/editing/lock',
@@ -405,6 +405,35 @@ async function main() {
         check('slide: dragging RIGHT lowers the value',
             slAfter2[0].mag < slAfter[0].mag - 1, `mag ${slAfter[0].mag} -> ${slAfter2[0].mag}`);
 
+        // ---- hovered effect on a DIRECT-PICK mark (/editing/gestures) -------
+        // Hover used to exist only in plane-on-top mode, so a direct-pick mark gave
+        // no pre-press signal at all — the cursor was the whole vocabulary. Nothing
+        // but a real pointer can prove this: the effect is a CSS property plus an
+        // overlay node the engine adds on a pointerenter it only now emits, and both
+        // typecheck and check:warnings are blind to it.
+        console.log('\nHovered effect on a direct-pick mark (/editing/gestures)');
+        await open('/editing/gestures', '#slide .chart svg circle.mark');
+        const fxCount = () => page.$eval('#slide .chart svg .effects-layer',
+            (el) => el.childElementCount).catch(() => 0);
+        const fxIdle = await fxCount();
+        check('hover: no effect overlay while the pointer is away', fxIdle === 0, `${fxIdle} nodes`);
+        const hoverTarget = await centreOf(page.locator('#slide .chart svg circle.mark').first());
+        await page.mouse.move(hoverTarget.x, hoverTarget.y);
+        await page.waitForTimeout(120);
+        const fxOver = await fxCount();
+        check('hover: pointing at a draggable mark outlines it', fxOver > 0, `${fxOver} nodes`);
+        // And it must go away again — a hover effect that leaks is worse than none.
+        await page.mouse.move(hoverTarget.x + 260, hoverTarget.y + 160);
+        await page.waitForTimeout(120);
+        const fxOut = await fxCount();
+        check('hover: leaving the mark clears the outline', fxOut === 0, `${fxOut} nodes`);
+        // The mark's own paint is untouched throughout — the whole reason an effect
+        // is a CSS property / overlay rather than a style attribute.
+        const strokeAfterHover = await page.$eval('#slide .chart svg circle.mark',
+            (el) => el.getAttribute('stroke'));
+        check('hover: the mark\'s own stroke attribute is untouched',
+            strokeAfterHover != null, `stroke=${strokeAfterHover}`);
+
         // ---- Face head: move (x+y bound) + slide resize (size bound) --------
         // The outline is a drag-to-move target when the centre is bound to fields,
         // and a rim handle resizes the head via an absolute slide. Both are direct
@@ -583,6 +612,61 @@ async function main() {
         check('composite.create: the new glyph lands at the pointer',
             glyphAfter.length === 4 && Math.abs(glyphAfter[3].x - 40) < 3 && Math.abs(glyphAfter[3].value - 50) < 3,
             JSON.stringify(glyphAfter[3]));
+
+        // ---- the `legends` spec key (/marks/legend) --------------------------
+        // The counterpart to `axes`: an IMPLICIT layer that desugars into legend
+        // marks. It has to both draw AND reserve space, and reserving space is the
+        // one thing in this library that changes the plot's size — so the check is
+        // that the swatches exist and the bars were actually squeezed for them.
+        console.log('\nThe legends spec key (/marks/legend)');
+        await open('/marks/legend', '#legends-key .chart svg');
+        const lkChart = page.locator('#legends-key .chart').first();
+        const lkSwatches = await lkChart.locator('svg rect').count();
+        const lkTexts = await lkChart.locator('svg text').count();
+        check('legends: true injects a legend with no legend mark composed',
+            lkSwatches > 3 && lkTexts > 3, `${lkSwatches} rects, ${lkTexts} texts`);
+        // The reserved band must actually shrink the plot: the rightmost bar's right
+        // edge has to stop short of the chart's own width.
+        const lkFit = await lkChart.locator('svg').evaluate((svg) => {
+            const w = +svg.getAttribute('width');
+            let right = 0;
+            for (const r of svg.querySelectorAll('rect.mark')) {
+                right = Math.max(right, +r.getAttribute('x') + +r.getAttribute('width'));
+            }
+            return { w, right };
+        });
+        check('legends: the injected legend reserves space (bars stop short of the edge)',
+            lkFit.right > 0 && lkFit.right < lkFit.w - 40, `bars end at ${lkFit.right} of ${lkFit.w}`);
+
+        // ---- guide: { track } — a handle's declared travel range (/marks/face) --
+        // The track is the SAME descriptor the edit inverts the pointer through
+        // (node.dm), drawn. So the check is not "a dashed line exists" but "the
+        // handle actually moves along it": drag to each end of the drawn segment and
+        // the value must hit the domain's ends.
+        console.log('\nHandle track guide (/marks/face)');
+        await open('/marks/face', '#track .chart svg');
+        const trackChart = page.locator('#track .chart').first();
+        const trackRows = () => trackChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        // Guide nodes are pointer-transparent lines carrying the guide dash.
+        const trackLines = await trackChart.locator('svg line[stroke-dasharray="3 3"]').count();
+        check('track: guide draws a segment per bound handle', trackLines >= 2, `${trackLines} tracks`);
+        // The track's own on-screen box, rather than re-deriving the plot translate.
+        // Scroll first: boundingBox() is viewport-relative, and this section sits far
+        // down the page, so an unscrolled measurement aims the pointer off-screen.
+        const trackLine = trackChart.locator('svg line[stroke-dasharray="3 3"]').first();
+        await trackLine.scrollIntoViewIfNeeded();
+        const trackBox = await trackLine.boundingBox();
+        const tBefore = await trackRows();
+        // Grab the handle itself — it sits at its current value's point on the track,
+        // and both seed values are mid-range — then slide to the track's far end.
+        const grabDot = await trackChart.locator('svg circle').first().boundingBox();
+        await mouseDrag(
+            grabDot.x + grabDot.width / 2, grabDot.y + grabDot.height / 2,
+            trackBox.x + trackBox.width / 2, trackBox.y + 1);
+        const tEnd = await trackRows();
+        check('track: dragging along the drawn track moves the value it maps',
+            JSON.stringify(tEnd) !== JSON.stringify(tBefore),
+            `${JSON.stringify(tBefore)} -> ${JSON.stringify(tEnd)}`);
 
         // ---- Face create + unique per day (/marks/face) ----------------------
         // Create on an ordinal (band) x × numeric y: click an empty day to add a
@@ -974,6 +1058,176 @@ async function main() {
         check('band: dragging one edge left the OTHER edge of the same row alone',
             bandSolo[1].hi === bandAfter[1].hi,
             `hi ${bandAfter[1].hi} -> ${bandSolo[1].hi}`);
+
+        // ---- Trend + band: a parametric line and its envelope ---------------
+        // A trend is edited through its PARAMETERS, not its position, so nothing
+        // here is visible to typecheck: each drag has to solve back to intercept /
+        // slope, and both handles live on ONE feature over ONE datum (the
+        // arbitration that keeps a drag on one from moving the other).
+        // A mark is INERT until an edit names the column a gesture writes. trend and
+        // face used to violate that — both attached their own edits unconditionally,
+        // so `trend({ edits: [] })` was still fully draggable and nothing in the spec
+        // said which columns a drag would set. Only a real pointer can prove the
+        // removal: the handles are still DRAWN, so the chart looks identical either
+        // way, and typecheck/check:warnings both stay green on the broken version.
+        console.log('\nA mark with no edit is inert (/marks/trend)');
+        await open('/marks/trend', '#inert .chart svg circle');
+        const inertChart = page.locator('#inert .chart').first();
+        const inertRows = () => inertChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        const inertBefore = await inertRows();
+        const inertHandles = await inertChart.locator('svg circle').count();
+        check('trend (no edit): the handles are still drawn', inertHandles >= 2, `${inertHandles} circles`);
+        for (const nth of [0, 1]) {
+            const h = inertChart.locator('svg circle').nth(nth);
+            await h.scrollIntoViewIfNeeded();
+            const hb = await h.boundingBox();
+            if (!hb) continue;
+            await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2 - 45, { steps: 6 });
+            await page.mouse.up();
+        }
+        await page.waitForTimeout(150);
+        const inertAfter = await inertRows();
+        check('trend (no edit): dragging both handles writes NOTHING',
+            JSON.stringify(inertAfter) === JSON.stringify(inertBefore),
+            `${JSON.stringify(inertBefore)} -> ${JSON.stringify(inertAfter)}`);
+
+        console.log('\nTrend + band (/marks/trend)');
+        await open('/marks/trend', '#twostep .chart svg circle');
+
+        // The staged chart: at stage 0 only the intercept handle is live, so this
+        // is also the stage gate under a real pointer.
+        const stagedChart = page.locator('#twostep .chart').first();
+        const stagedRows = () => stagedChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        const trendBefore = await stagedRows();
+
+        // The intercept handle: translate. Slope is HELD.
+        const iHandle = stagedChart.locator('svg circle').first();
+        await iHandle.scrollIntoViewIfNeeded();
+        const ib = await iHandle.boundingBox();
+        await page.mouse.move(ib.x + ib.width / 2, ib.y + ib.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(ib.x + ib.width / 2, ib.y + ib.height / 2 - 40, { steps: 8 });
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const afterIntercept = await stagedRows();
+        check('trend: dragging the intercept handle moved the intercept',
+            afterIntercept[0].intercept !== trendBefore[0].intercept,
+            `${trendBefore[0].intercept} -> ${afterIntercept[0].intercept}`);
+        check('trend: it HELD the slope',
+            Math.abs(afterIntercept[0].slope - trendBefore[0].slope) < 1e-9,
+            `slope ${trendBefore[0].slope} -> ${afterIntercept[0].slope}`);
+
+        // The slope handle rotates about the anchor, holding its VALUE — which is
+        // the whole point of the pivot, and what the slope edit firing on the
+        // intercept handle (an unclaimed `when`) would break. Read it off the
+        // unstaged chart, where both handles are live at once.
+        const anchorValue = (d) => d.intercept + d.slope * 0;
+        const freeChart = page.locator('#twostep .chart').nth(1);
+        const freeRows = () => freeChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        const freeBefore = await freeRows();
+        const sHandle = freeChart.locator('svg circle').nth(1);
+        await sHandle.scrollIntoViewIfNeeded();
+        const sb = await sHandle.boundingBox();
+        await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2 + 50, { steps: 8 });
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const afterSlope = await freeRows();
+        check('trend: dragging the slope handle moved the slope',
+            afterSlope[0].slope !== freeBefore[0].slope,
+            `${freeBefore[0].slope} -> ${afterSlope[0].slope}`);
+        check('trend: it HELD the anchor point',
+            Math.abs(anchorValue(afterSlope[0]) - anchorValue(freeBefore[0])) < 1e-9,
+            `value at anchor ${anchorValue(freeBefore[0])} -> ${anchorValue(afterSlope[0])}`);
+
+        // The three renders are three readings of ONE family, so each has to emit
+        // its own shape count — a render name silently falling through to the
+        // default would still draw a plausible chart. All three charts come from
+        // one example, so they share a `.chart` and differ only in the band.
+        await open('/marks/trend', '#render .chart svg');
+        const renderCharts = page.locator('#render .chart > div');
+        const regionPaths = await renderCharts.nth(0).locator('svg path').count();
+        const gradientPaths = await renderCharts.nth(1).locator('svg path').count();
+        // Axis/tick lines land in the same layer, so measure the fan against the
+        // region chart — identical but for the band — rather than a magic total.
+        const axisLines = await renderCharts.nth(0).locator('svg line').count();
+        const sampleLines = await renderCharts.nth(2).locator('svg line').count();
+        check('band: region draws ONE envelope polygon', regionPaths === 1, `${regionPaths} paths`);
+        check('band: gradient draws one polygon per level', gradientPaths === 6, `${gradientPaths} paths for levels: 6`);
+        check('band: samples draws one line per sample', sampleLines - axisLines === 80,
+            `${sampleLines} - ${axisLines} axis lines, for samples: 80`);
+
+        // The band's own handles write the SPREADS, and each claims its own.
+        await open('/marks/trend', '#band .chart svg circle');
+        const editBand = page.locator('#band .chart').nth(1);
+        const editBandRows = () => editBand.locator(':scope > div').first().evaluate((e) => e.getData());
+        const spreadBefore = await editBandRows();
+        const spreadHandle = editBand.locator('svg circle').first();
+        await spreadHandle.scrollIntoViewIfNeeded();
+        const pb = await spreadHandle.boundingBox();
+        await page.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2 - 30, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const spreadAfter = await editBandRows();
+        check('band: dragging a spread handle widened that spread',
+            spreadAfter[0].aSd !== spreadBefore[0].aSd,
+            `aSd ${spreadBefore[0].aSd} -> ${spreadAfter[0].aSd}`);
+        check('band: it left the line itself alone',
+            spreadAfter[0].intercept === spreadBefore[0].intercept
+            && spreadAfter[0].slope === spreadBefore[0].slope);
+
+        // ---- Line + Cone: the correlation preset ----------------------------
+        // Two probe clicks, no handles at all: with no node to read a channel tag
+        // off, an edit that insisted on one could never fire. The pinned intercept
+        // must also survive — a stray write would add an `intercept` column to the
+        // elicited data.
+        console.log('\nLine + Cone as a preset (/widgets)');
+        await open('/widgets', '#linecone .chart svg');
+        const coneChart = page.locator('#linecone .chart').first().locator(':scope > div').first();
+        const coneRows = () => coneChart.evaluate((e) => e.getData());
+        const coneStage = () => coneChart.evaluate((e) => e.getStage());
+        await coneChart.scrollIntoViewIfNeeded();
+        check('lineCone: starts at stage 0', (await coneStage()) === 0);
+
+        const coneSvg = await coneChart.locator('svg').boundingBox();
+        const aimX = coneSvg.x + coneSvg.width * 0.72;
+        const aimY = coneSvg.y + coneSvg.height * 0.32;
+        await page.mouse.move(aimX, aimY);
+        await page.waitForTimeout(80);
+        await page.mouse.click(aimX, aimY);
+        await page.waitForTimeout(150);
+        const afterAim = await coneRows();
+        check('lineCone: the first click committed r', afterAim[0].r !== 0, `r = ${afterAim[0].r}`);
+        check('lineCone: and advanced the stage', (await coneStage()) === 1);
+
+        // Stage 1 opens the cone. The gesture is declared on the LINE, but the band
+        // is what shows it, so hovering has to ghost a sibling feature's nodes —
+        // otherwise half the glyph sits frozen until the click and the reader is
+        // aiming blind. The committed spread is still 0 here, so every band node on
+        // screen is a ghost.
+        await page.mouse.move(aimX, aimY + 40, { steps: 4 });
+        await page.waitForTimeout(120);
+        const ghostFan = await coneChart.locator('svg line[data-ghost]').count();
+        const stillZero = (await coneRows())[0].spread;
+        check('lineCone: hovering ghosts the BAND, not just the line',
+            ghostFan > 1, `${ghostFan} ghost band lines`);
+        check('lineCone: the ghost committed nothing', stillZero === 0, `spread = ${stillZero}`);
+
+        await page.mouse.click(aimX, aimY + 40);
+        await page.waitForTimeout(150);
+        const afterOpen = await coneRows();
+        check('lineCone: the second click committed spread', afterOpen[0].spread > 0,
+            `spread = ${afterOpen[0].spread}`);
+        check('lineCone: it FROZE r (stage 0 is gated off)', afterOpen[0].r === afterAim[0].r,
+            `r ${afterAim[0].r} -> ${afterOpen[0].r}`);
+        check('lineCone: the pinned intercept wrote no column',
+            !('intercept' in afterOpen[0]), Object.keys(afterOpen[0]).join(','));
+        check('lineCone: and advanced past the last stage', (await coneStage()) === 2);
 
         // ---- Shape constraints --------------------------------------------
         // All three repair by pushing the rows/fields the gesture would have

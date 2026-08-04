@@ -14,7 +14,7 @@
 //               'brushRect' | 'probe' | string — how the gesture selects its target
 //               (see edit/drivers). Custom picks register via registerDriver.
 //     scope     null (universal) | the mark family it needs: 'line' | 'arc' |
-//               'waffle' | 'geo' | 'axis'. Each names a mark capability the engine
+//               'waffle' | 'geo' | 'axis' | 'trend'. Each names a mark capability the engine
 //               checks, so a misplaced edit warns instead of silently no-op'ing.
 //     constrain constraint(s) applied on this edit's commit (sugar)
 //     guide     true to self-draw this edit's guide (constraint bounds / snap ring)
@@ -59,6 +59,32 @@ import { edge as arcEdge } from './arc.js';
 // Arc-scoped edit, namespaced so the API shows it belongs on an arc/pie/donut mark:
 // drag a slice boundary to redistribute the two adjacent rows (total preserved).
 export const arc = { edge: arcEdge };
+
+import {
+    intercept as trendIntercept,
+    slope as trendSlope,
+    interceptSpread as trendInterceptSpread,
+    slopeSpread as trendSlopeSpread,
+} from './trend.js';
+
+// Trend-scoped edits: a parametric line is edited by its PARAMETERS, so each of
+// these inverts the pointer through x/y and then solves for the one it owns. They
+// need a `trend`/`trendBand` mark, so the scope is in the name like line/arc/geo.
+export const trend = {
+    intercept: trendIntercept,
+    slope: trendSlope,
+    interceptSpread: trendInterceptSpread,
+    slopeSpread: trendSlopeSpread,
+};
+
+import { expression as faceExpression, move as faceMove } from './face.js';
+
+// Face-scoped edits: a face glyph's seven parameters live on ONE feature over ONE
+// datum, each with a derived drag TRACK the mark stamps on its handle. `expression`
+// drags a bound parameter's handle; `move` drags the head. Both used to be built
+// inline in plot/face.js and attached unconditionally, so a face was editable with
+// nothing in the spec saying which columns a gesture wrote.
+export const face = { expression: faceExpression, move: faceMove };
 
 import { fill as waffleFill } from './waffle.js';
 

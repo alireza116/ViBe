@@ -10,7 +10,7 @@
 //   sweep     — you-draw-it: repaint each point the pointer crosses (drag)
 
 import { makeEdit, schemaDefaults, nextSeriesKey, numOf, invertChannel, mintDatum } from './shared.js';
-import { nearestSeries, nearestMark, nearestMarkOnAxis, DEFAULT_PICK_THRESHOLD } from './pick.js';
+import { nearestSeries, nearestMark, nearestMarkOnAxis, resolveThreshold } from './pick.js';
 import { resolveSamples } from '../core/samples.js';
 import { move } from './basic.js';
 
@@ -31,7 +31,7 @@ import { move } from './basic.js';
  */
 export function anchor(options = {}) {
     const { into = 'nearest', series: seriesField, ...rest } = options;
-    const threshold = options.threshold != null && options.threshold > 0 ? options.threshold : DEFAULT_PICK_THRESHOLD;
+    const threshold = resolveThreshold(options.threshold);
     return makeEdit({
         type: 'anchor',
         gesture: 'click',

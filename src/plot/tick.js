@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandSpan } from '../core/scales.js';
-import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf, markDefaults } from './mark.js';
+import { encodeChannel, categoryOf, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf, markDefaults, positionalKeys } from './mark.js';
 
 // tick: a thin line-segment mark (Observable Plot's tick). It marks a VALUE on
 // one axis (the linear/continuous axis) and SPANS the other axis — a category
@@ -35,16 +35,18 @@ import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, themeOf
  * @param {number} fullLength
  * @param {number} inset
  * @param {number | undefined} length
+ * @param {number} [index] row index, so a derived ({ fn }) channel sees (d, i, data)
+ * @param {import('../types').Datum[]} [data]
  * @returns {[number, number]}
  */
-function resolveSpan(spanAxis, scale, channels, scales, datum, key, fullLength, inset, length) {
+function resolveSpan(spanAxis, scale, channels, scales, datum, key, fullLength, inset, length, index, data) {
     // A fixed-length tick with a positional channel on the span axis: centre on
     // the datum (scatter / composite glyph), not on the band or plot midpoint.
     if (length != null && channels[spanAxis]) {
-        const center = encodeChannel(scales, channels, spanAxis, datum, fullLength / 2);
+        const center = encodeChannel(scales, channels, spanAxis, datum, fullLength / 2, index, data);
         return [center - length / 2, center + length / 2];
     }
-    return bandSpan(scale, datum[key], fullLength, { inset, length });
+    return bandSpan(scale, categoryOf(channels, spanAxis, datum, key, index, data), fullLength, { inset, length });
 }
 
 /**
@@ -65,11 +67,11 @@ function buildTick(options, forcedValueAxis) {
         length
     } = opts;
 
-    const xKey = (channels.x && channels.x.field) || 'x';
-    const yKey = (channels.y && channels.y.field) || 'y';
+    const { xKey, yKey } = positionalKeys(channels);
 
     return {
         id,
+        markName: 'tick',
         channels,
         edits,
         constraints,
@@ -108,8 +110,8 @@ function buildTick(options, forcedValueAxis) {
 
                 if (valueAxis === 'x') {
                     // Vertical tick: value on x (linear), span the y band.
-                    const valuePos = encodeChannel(scales, channels, 'x', d, width / 2);
-                    const [y1, y2] = resolveSpan('y', yScale, channels, scales, d, yKey, height, inset, length);
+                    const valuePos = encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
+                    const [y1, y2] = resolveSpan('y', yScale, channels, scales, d, yKey, height, inset, length, i, currentData);
                     return {
                         type: 'line',
                         x1: valuePos,
@@ -126,8 +128,8 @@ function buildTick(options, forcedValueAxis) {
                 }
 
                 // Horizontal tick: value on y (linear), span the x band.
-                const valuePos = encodeChannel(scales, channels, 'y', d, height / 2);
-                const [x1, x2] = resolveSpan('x', xScale, channels, scales, d, xKey, width, inset, length);
+                const valuePos = encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                const [x1, x2] = resolveSpan('x', xScale, channels, scales, d, xKey, width, inset, length, i, currentData);
                 return {
                     type: 'line',
                     x1,

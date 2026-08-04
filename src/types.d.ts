@@ -226,7 +226,7 @@ export interface Edit {
   // isAxis — and the engine dev-warns when the mark it's attached to lacks it,
   // instead of leaving you a silently dead gesture. See SCOPE_CAPABILITY in
   // core/elicit.js.
-  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | null;
+  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | 'trend' | null;
   threshold: number;
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
@@ -328,6 +328,20 @@ export interface RotateOptions extends EditOptions {
   fold?: boolean;
   // Another angular channel to measure the absolute angular distance from.
   relativeTo?: string;
+}
+
+// Options for the TREND-scoped edits (edit.trend.*). Each one inverts the pointer
+// through x/y and solves for the line parameter it owns, so the only extra knobs
+// are the two x positions that define the frame — the same pair the mark takes,
+// and normally inherited from it.
+export interface TrendEditOptions extends EditOptions {
+  // The pivot: the x whose value is held while the line rotates, and where an
+  // intercept drag places the line. Defaults to 0 when 0 is in the x domain.
+  anchor?: number;
+  // The x a HANDLE drag measures at. Ignored when the gesture carries no node (a
+  // plane/probe pick), where the pointer's own x is used so the line follows the
+  // cursor. Defaults to the x domain's other end.
+  probe?: number;
 }
 
 export interface SlideOptions extends EditOptions {
@@ -495,7 +509,7 @@ export interface Channels extends StyleChannels {
   // declared so rotate() is an exact inverse; else raw. Marks that emit geometry
   // (point/rect/tick/text/…) stamp it on FeatureNode.angle; the renderer applies
   // SVG rotate(-deg) about the mark centre. Also the primary channel of needle /
-  // axisRadial / cone (default range [180, 0] = left→right through the top).
+  // axisRadial / needle (default range [180, 0] = left→right through the top).
   // Arc/pie slice magnitude is `value`, not `angle` — a slice's share is a quantity
   // the layout turns into a sweep, not an orientation.
   angle?: ChannelSpec;
@@ -577,6 +591,71 @@ export interface FaceOptions extends MarkOptions {
   handles?: boolean;
 }
 
+// A parametric line's channel map: the ordinary positional/style channels plus the
+// PARAMETERS of the line. `intercept`/`slope` are the line itself; the uncertainty
+// is named either symmetrically (`interceptSpread`/`slopeSpread`, a half-width in
+// the field's own units) or as an explicit asymmetric range (`intercept1`/
+// `intercept2`, `slope1`/`slope2` — the same 1/2 span spelling `area` and `rect`
+// use). The range form wins when both are declared.
+//
+// All of them are UNSCALED: parameters read in their own units and projected
+// through x/y, not encoded themselves. Bind a field to make one editable, or pin it
+// with `{ datum }` — `intercept: { datum: 0 }` is what makes a trend a correlation.
+export type TrendParam =
+  | 'intercept' | 'slope'
+  | 'interceptSpread' | 'slopeSpread'
+  | 'intercept1' | 'intercept2' | 'slope1' | 'slope2';
+
+export type TrendChannels = Channels & Partial<Record<TrendParam, ChannelSpec>>;
+
+// The two x positions a parametric line is edited at. Shared by `trend`,
+// `trendBand` and the trend-scoped edits so a handle pivots exactly where it sits.
+export interface TrendAnchorOptions extends MarkOptions {
+  channels?: TrendChannels;
+  // The pivot: where the intercept handle sits, and the point a slope drag holds
+  // fixed. Defaults to 0 when 0 lies in the x domain, else the domain's first end.
+  anchor?: number;
+  // Where the slope handle sits. Defaults to the x domain's other end.
+  probe?: number;
+  // Draw the grab handles (they stay editable when hidden on `trend`).
+  handles?: boolean;
+  handleSize?: number;
+}
+
+// Options for a TREND mark: the line y = intercept + slope*x, clipped to the plot,
+// with a handle at `anchor` (translate) and one at `probe` (rotate about the
+// anchor). Its positional channels name the plot's AXES; the belief lives in the
+// parameter channels. Stage the two handles to elicit level first, then trend.
+// See plot/trend.js.
+export interface TrendOptions extends TrendAnchorOptions {
+  // Stage gates for the two handles — `interceptStage: 0, slopeStage: 1` asks the
+  // two questions in turn.
+  interceptStage?: number | null;
+  slopeStage?: number | null;
+}
+
+// Options for a TREND BAND mark: the uncertainty around a parametric line, drawn
+// as the envelope of every line the belief allows. Declares no edits of its own —
+// it is a view of the same rows the line's handles write. See plot/trendBand.js.
+export interface TrendBandOptions extends TrendAnchorOptions {
+  // How the family is drawn: one exact envelope polygon (default), `levels` nested
+  // envelopes stacked so the ink darkens toward the line, or `samples` individual
+  // lines drawn from it.
+  render?: 'region' | 'gradient' | 'samples';
+  // 'gradient' only: how many nested envelopes. Default 5.
+  levels?: number;
+  // 'samples' only: how many lines, and the seed that keeps the fan stable across
+  // re-renders. Defaults 60 and 7.
+  samples?: number;
+  seed?: number;
+  // 'samples' only: 'normal' (default) treats the bounds as a `sigma`-wide envelope
+  // so ~95% of draws land inside it; 'uniform' spreads flat across them.
+  distribution?: 'normal' | 'uniform';
+  // The envelope half-width, in standard deviations, when sampling normally.
+  // Default 1.96.
+  sigma?: number;
+}
+
 // Options for a COMPOSITE mark (a glyph): a named GROUP of ordinary marks over
 // the shared dataset. Each part encodes some columns; a part carrying an `edit`
 // on a channel is a handle. `composite` returns the parts as an array of features
@@ -621,6 +700,77 @@ export interface CompositeOptions {
  * A mark NEVER owns data: `Elicit` owns the chart's one dataset and hands the rows
  * to `build`. There is deliberately no `data` and no `onChange` here.
  */
+/**
+ * A CHART ELEMENT — `axis`, `grid`, `legend`, `axisRadial`. Structurally a feature
+ * like any other (the engine builds and draws it the same way), but it answers a
+ * different question, and the differences are the contract:
+ *
+ *   · It views a SCALE, not the dataset. `views: 'scale'`, always. It picks the
+ *     scale by a singular `channel` ('x', 'fill', 'angle'), so it has no `channels`
+ *     MAP, no fields of its own, and no `discreteScale`/`xKey`/`yKey`.
+ *   · Its style options are CHROME, not channels. `stroke`/`fill`/`fontSize` paint
+ *     a spine and its labels; there is no datum to resolve them against, so they
+ *     stay plain options rather than desugaring into channels (see AXIS_CHROME).
+ *   · An edit on it targets the DOMAIN, not rows (`edit.axis.*`, `target: 'domain'`)
+ *     — so it can't be a create target, and `edit/route.js` recovers its field from
+ *     `scale.fields[0]` instead of from a channel map.
+ *   · It may RESERVE layout space. A legend shrinks the plot so it never overlaps
+ *     the marks (core/legends.js) — nothing else in the library does this.
+ *
+ * The type is documentation and a checkable shape; the engine still branches on
+ * `views === 'scale'` rather than on this interface. Both `axes` and `legends` on
+ * the spec desugar into these.
+ */
+export interface ChartElement {
+  build(
+    currentData: Datum[],
+    scales: ScaleMap,
+    width: number,
+    height: number
+  ): FeatureNode[];
+
+  /** Always 'scale' — that is what makes it an element rather than a data mark. */
+  views: 'scale';
+  /** The single scale it draws, by channel name. */
+  channel: string;
+  /** Which kind, for the checks that genuinely need to tell them apart. */
+  isAxis?: boolean;
+  isGrid?: boolean;
+  isLegend?: boolean;
+
+  id?: string;
+  markName?: string;
+  /** Domain-targeting edits (edit.axis.*), already flattened to a list. */
+  edits?: Edit[];
+  /** Dataset invariants; promoted to the chart-wide set like a mark's. */
+  constraints?: Constraint[];
+  /** The single field an edit pins, when the element names one. */
+  field?: string;
+  /** Paint order ('background' puts it under the data marks). */
+  layer?: string;
+  /** Space-reserving elements only: measure, and the band the engine stamped. */
+  measure?(scales: ScaleMap): { width: number; height: number } | null;
+  anchor?: 'top' | 'right' | 'bottom' | 'left';
+  orient?: 'horizontal' | 'vertical';
+
+  [key: string]: any;
+}
+
+/**
+ * One entry of `Mark.requires`: a scale capability some channel(s) must have for
+ * the mark's geometry to mean anything.
+ */
+export interface MarkRequirement {
+  /** The channels this applies to, e.g. ['x', 'y']. */
+  channels: string[];
+  /** The capability needed. Matched against `scale.kind`, never `scale.type`. */
+  kind: 'discrete' | 'band' | 'point' | 'continuous';
+  /** 'all' (default) — every channel must satisfy it; 'any' — at least one. */
+  mode?: 'all' | 'any';
+  /** Why the mark needs it; appended to the dev warning. */
+  why?: string;
+}
+
 export interface Mark {
   /**
    * The one required method: emit this mark's scene nodes for the current rows.
@@ -655,6 +805,23 @@ export interface Mark {
   /** The factory name, stamped for dev messages (`bar()` beats `mark "undefined"`). */
   markName?: string;
 
+  /**
+   * What this mark needs from the resolved SCALES, checked once per render by the
+   * engine (`warnScaleRequirements`).
+   *
+   * A mark declares a CAPABILITY (`kind`), never a scale type — the same rule the
+   * rest of the engine follows. `mode: 'all'` (the default) requires every listed
+   * channel to satisfy it; `mode: 'any'` requires at least one, which is how a mark
+   * whose category axis is chosen at build time (waffle's orientation) states its
+   * need. `why` is prose appended to the warning.
+   *
+   * This exists because the alternative is silent degradation: without a band scale
+   * a waffle's blocks quietly become 20px wide, and without both continuous axes a
+   * trend emits no nodes at all. Both still "render", which is the worst outcome for
+   * a library whose output is someone's stated belief.
+   */
+  requires?: MarkRequirement[];
+
   /** Line-family series grouping. See plot/line.js. */
   seriesKey?: string | null;
   order?: string;
@@ -665,6 +832,7 @@ export interface Mark {
   supportsGeo?: boolean;
   supportsWaffle?: boolean;
   supportsArc?: boolean;
+  supportsTrend?: boolean;
 
   /**
    * What this feature is a view OF.
@@ -885,6 +1053,9 @@ export interface Theme {
   ink: string;
   // Interactive emphasis: draggable handles, a committed answer, an axis handle.
   accent: string;
+  /** Draggable-handle ink and its legibility halo, shared by every mark that draws one. */
+  handle: string;
+  handleStroke: string;
   // Secondary chrome / de-emphasised marks.
   muted: string;
   // The chart backdrop, applied as the svg/canvas CSS background (covers the margin
@@ -969,6 +1140,14 @@ export interface ElicitSpec {
   // `false` to suppress that channel; omitted = default axes on both positional
   // channels. Desugars into composable axis/grid marks.
   axes?: false | { x?: AxisSpec | false; y?: AxisSpec | false };
+  // The legend counterpart to `axes` — the IMPLICIT layer for the NON-positional
+  // scales, desugared into legend marks by core/legends.js's autoLegends.
+  //   true              one legend per non-positional channel bound to a field
+  //   { fill: {...}, size: false }   per-channel config; false suppresses one
+  // Defaults to none, unlike `axes`: a legend RESERVES layout space, so injecting
+  // one by default would silently shrink the plot the moment a `fill` field appears.
+  // An explicit legend mark in `marks` always wins for its channel.
+  legends?: boolean | Record<string, any>;
   // Customizable interaction-effects layer (grab / proximity-select).
   effects?: EffectsSpec;
   // The chart's theme (style layer): default colours, fonts, and affordance tokens.

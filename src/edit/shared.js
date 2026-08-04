@@ -6,12 +6,60 @@
 
 import { visualForChannel, axisOf } from '../core/encoding.js';
 import { rangeExtent } from '../core/scales.js';
+import { schemaDefaults } from '../core/schema.js';
+import { warn } from '../core/dev.js';
 
 /**
  * @param {any} v
  * @returns {any[]}
  */
 export const asList = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
+
+/**
+ * Compose an edit's OWN structural guard with an author-supplied `when`, so both
+ * must pass.
+ *
+ * Several edits are only meaningful on a particular kind of node — `edit.arc.edge`
+ * on a boundary handle, `edit.axis.categories`' three on a tick label / remove
+ * glyph, `edit.face.expression` on a handle carrying a drag track. That guard is
+ * part of what the edit IS, not a default the caller is choosing.
+ *
+ * Those factories used to drop the caller's options entirely rather than risk a
+ * `when` overwriting the guard — which also silently swallowed `stage`, `guide`,
+ * `name`, `threshold` and `constrain`, so an axis edit could not be staged or
+ * guided at all. Composing is what lets the options through safely.
+ * @param {(ctx: any) => boolean} guard the edit's own structural precondition
+ * @param {((ctx: any) => boolean) | null | undefined} userWhen
+ * @returns {(ctx: any) => boolean}
+ */
+export const andWhen = (guard, userWhen) =>
+    (ctx) => guard(ctx) && (typeof userWhen === 'function' ? !!userWhen(ctx) : true);
+
+/**
+ * Strip a `pick` an edit cannot honour, and say so.
+ *
+ * A few edits are inseparable from one driver: `brushSpan`/`brushRect`/`geo.brush`
+ * read a zone lock that only their own driver writes, so pointing them at another
+ * strategy produces an edit that silently never fires. They already forced their
+ * pick — but did it by quietly dropping the option, which is the same class of
+ * silent no-op the drop was protecting against.
+ * @param {any} options
+ * @param {string} type the edit's type, for the message
+ * @param {string} pick the driver it is bound to
+ * @returns {any} the options without `pick`
+ */
+export function claimPick(options, type, pick) {
+    const { pick: given, ...rest } = options || {};
+    if (given != null && given !== pick) {
+        warn(
+            `fixedpick:${type}`,
+            `${type} is bound to the "${pick}" driver — it reads a zone lock only that ` +
+            `driver writes — so { pick: "${given}" } is ignored. Drop it, or use an edit ` +
+            `that supports the strategy you want (move/moveSpan take any pick).`
+        );
+    }
+    return rest;
+}
 
 /**
  * Normalize an edit spec into the canonical Edit descriptor the engine routes to.
@@ -78,6 +126,34 @@ export function makeEdit(spec) {
 }
 
 /**
+ * Claim an edit for ONE tagged handle of a multi-handle feature.
+ *
+ * When a feature emits several handles over one datum (an area's y1/y2 edges, a
+ * trend's intercept/slope), direct-pick dispatch fans a gesture to EVERY direct
+ * edit on the feature — so an unguarded drag on the lo handle also runs the hi
+ * edge's edit. Each handle carries its `channel`, and this wraps an edit's `when`
+ * so it only fires on its own.
+ *
+ * An UNTAGGED or ABSENT node passes: a mark-level edit spanning both edges still
+ * sees every gesture, and a plane/probe-pick edit (which carries no node at all)
+ * is not silently killed by a guard written for handles.
+ * @param {any} edit
+ * @param {string} name the `channel` tag this edit owns
+ * @returns {any}
+ */
+export function claimEdge(edit, name) {
+    const inner = edit.when;
+    return {
+        ...edit,
+        when: (/** @type {import('../types').EditContext} */ ctx) => {
+            const ch = ctx.node && ctx.node.channel;
+            if (ch != null && ch !== name) return false;
+            return inner ? inner(ctx) : true;
+        }
+    };
+}
+
+/**
  * A fresh series key not already present in the data — the identity of a new line.
  * Uses the smallest non-negative integer free among the existing keys, so colors
  * (an ordinal scale over the keys) stay stable as lines come and go.
@@ -93,22 +169,12 @@ export function nextSeriesKey(data, seriesField) {
     return n;
 }
 
-/**
- * The starting values a minted datum gets from the dataset schema: every declared
- * field, set to its explicit `default` when given, else `null` (present but unset,
- * to be set later by an edit). Returns {} when no schema is declared.
- * @param {Record<string, import('../types').FieldSchema> | undefined} schema
- * @returns {Record<string, any>}
- */
-export function schemaDefaults(schema) {
-    /** @type {Record<string, any>} */
-    const out = {};
-    if (!schema) return out;
-    for (const [field, spec] of Object.entries(schema)) {
-        out[field] = spec && spec.default !== undefined ? spec.default : null;
-    }
-    return out;
-}
+// The starting values a minted datum gets from the schema. The SCHEMA owns that
+// (core/schema.js), not the edit layer — but a creator reaches for it constantly
+// (mintDatum below, line.js), so it stays part of the authoring kit re-exported from
+// here and edit/index.js. Imported as well as re-exported: `export … from` creates no
+// local binding, and this module calls it.
+export { schemaDefaults };
 
 /**
  * Mint ONE new datum — the single seed-and-invert core every creator builds on

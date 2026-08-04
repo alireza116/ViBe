@@ -1,6 +1,7 @@
 // @ts-check
 import { isBand, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
+import { claimEdge } from '../edit/shared.js';
+import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults, positionalKeys, resolveHandles } from './mark.js';
 
 // area: a filled path under a series (the distributional sibling of line). Same
 // grouping / ordering knobs as line; emits one filled `path` per series plus
@@ -32,27 +33,10 @@ const SINGLE = '__single__';
  * Span mode puts TWO handles on ONE feature over ONE datum (one per edge), and
  * direct-pick dispatch fans a gesture out to every direct edit on the feature —
  * so an unguarded drag on the lo handle runs the hi edge's drag too and collapses
- * the band onto the pointer. Each handle carries its `channel`, so claim each
- * edge's edit for its own handle (the trend intercept/slope arbitration, applied
- * for the author rather than asked of them). Untagged nodes are left alone: a
- * mark-level edit spanning both edges still sees every gesture.
- * @param {any} edit
- * @param {string} name
- * @returns {any}
- */
-function claimEdge(edit, name) {
-    const inner = edit.when;
-    return {
-        ...edit,
-        when: (/** @type {import('../types').EditContext} */ ctx) => {
-            const ch = ctx.node && ctx.node.channel;
-            if (ch != null && ch !== name) return false;
-            return inner ? inner(ctx) : true;
-        }
-    };
-}
-
-/**
+ * the band onto the pointer. `claimEdge` (edit/shared.js) claims each edge's edit
+ * for its own `channel`-tagged handle — the trend intercept/slope arbitration,
+ * applied for the author rather than asked of them.
+ *
  * Guard every edit that governs exactly one edge of the span pair, whether it was
  * co-located on the channel or declared at mark level.
  * @param {string[] | null} group the pair's channel names, or null outside span mode
@@ -81,7 +65,7 @@ function claimSpanEdges(group, channels, edits) {
  * @returns {import('../types').Mark}
  */
 function buildArea(options, forcedValueAxis) {
-    const opts = normalizeMarkOptions(options, { mark: 'area', allow: ['curve', 'handles', 'handleSize', 'order', 'samples', 'series', 'z'] });
+    const opts = normalizeMarkOptions(options, { mark: 'area', allow: ['curve', 'handles', 'handleSize', 'handleColor', 'order', 'samples', 'series', 'z'] });
     const {
         channels: rawChannels = {},
         id,
@@ -89,13 +73,13 @@ function buildArea(options, forcedValueAxis) {
         constraints,
         curve = 'linear',
         handles = true,
-        handleSize = 4,
+        handleSize,
+        handleColor,
         order = 'domain',
         samples
     } = opts;
 
-    const xKey = (rawChannels.x && rawChannels.x.field) || 'x';
-    const yKey = (rawChannels.y && rawChannels.y.field) || 'y';
+    const { xKey, yKey } = positionalKeys(rawChannels);
     const seriesField = seriesFieldOf(opts, rawChannels);
     // Span mode is decided once per mark (not per datum), exactly as bar/rect do it.
     const hasXSpan = !!(rawChannels.x1 && rawChannels.x2);
@@ -105,6 +89,7 @@ function buildArea(options, forcedValueAxis) {
 
     return {
         id,
+        markName: 'area',
         channels,
         edits,
         constraints,
@@ -147,6 +132,10 @@ function buildArea(options, forcedValueAxis) {
 
             /** @type {import('../types').FeatureNode[]} */
             const nodes = [];
+            // The shared handle contract (plot/mark.js): one radius default, one
+            // meaning per `handles` value, themed paint instead of the literal
+            // 'steelblue' that used to be an area handle's fallback fill.
+            const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor });
             const yBase = baselineOf(yScale);
             const xBase = baselineOf(xScale);
 
@@ -165,8 +154,11 @@ function buildArea(options, forcedValueAxis) {
                 }
 
                 const areaInk = themeOf(scales).ink;
+                // One band spans a whole series, so its style resolves from the series'
+                // FIRST row — and passes that row's own index, not a bare undefined.
                 const style = resolveStyle(scales, channels, sorted[0] ? sorted[0].d : {},
-                    markDefaults(scales, 'area', { fill: areaInk, stroke: areaInk, fillOpacity: 0.35 }));
+                    markDefaults(scales, 'area', { fill: areaInk, stroke: areaInk, fillOpacity: 0.35 }),
+                    sorted[0] ? sorted[0].i : undefined, currentData);
 
                 // Span mode: the far edge is a second field, not the baseline. Both
                 // edges resolve through encodeChannel like any other channel, so the
@@ -175,22 +167,27 @@ function buildArea(options, forcedValueAxis) {
                 let top;
                 /** @type {[number, number][]} */
                 let bottom;
+                // Each sorted entry keeps its GLOBAL index `i`, so a derived ({ fn })
+                // channel gets the same (d, i, data) here as it would on any other
+                // mark — sorting into series must not change what fn sees.
                 if (valueAxis === 'y') {
-                    const domainAt = (/** @type {any} */ d) => encodeChannel(scales, channels, 'x', d, width / 2);
-                    top = sorted.map(({ d }) => [domainAt(d), spanMode
-                        ? encodeChannel(scales, channels, 'y2', d, yBase)
-                        : encodeChannel(scales, channels, 'y', d, height / 2)]);
-                    bottom = [...sorted].reverse().map(({ d }) => [domainAt(d), spanMode
-                        ? encodeChannel(scales, channels, 'y1', d, yBase)
+                    const domainAt = (/** @type {any} */ d, /** @type {number} */ i) =>
+                        encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
+                    top = sorted.map(({ d, i }) => [domainAt(d, i), spanMode
+                        ? encodeChannel(scales, channels, 'y2', d, yBase, i, currentData)
+                        : encodeChannel(scales, channels, 'y', d, height / 2, i, currentData)]);
+                    bottom = [...sorted].reverse().map(({ d, i }) => [domainAt(d, i), spanMode
+                        ? encodeChannel(scales, channels, 'y1', d, yBase, i, currentData)
                         : yBase]);
                 } else {
-                    const domainAt = (/** @type {any} */ d) => encodeChannel(scales, channels, 'y', d, height / 2);
-                    top = sorted.map(({ d }) => [spanMode
-                        ? encodeChannel(scales, channels, 'x2', d, xBase)
-                        : encodeChannel(scales, channels, 'x', d, width / 2), domainAt(d)]);
-                    bottom = [...sorted].reverse().map(({ d }) => [spanMode
-                        ? encodeChannel(scales, channels, 'x1', d, xBase)
-                        : xBase, domainAt(d)]);
+                    const domainAt = (/** @type {any} */ d, /** @type {number} */ i) =>
+                        encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                    top = sorted.map(({ d, i }) => [spanMode
+                        ? encodeChannel(scales, channels, 'x2', d, xBase, i, currentData)
+                        : encodeChannel(scales, channels, 'x', d, width / 2, i, currentData), domainAt(d, i)]);
+                    bottom = [...sorted].reverse().map(({ d, i }) => [spanMode
+                        ? encodeChannel(scales, channels, 'x1', d, xBase, i, currentData)
+                        : xBase, domainAt(d, i)]);
                 }
                 const points = [...top, ...bottom];
 
@@ -215,18 +212,18 @@ function buildArea(options, forcedValueAxis) {
                     ? (valueAxis === 'y' ? ['y1', 'y2'] : ['x1', 'x2'])
                     : [valueAxis];
                 sorted.forEach(({ d, i }) => {
-                    const hStyle = resolveStyle(scales, channels, d, { fill: style.fill || 'steelblue' }, i, currentData);
+                    const hStyle = resolveStyle(scales, channels, d, { fill: handleStyle.fill }, i, currentData);
                     for (const ch of handleChannels) {
                         const onY = ch[0] === 'y';
                         const along = onY
-                            ? encodeChannel(scales, channels, 'x', d, width / 2)
-                            : encodeChannel(scales, channels, 'y', d, height / 2);
-                        const at = encodeChannel(scales, channels, ch, d, onY ? height / 2 : width / 2);
+                            ? encodeChannel(scales, channels, 'x', d, width / 2, i, currentData)
+                            : encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                        const at = encodeChannel(scales, channels, ch, d, onY ? height / 2 : width / 2, i, currentData);
                         nodes.push({
                             type: 'circle',
                             cx: onY ? along : at,
                             cy: onY ? at : along,
-                            r: handleSize,
+                            r: handleStyle.size,
                             ...hStyle,
                             data: d,
                             index: i,
@@ -243,17 +240,17 @@ function buildArea(options, forcedValueAxis) {
     };
 }
 
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export function area(options = {}) {
     return buildArea(options, null);
 }
 
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export function areaY(options = {}) {
     return buildArea(options, 'y');
 }
 
-/** @param {any} [options] @returns {any} */
+/** @param {any} [options] @returns {import('../types').Mark} */
 export function areaX(options = {}) {
     return buildArea(options, 'x');
 }

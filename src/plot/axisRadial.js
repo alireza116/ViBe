@@ -45,7 +45,15 @@ function anchorFor(x, cx, eps = 1) {
 export function axisRadial(options = {}) {
     // An axis's stroke/fontSize are chrome, not per-datum style, so they stay
     // top-level options (AXIS_CHROME) while x/y/angle desugar as usual.
-    const opts = normalizeMarkOptions(options, { except: AXIS_CHROME });
+    const opts = normalizeMarkOptions(options, {
+        except: AXIS_CHROME,
+        mark: 'axisRadial',
+        allow: [
+            'channel', 'radius', 'innerRadius', 'bandWidth', 'ticks', 'tickValues',
+            'tickFormat', 'tickSize', 'labelOffset', 'bands', 'title', 'arc', 'orient',
+            'start', 'end', 'labelFill',
+        ],
+    });
     const {
         channels = {},
         id,
@@ -79,6 +87,7 @@ export function axisRadial(options = {}) {
 
     return {
         id,
+        markName: 'axisRadial',
         channels,
         edits,
         constraints,

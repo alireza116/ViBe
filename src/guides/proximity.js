@@ -1,27 +1,27 @@
 // @ts-check
-// guides.proximity: highlights the current proximity selection produced by a
-// proximityDrag interactor. It reads the transient interaction state (ui) and
-// draws:
-//   - a dashed "threshold" ring around the pointer (the snap radius), and
-//   - a bright highlight around the currently-snapped mark (a ring for circles,
-//     an outline for bars). If nothing is within threshold, only the ring shows.
+// guides.proximity: draw the CATCHMENT of a named feature's proximity pick — the
+// dashed ring at the pointer showing how far it reaches to find a mark.
 //
-// Added automatically when a proximityDrag has `highlight: true`, or declared
-// explicitly: elicit.guides.proximity({ target: "my-feature" }).
+//   elicit.guides.proximity({ target: "my-feature" })
 //
-// This is the legacy standalone form of the `select` interaction effect; it now
-// delegates to the shared builder so it looks identical to the edit-owned guide
-// and honours the same customizable effects layer (ctx.effects.select). An
-// explicit `color` option still overrides, for backward compatibility.
-import { selectEffectNodes } from '../edit/guide.js';
-import { DEFAULT_EFFECTS } from '../core/effects.js';
+// It no longer draws the highlight around the snapped mark. That is interaction
+// STATE, not a rule, so it is now the `hovered` effect, which the engine draws for
+// every feature from one place (see core/effects.js and the state pass in
+// core/elicit.js). That is what makes "the pointer is over this mark" and "a
+// proximity pick resolved this mark" read identically, instead of only the second
+// being drawn — and only for edits that had asked for a guide.
+//
+// Prefer the edit-owned form — `move({ pick: 'nearest', guide: { catchment: true } })`
+// — which needs no feature id. This standalone version stays for a guide declared
+// against a feature whose edit doesn't own it.
+import { DEFAULT_CATCHMENT } from '../core/effects.js';
 
 /**
- * @param {{ target: string, color?: string }} options
+ * @param {{ target: string, color?: string, dash?: string, width?: number, opacity?: number }} options
  * @returns {any}
  */
 export function proximity(options) {
-    const { target, color } = options;
+    const { target, ...style } = options;
 
     return {
         isGuide: true,
@@ -31,12 +31,14 @@ export function proximity(options) {
          */
         build: (ctx) => {
             const info = ctx.ui && ctx.ui.session && ctx.ui.session[target];
-            if (!info) return [];
-            const base = (ctx.effects && ctx.effects.select) || DEFAULT_EFFECTS.select;
-            // An explicit guide `color` option wins over the effect's colour.
-            const select = color != null ? { ...base, color } : base;
-            const marks = (ctx.featureNodes && ctx.featureNodes[target]) || [];
-            return selectEffectNodes(info, marks, select);
+            if (!info || info.px == null || info.py == null || info.threshold == null) return [];
+            const spec = { ...DEFAULT_CATCHMENT, ...style };
+            return [{
+                type: 'circle', cx: info.px, cy: info.py, r: info.threshold,
+                fill: 'none', stroke: spec.color, strokeDasharray: spec.dash,
+                strokeWidth: spec.width, opacity: spec.opacity,
+                guide: true, effect: true, pointerEvents: 'none',
+            }];
         }
     };
 }

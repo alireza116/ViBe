@@ -21,6 +21,9 @@ import type {
   Renderer,
   RotateOptions,
   SelectEditOptions,
+  TrendBandOptions,
+  TrendEditOptions,
+  TrendOptions,
   SlideOptions,
   Theme,
   ToggleOptions,
@@ -66,7 +69,6 @@ export const plot: {
   waffle(options?: MarkOptions): Mark;
   waffleX(options?: MarkOptions): Mark;
   waffleY(options?: MarkOptions): Mark;
-  cone(options?: MarkOptions): Mark;
   needle(options?: MarkOptions): Mark;
   axisRadial(options?: MarkOptions): Mark;
   arc(options?: MarkOptions): Mark;
@@ -83,7 +85,8 @@ export const plot: {
   legendColor(options?: MarkOptions): Mark;
   legendSize(options?: MarkOptions): Mark;
   legendSymbol(options?: MarkOptions): Mark;
-  trend(options?: MarkOptions): Mark;
+  trend(options?: TrendOptions): Mark;
+  trendBand(options?: TrendBandOptions): Mark;
   geoBasemap(options?: MarkOptions): Mark;
   geoTile(options?: MarkOptions): Mark;
   geoPoint(options?: MarkOptions): Mark;
@@ -126,6 +129,16 @@ export const edit: {
   };
   arc: {
     edge(options?: EditOptions): Edit;
+  };
+  trend: {
+    intercept(options?: TrendEditOptions): Edit;
+    slope(options?: TrendEditOptions): Edit;
+    interceptSpread(options?: TrendEditOptions): Edit;
+    slopeSpread(options?: TrendEditOptions): Edit;
+  };
+  face: {
+    expression(options?: EditOptions): Edit;
+    move(options?: EditOptions): Edit;
   };
   waffle: {
     fill(options?: EditOptions): Edit;

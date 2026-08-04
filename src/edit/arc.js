@@ -18,7 +18,7 @@
 // per-slot sum a pie holds by construction. A lone donut stamps every row, so the
 // single-pie path is exactly the members === all-rows case.
 
-import { makeEdit } from './shared.js';
+import { makeEdit, andWhen } from './shared.js';
 import { pointerDegrees } from '../core/encoding.js';
 
 /**
@@ -27,17 +27,22 @@ import { pointerDegrees } from '../core/encoding.js';
  * loses, so the pair sum (and the pie total) is preserved. The boundary tracks the
  * pointer along the pair's own angular span, whose OUTER edges stay fixed during
  * the drag.
- * @param {{}} [options]
+ * @param {any} [options]
  * @returns {import('../types').Edit}
  */
 export function edge(options = {}) {
+    const { when: userWhen, ...rest } = options;
     return makeEdit({
         type: 'edge',
         gesture: 'drag',
         pick: 'direct',
         scope: 'arc',
-        // Only a boundary handle triggers this (slice paths are inert for it).
-        when: (/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.edge),
+        // Options pass through like every other edit factory's (stage, guide, name,
+        // constrain, threshold). They used to be accepted and dropped on the floor.
+        ...rest,
+        // Only a boundary handle triggers this (slice paths are inert for it). An
+        // author `when` NARROWS that; it can't replace it.
+        when: andWhen((/** @type {import('../types').EditContext} */ ctx) => !!(ctx.node && ctx.node.edge), userWhen),
         apply: (/** @type {import('../types').EditContext} */ ctx) => {
             const node = /** @type {any} */ (ctx.node);
             if (!node || !node.edge) return undefined;

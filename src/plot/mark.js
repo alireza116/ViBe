@@ -59,7 +59,7 @@
 //     and let the engine decide (see rule.js). Setting it yourself there also
 //     disables the mark when it DOES carry an edit.
 //   - DO set it per-node on a glyph's CHROME — a line's path, a trend's fitted
-//     line, a dotStack's ghosts, a cone's samples — when the same feature also
+//     line, a dotStack's ghosts, a trendBand's samples — when the same feature also
 //     emits handles. The engine can't make that distinction for you (it sees one
 //     feature), and without it the chrome, drawn last, eats the handles' drags.
 //     `pointerEvents: 'stroke'` narrows a hit area to a shape's outline.
@@ -109,6 +109,7 @@ const SHORTHANDS = [
 // any `theme.marks[name]` overrides over the mark's built-in fallbacks. See
 // core/theme.js for the precedence rules.
 export { themeOf, markDefaults } from '../core/theme.js';
+import { themeOf } from '../core/theme.js';
 
 // A derived channel's fn re-runs on every render, so a warning would repeat
 // forever — `warn` dedups once per key. See core/dev.js.
@@ -169,8 +170,12 @@ export function encodeChannel(scales, channels, channel, datum, fallback, index,
         if (spec.value !== undefined) return spec.value;
         // Data-space constant — the value is in the field's units, so it goes
         // through the scale exactly as a field's value would. `y: { datum: 25 }`
-        // is a reference line at y=25, not at pixel 25.
+        // is a reference line at y=25, not at pixel 25. On an UNSCALED channel
+        // (`scale: null`) the units are already the output, so the literal is used
+        // as-is — the same rule the `{ field }` branch below applies, which is what
+        // lets a parametric mark pin a parameter (`intercept: { datum: 0 }`).
         if (spec.datum !== undefined) {
+            if (spec.scale === null) return spec.datum;
             const scale = scales[channel];
             return scale ? scale.encode(spec.datum, fallback) : fallback;
         }
@@ -185,6 +190,177 @@ export function encodeChannel(scales, channels, channel, datum, fallback, index,
     const scale = scales[channel];
     if (!scale) return fallback;
     return scale.encode(raw, fallback);
+}
+
+/**
+ * The shared HANDLE contract — one radius default, one meaning for `handles`, and
+ * one place a handle's paint comes from.
+ *
+ * A handle is a grabbable sub-element a mark draws so a value can be dragged: a
+ * line/area point, a trend's intercept and slope dots, an arc's boundary, a face's
+ * eyelid, an axis end, a legend's ramp grip. Seven marks drew them with no shared
+ * contract at all — `handleSize` defaulted to 4, 5 or 6 depending on the mark and
+ * was hard-coded on axis (5) and legend (6); the colour was themed on some marks and
+ * a literal (`'steelblue'`, `'#0f172a'`, `'rgba(15,23,42,0.5)'`) on others; and
+ * `handles: false` meant three different things — invisible AND inert, invisible but
+ * still grabbable, or radius-zero.
+ *
+ * `handles` now has exactly three values:
+ *   true    drawn and grabbable (the default)
+ *   false   neither drawn nor grabbable
+ *   'hit'   invisible but still grabbable — the deliberate behaviour arc and face
+ *           already had, where the SHAPE is the affordance (a slice boundary, a lip)
+ *           and the dot would only be clutter.
+ * @type {{ size: number }}
+ */
+export const HANDLE_DEFAULTS = { size: 5 };
+
+/**
+ * Resolve a mark's handle options into the paint every handle node needs.
+ *
+ * @param {import('../types').ScaleMap} scales the scale map (carries the theme)
+ * @param {{ handles?: boolean | string, handleSize?: number, handleColor?: string }} options
+ * @param {{ fill?: string, stroke?: string }} [fallback] the mark's own ink, when it has one
+ * @returns {{ visible: boolean, grabbable: boolean, size: number, fill: string, stroke: string, strokeWidth: number }}
+ */
+export function resolveHandles(scales, options, fallback = {}) {
+    const { handles = true, handleSize, handleColor } = options || {};
+    const theme = themeOf(scales);
+    const visible = handles !== false && handles !== 'hit';
+    return {
+        visible,
+        // `false` is inert; 'hit' keeps the target. A mark still decides whether an
+        // invisible target makes sense for its geometry.
+        grabbable: handles !== false,
+        size: handleSize != null ? handleSize : HANDLE_DEFAULTS.size,
+        fill: handleColor || fallback.fill || theme.handle || theme.accent,
+        stroke: visible ? (fallback.stroke || theme.handleStroke) : 'none',
+        strokeWidth: 1.25,
+    };
+}
+
+/**
+ * The value-field names a mark reports back to the edit/constraint layer as
+ * `xKey`/`yKey` — the field each positional channel is bound to, defaulting to the
+ * column named after the channel.
+ *
+ * One helper because there were FOUR spellings of this in `src/plot/`:
+ * `(channels.x && channels.x.field) || 'x'` (bar, line, area, tick, rect, waffle,
+ * rule, trend, trendBand), the same thing without the default (point, text, face),
+ * `yKey` set and `xKey` never (arc), and a non-positional field aliased into both
+ * (needle). The engine and edit/guide.js each re-applied `|| 'x'` on read, so the
+ * variants mostly agreed by accident — but "mostly, by accident" is what this pass
+ * exists to remove.
+ *
+ * arc, needle and the geo* family stay deliberate exceptions and say why at their
+ * own declaration: arc has no category axis (its rows are their own layout order),
+ * needle is positioned by an angle, and geo marks key on lon/lat.
+ * @param {Record<string, any> | undefined} channels
+ * @returns {{ xKey: string, yKey: string }}
+ */
+export function positionalKeys(channels) {
+    const ch = channels || {};
+    return {
+        xKey: (ch.x && ch.x.field) || 'x',
+        yKey: (ch.y && ch.y.field) || 'y',
+    };
+}
+
+/**
+ * Resolve a datum's CATEGORY on a band/point axis — the discrete-axis counterpart
+ * to `encodeChannel`.
+ *
+ * A band mark (bar/tick/rect/waffle/arc) needs a category KEY, not a pixel: it feeds
+ * the key to `bandStartOf`/`bandwidthOf` to get an interval. So it cannot use
+ * `encodeChannel`, and every one of them instead read `datum[key]` raw — which meant
+ * the channel forms worked on a bar's VALUE axis and were silently ignored on its
+ * CATEGORY axis. `bar({ channels: { x: { datum: 'A' } } })` read `d['x']` and drew
+ * wherever that landed. This is that missing path, in one place.
+ *
+ * The forms, in the same precedence `encodeChannel` uses:
+ *   { fn }     fn(d, i, data) -> the category key
+ *   { datum }  a data-space constant: the category itself (pin every row to one band)
+ *   { field }  datum[field] — the ordinary case
+ *   (none)     datum[key], the mark's xKey/yKey; and when the mark has no key
+ *              either, the column named after the CHANNEL (`d.x` on x). That last
+ *              step is the old per-mark `(channels.x && channels.x.field) || 'x'`
+ *              default, hoisted here so it happens once instead of being spelled
+ *              four different ways across bar/tick/rect/waffle/point/text/arc — and
+ *              warned about, because an implicit column is exactly the "which data
+ *              does this mark touch?" ambiguity the channel map exists to remove.
+ *
+ * `{ value }` is deliberately NOT honoured, and warns. `value` means "visual space,
+ * skip the scale", and on a category axis there is no such thing: the output of the
+ * axis is a band, chosen by which category you name — which is exactly `{ datum }`.
+ * Silently treating it as a category would make two spellings mean one thing.
+ * @param {Record<string, any>} channels
+ * @param {string} channel
+ * @param {import('../types').Datum | null} datum
+ * @param {string | undefined} key the mark's xKey/yKey fallback
+ * @param {number} [index] row index, passed to a derived channel's fn
+ * @param {import('../types').Datum[]} [data] the dataset, passed to a derived fn
+ * @returns {any} the category key, or undefined when there is nothing to resolve
+ */
+export function categoryOf(channels, channel, datum, key, index, data) {
+    const spec = channels ? channels[channel] : undefined;
+    const column = key != null ? key : channel;
+    if (key == null && datum && datum[channel] !== undefined) {
+        warn(
+            `implicitcol:${channel}`,
+            `a mark places rows on the "${channel}" category axis but declares no ` +
+            `"${channel}" channel, so it is reading the column named "${channel}" implicitly. ` +
+            `Declare it — channels: { ${channel}: { field: "${channel}" } } — so the spec says ` +
+            `which column the mark draws (and which one an edit would write).`
+        );
+    }
+    const fallback = datum ? datum[column] : undefined;
+    if (!spec) return fallback;
+    if (spec.field === undefined) {
+        if (typeof spec.fn === 'function') {
+            return callChannelFn(spec, channel, datum, index, data, fallback);
+        }
+        if (spec.datum !== undefined) return spec.datum;
+        if (spec.value !== undefined) {
+            warn(
+                `catvalue:${channel}`,
+                `channel "${channel}" is a CATEGORY axis on this mark, and { value: … } is a ` +
+                `visual-space constant — there is no visual constant for "which band". Use ` +
+                `{ datum: … } to pin every row to one category, or { field: "…" } to read it ` +
+                `from the data.`
+            );
+            return fallback;
+        }
+        return fallback;
+    }
+    const raw = datum ? datum[spec.field] : undefined;
+    return raw === undefined || raw === null ? fallback : raw;
+}
+
+/**
+ * Encode an ARBITRARY value through a channel's scale — the derived-value sibling
+ * of `encodeChannel`, which can only encode a value a datum already holds.
+ *
+ * A parametric mark computes the points it draws (`trend`'s line is sampled at x
+ * positions no row contains; `trendBand`'s envelope is evaluated at the domain
+ * ends), so it has a value in the field's units and needs the same field->pixel
+ * path. Without this, such a mark reaches past the encoding layer and calls
+ * `scales.x.encode(v)` itself, which is how `trend`/`cone` each grew their own
+ * placement rules. Honours `scale: null` (raw) and a missing scale exactly as
+ * `encodeChannel` does, so the two stay interchangeable.
+ * @param {import('../types').ScaleMap} scales
+ * @param {Record<string, any>} channels
+ * @param {string} channel
+ * @param {any} value in the channel field's own units
+ * @param {any} [fallback]
+ * @returns {any}
+ */
+export function encodeValue(scales, channels, channel, value, fallback) {
+    if (value === undefined || value === null) return fallback;
+    const spec = channels[channel];
+    if (spec && spec.scale === null) return value;
+    const scale = scales[channel];
+    if (!scale) return fallback;
+    return scale.encode(value, fallback);
 }
 
 /**
@@ -346,9 +522,11 @@ const MISTAKEN_OPTIONS = {
  * misspelled `strokeWdith` all "worked" and did nothing at all. That is the
  * quietest class of authoring bug in the library.
  *
- * `allow` is the mark's own option vocabulary. When it is omitted only the
- * MISTAKEN_OPTIONS check runs — a mark that hasn't declared its vocabulary yet
- * degrades to no false positives rather than to noise.
+ * `allow` is the mark's own option vocabulary on top of the universal options and
+ * the style shorthands. Omitting it silently disables every unknown-option check —
+ * so a mark that names itself but declares no vocabulary is a diagnostics HOLE, not
+ * a lenient default, and gets told so (once). `arc`/`pie`/`donut` and `axisRadial`
+ * sat in that hole for a long time: `arc({ outerRadus: 50 })` warned nothing.
  * @param {string | undefined} mark the factory name, for the message
  * @param {any} options the RAW options, before shorthands are stripped
  * @param {string[] | undefined} allow mark-specific option names
@@ -357,6 +535,14 @@ const MISTAKEN_OPTIONS = {
 export function warnUnknownOptions(mark, options, allow) {
     if (!options || !warningsEnabled()) return;
     const name = mark || 'this mark';
+    if (mark && !allow) {
+        warn(
+            `noallow:${mark}`,
+            `${name}() calls normalizeMarkOptions without an \`allow\` list, which turns off ` +
+            `its unknown-option diagnostics. Declare the mark's own option vocabulary — see ` +
+            `the "Adding a new mark" contract in CLAUDE.md.`
+        );
+    }
     const known = allow
         ? new Set([...UNIVERSAL_OPTIONS, ...SHORTHANDS, ...allow])
         : null;
@@ -425,3 +611,46 @@ export function normalizeMarkOptions(options = {}, { except = [], mark, allow } 
  * @type {string[]}
  */
 export const AXIS_CHROME = ['stroke', 'strokeWidth', 'fill', 'fontSize'];
+
+/**
+ * Options every CHART ELEMENT accepts. A chart element (`views: 'scale'` — axis,
+ * grid, legend, axisRadial) draws a SCALE rather than columns of the dataset, so it
+ * has no `channels` map: the universal set is the mark's minus that.
+ * @type {string[]}
+ */
+const UNIVERSAL_ELEMENT_OPTIONS = ['id', 'edit', 'edits', 'constraints', 'field'];
+
+/**
+ * Validate a CHART ELEMENT's options. The counterpart to normalizeMarkOptions for
+ * `views: 'scale'` features — the diagnostics half without the channel desugar half,
+ * because an element has nothing to desugar INTO.
+ *
+ * This exists because `axis`/`axisX`/`axisY`/`grid`/`gridX`/`gridY`/`legend`/
+ * `legendColor`/`legendSize`/`legendSymbol` skipped normalizeMarkOptions entirely
+ * (correctly — they encode no datum) and thereby skipped all validation too. They
+ * take ~20 options each and checked none of them: `axisX({ colour: 'red' })` and
+ * `axisX({ tickss: 5 })` both rendered a default axis in silence. Routing them
+ * through normalizeMarkOptions instead would be wrong in the other direction — it
+ * would accept `dy`/`symbol`/`size` (every style SHORTHAND) on an axis.
+ * @param {string} element the factory name, for the message
+ * @param {any} options
+ * @param {string[]} allow the element's own option vocabulary
+ * @returns {void}
+ */
+export function warnUnknownElementOptions(element, options, allow) {
+    if (!options || !warningsEnabled()) return;
+    const known = new Set([...UNIVERSAL_ELEMENT_OPTIONS, ...allow]);
+    for (const key of Object.keys(options)) {
+        if (known.has(key)) continue;
+        const fix = MISTAKEN_OPTIONS[key];
+        if (fix) {
+            warn(`opt:${element}:${key}`, `${element}({ ${key}: … }): ${fix}`);
+            continue;
+        }
+        warn(
+            `opt:${element}:${key}`,
+            `${element}({ ${key}: … }) is not an option this chart element reads, so it is ` +
+            `ignored. ${element} options are: ${[...known].sort().join(', ')}.`
+        );
+    }
+}

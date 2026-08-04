@@ -11,7 +11,69 @@
 // where its band landed, so the mark's build() can position itself there without a
 // widened signature (the same mutable-object transport `_place` documents).
 
+import { legend } from '../plot/legend.js';
+
 /** @typedef {{ top: number, right: number, bottom: number, left: number }} Sides */
+
+/**
+ * The channels a legend can describe: the non-positional ones a reader needs a key
+ * for. x/y are excluded because an AXIS is the key for those.
+ * @type {string[]}
+ */
+const LEGENDABLE = ['fill', 'stroke', 'size', 'symbol'];
+
+/**
+ * Resolve the global `legends` convenience into composable legend marks — the same
+ * IMPLICIT layer `axes` has (core/axes.js), for the same reason: a chart shouldn't
+ * have to hand-compose the key for a scale it already declared.
+ *
+ * `axes` had this and `legends` did not, so an axis was one word and a legend was a
+ * mark you had to know the name of. The default stays OFF, though — unlike axes,
+ * because a legend RESERVES layout space, and silently shrinking a plot because a
+ * `fill` channel exists would be a surprise.
+ *
+ *   undefined / false -> no legends (the default)
+ *   true              -> one per non-positional scale that is bound to a field
+ *   { fill: {...}, size: false }
+ *                     -> per-channel config; `false` suppresses that channel
+ *
+ * An explicit legend mark in `marks` always wins for its channel, exactly as an
+ * explicit `axisX(...)` wins over the injected one.
+ * Reads the MARKS' channel maps rather than the resolved scales, because legends
+ * are composed at setup — before resolveScales runs — exactly like autoAxes. A
+ * channel bound to a field on any mark is a channel that will get a scale.
+ * @param {any[]} features the user's marks
+ * @param {any} legendsOpt
+ * @returns {any[]} the legend marks to append
+ */
+export function autoLegends(features, legendsOpt) {
+    if (!legendsOpt) return [];
+    const flat = /** @type {any[]} */ (features || []).flat(Infinity).filter(
+        (f) => f && typeof f === 'object'
+    );
+    /** @param {string} ch */
+    const hasExplicit = (ch) => flat.some((f) => f.isLegend && f.channel === ch);
+    /** @param {string} ch */
+    const isBound = (ch) => flat.some((f) => {
+        const spec = f.channels && f.channels[ch];
+        return !!(spec && spec.field != null);
+    });
+
+    /** @type {any[]} */
+    const injected = [];
+    for (const ch of LEGENDABLE) {
+        const cfg = legendsOpt === true ? undefined : legendsOpt[ch];
+        if (cfg === false) continue;                 // channel suppressed
+        if (hasExplicit(ch)) continue;               // the author composed their own
+        // With `legends: { size: {...} }` the author named the channels explicitly;
+        // with `legends: true` take every one bound to a field. A CONSTANT channel
+        // never gets a legend either way: one colour has nothing to explain.
+        if (legendsOpt !== true && cfg === undefined) continue;
+        if (!isBound(ch)) continue;
+        injected.push(legend({ ...(cfg || {}), channel: ch }));
+    }
+    return injected;
+}
 
 /**
  * Measure the legends in `features` against the resolved `scales` and return the

@@ -14,7 +14,7 @@
 // is the object outcome; the gesture string is the physical action — they differ
 // deliberately (a `move` is driven by a 'drag').
 
-import { makeEdit, markCenter, resolveMarkNode, invertChannel, recenterSpan, mintDatum, linearInvert, channelDomain } from './shared.js';
+import { makeEdit, markCenter, resolveMarkNode, invertChannel, recenterSpan, mintDatum, linearInvert, channelDomain, claimPick } from './shared.js';
 import { axisOf, pointerDegrees, unwrapDegrees } from '../core/encoding.js';
 
 /**
@@ -93,7 +93,7 @@ export function brushSpan(options = {}) {
     // `edgeInset` is a driver-only knob: makeEdit passes it through onto the
     // descriptor, where the brush driver reads it (edgeInsetOf), the same way
     // pickThreshold reads edit.threshold.
-    const { pick: _pick, ...rest } = options;
+    const rest = claimPick(options, 'brushSpan', 'brush');
     return makeEdit({
         type: 'brushSpan',
         gesture: 'drag',
@@ -163,7 +163,7 @@ export function brushRect(options = {}) {
     // passes them through onto the descriptor, where the driver reads them
     // (like edgeInsetOf does). `resize`/`move` are re-stated so their defaults
     // land on the descriptor even when the caller omits them.
-    const { resize = 'both', move = true, pick: _pick, ...rest } = options;
+    const { resize = 'both', move = true, ...rest } = claimPick(options, 'brushRect', 'brushRect');
     return makeEdit({
         type: 'brushRect',
         gesture: 'drag',
@@ -346,7 +346,7 @@ export function resize(options = {}) {
  * Options:
  *   pivot: 'plot' (default) — plot centre; 'mark' — markCentre of the hit node
  *   fold:  true (default) — fold into (-90, 90] for direction-agnostic lines
- *          (cone); false — full-circle degrees for gauges/dials
+ *          (a fold-agnostic line); false — full-circle degrees for gauges/dials
  *   pick:  'plane' (default) updates the whole dataset; 'direct' updates the
  *          hit datum only (needle handle); 'probe' keeps the hover/click flow
  *

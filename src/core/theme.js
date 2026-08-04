@@ -41,6 +41,14 @@ export const DEFAULT_THEME = {
     accent: '#2563eb',
     // Secondary chrome / de-emphasised marks.
     muted: '#9ca3af',
+    // Draggable-handle ink, shared by every mark that draws one (see
+    // resolveHandles in plot/mark.js). Split out from `accent` so a theme can make
+    // handles read differently from other interactive emphasis without changing
+    // both. `handleStroke` is the halo that keeps a handle legible on top of the
+    // mark it belongs to — arc, face, axis, legend and geo each hard-coded '#fff'
+    // for exactly this, which meant none of them worked on a dark theme.
+    handle: '#2563eb',
+    handleStroke: '#fff',
     // The chart's backdrop, applied as the CSS background of the svg/canvas (so it
     // covers the margin band too). Defaults to null = transparent (the host page's
     // background shows through, exactly as before); a dark theme sets it to paint the

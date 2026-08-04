@@ -28,7 +28,7 @@ export const slideDriver = {
         const edit = edits[0];
         if (!edit) return false;
         const axis = /** @type {any} */ (edit).axis === 'y' ? 'y' : 'x';
-        const threshold = pickThreshold(edit) || GRAB_THRESHOLD;
+        const threshold = pickThreshold(edit, GRAB_THRESHOLD);
         let changed = false;
 
         if (event.type === 'dragstart') {

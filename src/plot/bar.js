@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandwidthOf, bandStartOf, baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults } from './mark.js';
+import { encodeChannel, categoryOf, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults, positionalKeys } from './mark.js';
 
 // bar: a rectangular mark that composes across orientations. The band axis is
 // the categorical/position axis (sets the bar's position + thickness) and the
@@ -85,8 +85,7 @@ function buildBar(options, forcedOrientation) {
     // Channel-native: read the x/y field from the channels, falling back to the
     // legacy x/y accessor options. Either way the scale for each channel is the
     // global one the engine resolves and passes in as scales.x / scales.y.
-    const xKey = (channels.x && channels.x.field) || 'x';
-    const yKey = (channels.y && channels.y.field) || 'y';
+    const { xKey, yKey } = positionalKeys(channels);
     // Span mode: both endpoint channels declared on that axis. Decided once per
     // mark (not per datum) — the missing form (baseline+value) stays the default.
     const hasXSpan = !!(channels.x1 && channels.x2);
@@ -100,6 +99,7 @@ function buildBar(options, forcedOrientation) {
 
     return {
         id,
+        markName: 'bar',
         channels,
         edits,
         constraints,
@@ -145,7 +145,7 @@ function buildBar(options, forcedOrientation) {
                     // Category on y (band geometry), value/length on x. The value
                     // axis resolves through encodeChannel like every other mark; the
                     // band axis keeps its interval geometry (start + thickness).
-                    const bandStart = bandStartOf(yScale, d[yKey], 0);
+                    const bandStart = bandStartOf(yScale, categoryOf(channels, 'y', d, yKey, i, currentData), 0);
                     const thickness = bandwidthOf(yScale, 20);
                     const baseline = baselineOf(xScale);
                     let lo, hi;
@@ -181,7 +181,7 @@ function buildBar(options, forcedOrientation) {
 
                 // Vertical: category on x (band geometry), value/length on y. Value
                 // via encodeChannel (as every mark); band axis keeps its interval.
-                const bandStart = bandStartOf(xScale, d[xKey], 0);
+                const bandStart = bandStartOf(xScale, categoryOf(channels, 'x', d, xKey, i, currentData), 0);
                 const thickness = bandwidthOf(xScale, 20);
                 const baseline = baselineOf(yScale);
                 let lo, hi;
