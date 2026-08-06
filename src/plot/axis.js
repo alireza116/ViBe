@@ -1,17 +1,15 @@
 // @ts-check
-// axis.js — axes and gridlines as COMPOSABLE MARKS (the Observable Plot model).
+// axis.js — axes and gridlines as CHART ELEMENTS (the Observable Plot model).
 //
-// An axis is not a renderer feature baked into the engine; it's an ordinary
-// feature (like ruleY) whose build() emits line + text scene nodes. It reads the
-// GLOBAL positional scale by channel name (scales.x / scales.y) and draws a spine,
-// ticks, labels and an optional title. Because it flows through the normal scene
-// pipeline it (a) redraws every update as the scale's domain grows, and (b) can
-// later carry `edits` to become interactive — an editable axis.
+// An axis is scale chrome, not a data mark: `views: 'scale'`, singular `channel`,
+// CHROME paint options (not desugared channels), domain-targeting edits
+// (`edit.axis.*`). Prefer `elicit.elements.axisX` (also aliased on `plot.*`).
 //
 // Two ways to use them:
-//   1. EXPLICITLY compose them:  marks: [ axisX({ ticks: 5 }), gridY(), point(...) ]
+//   1. EXPLICITLY:  elements: [ elements.axisX({ ticks: 5 }), elements.gridY() ]
+//      (or still inside `marks` — same factories)
 //   2. IMPLICITLY via the global `axes` convenience on Elicit(), which desugars
-//      into these same marks (see core/elicit.js).
+//      into these same elements (see core/axes.js).
 //
 // Positioning: `anchor` ('bottom'|'top'|'left'|'right') sets the base side; a
 // width/height/scales-aware `transform(ctx) -> {x?,y?}` overrides the base
@@ -20,7 +18,7 @@
 import * as d3 from 'd3';
 import { positionOnScale, isDiscrete } from '../core/scales.js';
 import { themeOf } from '../core/theme.js';
-import { warnUnknownElementOptions, HANDLE_DEFAULTS } from './mark.js';
+import { warnUnknownElementOptions, resolveHandles } from './mark.js';
 
 /**
  * `axis`'s own option vocabulary, on top of the universal chart-element options
@@ -219,13 +217,16 @@ export function axis(options = {}) {
             const stroke = strokeOpt ?? thm.axis.stroke;
             const fill = fillOpt ?? thm.axis.labelFill;
             const fontSize = fontSizeOpt ?? thm.axis.fontSize;
-            const handleColor = handleColorOpt ?? thm.axis.handle ?? thm.handle;
-            // The shared handle radius default (plot/mark.js). An axis used to
-            // hard-code 5 and expose only the colour, while arc/face/geo exposed only
-            // the radius and hard-coded the colour — the same sub-element, adjustable
-            // in a different half depending on which mark drew it.
-            const handleSize = handleSizeOpt ?? HANDLE_DEFAULTS.size;
-            const handleStroke = thm.handleStroke;
+            // Shared handle contract (plot/mark.js) — axis used to hard-code size
+            // and pull colour from theme.axis.handle without going through resolveHandles.
+            const handleStyle = resolveHandles(scales, {
+                handles: true,
+                handleSize: handleSizeOpt,
+                handleColor: handleColorOpt ?? thm.axis.handle,
+            });
+            const handleColor = handleStyle.fill;
+            const handleSize = handleStyle.size;
+            const handleStroke = handleStyle.stroke;
 
             const base = baseTranslate(anchor, width, height);
             const t = transform
@@ -315,7 +316,7 @@ export function axis(options = {}) {
                         cy: isX ? t.y : t.y + positionOnScale(scale, gV),
                         // Placement: at the domain's two extremes — the values a
                         // rescale drag moves.
-                        r: handleSize, fill: handleColor, stroke: handleStroke, strokeWidth: 1.5,
+                        r: handleSize, fill: handleColor, stroke: handleStroke, strokeWidth: handleStyle.strokeWidth,
                         axisHandle: true, handle: end, axis: channel,
                         anchorPixel: aPix, anchorValue: aV, grabPixel: gPix, grabValue: gV,
                         pxPerUnit: (gPix - aPix) / denom,

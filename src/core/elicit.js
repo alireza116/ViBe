@@ -377,9 +377,14 @@ export function Elicit(spec) {
         // `schema` and `scales` are read straight off the spec by resolveScales:
         // the schema owns each field's data type and DOMAIN, and `scales` is the
         // chart-level per-channel scale override.
-        marks: userFeatures = [],
+        marks: userMarks = [],
+        // Chart elements (axis / grid / legend / axisRadial) — the same factories
+        // as `elicit.elements.*`. Concatenated into the feature list with `marks`
+        // so authors can separate scale chrome from data marks without a second
+        // engine path. Elements in `marks` still work (and stay on `plot.*`).
+        elements: userElements = [],
         // Global axis convenience: desugars into composable axis/grid marks (see
-        // autoAxes). Explicit axis marks in `marks` take precedence per channel.
+        // autoAxes). Explicit axis marks in `marks`/`elements` take precedence per channel.
         axes,
         // The legend counterpart to `axes`: `true` for one legend per bound
         // non-positional scale, or a per-channel config ({ fill: {...}, size: false }).
@@ -417,10 +422,12 @@ export function Elicit(spec) {
     const effects = resolveEffects(effectsSpec, theme.effects);
 
     // Prepend auto-injected axis/grid marks (drawn behind marks via the background
-    // layer). Explicit axis marks the user composed into `marks` are preserved.
-    // A projection chart has no cartesian axes — skip autoAxes unless the caller
-    // forced them (axes !== undefined still respected via autoAxes(false)).
-    // Flattened because a group mark (composite) desugars to an ARRAY of features.
+    // layer). Explicit axis/element the user composed into `marks` or `elements`
+    // are preserved. A projection chart has no cartesian axes — skip autoAxes
+    // unless the caller forced them (axes !== undefined still respected via
+    // autoAxes(false)). Flattened because a group mark (composite) desugars to
+    // an ARRAY of features.
+    const userFeatures = [...userElements, ...userMarks];
     const axesOpt = spec.projection != null && axes === undefined ? false : axes;
     // …and append auto-injected LEGEND marks, the same IMPLICIT layer for the
     // non-positional scales (core/legends.js). `axes` had this convenience and

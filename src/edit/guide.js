@@ -60,14 +60,36 @@ const GUIDE_TRUE_PARTS = ['bounds', 'catchment'];
 
 /**
  * Resolve an edit's `guide` into one config per part, or `null` for a part that is
- * off. Colour precedence: the part's own > the guide's > the edit's legacy
+ * off.
+ *
+ * Grammar:
+ *   true                         → bounds + catchment (track stays opt-in)
+ *   false                        → nothing
+ *   null / omit                  → for a driver with `selects: true`, catchment
+ *                                  alone (proximity signifier); otherwise nothing
+ *   { bounds, catchment, track, color } → per-part on/off + style
+ *
+ * Colour precedence: the part's own > the guide's > the edit's legacy
  * `guideColor` > the theme's constraint colour > the built-in default.
+ * Part defaults: GUIDE_PARTS < theme.guide[part] < part override.
  * @param {import('../types').Edit} edit
  * @param {any} ctx
  * @returns {{ bounds: any, catchment: any, track: any }}
  */
 export function resolveGuide(edit, ctx) {
-    const spec = /** @type {any} */ (edit && edit.guide);
+    let spec = /** @type {any} */ (edit && edit.guide);
+    // Proximity picks that select a target need a pre-press signifier. Auto-enable
+    // catchment when the author left `guide` unset; `guide: false` stays fully off,
+    // and `guide: true` still means bounds + catchment (sweep's historical default).
+    if (spec == null) {
+        const driver = driverFor(edit);
+        spec = (driver && driver.selects) ? { catchment: true } : false;
+    }
+    if (spec === false) {
+        return { bounds: null, catchment: null, track: null };
+    }
+
+    const themeGuide = ctx && ctx.theme && ctx.theme.guide;
     const themeColor = ctx && ctx.theme && ctx.theme.constraint && ctx.theme.constraint.color;
     const baseColor = (spec && typeof spec === 'object' && spec.color)
         || (edit && edit.guideColor)
@@ -81,9 +103,11 @@ export function resolveGuide(edit, ctx) {
             ? GUIDE_TRUE_PARTS.includes(part)
             : (spec && typeof spec === 'object' ? /** @type {any} */ (spec)[part] : false);
         if (!on) return null;
+        const themePart = themeGuide && themeGuide[part];
         return {
             color: baseColor,
             ...GUIDE_PARTS[part],
+            ...(themePart && typeof themePart === 'object' ? themePart : {}),
             ...(typeof on === 'object' ? on : {}),
         };
     };
@@ -96,10 +120,10 @@ export function resolveGuide(edit, ctx) {
 }
 
 /**
- * Collect the auto-guides for every feature: an edit declared `guide: true`
- * self-draws (constraint bounds + nearest snap ring) via buildEditGuide, without
- * the caller repeating the feature id in a top-level guides list. Deduped per
- * (feature, edit).
+ * Collect the auto-guides for every feature: an edit with `guide: true` / an
+ * object form self-draws via buildEditGuide. Proximity picks that `selects` also
+ * register when `guide` is omitted (auto-catchment — see resolveGuide); `guide:
+ * false` stays fully off. Deduped per (feature, edit).
  * @param {any[]} features
  * @returns {any[]} guide objects ({ isGuide, build })
  */
@@ -110,7 +134,11 @@ export function autoEditGuides(features) {
     const seen = new Set();
     for (const feature of features) {
         collectEdits(feature).forEach((edit, i) => {
-            if (!edit.guide) return;
+            if (edit.guide === false) return;
+            if (!edit.guide) {
+                const driver = driverFor(edit);
+                if (!(driver && driver.selects)) return;
+            }
             const key = `${feature.id}:edit-${edit.type}-${i}`;
             if (seen.has(key)) return;
             seen.add(key);

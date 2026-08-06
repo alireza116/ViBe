@@ -45,15 +45,17 @@ import { encodeChannel, categoryOf, encodeAngle, resolveStyle, normalizeMarkOpti
  * @param {string} key the axis field name
  * @param {boolean} forcedValue this axis is forced to baseline→value
  * @param {number} fullLength the plot extent along this axis (fallback span)
+ * @param {number} [index] row index, passed to derived channel fns
+ * @param {any[]} [data] the dataset, passed to derived channel fns
  * @returns {{ lo: number, hi: number, band: boolean }}
  */
-function resolveExtent(axis, channels, scales, scale, datum, key, forcedValue, fullLength) {
+function resolveExtent(axis, channels, scales, scale, datum, key, forcedValue, fullLength, index, data) {
     const c1 = axis + '1';
     const c2 = axis + '2';
     // 1. SPAN — both endpoints declared.
     if (channels[c1] && channels[c2]) {
-        const v1 = encodeChannel(scales, channels, c1, datum, 0);
-        const v2 = encodeChannel(scales, channels, c2, datum, 0);
+        const v1 = encodeChannel(scales, channels, c1, datum, 0, index, data);
+        const v2 = encodeChannel(scales, channels, c2, datum, 0, index, data);
         return { lo: Math.min(v1, v2), hi: Math.max(v1, v2), band: false };
     }
     // 2. SIZE — an explicit pixel extent centred on an x/y anchor (SVG-native w/h).
@@ -61,21 +63,21 @@ function resolveExtent(axis, channels, scales, scale, datum, key, forcedValue, f
     // anchor goes through encodeChannel, so on a band axis it's the category centre.
     const sizeCh = axis === 'x' ? 'width' : 'height';
     if (channels[sizeCh]) {
-        const size = encodeChannel(scales, channels, sizeCh, datum, 0);
+        const size = encodeChannel(scales, channels, sizeCh, datum, 0, index, data);
         const [rlo, rhi] = scale ? rangeExtent(scale) : [0, fullLength];
-        const center = encodeChannel(scales, channels, axis, datum, (rlo + rhi) / 2);
+        const center = encodeChannel(scales, channels, axis, datum, (rlo + rhi) / 2, index, data);
         return { lo: center - size / 2, hi: center + size / 2, band: false };
     }
     // 3. BAND — a categorical axis (skipped when this axis is forced to value).
     if (!forcedValue && isBand(scale)) {
-        const start = bandStartOf(scale, categoryOf(channels, axis, datum, key), 0);
+        const start = bandStartOf(scale, categoryOf(channels, axis, datum, key, index, data), 0);
         const thickness = bandwidthOf(scale, 20);
         return { lo: start, hi: start + thickness, band: true };
     }
     // 2. VALUE — a single field drawn from the baseline.
     if (channels[axis]) {
         const baseline = baselineOf(scale);
-        const value = encodeChannel(scales, channels, axis, datum, baseline);
+        const value = encodeChannel(scales, channels, axis, datum, baseline, index, data);
         return { lo: Math.min(value, baseline), hi: Math.max(value, baseline), band: false };
     }
     // 4. EXTENT — nothing on this axis: span it fully.
@@ -118,8 +120,8 @@ function buildRect(options, forcedValueAxis) {
             return currentData.map((d, i) => {
                 const style = resolveStyle(scales, channels, d, rectDefaults, i, currentData);
 
-                const xExt = resolveExtent('x', channels, scales, xScale, d, xKey, forcedValueAxis === 'x', width);
-                const yExt = resolveExtent('y', channels, scales, yScale, d, yKey, forcedValueAxis === 'y', height);
+                const xExt = resolveExtent('x', channels, scales, xScale, d, xKey, forcedValueAxis === 'x', width, i, currentData);
+                const yExt = resolveExtent('y', channels, scales, yScale, d, yKey, forcedValueAxis === 'y', height, i, currentData);
 
                 // If one axis is a band, proximity picking measures distance along
                 // the OTHER (value) axis' interval — mirror bar's bandAxis so a

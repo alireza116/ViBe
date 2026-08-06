@@ -211,28 +211,43 @@ function buildArea(options, forcedValueAxis) {
                 const handleChannels = spanMode
                     ? (valueAxis === 'y' ? ['y1', 'y2'] : ['x1', 'x2'])
                     : [valueAxis];
-                sorted.forEach(({ d, i }) => {
-                    const hStyle = resolveStyle(scales, channels, d, { fill: handleStyle.fill }, i, currentData);
-                    for (const ch of handleChannels) {
-                        const onY = ch[0] === 'y';
-                        const along = onY
-                            ? encodeChannel(scales, channels, 'x', d, width / 2, i, currentData)
-                            : encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
-                        const at = encodeChannel(scales, channels, ch, d, onY ? height / 2 : width / 2, i, currentData);
-                        nodes.push({
-                            type: 'circle',
-                            cx: onY ? along : at,
-                            cy: onY ? at : along,
-                            r: handleStyle.size,
-                            ...hStyle,
-                            data: d,
-                            index: i,
-                            channel: ch,
-                            series: series === SINGLE ? undefined : series,
-                            ...(handles ? {} : { opacity: 0, pointerEvents: 'none' })
-                        });
-                    }
-                });
+                // One `handles` vocabulary (plot/mark.js): false = neither drawn nor
+                // grabbable; 'hit' = invisible but grabbable. area used to treat false
+                // as opacity:0 + pointerEvents:none and ignore 'hit'.
+                if (handleStyle.grabbable) {
+                    sorted.forEach(({ d, i }) => {
+                        const hStyle = resolveStyle(scales, channels, d, {
+                            fill: handleStyle.fill,
+                            stroke: handleStyle.stroke,
+                            strokeWidth: handleStyle.strokeWidth,
+                        }, i, currentData);
+                        for (const ch of handleChannels) {
+                            const onY = ch[0] === 'y';
+                            const along = onY
+                                ? encodeChannel(scales, channels, 'x', d, width / 2, i, currentData)
+                                : encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
+                            const at = encodeChannel(scales, channels, ch, d, onY ? height / 2 : width / 2, i, currentData);
+                            nodes.push({
+                                type: 'circle',
+                                cx: onY ? along : at,
+                                cy: onY ? at : along,
+                                r: handleStyle.size,
+                                ...hStyle,
+                                // Channel fill must not paint a 'hit' handle — force
+                                // transparent after resolveStyle.
+                                ...(handleStyle.visible ? {} : {
+                                    fill: 'transparent',
+                                    stroke: 'none',
+                                    strokeWidth: 0,
+                                }),
+                                data: d,
+                                index: i,
+                                channel: ch,
+                                series: series === SINGLE ? undefined : series,
+                            });
+                        }
+                    });
+                }
             }
 
             return nodes;

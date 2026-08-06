@@ -8,12 +8,15 @@
 //     is 0.
 //   - a SLOPE handle at x = probe (default the x domain's other end): dragging it
 //     rotates the line about the anchor point (holds the anchor's value).
-// Stage the two (interceptStage / slopeStage) to elicit intercept first, then slope.
+// Stage the two edits to elicit intercept first, then slope:
 //
 //   Elicit({ schema: { x: { type: 'quantitative', domain: [-10, 10] },
 //                      y: { type: 'quantitative', domain: [-10, 10] } },
 //            data: [{ intercept: 0, slope: 1 }],
-//            marks: [ trend({ interceptStage: 0, slopeStage: 1 }) ] })
+//            marks: [ trend({ channels: {
+//              intercept: { field: 'intercept', edit: edit.trend.intercept() },
+//              slope:     { field: 'slope',     edit: edit.trend.slope({ stage: 1 }) },
+//            }}) ] })
 //
 // Trend is the one mark whose POSITIONAL channels name the plot's AXES rather than
 // fields of its datum: the belief is about the relationship between x and y, while
@@ -31,6 +34,12 @@
 //
 // By default (when the chart leaves `axes` unspecified), autoAxes detects a trend
 // and crosses the axes at the origin — the natural frame for intercept + slope.
+//
+// Affordance map (attach edit.trend.intercept / .slope yourself — mark is inert):
+//   line chrome          → pointer-transparent (not a grab target)
+//   circle at `anchor`   → channel:'intercept' (default x=0-in-domain or domain start)
+//   circle at `probe`    → channel:'slope' (default the other domain end)
+//   handles: true|false|'hit' — shared contract; false emits no handles
 //
 // The line is a non-interactive visual and each handle is a draggable circle tagged
 // with a `channel` ('intercept' | 'slope'); the two edits claim their own tag, so

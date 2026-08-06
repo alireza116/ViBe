@@ -6,7 +6,9 @@ Guidance for Claude Code when working in this repo. ElicitJS just went through a
 
 A declarative viz library for interactive belief elicitation. `Elicit(spec)` renders an SVG chart where gestures write back to data. The core idea: **an edit is the inverse of encoding** — `encode` maps data → visual through a channel's scale; an edit's `apply()` maps a gesture → data through the *same* scale.
 
-Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/plot/mark.js` (shared mark foundation), `src/edit/index.js` (edit barrel). Read `ARCHITECTURE.md` for the architecture map before making structural changes (`README.md` is the short front door: what it is, install, one example, how to run it).
+Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/plot/mark.js` (shared mark foundation), `src/edit/index.js` (edit barrel), `src/elements/index.js` (chart elements: axis / grid / legend / axisRadial). Read `ARCHITECTURE.md` and `MARK_CONTRACTS.md` before making structural changes (`README.md` is the short front door: what it is, install, one example, how to run it).
+
+**Public namespace matches kind.** Data marks live under `elicit.plot.*`. Scale chrome lives under `elicit.elements.*` (also `ElicitSpec.elements`, concatenated with `marks`). The same factories stay aliased on `plot.*` during migration.
 
 ## Non-negotiable invariants
 

@@ -24,7 +24,7 @@
 import * as d3 from 'd3';
 import { themeOf } from '../core/theme.js';
 import { tickData } from './axis.js';
-import { warnUnknownElementOptions, HANDLE_DEFAULTS } from './mark.js';
+import { warnUnknownElementOptions, resolveHandles } from './mark.js';
 
 /**
  * `legend`'s own option vocabulary, on top of the universal chart-element options
@@ -226,10 +226,16 @@ export function legend(options = {}) {
             const thm = themeOf(scales);
             const swatchStroke = strokeOpt ?? (thm.guide.legend.stroke || '#374151');
             const labelFill = fillOpt ?? (thm.guide.legend.labelFill || '#374151');
-            const handleColor = handleColorOpt ?? thm.axis.handle ?? thm.handle;
-            // Shared radius default rather than a hard-coded 6 (see plot/mark.js).
-            const handleSize = handleSizeOpt ?? HANDLE_DEFAULTS.size;
-            const handleStroke = thm.handleStroke;
+            // Shared handle contract (plot/mark.js) — legend used to hard-code size
+            // and bypass resolveHandles for ramp grips.
+            const handleStyle = resolveHandles(scales, {
+                handles: true,
+                handleSize: handleSizeOpt,
+                handleColor: handleColorOpt ?? thm.axis.handle,
+            });
+            const handleColor = handleStyle.fill;
+            const handleSize = handleStyle.size;
+            const handleStroke = handleStyle.stroke;
             const { ramp, values, format, labelW, fontSize } = readScale(scale, thm);
             const across = place.size || (this.measure(scales) || { width: 0, height: 0 })[vertical ? 'width' : 'height'];
 

@@ -17,15 +17,16 @@
 // whisker. It mirrors bar's span model (see bar.js): the endpoints resolve through
 // encodeChannel exactly like bar's x1/x2·y1/y2, a missing endpoint defaults to the
 // value-axis baseline (so `y2` alone spans baseline -> y2), and the perpendicular
-// position comes from the category channel (band centre) via encodeChannel.
+// position comes from the category channel via categoryOf (band centre), the same
+// path every other band mark uses.
 //
 // A rule is an ordinary editable mark: put an `edit` on an endpoint channel and its
 // cap becomes a handle. It carries no pointerEvents of its own — the engine silences
 // any mark with no direct-pick edit, so an inert whisker cannot swallow a sibling
 // handle's drag while an editable one still receives its own.
 
-import { baselineOf } from '../core/scales.js';
-import { encodeChannel, resolveStyle, normalizeMarkOptions, positionalKeys } from './mark.js';
+import { baselineOf, isBand, bandStartOf, bandwidthOf } from '../core/scales.js';
+import { encodeChannel, categoryOf, resolveStyle, normalizeMarkOptions, positionalKeys } from './mark.js';
 
 /**
  * @param {any} options
@@ -55,6 +56,7 @@ function buildRule(options, forcedValueAxis) {
     // row — otherwise `ruleY({ channels: { y: { datum: 25 } } })` would stack N
     // identical lines on a chart with N rows.
     const constant = !Object.values(channels).some((/** @type {any} */ c) => c && c.field != null);
+    const { xKey, yKey } = positionalKeys(channels);
 
     return {
         id,
@@ -65,7 +67,8 @@ function buildRule(options, forcedValueAxis) {
         // A rule spans; it has no opinion about the discrete scale of the axis it
         // crosses. Left undefined so a composite can stamp its own onto it.
         discreteScale,
-        ...positionalKeys(channels),
+        xKey,
+        yKey,
         /**
          * @param {any[]} currentData
          * @param {import('../types').ScaleMap} scales
@@ -95,10 +98,19 @@ function buildRule(options, forcedValueAxis) {
                     const a = channels[c1] ? encodeChannel(scales, channels, c1, datum, baseline, index, currentData) : baseline;
                     const b = channels[c2] ? encodeChannel(scales, channels, c2, datum, baseline, index, currentData) : baseline;
                     if (a === undefined || b === undefined) return;
-                    // Perpendicular position: the datum's category centre, else centre.
-                    const posAt = channels[posAxis]
-                        ? encodeChannel(scales, channels, posAxis, datum, posLen / 2, index, currentData)
-                        : posLen / 2;
+                    // Perpendicular position: category centre on a band axis (via
+                    // categoryOf, so { fn }/{ datum } work), else encodeChannel.
+                    const posScale = scales[posAxis];
+                    let posAt = posLen / 2;
+                    if (channels[posAxis]) {
+                        if (isBand(posScale)) {
+                            const catKey = posAxis === 'x' ? xKey : yKey;
+                            const cat = categoryOf(channels, posAxis, datum, catKey, index, currentData);
+                            posAt = bandStartOf(posScale, cat, 0) + bandwidthOf(posScale, 0) / 2;
+                        } else {
+                            posAt = encodeChannel(scales, channels, posAxis, datum, posLen / 2, index, currentData);
+                        }
+                    }
                     /** @type {import('../types').FeatureNode} */
                     const spanNode = {
                         type: 'line',

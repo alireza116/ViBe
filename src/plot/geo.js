@@ -159,6 +159,8 @@ export function geoTile(options = {}) {
     const {
         channels = {},
         id,
+        edits,
+        constraints,
         url = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
         subdomains = [],
         tileSize = 256,
@@ -174,6 +176,10 @@ export function geoTile(options = {}) {
         id,
         markName: 'geoTile',
         channels,
+        // Verbatim — map chrome rarely edits, but dropping these after normalize
+        // made geoTile the only mark that silently discarded author-supplied edits.
+        edits,
+        constraints,
         supportsGeo: true,
         /**
          * @param {any[]} _currentData
@@ -399,6 +405,7 @@ export function geoLine(options = {}) {
     if (rowMode) {
         return {
             id,
+            markName: 'geoLine',
             channels,
             edits,
             constraints,

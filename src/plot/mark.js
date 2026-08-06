@@ -227,15 +227,19 @@ export function resolveHandles(scales, options, fallback = {}) {
     const { handles = true, handleSize, handleColor } = options || {};
     const theme = themeOf(scales);
     const visible = handles !== false && handles !== 'hit';
+    const grabbable = handles !== false;
+    // 'hit' must stay pointer-hittable: opacity:0 is skipped by some hit-testers
+    // (Chromium under Playwright), so invisible-but-grabbable uses a transparent
+    // fill instead — the same pattern face already used for its supplemental dots.
     return {
         visible,
-        // `false` is inert; 'hit' keeps the target. A mark still decides whether an
-        // invisible target makes sense for its geometry.
-        grabbable: handles !== false,
+        grabbable,
         size: handleSize != null ? handleSize : HANDLE_DEFAULTS.size,
-        fill: handleColor || fallback.fill || theme.handle || theme.accent,
+        fill: visible
+            ? (handleColor || fallback.fill || theme.handle || theme.accent)
+            : (grabbable ? 'transparent' : (handleColor || fallback.fill || theme.handle || theme.accent)),
         stroke: visible ? (fallback.stroke || theme.handleStroke) : 'none',
-        strokeWidth: 1.25,
+        strokeWidth: visible ? 1.25 : 0,
     };
 }
 

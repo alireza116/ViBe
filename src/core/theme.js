@@ -73,15 +73,22 @@ export const DEFAULT_THEME = {
     axis: { stroke: '#6b7280', labelFill: '#374151', fontSize: 10, handle: '#2563eb' },
     grid: { stroke: '#e5e7eb', strokeWidth: 1 },
 
-    // Non-interactive annotation guides (guides/*). Each carries the historical
-    // literal so an un-themed guide is unchanged.
+    // Non-interactive annotation guides (guides/*) PLUS the per-part tokens an
+    // edit's self-drawn guide reads (edit/guide.js — bounds / catchment / track).
+    // Annotation literals keep the historical look; edit-guide parts merge under
+    // GUIDE_PARTS defaults, then under a per-edit `guide: { … }` override.
     guide: {
         rule: { stroke: '#64748b', strokeDasharray: '5 4' },
         region: { fill: '#64748b', opacity: 0.1 },
-        legend: { stroke: '#374151', labelFill: '#374151', fontSize: 11 }
+        legend: { stroke: '#374151', labelFill: '#374151', fontSize: 11 },
+        // Edit-guide parts (resolveGuide). Colour falls back to theme.constraint.
+        bounds: { dash: '4 4', width: 1, opacity: 0.9 },
+        catchment: { dash: '2 4', width: 1, opacity: 0.45 },
+        track: { dash: '3 3', width: 2, opacity: 0.35 },
     },
 
-    // The constraint-guide colour (edit/guide.js). Per-edit `guideColor` still wins.
+    // The constraint-guide colour (edit/guide.js). Per-edit `guide: { color }` /
+    // legacy `guideColor` still wins.
     constraint: { color: '#e4572e' },
 
     // Interaction-effects defaults. Merged UNDER spec.effects by resolveEffects, so

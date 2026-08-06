@@ -73,10 +73,10 @@ export function arc(options = {}) {
         arc: arcOpt,
         start,
         end,
-        // Boundary editing chrome: `handles: true` draws a grab dot on each interior
-        // edge, `false` keeps the edge grabbable but invisible. handleSize is the dot
-        // radius (also the invisible grab target). Only emitted when an edge edit is
-        // wired (see markEdits below).
+        // Affordance: rim circles between slices (channel tag via node.edge).
+        // Slice paths themselves are not edge-editable — grab the boundary dots.
+        // handles: true|false|'hit' (shared contract). Only emitted when an edge
+        // edit is wired (see markEdits below).
         handles = true,
         handleSize,
         handleColor,

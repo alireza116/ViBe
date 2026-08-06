@@ -1,6 +1,6 @@
 // @ts-check
 import { isBand, bandwidthOf, bandStartOf, baselineOf } from '../core/scales.js';
-import { encodeChannel, categoryOf, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults, positionalKeys } from './mark.js';
+import { encodeChannel, encodeValue, categoryOf, resolveStyle, normalizeMarkOptions, seriesFieldOf, themeOf, markDefaults, positionalKeys } from './mark.js';
 
 // bar: a rectangular mark that composes across orientations. The band axis is
 // the categorical/position axis (sets the bar's position + thickness) and the
@@ -150,18 +150,20 @@ function buildBar(options, forcedOrientation) {
                     const baseline = baselineOf(xScale);
                     let lo, hi;
                     if (hasXSpan) {
-                        const v1 = encodeChannel(scales, channels, 'x1', d, baseline);
-                        const v2 = encodeChannel(scales, channels, 'x2', d, baseline);
+                        const v1 = encodeChannel(scales, channels, 'x1', d, baseline, i, currentData);
+                        const v2 = encodeChannel(scales, channels, 'x2', d, baseline, i, currentData);
                         lo = Math.min(v1, v2);
                         hi = Math.max(v1, v2);
                     } else if (stacks) {
+                        // Stack baselines are derived data-space values, not channel
+                        // reads — encodeValue runs them through the same scale path.
                         const { y0, y1 } = stacks.get(i) || { y0: 0, y1: d[xKey] };
-                        const p0 = xScale ? xScale.encode(y0, baseline) : baseline;
-                        const p1 = xScale ? xScale.encode(y1, baseline) : baseline;
+                        const p0 = encodeValue(scales, channels, 'x', y0, baseline);
+                        const p1 = encodeValue(scales, channels, 'x', y1, baseline);
                         lo = Math.min(p0, p1);
                         hi = Math.max(p0, p1);
                     } else {
-                        const valuePos = encodeChannel(scales, channels, 'x', d, baseline);
+                        const valuePos = encodeChannel(scales, channels, 'x', d, baseline, i, currentData);
                         lo = Math.min(valuePos, baseline);
                         hi = Math.max(valuePos, baseline);
                     }
@@ -186,18 +188,18 @@ function buildBar(options, forcedOrientation) {
                 const baseline = baselineOf(yScale);
                 let lo, hi;
                 if (hasYSpan) {
-                    const v1 = encodeChannel(scales, channels, 'y1', d, baseline);
-                    const v2 = encodeChannel(scales, channels, 'y2', d, baseline);
+                    const v1 = encodeChannel(scales, channels, 'y1', d, baseline, i, currentData);
+                    const v2 = encodeChannel(scales, channels, 'y2', d, baseline, i, currentData);
                     lo = Math.min(v1, v2);
                     hi = Math.max(v1, v2);
                 } else if (stacks) {
                     const { y0, y1 } = stacks.get(i) || { y0: 0, y1: d[yKey] };
-                    const p0 = yScale ? yScale.encode(y0, baseline) : baseline;
-                    const p1 = yScale ? yScale.encode(y1, baseline) : baseline;
+                    const p0 = encodeValue(scales, channels, 'y', y0, baseline);
+                    const p1 = encodeValue(scales, channels, 'y', y1, baseline);
                     lo = Math.min(p0, p1);
                     hi = Math.max(p0, p1);
                 } else {
-                    const valuePos = encodeChannel(scales, channels, 'y', d, baseline);
+                    const valuePos = encodeChannel(scales, channels, 'y', d, baseline, i, currentData);
                     lo = Math.min(valuePos, baseline);
                     hi = Math.max(valuePos, baseline);
                 }

@@ -28,9 +28,12 @@
 //
 // Every node is inert (`pointerEvents: 'none'`) and painted in the BACKGROUND
 // layer, because the band is a view of parameters the reader edits elsewhere —
-// on the `trend` line's handles, or straight off the plane. Turning `handles` on
-// puts a grab on each spread: at `probe` for the slope, at `anchor` for the
-// intercept, each tagged with its `channel` so `edit.trend.*Spread` claims its own.
+// on the `trend` line's handles, or straight off the plane. `handles` defaults
+// FALSE (unlike `trend`) so a band+line pair doesn't double the grab targets;
+// turn it on for standalone spread edits. Affordance when handles are on:
+//   circle at `anchor` → channel:'interceptSpread' (or intercept1/2)
+//   circle at `probe`  → channel:'slopeSpread' (or slope1/2)
+//   handles: true|false|'hit' — shared contract
 //
 // It declares NO edits of its own. A band and a line over the same rows are two
 // views of one belief, and a whole-dataset (plane/probe) edit declared on both

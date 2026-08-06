@@ -97,6 +97,22 @@ export const plot: {
   [name: string]: (...args: any[]) => any;
 };
 
+/** Chart elements — scale chrome. Prefer over the `plot.*` aliases. */
+export const elements: {
+  axis(options?: MarkOptions): Mark;
+  axisX(options?: MarkOptions): Mark;
+  axisY(options?: MarkOptions): Mark;
+  grid(options?: MarkOptions): Mark;
+  gridX(options?: MarkOptions): Mark;
+  gridY(options?: MarkOptions): Mark;
+  legend(options?: MarkOptions): Mark;
+  legendColor(options?: MarkOptions): Mark;
+  legendSize(options?: MarkOptions): Mark;
+  legendSymbol(options?: MarkOptions): Mark;
+  axisRadial(options?: MarkOptions): Mark;
+  [name: string]: (...args: any[]) => any;
+};
+
 export const edit: {
   move(options?: EditOptions): Edit;
   moveSpan(options?: EditOptions): Edit;

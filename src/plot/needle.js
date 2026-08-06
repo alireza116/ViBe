@@ -18,6 +18,10 @@
 // Pivot defaults to the plot centre; optional x/y channels place it on a
 // categorical or linear axis (many small needles across a chart).
 // discreteScale is 'point' so categorical fields land on ticks.
+//
+// Affordance map (pair with rotate({ pivot:'mark', pick:'direct' }) on angle):
+//   tapered path + hub → the mark itself; hub is the shared-contract handle
+//   handles: true|false|'hit' — false emits no hub and silences the path
 
 import { encodeChannel, encodeAngle, resolveStyle, normalizeMarkOptions, markDefaults, resolveHandles } from './mark.js';
 import { arcSpan, needleTriangle } from './polar.js';
@@ -97,20 +101,27 @@ export function needle(options = {}) {
                     d: dPath,
                     ...style,
                     cx, cy,
+                    data: d,
                     index: i,
-                    cursor: 'grab',
+                    cursor: handleStyle.grabbable ? 'grab' : undefined,
+                    ...(handleStyle.grabbable ? {} : { pointerEvents: 'none' }),
                 });
 
-                nodes.push({
-                    type: 'circle',
-                    cx, cy,
-                    r: handleStyle.size,
-                    ...style,
-                    stroke: style.stroke || '#0f172a',
-                    strokeWidth: 1,
-                    index: i,
-                    cursor: 'grab',
-                });
+                // Hub = this mark's handle. Respect the shared contract: false emits
+                // nothing; 'hit' keeps an invisible grab target.
+                if (handleStyle.grabbable) {
+                    nodes.push({
+                        type: 'circle',
+                        cx, cy,
+                        r: handleStyle.size,
+                        fill: handleStyle.fill,
+                        stroke: handleStyle.stroke,
+                        strokeWidth: handleStyle.strokeWidth,
+                        data: d,
+                        index: i,
+                        cursor: 'grab',
+                    });
+                }
             });
 
             return nodes;

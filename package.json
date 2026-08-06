@@ -25,6 +25,7 @@
     "dist",
     "README.md",
     "ARCHITECTURE.md",
+    "MARK_CONTRACTS.md",
     "LICENSE"
   ],
   "scripts": {

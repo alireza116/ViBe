@@ -11,6 +11,8 @@ export { text, textX, textY } from './text.js';
 export { dotStack, dotStackX, dotStackY } from './dotStack.js';
 export { waffle, waffleX, waffleY } from './waffle.js';
 export { needle } from './needle.js';
+// Chart elements — prefer `elicit.elements.*`. Re-exported here as aliases so
+// existing `plot.axis` / `plot.legend` / `plot.axisRadial` specs keep working.
 export { axisRadial } from './axisRadial.js';
 export { arc, pie, donut } from './arc.js';
 export { composite } from './composite.js';

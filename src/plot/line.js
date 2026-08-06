@@ -146,21 +146,27 @@ function buildLine(options, forcedValueAxis, defaultOrder = 'domain') {
             // machinery. Tagged with `series` so a sweep can scope to one line.
             const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor },
                 { fill: lineDefaults.stroke });
-            placed.forEach(({ d, i, cx, cy, series }) => {
+                placed.forEach(({ d, i, cx, cy, series }) => {
                 if (!handleStyle.grabbable) return;
-                const style = resolveStyle(scales, channels, d, { fill: handleStyle.fill }, i, currentData);
+                const style = resolveStyle(scales, channels, d, {
+                    fill: handleStyle.fill,
+                    stroke: handleStyle.stroke,
+                    strokeWidth: handleStyle.strokeWidth,
+                }, i, currentData);
                 nodes.push({
                     type: 'circle',
                     cx,
                     cy,
                     // One `handles` vocabulary across marks (plot/mark.js): `false` is
-                    // neither drawn nor grabbable — it used to be r:0 + opacity:0 here,
-                    // opacity:0 + inert on area, and transparent-but-grabbable on
-                    // arc/face, i.e. three behaviours behind one option name. An
-                    // invisible-but-grabbable handle is now spelled `handles: 'hit'`.
+                    // neither drawn nor grabbable. Invisible-but-grabbable is
+                    // `handles: 'hit'` (transparent fill — not opacity:0).
                     r: handleStyle.size,
                     ...style,
-                    ...(handleStyle.visible ? {} : { opacity: 0 }),
+                    ...(handleStyle.visible ? {} : {
+                        fill: 'transparent',
+                        stroke: 'none',
+                        strokeWidth: 0,
+                    }),
                     data: d,
                     index: i,
                     series,

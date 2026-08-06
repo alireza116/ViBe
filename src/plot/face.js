@@ -39,14 +39,22 @@
 //   browHeight   brow height       slammed down ↔ high arch
 //   browTilt     brow tilt         outer-down (sad) ↔ inner-down (angry)
 //
-// ── Direct manipulation (the trend model) ────────────────────────────────────
+// ── Direct manipulation (intentional handle-contract exception) ──────────────
 // A face is a single-datum glyph, like `trend`: its parts share ONE feature over
-// ONE datum. Every part's pixels DERIVE from the params, and the editable parts
-// are their OWN drag targets — no floating handles. A feature that carries two
-// params is a 2-D drag (mouth: ↕ curve, ↔ asym; brow: ↕ height, ↔ tilt); the two
-// eyelid/lip params (eye squint, mouth open) get a small handle on the eyelid/lip.
-// A generic edit reads the grabbed node's `dm` descriptor and inverts the pointer
-// through each param's own [0,1] scale, so this stays on the ONE inversion path.
+// ONE datum. The SHAPE is the affordance — eyes / brows / mouth carry `dm` tracks
+// and stay grabbable regardless of `handles`. That is deliberate direct
+// manipulation (the face IS the control), not a silent bypass of the shared
+// contract. The `handles` option gates only the SUPPLEMENTAL eyelid/lip/size
+// dots (`true` / `false` / `'hit'`), same vocabulary as every other mark.
+//
+// Affordance map (with edit.face.expression / edit.face.move attached):
+//   mouth hit-path     → mouthCurve + mouthAsym (dm)
+//   eye ellipses       → eyeScale (dm)
+//   brows              → browHeight + browTilt (dm)
+//   eyelid/lip dots    → eyeSquint / mouthOpen (handles option)
+//   outline (x+y bound)→ edit.face.move
+//   right-rim size dot → size channel (handles option)
+// Pair with `guide: { track: true }` to draw the dm travel ranges.
 //
 // The centre is placed through the global x/y scales when those channels carry
 // fields (small-multiples / an emotion-space scatter), else parked at the plot
@@ -259,16 +267,17 @@ export function face(options = {}) {
                         browDmX, browDmY));
                 }
 
-                // ── Eyelid / lip handles for the two "pull" params. Small dots at
-                //    the eyelid and lower lip; grabbable even when handles:false. ─
+                // ── Eyelid / lip dots for the two "pull" params. Gated by the
+                //    shared `handles` contract; the eye/mouth/brow SHAPES above
+                //    stay the primary affordances (see header). ─
                 /** @param {number} hx @param {number} hy @param {any} dmY */
                 const pushHandle = (hx, hy, dmY) => {
-                    if (!dmY) return;
+                    if (!dmY || !handleStyle.grabbable) return;
                     nodes.push(editable({
                         type: 'circle', cx: hx, cy: hy, r: handleStyle.size,
-                        fill: handleStyle.visible ? handleStyle.fill : 'transparent',
-                        stroke: handleStyle.visible ? handleStyle.stroke : 'none',
-                        strokeWidth: handleStyle.visible ? handleStyle.strokeWidth : 0,
+                        fill: handleStyle.fill,
+                        stroke: handleStyle.stroke,
+                        strokeWidth: handleStyle.strokeWidth,
                     }, undefined, dmY));
                 };
                 // Squint: eyelid of the right eye, drag DOWN to squint.
@@ -285,7 +294,7 @@ export function face(options = {}) {
                 // rim (cx + R) — maps straight back to the current value: no jump on
                 // grab, and the mapping honours whatever range the size scale uses.
                 const sizeCh = channels.size;
-                if (sizeCh && sizeCh.field != null) {
+                if (sizeCh && sizeCh.field != null && handleStyle.grabbable) {
                     const sScale = scales.size;
                     const dom = sScale && sScale.domainConfig;
                     const loVal = Array.isArray(dom) ? dom[0] : 0;
@@ -295,9 +304,9 @@ export function face(options = {}) {
                     const sizeSpec = { channel: 'size', field: sizeCh.field, pxAt0: cx + rLo, pxAt1: cx + rHi, loVal, hiVal };
                     nodes.push(editable({
                         type: 'circle', cx: cx + R, cy, r: handleStyle.size,
-                        fill: handleStyle.visible ? handleStyle.fill : 'transparent',
-                        stroke: handleStyle.visible ? handleStyle.stroke : 'none',
-                        strokeWidth: handleStyle.visible ? handleStyle.strokeWidth : 0,
+                        fill: handleStyle.fill,
+                        stroke: handleStyle.stroke,
+                        strokeWidth: handleStyle.strokeWidth,
                         cursor: 'ew-resize',
                     }, sizeSpec, undefined));
                 }

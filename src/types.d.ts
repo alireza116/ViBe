@@ -226,7 +226,7 @@ export interface Edit {
   // isAxis — and the engine dev-warns when the mark it's attached to lacks it,
   // instead of leaving you a silently dead gesture. See SCOPE_CAPABILITY in
   // core/elicit.js.
-  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | 'trend' | null;
+  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | 'trend' | 'face' | null;
   threshold: number;
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
@@ -234,9 +234,14 @@ export interface Edit {
   // home for invariants is the dataset's `constraints` (plural), which hold for
   // every edit; `constrain` (singular) is a guard you want on just this one.
   constrain: Constraint[];
-  // true = this edit self-draws its guide (constraint bounds + snap ring). Not to
-  // be confused with a Constraint's `guide`, which is a drawer function.
-  guide: boolean | null;
+  // An edit self-draws its guide (constraint rules + proximity catchment + travel
+  // track). Not to be confused with a Constraint's `guide`, which is a drawer
+  // function. See GuideSpec / edit/guide.js.
+  //   true                         → bounds + catchment at part defaults
+  //   false / null                 → nothing
+  //   { bounds, catchment, track, color } → per-part on/off + style
+  guide: boolean | GuideSpec | null;
+  /** @deprecated Prefer `guide: { color }` — still wins under a part's own colour. */
   guideColor: string | null;
   // Multi-stage gate: active only when it equals the engine's current stage;
   // null = always active. A uniform filter applied to every edit, like `gesture`
@@ -302,7 +307,8 @@ export interface EditOptions {
   threshold?: number;
   // Edit-scoped constraint sugar (see Edit.constrain).
   constrain?: Constraint | Constraint[];
-  guide?: boolean;
+  guide?: boolean | GuideSpec;
+  /** @deprecated Prefer `guide: { color }`. */
   guideColor?: string;
   stage?: number;
   advance?: boolean;
@@ -617,22 +623,18 @@ export interface TrendAnchorOptions extends MarkOptions {
   anchor?: number;
   // Where the slope handle sits. Defaults to the x domain's other end.
   probe?: number;
-  // Draw the grab handles (they stay editable when hidden on `trend`).
-  handles?: boolean;
+  // true | false | 'hit' — the shared handle contract (plot/mark.js).
+  handles?: boolean | 'hit';
   handleSize?: number;
+  handleColor?: string;
 }
 
 // Options for a TREND mark: the line y = intercept + slope*x, clipped to the plot,
 // with a handle at `anchor` (translate) and one at `probe` (rotate about the
 // anchor). Its positional channels name the plot's AXES; the belief lives in the
-// parameter channels. Stage the two handles to elicit level first, then trend.
-// See plot/trend.js.
-export interface TrendOptions extends TrendAnchorOptions {
-  // Stage gates for the two handles — `interceptStage: 0, slopeStage: 1` asks the
-  // two questions in turn.
-  interceptStage?: number | null;
-  slopeStage?: number | null;
-}
+// parameter channels. Stage via the edits (`edit.trend.slope({ stage: 1 })`),
+// not mark options. See plot/trend.js.
+export interface TrendOptions extends TrendAnchorOptions {}
 
 // Options for a TREND BAND mark: the uncertainty around a parametric line, drawn
 // as the envelope of every line the belief allows. Declares no edits of its own —
@@ -701,25 +703,30 @@ export interface CompositeOptions {
  * to `build`. There is deliberately no `data` and no `onChange` here.
  */
 /**
- * A CHART ELEMENT — `axis`, `grid`, `legend`, `axisRadial`. Structurally a feature
- * like any other (the engine builds and draws it the same way), but it answers a
- * different question, and the differences are the contract:
+ * A CHART ELEMENT — `axis`, `grid`, `legend`, `axisRadial`. Public as
+ * `elicit.elements.*` (also aliased on `plot.*`). Structurally a feature like any
+ * other (the engine builds and draws it the same way), but it answers a different
+ * question, and the differences are the contract:
  *
  *   · It views a SCALE, not the dataset. `views: 'scale'`, always. It picks the
- *     scale by a singular `channel` ('x', 'fill', 'angle'), so it has no `channels`
- *     MAP, no fields of its own, and no `discreteScale`/`xKey`/`yKey`.
+ *     scale by a singular `channel` ('x', 'fill', 'angle'), so it has no data-mark
+ *     `channels` MAP, no fields of its own, and no `discreteScale`/`xKey`/`yKey`.
  *   · Its style options are CHROME, not channels. `stroke`/`fill`/`fontSize` paint
  *     a spine and its labels; there is no datum to resolve them against, so they
- *     stay plain options rather than desugaring into channels (see AXIS_CHROME).
+ *     stay plain options rather than desugaring into channels.
  *   · An edit on it targets the DOMAIN, not rows (`edit.axis.*`, `target: 'domain'`)
  *     — so it can't be a create target, and `edit/route.js` recovers its field from
  *     `scale.fields[0]` instead of from a channel map.
  *   · It may RESERVE layout space. A legend shrinks the plot so it never overlaps
  *     the marks (core/legends.js) — nothing else in the library does this.
  *
+ * Exception: `axisRadial` may carry optional placement `channels` (x/y/fill) to
+ * draw one ring per row around small-multiple needles — placement chrome, not a
+ * data-mark encoding surface.
+ *
  * The type is documentation and a checkable shape; the engine still branches on
  * `views === 'scale'` rather than on this interface. Both `axes` and `legends` on
- * the spec desugar into these.
+ * the spec desugar into these; authors may also pass them via `ElicitSpec.elements`.
  */
 export interface ChartElement {
   build(
@@ -733,6 +740,11 @@ export interface ChartElement {
   views: 'scale';
   /** The single scale it draws, by channel name. */
   channel: string;
+  /**
+   * Placement-only channel map (`axisRadial` small-multiple rings). Not a
+   * data-mark encoding surface — see the exception note above.
+   */
+  channels?: Channels;
   /** Which kind, for the checks that genuinely need to tell them apart. */
   isAxis?: boolean;
   isGrid?: boolean;
@@ -1072,11 +1084,15 @@ export interface Theme {
   // Chart chrome.
   axis: { stroke: string; labelFill: string; fontSize: number; handle: string };
   grid: { stroke: string; strokeWidth: number };
-  // Non-interactive annotation guides (guides/*).
+  // Annotation guides (guides/*) plus edit-guide part tokens (edit/guide.js).
   guide: {
     rule: { stroke: string; strokeDasharray: string };
     region: { fill: string; opacity: number };
     legend: { stroke: string; labelFill: string; fontSize: number };
+    /** Edit-guide parts — merged under GUIDE_PARTS, under per-edit overrides. */
+    bounds?: GuidePartStyle;
+    catchment?: GuidePartStyle;
+    track?: GuidePartStyle;
   };
   // The constraint-guide colour (per-edit `guideColor` still wins).
   constraint: { color: string };
@@ -1094,14 +1110,70 @@ export interface Theme {
   marks: Record<string, Record<string, any>>;
 }
 
+/**
+ * Per-part paint for an edit's self-drawn guide (`edit.guide`). A GUIDE shows a
+ * RULE (what you may do); an EFFECT shows interaction STATE. See edit/guide.js.
+ */
+export interface GuidePartStyle {
+  color?: string;
+  dash?: string;
+  width?: number;
+  opacity?: number;
+  bandOpacity?: number;
+  fontSize?: number;
+  labelOpacity?: number;
+  tickLength?: number;
+  tickOpacity?: number;
+}
+
+/**
+ * Object form of `edit.guide`. `true` on a part (or omitting a part under
+ * `guide: true`) uses the library defaults for that part.
+ */
+export interface GuideSpec {
+  /** Constraint boundaries on the edit's value channel (clamp/snap/maintainSum). */
+  bounds?: boolean | GuidePartStyle;
+  /** Proximity snap ring — only drawn by drivers that select a target. */
+  catchment?: boolean | GuidePartStyle;
+  /** Where a handle can travel (`node.dm`); opt-in even under `guide: true`. */
+  track?: boolean | GuidePartStyle;
+  /** Base colour for every part (part-level color still wins). */
+  color?: string;
+}
+
+/**
+ * Interaction-feedback states. An effect paints as a CSS style PROPERTY on the
+ * element or as an overlay node (`effect: true`) — never as a presentation
+ * attribute that would wipe a mark's own stroke. Legacy `grab`/`select` keys are
+ * still accepted at runtime and migrated with a warn (see core/effects.js).
+ */
 export interface EffectsSpec {
-  // false disables; a string is shorthand for { filter }.
-  grab?: false | string | { filter?: string | null };
-  // false disables the overlay; partial objects merge over the defaults.
-  select?: false | {
+  /** Pointer is over / proximity has selected this mark. */
+  hovered?: false | string | EffectStyle;
+  /** Row is in `ui.selection`. */
+  selected?: false | string | EffectStyle;
+  /** An active drag is holding this mark. */
+  grabbed?: false | string | EffectStyle;
+  /** @deprecated Use `grabbed`. */
+  grab?: false | string | EffectStyle;
+  /** @deprecated Use `selected` (and `hovered` for proximity). */
+  select?: false | string | EffectStyle;
+}
+
+/** Paint vocabulary for one effect state (CSS property and/or outline overlay). */
+export interface EffectStyle {
+  filter?: string | null;
+  opacity?: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  cursor?: string;
+  outline?: {
     color?: string;
-    ring?: { dash?: string; width?: number; opacity?: number };
-    highlight?: { width?: number; opacity?: number; pad?: number };
+    width?: number;
+    pad?: number;
+    dash?: string;
+    opacity?: number;
   };
 }
 
@@ -1110,6 +1182,11 @@ export interface ElicitSpec {
   height?: number;
   margins?: { top: number; right: number; bottom: number; left: number };
   marks?: any[];
+  // Chart elements (`elicit.elements.*` — axis / grid / legend / axisRadial).
+  // Concatenated with `marks` into the feature list; same factories also work
+  // inside `marks` (and stay aliased on `plot.*`). Prefer this key when the
+  // intent is scale chrome rather than a data view.
+  elements?: ChartElement[];
   // THE dataset. A chart elicits exactly one — even a slider elicits a one-row
   // dataset. Seed rows are a starting point; every mark is a view over these rows,
   // encoding some columns and (where it carries an edit) writing them back. Marks

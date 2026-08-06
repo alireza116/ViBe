@@ -1,6 +1,7 @@
 // @ts-check
 import { Elicit } from "./core/elicit.js";
 import * as plot from "./plot/index.js";
+import * as elements from "./elements/index.js";
 import * as edit from "./edit/index.js";
 import { when } from "./edit/index.js";
 import * as constraints from "./constraints/index.js";
@@ -16,6 +17,9 @@ import { setWarnings } from "./core/dev.js";
 export {
   Elicit,
   plot,
+  // Chart elements (axis / grid / legend / axisRadial) — scale chrome. Also
+  // aliased on `plot.*` so existing specs keep working; prefer `elements.*`.
+  elements,
   edit,
   when,
   constraints,

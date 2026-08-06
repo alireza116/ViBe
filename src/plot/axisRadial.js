@@ -1,20 +1,24 @@
 // @ts-check
-// axisRadial.js — a circular / semicircular axis as a composable mark. Sibling of
-// axisX/axisY: reads the global `angle` scale and draws an arc spine, ticks,
-// labels, and optional colored categorical bands (the NYT gauge chrome).
+// axisRadial.js — a circular / semicircular axis as a CHART ELEMENT (sibling of
+// axisX/axisY). It views the global `angle` SCALE (`views: 'scale'`), paints
+// chrome (arc spine, ticks, labels, optional colored categorical bands), and is
+// inert by default. Domain editing is out of scope — Cartesian edit.axis.* stays
+// on linear axes.
 //
-//   axisRadial({
+//   elements.axisRadial({
 //     orient: 'top',          // default: left → right through the top (NYT)
 //     radius: 110, bands: true, ticks: 5,
-//     channels: { angle: { field: 'chance' }, fill: { field: 'chance' } },
 //   })
 //
-// Inert by default (background layer, pointer-events none). Domain editing is
-// out of scope — Cartesian edit.axis.* stays on linear axes.
+// Placement exception: optional `channels.x` / `channels.y` (and `fill` for
+// categorical bands) draw ONE RING PER ROW — small-multiple chrome around each
+// needle. That is the one ChartElement that carries a channel map, and only for
+// placement / band colour — not for encoding elicited columns the way a data
+// mark does. Prefer `elicit.elements.axisRadial` (also aliased on `plot.*`).
 
 import { positionOnScale, isDiscrete } from '../core/scales.js';
 import { DEFAULT_PALETTE } from '../core/encoding.js';
-import { encodeChannel, normalizeMarkOptions, AXIS_CHROME, themeOf } from './mark.js';
+import { encodeChannel, warnUnknownElementOptions, themeOf } from './mark.js';
 import { tickData } from './axis.js';
 import {
     arcSpan,
@@ -38,22 +42,21 @@ function anchorFor(x, cx, eps = 1) {
     return 'middle';
 }
 
+/** @type {string[]} */
+const AXIS_RADIAL_OPTIONS = [
+    'channel', 'channels', 'radius', 'innerRadius', 'bandWidth', 'ticks', 'tickValues',
+    'tickFormat', 'tickSize', 'labelOffset', 'bands', 'title', 'arc', 'orient',
+    'start', 'end', 'labelFill', 'stroke', 'strokeWidth', 'fontSize',
+];
+
 /**
  * @param {any} [options]
- * @returns {import('../types').Mark}
+ * @returns {import('../types').ChartElement}
  */
 export function axisRadial(options = {}) {
-    // An axis's stroke/fontSize are chrome, not per-datum style, so they stay
-    // top-level options (AXIS_CHROME) while x/y/angle desugar as usual.
-    const opts = normalizeMarkOptions(options, {
-        except: AXIS_CHROME,
-        mark: 'axisRadial',
-        allow: [
-            'channel', 'radius', 'innerRadius', 'bandWidth', 'ticks', 'tickValues',
-            'tickFormat', 'tickSize', 'labelOffset', 'bands', 'title', 'arc', 'orient',
-            'start', 'end', 'labelFill',
-        ],
-    });
+    // Chart-element validation (no style-shorthand desugar). `channels` is the
+    // documented placement exception for small-multiple rings — see header.
+    warnUnknownElementOptions('axisRadial', options, AXIS_RADIAL_OPTIONS);
     const {
         channels = {},
         id,
@@ -79,7 +82,7 @@ export function axisRadial(options = {}) {
         stroke: strokeOpt,
         strokeWidth = 1.25,
         fontSize: fontSizeOpt,
-    } = opts;
+    } = options;
 
     const [spanStart, spanEnd] = arcSpan({ arc: arcOpt, orient, start, end });
     const xField = channels.x && channels.x.field;
@@ -88,12 +91,14 @@ export function axisRadial(options = {}) {
     return {
         id,
         markName: 'axisRadial',
+        channel,
+        // Placement / band-colour only — see header. Not a data-mark channel map.
         channels,
         edits,
         constraints,
-        discreteScale: 'point',
         isAxis: true,
         views: 'scale',
+        layer: 'background',
         /**
          * @param {any[]} currentData
          * @param {any} scales
@@ -211,16 +216,16 @@ export function axisRadial(options = {}) {
                 /** @type {import('../types').FeatureNode[]} */
                 const nodes = [];
                 const r = radiusOpt != null ? radiusOpt : Math.min(width, height) * 0.42;
-                currentData.forEach((/** @type {any} */ d) => {
-                    const cx = encodeChannel(scales, channels, 'x', d, width / 2);
-                    const cy = encodeChannel(scales, channels, 'y', d, height / 2);
+                currentData.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
+                    const cx = encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
+                    const cy = encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
                     nodes.push(...drawAxis(cx, cy, r));
                 });
                 return nodes;
             }
 
-            const cx = encodeChannel(scales, channels, 'x', currentData[0], width / 2);
-            const cy = encodeChannel(scales, channels, 'y', currentData[0], height / 2);
+            const cx = encodeChannel(scales, channels, 'x', currentData[0], width / 2, 0, currentData);
+            const cy = encodeChannel(scales, channels, 'y', currentData[0], height / 2, 0, currentData);
             const r = radiusOpt != null ? radiusOpt : Math.min(width, height) * 0.42;
             return drawAxis(cx, cy, r);
         },

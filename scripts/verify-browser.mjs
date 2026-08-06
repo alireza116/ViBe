@@ -69,7 +69,10 @@ async function main() {
         const open = async (route, waitFor) => {
             for (let attempt = 1; attempt <= 2; attempt++) {
                 try {
-                    await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 60000 });
+                    // 'load' rather than 'networkidle': Next's HMR websocket keeps
+                    // the connection open, so networkidle can hang after a long
+                    // route tour even when the page is ready.
+                    await page.goto(BASE + route, { waitUntil: 'load', timeout: 60000 });
                     if (waitFor) await page.waitForSelector(waitFor, { timeout: 60000, state: 'attached' });
                     await page.waitForTimeout(400);
                     return;
@@ -92,7 +95,7 @@ async function main() {
         // ---- Every documented route mounts -------------------------------
         console.log('\nAll routes (elicitjs-docs)');
         const routes = [
-            '/', '/overview', '/concepts', '/sizing', '/renderers', '/authoring',
+            '/', '/overview', '/concepts', '/concepts/contracts', '/sizing', '/renderers', '/authoring',
             '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',
             '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
             '/marks/dotstack', '/marks/waffle', '/marks/needle',
@@ -1058,6 +1061,57 @@ async function main() {
         check('band: dragging one edge left the OTHER edge of the same row alone',
             bandSolo[1].hi === bandAfter[1].hi,
             `hi ${bandAfter[1].hi} -> ${bandSolo[1].hi}`);
+
+        // handles: 'hit' — invisible but still grabbable (area used to treat false
+        // as inert and ignore 'hit'). Opacity 0 circles must still drag.
+        console.log('\nArea hit handles (/marks/area #hit)');
+        await open('/marks/area', '#hit .chart svg');
+        const hitEl = '#hit .chart > div';
+        const hitRows = () => page.$eval(hitEl, (e) => e.getData());
+        const hitBefore = await hitRows();
+        const hitOpacities = await page.$$eval('#hit svg circle', (cs) =>
+            cs.map((c) => ({
+                opacity: getComputedStyle(c).opacity || c.getAttribute('opacity') || '1',
+                fill: c.getAttribute('fill') || getComputedStyle(c).fill,
+            })));
+        check('hit: handles are present', hitOpacities.length >= 5, `${hitOpacities.length} circles`);
+        check('hit: handles are invisible (transparent fill, not opacity:0)',
+            hitOpacities.every((o) => o.fill === 'transparent' || o.fill === 'none' || Number(o.opacity) === 0),
+            JSON.stringify(hitOpacities));
+        const hitHandle = page.locator('#hit svg circle').nth(2);
+        await hitHandle.scrollIntoViewIfNeeded();
+        const hb = await hitHandle.boundingBox();
+        await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2 - 60, { steps: 8 });
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const hitAfter = await hitRows();
+        check('hit: invisible handle still writes on drag',
+            hitAfter.some((d, i) => d.n !== hitBefore[i].n),
+            JSON.stringify({ before: hitBefore.map((d) => d.n), after: hitAfter.map((d) => d.n) }));
+
+        // Chart elements via elicit.elements + ElicitSpec.elements
+        console.log('\nChart elements namespace (/marks/axes #elements-ns)');
+        await open('/marks/axes', '#elements-ns .chart svg');
+        const elErrs = await page.locator('#elements-ns .live-error').allTextContents();
+        check('elements: example evaluates', elErrs.length === 0, elErrs.join(' | '));
+        const elBars = await page.locator('#elements-ns svg rect:not(.plane)').count();
+        check('elements: bar marks render beside element chrome', elBars >= 3, `${elBars} bars`);
+        const elNsRows = () => page.$eval('#elements-ns .chart > div', (e) => e.getData());
+        const elBefore = await elNsRows();
+        const elBar = page.locator('#elements-ns svg rect:not(.plane)').nth(1);
+        await elBar.scrollIntoViewIfNeeded();
+        const ebb = await elBar.boundingBox();
+        // Grab the bar body (mid-height), drag upward to raise n.
+        await page.mouse.move(ebb.x + ebb.width / 2, ebb.y + ebb.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(ebb.x + ebb.width / 2, ebb.y + ebb.height / 2 - 80, { steps: 8 });
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const elAfter = await elNsRows();
+        check('elements: dragging a bar still writes data',
+            elAfter[1].n !== elBefore[1].n, `${elBefore[1].n} -> ${elAfter[1].n}`);
 
         // ---- Trend + band: a parametric line and its envelope ---------------
         // A trend is edited through its PARAMETERS, not its position, so nothing

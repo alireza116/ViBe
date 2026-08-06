@@ -41,7 +41,7 @@ const PORT = 3123;
 const BASE = `http://localhost:${PORT}`;
 
 const routes = [
-    '/', '/overview', '/concepts', '/sizing', '/renderers', '/authoring',
+    '/', '/overview', '/concepts', '/concepts/contracts', '/sizing', '/renderers', '/authoring',
     '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',
     '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
     '/marks/dotstack', '/marks/waffle', '/marks/needle',
@@ -84,7 +84,7 @@ async function main() {
         });
 
         for (route of routes) {
-            await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 60000 });
+            await page.goto(BASE + route, { waitUntil: 'load', timeout: 60000 });
             await page.waitForTimeout(400);
             console.log(`  visited ${route}`);
         }
