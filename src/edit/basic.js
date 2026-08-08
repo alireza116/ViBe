@@ -238,7 +238,7 @@ function slideAxis(axis, increase) {
 
 /**
  * How far the pointer travels to sweep the whole domain. An explicit `extent`
- * wins; otherwise a channel resolved in a `group`'s local FRAME sweeps in one
+ * wins; otherwise a channel resolved in a composite's local FRAME sweeps in one
  * glyph-radius, so the gesture scales with the glyph instead of being a pixel
  * constant that is enormous on a small face and tiny on a large one. 120px is the
  * plain-chart fallback.

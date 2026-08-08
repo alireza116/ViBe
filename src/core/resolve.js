@@ -105,8 +105,8 @@ export function resolveScales(features, dataset, spec, dims) {
       // schema entry.
       if (chSpec.scale === null) continue;
 
-      // `scale: 'frame'` is a group's LOCAL coordinate box (plot/group.js): the
-      // scale is built per datum from the group's own position and size, so
+      // `scale: 'frame'` is a composite's LOCAL coordinate box (plot/composite.js): the
+      // scale is built per datum from the composite's own position and size, so
       // there is no global one to resolve. Skipping BEFORE bucketOf is what
       // keeps a glyph's internal geometry out of the chart's axes — a face's eye
       // at local x -0.4 must not widen the x domain, demand a band, or conjure

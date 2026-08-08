@@ -189,14 +189,16 @@ export function axisOf(channelName) {
     return AXIS_OF[channelName];
 }
 
-// ── FRAME channels: a group's LOCAL coordinate box ──────────────────────────
-// `scale: 'frame'` (or `scale: { type: 'frame', range: [...] }`) says: this
-// channel is not on a global axis — resolve it against the enclosing group()'s
-// per-datum frame. The marker is CHANNEL-side only: core/plot/group.js turns it
-// into an ordinary linear scale (createFrameScale), so no resolved scale object
-// ever carries type 'frame' and nothing downstream branches on it. The global
-// resolver skips a flagged channel entirely, which is what keeps a glyph's local
-// geometry out of the chart's x/y buckets (no phantom axis, no band demand).
+// ── FRAME channels: a composite's LOCAL coordinate box ──────────────────────
+// `frame: -0.4` (short) or `scale: 'frame'` / `scale: { type: 'frame', range }`
+// (long) says: this channel is not on a global axis — resolve it against the
+// enclosing composite()'s per-datum box. The marker is CHANNEL-side only:
+// plot/composite.js turns it into an ordinary linear scale (createFrameScale),
+// so no resolved scale object ever carries type 'frame' and nothing downstream
+// branches on it. The global resolver skips a flagged channel entirely, which is
+// what keeps a glyph's local geometry out of the chart's x/y buckets (no phantom
+// axis, no band demand). `normalizeFrameKey` folds the short form into the long
+// one, so `frameSpecOf` stays the single reader.
 
 /**
  * The frame ScaleSpec of a channel, or null when the channel isn't frame-scaled.
@@ -210,6 +212,31 @@ export function frameSpecOf(chSpec) {
     if (s === 'frame') return {};
     if (s && typeof s === 'object' && s.type === 'frame') return s;
     return null;
+}
+
+/**
+ * Desugar the short `frame:` spelling into the `scale` forms above, so the rest
+ * of the library keeps reading exactly one thing.
+ *
+ *   { frame: -0.4 }                  ->  { datum: -0.4, scale: 'frame' }
+ *   { field: 'f', frame: [lo, hi] }  ->  { field: 'f', scale: { type: 'frame', range: [lo, hi] } }
+ *   { field: 'f', frame: true }      ->  { field: 'f', scale: 'frame' }
+ *
+ * `frame` exists because the long form had to be repeated on every channel of a
+ * glyph, and a channel inside a glyph is local far more often than not — making
+ * the local spelling the short one is what keeps an author from reaching for a
+ * `{ value }` (which still means PIXELS, here as everywhere) by accident. An
+ * explicit `scale` wins: it is how an author overrides a preset's range.
+ * @param {any} chSpec a ChannelSpec
+ * @returns {any} the same spec, or a desugared copy
+ */
+export function normalizeFrameKey(chSpec) {
+    if (!chSpec || typeof chSpec !== 'object' || chSpec.frame === undefined) return chSpec;
+    const { frame, ...rest } = chSpec;
+    if (rest.scale !== undefined) return rest;
+    if (Array.isArray(frame)) return { ...rest, scale: { type: 'frame', range: frame } };
+    if (typeof frame === 'number') return { ...rest, datum: frame, scale: 'frame' };
+    return { ...rest, scale: 'frame' };
 }
 
 // Channels whose frame output is a MAGNITUDE (a length from the frame's origin,

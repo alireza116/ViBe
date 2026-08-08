@@ -424,7 +424,7 @@ export function Elicit(spec) {
     // layer). Explicit axis/element the user composed into `marks` or `elements`
     // are preserved. A projection chart has no cartesian axes — skip autoAxes
     // unless the caller forced them (axes !== undefined still respected via
-    // autoAxes(false)). Flattened because a group mark (composite) desugars to
+    // autoAxes(false)). Flattened because a composite mark desugars to
     // an ARRAY of features.
     const userFeatures = [...userElements, ...userMarks];
     const axesOpt = spec.projection != null && axes === undefined ? false : axes;
@@ -716,7 +716,7 @@ export function Elicit(spec) {
     const featureNodes = {};
 
     // The scale map an edit on this node should resolve against. A part of a
-    // `group` is drawn inside a per-datum local FRAME, and each of its nodes
+    // composite in box mode is drawn inside a per-datum local FRAME, and each of its nodes
     // carries the frame scales it was encoded through — overlaying them is how a
     // gesture inverts back through the same mapping. Returns null when no frame is
     // in play, so the caller keeps the global map unchanged.
@@ -827,7 +827,7 @@ export function Elicit(spec) {
         // same object it already gets, without a widened build() signature.
         /** @type {any} */ (scales).selection = selectionPrimary();
         // The dataset schema rides along as one more reserved non-Scale key. A
-        // group's frame scales are built inside build() (one per datum), and the
+        // composite's frame scales are built inside build() (one per datum), and the
         // DOMAIN of a frame channel is the field's — which only the schema knows.
         /** @type {any} */ (scales).schema = schema;
         warnProjectionCartesianMix(features, scales);
@@ -1096,8 +1096,8 @@ export function Elicit(spec) {
     const computeEdit = (feature, edit, event, index) => {
         const currentData = dataset;
         const markChannels = feature.channels || {};
-        // A node built inside a group's local FRAME carries the very scales it was
-        // encoded through (plot/group.js stamps `node.frame`). Overlay them so the
+        // A node built inside a composite's local FRAME carries the very scales it was
+        // encoded through (plot/composite.js stamps `node.frame`). Overlay them so the
         // edit inverts through the same objects — "an edit is the inverse of
         // encoding" holds per datum, with no second inversion path: this is channel
         // resolution honouring which scale drew the thing you grabbed, not a new
@@ -1497,7 +1497,7 @@ export function Elicit(spec) {
             const feature = features.find((f) => f.id === node.featureId);
             const channels = (feature && feature.channels) || {};
             const datum = node.index != null ? dataset[node.index] : node.data;
-            // Inside a group's frame the datum's position is a LOCAL one, so read it
+            // Inside a composite's frame the datum's position is a LOCAL one, so read it
             // (and step it) through the node's own frame scales — the same overlay
             // computeEdit applies when the resulting drag arrives.
             const ks = frameScalesFor(feature, node, node.index) || scales;
@@ -1701,7 +1701,7 @@ export function Elicit(spec) {
             const datum = dataset[index];
             const channels = feature.channels || {};
             // Forward-encode through the SAME scales the edit will invert — which,
-            // inside a group's frame, are the node's own (see frameScalesFor).
+            // inside a composite's frame, are the node's own (see frameScalesFor).
             const editScales = frameScalesFor(feature, node, index) || scales;
             // Base: where the datum currently sits, so a single-axis set doesn't move
             // the other axis.

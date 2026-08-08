@@ -10,9 +10,10 @@
 //   })
 //
 // ── A PRESET, not a mark ────────────────────────────────────────────────────
-// `face()` returns a `group` (plot/group.js): a head `point`, two `ellipse`
-// eyes, two `tickY` brows and a `curveY` mouth, each a real feature placed in
-// the group's local frame. It draws nothing a spec author couldn't assemble
+// `face()` returns a `composite` in box mode (plot/composite.js): a head
+// `point`, two `ellipse` eyes, two `tickY` brows and a `curveY` mouth, each a
+// real feature placed in the glyph's local box. It draws nothing a spec author
+// couldn't assemble
 // themselves — assembling it is the point, and the parts are the documentation
 // of how a frame-scaled glyph is put together.
 //
@@ -34,8 +35,13 @@
 //   eyeSquint    eyes   ry          round ↔ flat/squished         slide({ axis:'y', increase:'down' })
 //   browHeight   brows  y           slammed down ↔ high arch      slide({ axis:'y', increase:'up' })
 //   browTilt     brows  angle       outer-down (sad) ↔ inner-down rotate({ pivot:'mark', pick:'direct' })
-//   x / y        head   x / y       where the face sits           move()
-//   size         head   size        how big it is                 resize()
+//   x / y        box    x / y       where the face sits           move()
+//   size         box    size        how big it is                 resize()
+//
+// The last two are the COMPOSITE's own channels — the box the parts live in. It
+// is a real grab target covering the whole glyph, so a `move()` there picks the
+// face up bodily (including by the gaps between its features) while a drag on an
+// eye still edits only the eye.
 //
 // (`mouthOpen` is gone. Its filled cavity was a second derived path over the
 // same curve, not a mark, and it was the one parameter that could not be
@@ -63,7 +69,7 @@
 // than as arithmetic on R — which is what lets each one be a scale a gesture
 // inverts through.
 
-import { group } from './group.js';
+import { composite } from './composite.js';
 import { point } from './point.js';
 import { ellipse } from './ellipse.js';
 import { tickY } from './tick.js';
@@ -137,46 +143,38 @@ export function face(options = {}) {
      */
     const param = (name, range, neutral = 0.5) => {
         const spec = channels[name];
-        const scale = { type: 'frame', range };
         if (spec && spec.field != null) {
-            // An author-declared scale wins — that is how a range is overridden.
-            return spec.scale !== undefined ? spec : { ...spec, scale };
+            // An author-declared range wins — that is how a preset is overridden.
+            return spec.scale !== undefined || spec.frame !== undefined
+                ? spec
+                : { ...spec, frame: range };
         }
         const t = spec && spec.value !== undefined ? clamp01(+spec.value) : neutral;
-        // A DATA-space constant on the same frame scale, not a `{ value }`: the
-        // number is a position in the glyph's local box, and `{ value }` would put
-        // a brow at pixel 0.4 instead of 40% of the way up the face.
-        return { datum: range[0] + t * (range[1] - range[0]), scale };
+        // A LOCAL constant, not a `{ value }`: the number is a position in the
+        // glyph's own box, and `{ value }` would put a brow at pixel 0.4 instead of
+        // 40% of the way up the face.
+        return { frame: range[0] + t * (range[1] - range[0]) };
     };
 
     /** A pinned position in the local frame. @param {number} u */
-    const at = (u) => ({ datum: u, scale: 'frame' });
+    const at = (u) => ({ frame: u });
     /** A magnitude as a fraction of the face's radius. @param {number} u */
-    const of = (u) => ({ datum: u, scale: 'frame' });
-
-    // The frame is defined by the author's placement channels, minus any edit —
-    // the edit belongs on the head, which is the node you actually grab. (The
-    // anchor draws nothing, so an edit there would be dead; group warns about it.)
-    /** @param {any} spec */
-    const bare = (spec) => {
-        if (!spec) return spec;
-        const { edit: _edit, ...rest } = spec;
-        return rest;
-    };
-
-    // The head is exactly the frame's half-size. When the author bound `size` to a
-    // field the head reads that field (so a `resize()` on it is elicited and the
-    // frame follows); otherwise it takes the frame's own radius.
-    const headSize = channels.size || of(1);
+    const of = (u) => ({ frame: u });
 
     const eyeRx = param('eyeScale', G.eyeRx, (G.eyeNeutral - G.eyeRx[0]) / (G.eyeRx[1] - G.eyeRx[0]));
     // An unbound squint leaves a ROUND eye, so ry follows rx rather than sitting at
     // its own neutral — otherwise widening the eyes would also un-round them. Its
     // EDIT is stripped, though: rx already carries it, and the same edit on both
     // radii would fire twice per drag and make the field doubly addressable.
+    /** @param {any} spec */
+    const noEdit = (spec) => {
+        if (!spec) return spec;
+        const { edit: _edit, ...rest } = spec;
+        return rest;
+    };
     const eyeRy = channels.eyeSquint
         ? param('eyeSquint', G.eyeRy)
-        : bare(eyeRx);
+        : noEdit(eyeRx);
 
     const browHeight = param('browHeight', G.browY);
     const lineWidth = of(G.lineWidth);
@@ -215,24 +213,25 @@ export function face(options = {}) {
         }
     });
 
-    return group({
+    return composite({
         id: glyph,
         constraints,
+        edits,
+        // The author's placement channels define the face's box — verbatim, edits
+        // included: the box is a real grab target, so a `move()` / `resize()` here
+        // takes hold of the whole glyph and every part follows.
         channels: {
-            x: bare(channels.x),
-            y: bare(channels.y),
-            size: bare(channels.size),
+            x: channels.x,
+            y: channels.y,
+            size: channels.size,
         },
         parts: [
-            // Head. Carries the author's placement/size channels verbatim, so their
-            // edits (move / resize) grab the glyph itself.
+            // Head. Exactly the box's half-size, at its origin — it states no
+            // position because "here, at the glyph" is what saying nothing means.
             point({
                 id: partId('head'),
-                edits,
                 channels: {
-                    x: channels.x,
-                    y: channels.y,
-                    size: headSize,
+                    size: of(1),
                     fill: channels.fill || { value: G.headFill },
                     stroke: channels.stroke || { value: G.headStroke },
                     strokeWidth: channels.strokeWidth || of(G.headStrokeWidth),

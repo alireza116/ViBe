@@ -154,20 +154,12 @@ N/A = use a different edit family (documented).
 <td><code>supportsArc</code></td>
 </tr>
 <tr>
-<td><code>composite</code></td>
+<td><code>composite</code> (alias <code>group</code>)</td>
 <td>data</td>
-<td>group channels → parts</td>
-<td>depends on parts</td>
-<td>per-part features</td>
-<td>stamps <code>discreteScale</code></td>
-</tr>
-<tr>
-<td><code>group</code></td>
-<td>data</td>
-<td>composite + a per-datum LOCAL FRAME: group x/y/size define the box (they do <b>not</b> trickle); a part's <code>scale: 'frame'</code> channel resolves in it</td>
-<td>depends on parts (mark-level edits ride the LAST part)</td>
-<td>per-part features; <code>node.frame</code> carries the scales an edit inverts through; <code>node.dm</code> for positional frame channels</td>
-<td>emits an inert frame ANCHOR; stamps <code>discreteScale</code></td>
+<td>composite channels → parts. BOX MODE (switched on by a part stating <code>frame:</code>): x/y/size define a per-datum box and are withheld from the trickle; a local part with no x/y sits at the ORIGIN</td>
+<td>depends on parts; mark-level edits ride the LAST part, or the BOX in box mode</td>
+<td>per-part features; in box mode <code>node.frame</code> carries the scales an edit inverts through, and <code>node.dm</code> the positional local channels</td>
+<td>stamps <code>discreteScale</code>; in box mode emits the BOX first — one <code>hit</code> circle per row, so an edit on x/y/size grabs the whole glyph</td>
 </tr>
 </tbody>
 </table>
@@ -204,9 +196,9 @@ N/A = use a different edit family (documented).
 </tr>
 <tr>
 <td><code>face</code></td>
-<td><b>preset</b> → <code>group</code></td>
+<td><b>preset</b> → <code>composite</code> (box mode)</td>
 <td>six params forwarded to a part's channel (mouthCurve→curvature, eyeScale/eyeSquint→rx/ry, browHeight→y, browTilt/mouthAsym→angle); emotion preset binds valence/arousal if unbound</td>
-<td>natural via the HEAD part (mark-level edits ride there)</td>
+<td>natural via the BOX (x/y/size and mark-level edits ride there)</td>
 <td><b>shape is the control</b> — each feature is its own mark, so no arbitration and no <code>handles</code> option</td>
 <td>none (it is a desugaring; there is no <code>edit.face.*</code>)</td>
 </tr>

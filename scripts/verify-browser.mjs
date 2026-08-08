@@ -97,7 +97,7 @@ async function main() {
         const routes = [
             '/', '/overview', '/concepts', '/concepts/contracts', '/sizing', '/renderers', '/authoring',
             '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',
-            '/marks/ellipse', '/marks/curve', '/marks/group',
+            '/marks/ellipse', '/marks/curve',
             '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
             '/marks/dotstack', '/marks/waffle', '/marks/needle',
             '/marks/axis-radial', '/marks/arc', '/marks/geo', '/marks/trend', '/marks/axes',
@@ -814,6 +814,65 @@ async function main() {
         check('composite.create: the new glyph lands at the pointer',
             glyphAfter.length === 4 && Math.abs(glyphAfter[3].x - 40) < 3 && Math.abs(glyphAfter[3].value - 50) < 3,
             JSON.stringify(glyphAfter[3]));
+
+        // ---- Composite BOX mode (/marks/composite) ---------------------------
+        // A part stating a `frame:` channel turns the composite into a per-datum
+        // box, and the box is a real feature drawing an INVISIBLE hit circle under
+        // every part. Two things only a real gesture proves:
+        //   1. An edit on the composite's own `size` is grabbable THROUGH a part
+        //      that carries no edit of its own. The outer disc is pointer-transparent
+        //      (the engine's rule for a mark with no direct-pick edit), so the drag
+        //      falls through to the box beneath it. Before the box drew nodes, that
+        //      edit had nothing to grab and was silently stripped.
+        //   2. A part that DOES carry an edit is drawn above the box and still wins
+        //      the pick, so the inner disc writes `share` and leaves `weight` alone.
+        //      Losing that would make every glyph part un-grabbable at once.
+        console.log('\nComposite box mode: grab the glyph vs. grab a part (/marks/composite)');
+        await open('/marks/composite', '#scaling .chart svg circle.mark:not([data-hit])');
+        const pipChart = page.locator('#scaling .chart').first();
+        await pipChart.locator('svg circle.mark:not([data-hit])').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const pipData = () => pipChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        // The renderer joins by SHAPE, so all three outer discs precede all three
+        // inner ones — index tells you nothing about which pip a circle belongs to.
+        // Take the FIRST pip's pair by concentricity instead, and re-read it after
+        // each gesture (a resize moves the geometry).
+        const pipPair = async () => {
+            const cs = await pipChart.locator('svg circle.mark:not([data-hit])').evaluateAll((els) =>
+                els.map((c) => {
+                    const r = c.getBoundingClientRect();
+                    return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, r: Math.min(r.width, r.height) / 2 };
+                }));
+            const same = cs.filter((c) => Math.abs(c.cx - cs[0].cx) < 2);
+            return {
+                outer: same.reduce((a, b) => (a.r >= b.r ? a : b)),
+                inner: same.reduce((a, b) => (a.r <= b.r ? a : b)),
+            };
+        };
+        const { outer, inner } = await pipPair();
+        check('composite box: the outer disc is the box, the inner one a fraction of it',
+            outer.r > inner.r, `outer r ${outer.r}, inner r ${inner.r}`);
+        // Grab the RING — outer disc, clear of the inner one — and drag outward.
+        const ringY = outer.cy + (inner.r + outer.r) / 2;
+        const pipBefore = (await pipData())[0];
+        await mouseDrag(outer.cx, ringY, outer.cx, outer.cy + outer.r * 1.6);
+        const pipGrown = (await pipData())[0];
+        check('composite box: dragging an inert part resizes the GLYPH (falls through to the box)',
+            pipGrown.weight > pipBefore.weight + 1, `weight ${pipBefore.weight} -> ${pipGrown.weight}`);
+        check('composite box: resizing the glyph leaves the inner part’s field alone',
+            Math.abs(pipGrown.share - pipBefore.share) < 0.02,
+            `share ${pipBefore.share} -> ${pipGrown.share}`);
+        // Now the inner disc, which has its own edit: it must win the pick.
+        const inner2 = (await pipPair()).inner;
+        const shareBefore = (await pipData())[0];
+        await mouseDrag(inner2.cx, inner2.cy, inner2.cx, inner2.cy - 40);
+        const shareAfter = (await pipData())[0];
+        check('composite box: a part with its own edit still wins the pick (share rises)',
+            shareAfter.share > shareBefore.share + 0.02,
+            `share ${shareBefore.share} -> ${shareAfter.share}`);
+        check('composite box: that drag does not resize the glyph',
+            Math.abs(shareAfter.weight - shareBefore.weight) < 0.5,
+            `weight ${shareBefore.weight} -> ${shareAfter.weight}`);
 
         // ---- the `legends` spec key (/marks/legend) --------------------------
         // The counterpart to `axes`: an IMPLICIT layer that desugars into legend

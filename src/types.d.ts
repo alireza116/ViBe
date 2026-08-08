@@ -6,10 +6,10 @@ export type Datum = Record<string, any>;
 // holds the data type. A scale type is named by `scale` (a string, or the `type`
 // of a ScaleSpec). See scaleTypeFor in core/encoding.js for the routing.
 // 'frame' is the one CHANNEL-SIDE-ONLY member: it marks a channel as belonging to
-// an enclosing group()'s local coordinate box rather than a global axis (see
-// plot/group.js). The group builds a real per-datum linear scale for it
+// an enclosing composite()'s local coordinate box rather than a global axis (see
+// plot/composite.js). The composite builds a real per-datum linear scale for it
 // (createFrameScale), so no RESOLVED scale ever carries type 'frame' and nothing
-// downstream branches on it.
+// downstream branches on it. `ChannelSpec.frame` is the short spelling.
 export type ScaleType =
   | 'linear' | 'log' | 'symlog' | 'pow' | 'sqrt' | 'time'
   | 'band' | 'point' | 'ordinal' | 'sequential' | 'diverging'
@@ -363,7 +363,7 @@ export interface SlideOptions extends EditOptions {
   // 'up'|'down' for axis:'y' (default 'left'/'up').
   increase?: 'left' | 'right' | 'up' | 'down';
   // Pixel span that traverses the full domain. Defaults to the glyph radius for a
-  // channel resolved in a `group`'s local frame, else 120.
+  // channel resolved in a composite's local frame, else 120.
   extent?: number;
   // 'relative' (default): the value moves by the drag DELTA from where you
   // grabbed, so there is no jump. 'absolute': the value is read off the pointer's
@@ -472,8 +472,21 @@ export interface ChannelSpec {
   type?: MeasureType;
   // The scale, by name (`'log'`), by spec (`{ type: 'sqrt', range: [4, 20] }`),
   // as a live d3 scale (adopted as-is; see adoptScale in core/scales.js), or
-  // `null` to read the field unscaled.
+  // `null` to read the field unscaled. `'frame'` / `{ type: 'frame', range }` is
+  // the long spelling of `frame` below.
   scale?: ScaleType | ScaleSpec | Function | null;
+  // LOCAL to the enclosing composite's box, and what switches that composite into
+  // box mode (plot/composite.js). Three forms:
+  //   frame: -0.4          a pinned local position — x/y in [-1, 1] from the
+  //                        glyph's centre with y UP, magnitudes (size/rx/ry/
+  //                        strokeWidth) as a fraction of its half-size
+  //   frame: [lo, hi]      map `field`'s SCHEMA domain onto that slice of the box
+  //   frame: true          map `field` onto the channel's default local range
+  // Desugars to `scale` (normalizeFrameKey in core/encoding.js), which stays the
+  // single reader. An explicit `scale` wins. `{ value }` still means PIXELS here
+  // as everywhere — inside a glyph you almost never want one, which is why the
+  // local spelling is the short one.
+  frame?: number | number[] | boolean;
   // Makes the channel writable: a gesture inverts back to `field` through this
   // same scale. Collected by edit/route.js's collectEdits.
   edit?: Edit;
@@ -588,12 +601,12 @@ export type FaceParam =
 export type FaceChannels = Channels & Partial<Record<FaceParam, ChannelSpec>>;
 
 // Options for the FACE preset (an emotion glyph). `face()` is not a mark: it
-// returns a `group` of ordinary marks — a head `point`, two `ellipse` eyes, two
-// `tickY` brows and a `curveY` mouth — each placed in the group's local frame.
-// So every part is its own feature with its own direct-pick edit, and a parameter
-// is edited with the universal edits (`slide` on a curvature or a radius,
-// `rotate` on a brow's angle, `move`/`resize` on the head) rather than a
-// face-specific namespace.
+// returns a `composite` of ordinary marks in box mode — a head `point`, two
+// `ellipse` eyes, two `tickY` brows and a `curveY` mouth — each placed in the
+// glyph's local box. So every part is its own feature with its own direct-pick
+// edit, and a parameter is edited with the universal edits (`slide` on a
+// curvature or a radius, `rotate` on a brow's angle, `move`/`resize` on the
+// composite's own x/y/size) rather than a face-specific namespace.
 //
 // Bind NO param for the emotion preset (mouthCurve ← valence, eyeScale ←
 // arousal); binding any one replaces it. The centre is placed by the x/y channels
@@ -671,23 +684,43 @@ export interface TrendBandOptions extends TrendAnchorOptions {
   sigma?: number;
 }
 
-// Options for a COMPOSITE mark (a glyph): a named GROUP of ordinary marks over
+// Options for a COMPOSITE mark (a glyph): a named group of ordinary marks over
 // the shared dataset. Each part encodes some columns; a part carrying an `edit`
 // on a channel is a handle. `composite` returns the parts as an array of features
 // (Elicit flattens it) — it is a desugaring, not a new kind of feature.
 //
-// Group-level `channels` (and style/angle shorthands) merge into every part at
-// desugar time; a part's own channel for the same name wins. Inherited `edit`s
-// attach to the last part only (visuals first, handles last) so one dataset does
-// not get the same edit applied twice.
+// It has TWO MODES, one rule apart, and a part switches between them:
+//
+// PLAIN — every part stands on the chart's own axes (an error bar's caps are
+// positions on y). Composite-level `channels` (and style/angle shorthands) merge
+// into every part at desugar time; a part's own channel for the same name wins.
+// Inherited `edit`s attach to the last part only (visuals first, handles last) so
+// one dataset does not get the same edit applied twice.
+//
+// BOX — a part states a channel in LOCAL units (`ChannelSpec.frame`), and the
+// composite becomes a per-datum box. Its own `x`/`y`/`size` then place and size
+// that box instead of trickling down: local +1 on x is `origin + size`, local +1
+// on y is `origin - size` (local y is UP), a magnitude of 1 is `size`. Each local
+// channel becomes a real, invertible per-datum scale (createFrameScale), so marks
+// encode and edits invert through the same object with no bespoke geometry on
+// either side. A local part that states no x/y sits at the box's ORIGIN — parts
+// do not repeat the composite's placement. A part with no local channel at all
+// keeps its ordinary build over the global scales.
+//
+// In box mode the returned array is led by the BOX: a feature carrying the
+// composite's x/y/size (so the global resolver builds the axes the origin is
+// measured against) that draws one transparent hit circle per row beneath every
+// part — which is what makes a `move()` on the composite's `x` pick the whole
+// glyph up while a drag on one part still edits only that part.
 export interface CompositeOptions {
   // The sub-marks, in z-order: visual parts first, handles last.
   parts?: any[];
   id?: string;
-  // Shared channel map inherited by every part (part keys win). Typical for a
-  // glyph-wide `angle`, `x`/`y`, or `fill`.
+  // Shared channel map. In plain mode every part inherits it (part keys win). In
+  // box mode `x`/`y`/`size` are withheld — they define the box — and everything
+  // else (fill, opacity, angle, …) still trickles.
   channels?: Channels;
-  // Constant shorthands desugared into group channels (same list as MarkOptions).
+  // Constant shorthands desugared into composite channels (same list as MarkOptions).
   fill?: any;
   stroke?: any;
   strokeWidth?: number;
@@ -699,31 +732,17 @@ export interface CompositeOptions {
   // Stamped onto any part that doesn't declare its own (a glyph usually sits in a
   // band slot). See plot/composite.js.
   discreteScale?: 'band' | 'point';
-  // Group-level data invariants; promoted to the dataset like any mark's.
+  // Composite-level data invariants; promoted to the dataset like any mark's.
   constraints?: Constraint[];
+  // Mark-level edits. Ride the last part in plain mode; in box mode they ride the
+  // box, whose channel map holds the glyph's placement columns.
+  edits?: Edit[];
   [key: string]: any;
 }
 
-// Options for a GROUP — `composite` plus a per-datum LOCAL COORDINATE FRAME.
-//
-// The group's own `x`/`y`/`size` channels define, for each row, a box: an origin
-// and a half-size. A part's channel flagged `scale: 'frame'` (or
-// `scale: { type: 'frame', range: [...] }`) resolves against that box instead of
-// a global axis — local +1 on x is `origin + size`, local +1 on y is
-// `origin - size` (local y is UP), and a magnitude of 1 is `size`. Each such
-// channel becomes a real, invertible per-datum scale, so marks encode and edits
-// invert through the same object with no bespoke geometry on either side.
-//
-// Like `composite` this is a desugaring: it returns an inert frame ANCHOR feature
-// (which feeds the global resolver so the frame's origin has scales to measure
-// against) followed by the wrapped parts. See plot/group.js.
-export interface GroupOptions extends CompositeOptions {
-  // The group's frame-defining channels live here: `x`, `y` and `size`. Unlike
-  // CompositeOptions.channels, those three do NOT trickle into the parts —
-  // inheriting them would place every part at the anchor. Everything else
-  // (fill, opacity, …) trickles exactly as it does on a composite.
-  channels?: Channels;
-}
+// `group` was a separate mark for box mode before the two were merged; it is an
+// alias of `composite` now, and this is an alias of its options.
+export type GroupOptions = CompositeOptions;
 
 /**
  * What a mark factory returns — the feature object the engine consumes.
@@ -991,6 +1010,11 @@ export interface FeatureNode {
   // to featureNodes (picking/guides ignore it), never editable, pointer-transparent.
   // The D3 renderer stamps a `data-ghost` attribute so a test can find it.
   ghost?: boolean;
+  // HIT-ONLY: the node paints nothing and exists to be grabbed — a composite's box
+  // draws one over the whole glyph so an edit on the composite's own x/y/size has
+  // something to take hold of. Tagged `data-hit` by the D3 renderer, so a selector
+  // can tell it from a part it sits under.
+  hit?: boolean;
   // Runtime tags set by marks for the pick/driver layer: `series` groups a line's
   // nodes; `sweepAxis`/`bandAxis` name the axis proximity measures along; `cursor`
   // overrides the interactive cursor (e.g. a tick's ew-resize); `channel` tags one
@@ -1004,7 +1028,7 @@ export interface FeatureNode {
   channel?: string;
   cursor?: string;
   // The per-datum LOCAL scales this node was encoded through, stamped by
-  // plot/group.js on every node a framed part emits. The engine overlays them on
+  // plot/composite.js on every node a framed part emits. The engine overlays them on
   // the global map when resolving an edit's channels, so a gesture inverts through
   // the same mapping that drew the node (see frameScalesFor in core/elicit.js).
   frame?: ScaleMap;

@@ -15,6 +15,7 @@ import type {
   ElicitElement,
   ElicitSpec,
   FaceOptions,
+  CompositeOptions,
   LegendEditOptions,
   MarkOptions,
   NewSeriesOptions,
@@ -57,6 +58,10 @@ export const plot: {
   areaY(options?: MarkOptions): Mark;
   point(options?: MarkOptions): Mark;
   face(options?: FaceOptions): Mark;
+  ellipse(options?: MarkOptions): Mark;
+  curve(options?: MarkOptions): Mark;
+  curveX(options?: MarkOptions): Mark;
+  curveY(options?: MarkOptions): Mark;
   text(options?: MarkOptions): Mark;
   textX(options?: MarkOptions): Mark;
   textY(options?: MarkOptions): Mark;
@@ -74,7 +79,9 @@ export const plot: {
   arc(options?: MarkOptions): Mark;
   pie(options?: MarkOptions): Mark;
   donut(options?: MarkOptions): Mark;
-  composite(options?: MarkOptions): Mark;
+  composite(options?: CompositeOptions): Mark;
+  // Alias of `composite` — box mode used to be a separate mark.
+  group(options?: CompositeOptions): Mark;
   axis(options?: MarkOptions): Mark;
   axisX(options?: MarkOptions): Mark;
   axisY(options?: MarkOptions): Mark;
@@ -151,10 +158,6 @@ export const edit: {
     slope(options?: TrendEditOptions): Edit;
     interceptSpread(options?: TrendEditOptions): Edit;
     slopeSpread(options?: TrendEditOptions): Edit;
-  };
-  face: {
-    expression(options?: EditOptions): Edit;
-    move(options?: EditOptions): Edit;
   };
   waffle: {
     fill(options?: EditOptions): Edit;

@@ -616,6 +616,12 @@ export class D3Renderer {
     // Mark a probe ghost-preview node so a test (and a stylesheet) can find it. The
     // single place every mark shape's paint flows through, so one line covers all.
     sel.attr("data-ghost", (/** @type {any} */ d) => (d.ghost ? "" : null));
+    // Same idea for a HIT-ONLY node: a composite's box draws an invisible circle
+    // over the whole glyph so an edit on the composite's own x/y/size has something
+    // to grab. It paints nothing, so without a tag it is indistinguishable in the
+    // DOM from a mark that happens to be transparent — and a `circle.mark` selector
+    // silently picks it up ahead of the part it sits under.
+    sel.attr("data-hit", (/** @type {any} */ d) => (d.hit ? "" : null));
     return sel;
   }
 
