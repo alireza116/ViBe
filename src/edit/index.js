@@ -77,14 +77,12 @@ export const trend = {
     slopeSpread: trendSlopeSpread,
 };
 
-import { expression as faceExpression, move as faceMove } from './face.js';
-
-// Face-scoped edits: a face glyph's seven parameters live on ONE feature over ONE
-// datum, each with a derived drag TRACK the mark stamps on its handle. `expression`
-// drags a bound parameter's handle; `move` drags the head. Both used to be built
-// inline in plot/face.js and attached unconditionally, so a face was editable with
-// nothing in the spec saying which columns a gesture wrote.
-export const face = { expression: faceExpression, move: faceMove };
+// There is no `edit.face.*`. A face is now a `group` of ordinary marks
+// (plot/face.js), so each parameter is a channel on a concrete part and takes the
+// universal edits: `slide` on a mouth's curvature or an eye's rx/ry, `rotate` on a
+// brow's angle, `move`/`resize` on the head. The namespace existed only to reach
+// handles that lived on one feature with a private drag descriptor — which is the
+// arrangement the group form removed.
 
 import { fill as waffleFill } from './waffle.js';
 

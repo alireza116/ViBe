@@ -6,6 +6,8 @@ export { tick, tickX, tickY } from './tick.js';
 export { line, lineY, lineX, connectedScatter, path } from './line.js';
 export { area, areaY, areaX } from './area.js';
 export { point } from './point.js';
+export { ellipse } from './ellipse.js';
+export { curve, curveX, curveY } from './curve.js';
 export { face } from './face.js';
 export { text, textX, textY } from './text.js';
 export { dotStack, dotStackX, dotStackY } from './dotStack.js';
@@ -16,6 +18,7 @@ export { needle } from './needle.js';
 export { axisRadial } from './axisRadial.js';
 export { arc, pie, donut } from './arc.js';
 export { composite } from './composite.js';
+export { group } from './group.js';
 export { axis, axisX, axisY, grid, gridX, gridY } from './axis.js';
 export { legend, legendColor, legendSize, legendSymbol } from './legend.js';
 // Shared mark foundation — for authoring new marks (channel resolution + the

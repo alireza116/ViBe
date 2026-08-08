@@ -237,40 +237,65 @@ function slideAxis(axis, increase) {
 }
 
 /**
+ * How far the pointer travels to sweep the whole domain. An explicit `extent`
+ * wins; otherwise a channel resolved in a `group`'s local FRAME sweeps in one
+ * glyph-radius, so the gesture scales with the glyph instead of being a pixel
+ * constant that is enormous on a small face and tiny on a large one. 120px is the
+ * plain-chart fallback.
+ * @param {number | undefined} extent @param {any} ch @returns {number}
+ */
+function slideExtent(extent, ch) {
+    if (typeof extent === 'number' && extent > 0) return extent;
+    const frame = ch && ch.scale && /** @type {any} */ (ch.scale).frameExtent;
+    return typeof frame === 'number' && frame > 0 ? frame : 120;
+}
+
+/**
+ * Where a relative slide's dragstart anchor lives in the feature's session. Keyed
+ * by axis + field so several relative slides on ONE feature (an eye's `rx` and
+ * `ry`) keep separate anchors instead of clobbering each other.
+ * @param {'x'|'y'} axis @param {string} field @returns {string}
+ */
+export const slideAnchorKey = (axis, field) => `${axis}:${field}`;
+
+/**
  * slide — magnitude transform. Inversion: linear — the value tracks how far
- * the pointer has moved along one axis, mapped through the channel's domain, the
- * generalized form of the face's eye/param interaction. It is
+ * the pointer has moved along one axis, mapped through the channel's domain. It is
  * the linear alternative to `resize` (which reads the pointer's RADIUS from the
  * centre — "outside grows, inside shrinks"), and the recommended edit for a
  * magnitude channel like `size`.
  *
- * Two modes, same mapping (`linearInvert`), different anchor:
- *   - `absolute` (default): a fixed track anchored at the mark centre, ±`extent`
- *     px along `axis`. The value follows the pointer's position on that track, so
- *     it may JUMP to the pointer on grab. Direct-pick (`pick:'direct'`) — it
- *     coexists with a mark's other direct edits (this is exactly what the face's
- *     eyes do), so it is the mode a glyph handle uses.
- *   - `relative`: the value changes by how far the pointer has moved SINCE the
- *     grab (no jump). It needs a dragstart snapshot, so it rides the `slide`
- *     driver (`pick:'slide'`), which raises the plane above the marks. That means
- *     it CANNOT share a chart with direct-pick edits (the plane silences them) —
- *     use it for a standalone magnitude chart, and `absolute` inside a glyph.
+ * Two modes, same mapping, different anchor. Both are DIRECT-pick — the thing you
+ * grabbed is the thing you adjust — so either coexists with a mark's other direct
+ * edits, which is what a glyph handle needs.
+ *   - `relative` (default): the value changes by how far the pointer has moved
+ *     SINCE the grab. No jump, and the mark may move under the gesture without
+ *     feeding back into it. It needs a dragstart snapshot, which the `slide`
+ *     driver stashes in the feature's session.
+ *   - `absolute`: a fixed track centred on the mark, ±`extent` px along `axis`;
+ *     the value is read off the pointer's POSITION on that track. Stateless, but
+ *     it only reads right when the handle already sits at its value's place on
+ *     that track (a dot on a rail). Otherwise pressing the mark teleports the
+ *     value — grabbing a mark centre snaps it to the middle of the domain — which
+ *     is why it is no longer the default.
  *
  * `increase` names the direction that raises the value: `'left'|'right'` for
  * `axis:'x'`, `'up'|'down'` for `axis:'y'` (default `'left'`/`'up'`). `extent`
- * is the pixel span that traverses the full domain.
+ * is the pixel span that traverses the full domain (see `slideExtent`).
  * @param {import('../types').EditOptions & { axis?: 'x'|'y', increase?: 'left'|'right'|'up'|'down', extent?: number, mode?: 'absolute'|'relative' }} [options]
  * @returns {import('../types').Edit}
  */
 export function slide(options = {}) {
-    const { axis = 'x', increase, extent = 120, mode = 'absolute', ...rest } = options;
+    const { axis = 'x', increase, extent, mode = 'relative', ...rest } = options;
     const { towardSmaller } = slideAxis(axis, increase);
     return makeEdit({
         type: 'slide',
         gesture: 'drag',
-        // Relative needs a frozen dragstart anchor, which only a driver can stash
-        // in the session — so it is plane-pick; absolute is a stateless direct edit.
-        pick: mode === 'relative' ? 'slide' : 'direct',
+        // Direct in both modes. Relative still needs the driver's dragstart anchor,
+        // but the driver claims it by CAPABILITY (type + mode) from either dispatch
+        // path — so it gets its lifecycle without the plane being raised, and a
+        // glyph's parts each stay independently grabbable.
+        pick: 'direct',
         // Knobs ride onto the descriptor (makeEdit passes unknown keys through) so
         // both the apply below and the slide driver read the same configuration.
         axis, increase, extent, mode,
@@ -280,16 +305,18 @@ export function slide(options = {}) {
             if (!ch || !ch.field) return undefined;
             const [loVal, hiVal] = channelDomain(ch);
             const px = axis === 'x' ? ctx.pointer.x : ctx.pointer.y;
+            const span = slideExtent(extent, ch);
 
             if (mode === 'relative') {
                 // The driver froze the grab pixel + starting value at dragstart; the
                 // value moves proportionally from there, so there is no grab jump.
-                const s = ctx.session;
-                if (!s || s.startPx == null || typeof s.startValue !== 'number') return undefined;
-                const moved = (px - s.startPx) * (towardSmaller ? -1 : 1);
+                const anchors = /** @type {any} */ (ctx.session || {}).slide;
+                const a = anchors && anchors[slideAnchorKey(axis, ch.field)];
+                if (!a || typeof a.startValue !== 'number') return undefined;
+                const moved = (px - a.startPx) * (towardSmaller ? -1 : 1);
                 const range = hiVal - loVal;
                 const lo = Math.min(loVal, hiVal), hi = Math.max(loVal, hiVal);
-                const v = Math.max(lo, Math.min(hi, s.startValue + (moved / extent) * range));
+                const v = Math.max(lo, Math.min(hi, a.startValue + (moved / span) * range));
                 return { ...ctx.datum, [ch.field]: v };
             }
 
@@ -298,8 +325,8 @@ export function slide(options = {}) {
             const c = markCenter(resolveMarkNode(ctx));
             if (!c) return undefined;
             const centre = axis === 'x' ? c.cx : c.cy;
-            const pxLo = towardSmaller ? centre + extent : centre - extent; // value = loVal here
-            const pxHi = towardSmaller ? centre - extent : centre + extent; // value = hiVal here
+            const pxLo = towardSmaller ? centre + span : centre - span; // value = loVal here
+            const pxHi = towardSmaller ? centre - span : centre + span; // value = hiVal here
             const v = linearInvert(px, pxLo, pxHi, loVal, hiVal);
             if (v === undefined) return undefined;
             return { ...ctx.datum, [ch.field]: v };

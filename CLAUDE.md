@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repo. ElicitJS just went through a
 
 A declarative viz library for interactive belief elicitation. `Elicit(spec)` renders an SVG chart where gestures write back to data. The core idea: **an edit is the inverse of encoding** — `encode` maps data → visual through a channel's scale; an edit's `apply()` maps a gesture → data through the *same* scale.
 
-Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/plot/mark.js` (shared mark foundation), `src/edit/index.js` (edit barrel), `src/elements/index.js` (chart elements: axis / grid / legend / axisRadial). Read `ARCHITECTURE.md` and `MARK_CONTRACTS.md` before making structural changes (`README.md` is the short front door: what it is, install, one example, how to run it).
+Entry points: `src/index.js` (public API), `src/core/elicit.js` (engine), `src/plot/mark.js` (shared mark foundation), `src/plot/group.js` (glyph-local frames), `src/edit/index.js` (edit barrel), `src/elements/index.js` (chart elements: axis / grid / legend / axisRadial). Read `ARCHITECTURE.md` and `MARK_CONTRACTS.md` before making structural changes (`README.md` is the short front door: what it is, install, one example, how to run it).
 
 **Public namespace matches kind.** Data marks live under `elicit.plot.*`. Scale chrome lives under `elicit.elements.*` (also `ElicitSpec.elements`, concatenated with `marks`). The same factories stay aliased on `plot.*` during migration.
 
@@ -31,8 +31,9 @@ internal (unexported, therefore unreplaceable) expression edit plus a `move`, so
 `trend({ edits: [] })` was still fully draggable and nothing in the spec said which
 columns a gesture would write. Which column an interaction writes is the one thing
 the channel map exists to state, and a default that cannot be turned off is not a
-default. `edit.face.*` was exported to make face's handles reachable; staging goes on
-the edit (`edit.trend.slope({ stage: 1 })`), never on the mark.
+default. Staging goes on the edit (`edit.trend.slope({ stage: 1 })`), never on the
+mark. (`edit.face.*` was exported to make face's handles reachable; it is gone —
+face is a `group` of ordinary marks now, so its parameters take the universal edits.)
 
 **A mark declares what it needs from a scale (`Mark.requires`); it never degrades in
 silence.** Silent degradation is the worst failure mode available here, because the
@@ -56,6 +57,25 @@ a mark's own stroke. Hover has two sources — a proximity driver's session and 
 renderer's per-node `pointerover` — and both feed the ONE `hovered` effect, so "this
 is the mark you are about to touch" reads identically either way.
 
+**The ENGINE's state pass decides an effect; a renderer only applies it.** Both halves
+come out of the one loop in `update()`: the outline overlay, and the restyle, stamped
+on the mark's own node as `node.effectStyle` (merged across states by `effectStyleFor`,
+`grabbed` > `selected` > `hovered`). This rule exists because it was violated —
+the D3 renderer painted the restyle half itself off its own `pointerenter`/`d3.drag`,
+so `hovered: { fill }` lit up under a direct pick and stayed dark under a proximity
+driver's hover of the same row, `selected: { fill }` did nothing at all, `grabbed` read
+`filter` and dropped the other five props, and canvas had no element effects whatever —
+while `core/effects.js` documented one uniform vocabulary for all three states. Which
+half a property uses is fixed: `outline` is an overlay because it needs padding
+OUTSIDE the shape; everything else restyles the node, because a copy drawn on top
+cannot dim a mark (`opacity`, `filter`) and composites a `fill` wrongly over a
+translucent one. **Anything drawn ABOUT a node must carry that node's `angle`** —
+an overlay is a new node, so it lands at the mark's UNROTATED position unless it copies
+the transform, and every overlay shape is kept concentric with its source so
+`markCenter` resolves one pivot for both. Pick geometry has the same duty: `unrotate`
+(`edit/pick.js`) brings the pointer into the mark's frame through `markCenter` before
+any axis-aligned test, so what is outlined and what a drag grabs cannot drift apart.
+
 **One handle contract.** `resolveHandles` (`plot/mark.js`) is where a handle's radius,
 paint and visibility come from: `HANDLE_DEFAULTS.size`, `theme.handle`/`theme.handleStroke`,
 and `handles: true | false | 'hit'` — drawn+grabbable / neither / invisible-but-grabbable.
@@ -72,7 +92,11 @@ draws — so the line the author sees IS the mapping, not a redrawing of it.
 
 **Edits are descriptors, not closures with hidden state.** An edit is `{ type, gesture, channels, when, pick, scope, threshold, into, constrain, guide, apply }` built via `makeEdit` (`src/edit/shared.js`). `apply(ctx)` is pure given `ctx` — it returns a datum (direct edit), a full array (whole-dataset edit), or `undefined` (no-op). Never mutate `ctx.data` in place.
 
-**Multi-event lifecycles are drivers, not engine branches.** If you're adding an interaction mode that needs `hover`/`dragstart`/`drag`/`dragend` state (like `nearest`, `sweep`, `draw`), write a new file in `src/edit/drivers/` implementing `{ name, wants(edit), onEvent(ctx) }` and register it in `drivers/index.js`. **Never** add a new `if (pick === '...')` branch inside `core/elicit.js`'s dispatch — that's the god-module pattern the drivers refactor eliminated. The engine must stay ignorant of specific modes.
+**Multi-event lifecycles are drivers, not engine branches.** If you're adding an interaction mode that needs `hover`/`dragstart`/`drag`/`dragend` state (like `nearest`, `sweep`, `draw`), write a new file in `src/edit/drivers/` implementing `{ name, wants(edit), onEvent(ctx) }` and register it in `drivers/index.js`. **Never** add a new `if (pick === '...')` branch inside `core/elicit.js`'s dispatch — that's the god-module pattern the drivers refactor eliminated. The engine must stay ignorant of specific modes. A driver is not the same thing as a raised plane: it may claim a **direct**-pick edit by CAPABILITY (`wants: e => e.type === 'slide' && e.mode === 'relative'`), and then `runDrivers` hands it `ctx.index` — the datum the gesture landed on — so it skips target selection and `needsPlaneOnTop` stays false. That is what lets a lifecycle edit sit on a glyph part beside the other direct edits; a relative `slide` needs a dragstart ANCHOR, not a target search, and conflating the two once forced every jump-free drag onto the plane.
+
+**Two edits on one mark must read different COMPONENTS of the gesture.** A drag fans to every direct edit on the touched feature, which is intended (that's how a brow's height and tilt, or an eye's `rx` and `ry`, come off one gesture). It only works if they read orthogonal things: `slide({ axis: 'x' })` beside `slide({ axis: 'y' })`, or a positional `move({ channels: ['y'] })` beside an x-slide. Two edits reading the same component fight, and the loser is whichever applies first. Note the corollary for `rotate`: its sensitivity is the pointer's DISTANCE TO THE PIVOT, so on a glyph part — where you grab the thing at its own centre — a few pixels swing the pointer most of a half-turn and pin the value to a domain end. `rotate` is for a needle or a dial you grab at arm's length; a tilt you grab on top of is a `slide`, even though the channel is an `angle`.
+
+**`slide` is RELATIVE by default, and that default is load-bearing.** Absolute mode reads the value off the pointer's POSITION on a track centred on the mark, so it is right only when the handle already sits at its value's place on that track (a dot on a rail). Anywhere else — an eye whose `rx` grows about a fixed centre, a brow that moves along the very axis it slides on — merely PRESSING the mark teleports the value, and a channel that moves the mark along its own slide axis feeds back and runs away. Both bugs shipped. Relative mode freezes `{ startPx, startValue }` per edit at dragstart (keyed `${axis}:${field}` via `slideAnchorKey`, so two slides on one feature don't clobber each other) and moves proportionally from there. `extent` — the drag distance that sweeps the domain — defaults to the frame's `frameExtent` inside a `group`, so the gesture scales with the glyph instead of being a 120px constant that is enormous on a small face.
 
 **Scope goes in the name.** An edit that only works on marks with series grouping (a `line` family capability) belongs under `edit.line.*` and must set `scope: 'line'` in its descriptor (the engine dev-warns on a scope mismatch — see `warnScopeMismatch` and the `SCOPE_CAPABILITY` table in `elicit.js`). A genuinely universal edit (works on any mark) stays top-level in `edit.*`. Don't add a mark-specific edit to the top-level namespace "because it's simpler" — that's the flat-namespace problem the namespacing fixed.
 
@@ -106,6 +130,22 @@ The contract is the `Mark` interface in `src/types.d.ts` (prose version at the t
 - Export both a bare form (auto-detects orientation/axis) and, where the mark has a natural direction, `...X`/`...Y` variants — every directional mark in this codebase (`bar`, `tick`, `line`, `axis`, `grid`, `rule`) follows that pairing. Don't ship an asymmetric `ruleY`-with-no-`ruleX` again.
 
 **Glyphs: prefer a group of marks over one clever mark.** If a glyph's handles map to distinct *fields* of a row, build it as a `composite` — a group that desugars into ordinary marks (`Elicit` flattens nested arrays in `marks`). Each handle is then its own feature, so direct-pick dispatch keeps a drag on one handle from touching another, and each handle edits a plain `y`/`x` channel. Only when several handles must live on **one** feature over **one** datum (their positions are *derived*, not fields — see `trend`'s intercept/slope, `area`'s span edges) do you need the `channel` node tag to arbitrate. Use `claimEdge(edit, name)` from `src/edit/shared.js` for that guard, never a hand-written `when: ctx => ctx.node.channel === '…'`: `claimEdge` rejects only a *differently* tagged node, so an untagged node (a mark-level edit spanning both handles) and an **absent** one still pass. That second case is load-bearing — a `plane`/`probe`-pick edit carries no node at all, so a guard that demands one silently kills every gesture on it. Reach for the whole pattern last; it was `composite`'s old shape and the group form replaced it.
+
+**A glyph whose parts are placed relative to the GLYPH is a `group`, not arithmetic
+on a radius.** `composite` resolves every part through the global scales, which is
+right for an error bar (its caps are values on the y axis) and wrong for a face's eye
+("16% of the way up *this* face"). `group` (`src/plot/group.js`) adds a per-datum
+local FRAME: its own `x`/`y`/`size` define a box per row, and a part's channel marked
+`scale: 'frame'` resolves in it. The load-bearing decision is that a frame channel
+becomes a **real, invertible scale** (`createFrameScale` in `core/scales.js`), stamped
+on every node it produced as `node.frame` — so `computeEdit` overlays those scales and
+the universal edits invert through the very object that encoded, per datum, with no
+second inversion path and no bespoke pixel tracks. `'frame'` is a CHANNEL-side marker
+only: no resolved scale carries it, so nothing branches on it, and `resolveScales`
+skips a flagged channel *before* `bucketOf` so a glyph's internal geometry never
+widens an axis domain, demands a band, or conjures an axis. Don't reintroduce a mark
+that computes pixel offsets from R and an edit that un-computes them — that was the
+old `face`, and it is exactly the machinery this replaced.
 
 ## Adding a new edit
 
@@ -147,7 +187,11 @@ The contract is the `Mark` interface in `src/types.d.ts` (prose version at the t
 - A mark without style/encoding support "for the quick case" (this is how `dot` diverged from `point` before being folded back in).
 - Engine code that branches on a specific `pick`/edit `type` outside the driver registry.
 - A standalone guide or constraint-introspection module that duplicates `edit/guide.js`.
-- A glyph that fakes several marks inside one feature and arbitrates its own handles, when a `composite` group of real marks would do.
+- A glyph that fakes several marks inside one feature and arbitrates its own handles, when a `composite` (or `group`) of real marks would do.
+- A glyph-local position computed as pixel arithmetic on a radius, with an edit that reverses that arithmetic through a hand-rolled track. A `group`'s frame channel is a real scale; the edit inverts through it.
+- Two edits on one mark that read the same component of a drag, or a `rotate` on a handle you grab at its own pivot.
+- A multi-event lifecycle that forces its edit onto the plane when all it needs is a dragstart snapshot. Claim it by capability and read `ctx.index`.
+- A per-mark scoped edit namespace for a glyph whose parameters are plain fields on ordinary parts. (`edit.face.*` existed for exactly that and is gone.)
 - A `domain` or `range` on a channel, or a `spec.x` / `spec.y` scale block. Domains live on the schema; scale config lives on `scale` (per channel) or `spec.scales` (per chart).
 - A `scale.type === '…'` branch anywhere outside `core/scales.js`. Read `kind` / `temporal` / `invertible`.
 - A second name for a field on a mark: `channels` is the only place a field is named. (`x` once meant a field name on `bar`, a constant on `rule`, a scale config on `spec`, and nothing on `point`.)
@@ -166,5 +210,11 @@ The contract is the `Mark` interface in `src/types.d.ts` (prose version at the t
   overlay nodes.
 - A second `hover` path for direct-pick marks. `ui.hover` and a proximity driver's
   session both feed the one `hovered` effect.
+- A renderer that DECIDES an effect rather than applying `node.effectStyle` / the
+  state pass's overlay nodes — that is the second painter, with its own source of
+  truth, that made half the effects vocabulary a no-op.
+- An overlay node (or a hit box) built beside a rotated mark without copying its
+  `angle`, or a geometry test that skips `unrotate`. It draws/picks where the mark
+  ISN'T, and the page still renders, so no gate but `verify:browser` sees it.
 - A `fn:`-style warn key that collides with another module's namespace (`resolve.js`
   and `mark.js` shared `fn:<channel>` and silenced each other).

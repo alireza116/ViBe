@@ -97,6 +97,7 @@ async function main() {
         const routes = [
             '/', '/overview', '/concepts', '/concepts/contracts', '/sizing', '/renderers', '/authoring',
             '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',
+            '/marks/ellipse', '/marks/curve', '/marks/group',
             '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
             '/marks/dotstack', '/marks/waffle', '/marks/needle',
             '/marks/axis-radial', '/marks/arc', '/marks/geo', '/marks/trend', '/marks/axes',
@@ -437,44 +438,242 @@ async function main() {
         check('hover: the mark\'s own stroke attribute is untouched',
             strokeAfterHover != null, `stroke=${strokeAfterHover}`);
 
-        // ---- Face head: move (x+y bound) + slide resize (size bound) --------
-        // The outline is a drag-to-move target when the centre is bound to fields,
-        // and a rim handle resizes the head via an absolute slide. Both are direct
-        // edits that coexist with the eyes/mouth (which carry `dm`).
-        console.log('\nFace head move + resize (/marks/face)');
-        await open('/marks/face', '#head .chart svg path.mark-line');
-        const headData = () => page.$eval('#head .chart > div', (el) => el.getData());
+        // ---- effects follow a ROTATED mark (/marks/point #angle) -------------
+        // An effect overlay is a NEW node built beside the mark, so it only lands on
+        // the mark if it copies the mark's transform. It didn't: every outline stayed
+        // axis-aligned at the mark's unrotated position, and the more you spun a mark
+        // the further its own highlight sat from it. Neither typecheck nor
+        // check:warnings can see this — the page renders perfectly, just wrong.
+        console.log('\nEffects on a rotated mark (/marks/point #angle)');
+        await open('/marks/point', '#angle .chart svg rect.mark');
+        const sqChart = page.locator('#angle .chart').first();
+        const sqMark = sqChart.locator('svg rect.mark').first();
+        await sqMark.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        // Spin it well away from its seeded -20°, so an unrotated outline can't pass
+        // by accident.
+        const sqC = await centreOf(sqMark);
+        await mouseDrag(sqC.x, sqC.y - 40, sqC.x + 46, sqC.y + 24);
+        const sqTransform = await sqMark.getAttribute('transform');
+        check('rotate: dragging a square spins it (mark carries a rotate transform)',
+            !!sqTransform && /rotate\(/.test(sqTransform), `transform=${sqTransform}`);
+        await page.mouse.move(sqC.x, sqC.y);
+        await page.waitForTimeout(150);
+        const sqFx = sqChart.locator('svg .effects-layer rect.effect').first();
+        const sqFxCount = await sqChart.locator('svg .effects-layer rect.effect').count();
+        check('rotate: hovering the rotated square draws an outline', sqFxCount > 0, `${sqFxCount} nodes`);
+        const sqFxTransform = sqFxCount ? await sqFx.getAttribute('transform') : null;
+        // Same pivot, same angle — the outline is concentric with the mark, so the two
+        // transforms must be string-identical, not merely both present.
+        check('rotate: the outline carries the SAME rotation as the mark it outlines',
+            sqFxTransform === sqTransform, `mark=${sqTransform} outline=${sqFxTransform}`);
+
+        // ---- proximity picking follows a rotated mark ------------------------
+        // Direct pick rides the DOM, which honours the transform for free; PROXIMITY
+        // pick measures node geometry itself, and that geometry is the mark's upright
+        // one. Without bringing the pointer into the mark's frame first, a tick spun
+        // onto the horizontal was picked along the vertical it no longer occupies.
+        // The example's threshold (12px) is deliberately tighter than the tick's
+        // half-length (18px), so a press out along the drawn arm is INSIDE the
+        // catchment of the rotated segment and OUTSIDE the catchment of the upright
+        // one — the two answers can't be confused for each other.
+        const nearChart = page.locator('#angle .chart').nth(2);
+        await nearChart.locator('svg line.mark').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const nearData = () => nearChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        // Row 0 is seeded at 90° — drawn horizontal. Its own bbox gives the drawn arm.
+        const nearBox = await nearChart.locator('svg line.mark').first().boundingBox();
+        check('nearest: the 90° tick is drawn HORIZONTAL (wide, not tall)',
+            nearBox.width > nearBox.height, `${Math.round(nearBox.width)}x${Math.round(nearBox.height)}`);
+        const armX = nearBox.x + nearBox.width - 3;   // just inside the drawn arm's end
+        const armY = nearBox.y + nearBox.height / 2;
+        const nearBefore = await nearData();
+        await mouseDrag(armX, armY, armX, armY - 30);
+        const nearAfter = await nearData();
+        check('nearest: a spun tick is picked along the arm it is DRAWN on',
+            nearAfter[0].y > nearBefore[0].y + 1,
+            `y ${nearBefore[0].y} -> ${nearAfter[0].y}`);
+        check('nearest: the press did not grab the OTHER tick instead',
+            nearAfter[1].y === nearBefore[1].y,
+            `other y ${nearBefore[1].y} -> ${nearAfter[1].y}`);
+
+        // ---- a `grabbed` effect exists at all (/marks/point #angle) ----------
+        // grabbed used to be painted by the renderer straight off d3.drag, reading
+        // `filter` and ignoring the rest of the vocabulary — an outline for it was
+        // simply undrawable. It is a state in the engine's pass now, so the default
+        // (a filter) must appear mid-drag on the mark's own node and clear on release.
+        const sqEl = sqChart.locator('svg rect.mark').first();
+        const filterOf = () => sqEl.evaluate((el) => el.style.filter || '');
+        check('grab: no filter on the mark at rest', (await filterOf()) === '', `filter=${await filterOf()}`);
+        const gC = await centreOf(sqEl);
+        await page.mouse.move(gC.x, gC.y);
+        await page.mouse.down();
+        await page.mouse.move(gC.x + 12, gC.y + 8);
+        await page.waitForTimeout(120);
+        const filterDuring = await filterOf();
+        check('grab: the dragged mark carries the grabbed effect', filterDuring !== '', `filter=${filterDuring}`);
+        await page.mouse.up();
+        await page.waitForTimeout(150);
+        const filterAfter = await filterOf();
+        check('grab: the effect clears on release', filterAfter === '', `filter=${filterAfter}`);
+
+        // ---- The mouth is a `curve` mark (/marks/face) -----------------------
+        // A stroked curve is a few pixels wide, so the mark lays a fat TRANSPARENT
+        // hit path over it and leaves `pointerEvents` unset — which means the engine
+        // silences it when the mark is inert and hands the pointer back when it
+        // isn't. Whether a transparent stroke is actually hittable is a browser
+        // question no amount of typechecking answers; drag it and see.
+        console.log('\nFace mouth: a draggable curve (/marks/face)');
+        await open('/marks/face', '#emotion .chart svg path.mark-line');
+        const mouthChart = page.locator('#emotion .chart').first();
+        await mouthChart.locator('svg path.mark-line').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const mouthData = () => mouthChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        const mouthPaths = await mouthChart.locator('svg path.mark-line').count();
+        check('face mouth: the curve draws a visual path plus a hit path',
+            mouthPaths === 2, `${mouthPaths} paths`);
+        const mouthBefore = await mouthData();
+        const mouthBox = await mouthChart.locator('svg path.mark-line').last().boundingBox();
+        const mx = mouthBox.x + mouthBox.width / 2;
+        const my = mouthBox.y + mouthBox.height / 2;
+        await mouseDrag(mx, my, mx, my - 100);
+        const mouthAfter = await mouthData();
+        check('face mouth: dragging the mouth up raises valence (slide on curvature)',
+            mouthAfter[0].valence > mouthBefore[0].valence + 0.2,
+            `valence ${mouthBefore[0].valence} -> ${mouthAfter[0].valence}`);
+        // And back down — the mapping is signed, not a one-way pull. Re-measure
+        // first: the mouth just bowed, so its box is not where it was.
+        const mouthBox2 = await mouthChart.locator('svg path.mark-line').last().boundingBox();
+        const mx2 = mouthBox2.x + mouthBox2.width / 2;
+        const my2 = mouthBox2.y + mouthBox2.height / 2;
+        await mouseDrag(mx2, my2, mx2, my2 + 100);
+        const mouthDown = await mouthData();
+        check('face mouth: dragging it back down lowers valence',
+            mouthDown[0].valence < mouthAfter[0].valence - 0.2,
+            `valence ${mouthAfter[0].valence} -> ${mouthDown[0].valence}`);
+
+        // ---- Face as a GROUP of marks (/marks/face) -------------------------
+        // The face is a `group`: a `point` head, `ellipse` eyes, `tickY` brows and a
+        // `curveY` mouth, each placed through a per-datum FRAME scale. Three things
+        // only a real gesture proves, and all three were impossible in the old
+        // one-feature face: the head takes an ordinary move(); a drag on a facial
+        // feature edits ONLY its own field (per-part direct-pick isolation); and a
+        // resize of the head rescales the features with it, because their positions
+        // are fractions of the frame rather than pixels.
+        console.log('\nFace: head move + per-part isolation (/marks/face)');
+        await open('/marks/face', '#head .chart svg circle.mark');
+        const headChart = page.locator('#head .chart').first();
+        const headData = () => headChart.locator(':scope > div').first().evaluate((e) => e.getData());
         // Scroll the chart into view first — mouseDrag uses viewport coords, and this
         // section sits far down the page (a bbox read while off-screen would miss).
-        await page.locator('#head .chart svg path.mark-line').first().scrollIntoViewIfNeeded();
+        await headChart.locator('svg circle.mark').first().scrollIntoViewIfNeeded();
         await page.waitForTimeout(150);
-        // Move: grab the chin (below the mouth, on the outline fill only) and drag
-        // right. The outline is the FIRST path.mark-line; its bbox gives centre + R.
-        const outline = await page.$eval('#head .chart svg path.mark-line', (p) => {
-            const r = p.getBoundingClientRect();
+        // The head is the only circle.mark; its bbox gives the centre and radius.
+        const head = await headChart.locator('svg circle.mark').first().evaluate((c) => {
+            const r = c.getBoundingClientRect();
             return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, r: Math.min(r.width, r.height) / 2 };
         });
         const headBefore = await headData();
-        const chinX = outline.cx, chinY = outline.cy + outline.r * 0.68;
+        // Grab the chin — head fill, below the mouth and clear of every feature.
+        const chinX = head.cx, chinY = head.cy + head.r * 0.72;
         await mouseDrag(chinX, chinY, chinX + 55, chinY);
         const headMoved = await headData();
-        check('face head: dragging the outline moves it (px rises on a rightward drag)',
+        check('face head: dragging the head moves it (px rises on a rightward drag)',
             headMoved[0].px > headBefore[0].px + 0.05, `px ${headBefore[0].px} -> ${headMoved[0].px}`);
-        // Resize: the rim handle is the RIGHTMOST circle.mark; drag it further right
-        // to grow the head (mag rises).
-        const rim = await page.$$eval('#head .chart svg circle.mark', (cs) => {
-            let best = null;
-            for (const c of cs) { const r = c.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; if (!best || cx > best.cx) best = { cx, cy }; }
-            return best;
+        check('face head: moving the head leaves the expression alone',
+            headMoved[0].valence === headBefore[0].valence
+            && headMoved[0].arousal === headBefore[0].arousal,
+            `valence ${headBefore[0].valence} -> ${headMoved[0].valence}`);
+        // An eye is an <ellipse> — a node type that did not exist before this glyph
+        // was a composition. Dragging one writes arousal and NOTHING else: with the
+        // parts as separate features, direct-pick can't fan a gesture across them.
+        const eyes = await headChart.locator('svg ellipse.mark').count();
+        check('face: the eyes render as ellipse nodes', eyes === 2, `${eyes} ellipses`);
+        const eyeBefore = await headData();
+        const eyeBox = await headChart.locator('svg ellipse.mark').last().boundingBox();
+        await mouseDrag(eyeBox.x + eyeBox.width / 2, eyeBox.y + eyeBox.height / 2,
+            eyeBox.x + eyeBox.width / 2 + 60, eyeBox.y + eyeBox.height / 2);
+        const eyeAfter = await headData();
+        check('face eye: dragging an eye right widens it (arousal rises)',
+            eyeAfter[0].arousal > eyeBefore[0].arousal + 0.05,
+            `arousal ${eyeBefore[0].arousal} -> ${eyeAfter[0].arousal}`);
+        check('face eye: the drag does not move the head (per-part direct pick)',
+            eyeAfter[0].px === eyeBefore[0].px && eyeAfter[0].py === eyeBefore[0].py,
+            `px ${eyeBefore[0].px} -> ${eyeAfter[0].px}`);
+
+        // ---- A drag on a glyph part is proportional and orthogonal -----------
+        // Two properties that only a real gesture can show, and both were broken
+        // when the parts first went live:
+        //   1. NO GRAB JUMP. `slide` defaults to relative, so a small drag makes a
+        //      small change. Absolute mode reads the value off the pointer's
+        //      POSITION on a track centred on the mark, so merely PRESSING a part
+        //      whose centre isn't at its value's place on that track teleported the
+        //      value (a brow jumped a third of its domain on a 12px nudge).
+        //   2. ORTHOGONALITY. Two params share a part (a brow's height and tilt),
+        //      so they must read different COMPONENTS of one drag. An angular edit
+        //      cannot: you grab a brow at its own pivot, so a few pixels of vertical
+        //      travel swung the pointer ~90° and pinned the tilt to its extreme.
+        console.log('\nFace params: proportional and orthogonal drags (/marks/face)');
+        await open('/marks/face', '#expressive .chart svg line.mark');
+        const exChart = page.locator('#expressive .chart').first();
+        await exChart.locator('svg line.mark').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const exData = () => exChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        // A brow: `browH` on the y component (move), `browT` on the x (slide).
+        const browAt = () => exChart.locator('svg line.mark').first().evaluate((l) => {
+            const r = l.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
         });
-        check('face head: a resize handle is present on the rim', rim != null, `${JSON.stringify(rim)}`);
-        if (rim) {
-            const magBefore = (await headData())[0].mag;
-            await mouseDrag(rim.cx, rim.cy, rim.cx + 45, rim.cy);
-            const magAfter = (await headData())[0].mag;
-            check('face head: dragging the rim handle out grows the head (slide on size)',
-                magAfter > magBefore + 1, `mag ${magBefore} -> ${magAfter}`);
-        }
+        const exBefore = (await exData())[0];
+        const brow1 = await browAt();
+        await mouseDrag(brow1.x, brow1.y, brow1.x, brow1.y - 12);
+        const browNudged = (await exData())[0];
+        check('face brow: a 12px nudge moves browH a little, not a lot (no grab jump)',
+            browNudged.browH > exBefore.browH && browNudged.browH < exBefore.browH + 0.45,
+            `browH ${exBefore.browH} -> ${browNudged.browH}`);
+        check('face brow: a VERTICAL drag leaves the tilt alone (orthogonal params)',
+            Math.abs(browNudged.browT - exBefore.browT) < 0.05,
+            `browT ${exBefore.browT} -> ${browNudged.browT}`);
+        // And the mouth, whose two params share one curve the same way.
+        const mouthAt = () => exChart.locator('svg path.mark-line').last().evaluate((p) => {
+            const r = p.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        });
+        const mouth1 = await mouthAt();
+        const beforeMouth = (await exData())[0];
+        await mouseDrag(mouth1.x, mouth1.y, mouth1.x + 14, mouth1.y);
+        const mouthNudged = (await exData())[0];
+        check('face mouth: a HORIZONTAL drag smirks it without bending it',
+            mouthNudged.smirk > beforeMouth.smirk
+            && Math.abs(mouthNudged.curve - beforeMouth.curve) < 0.05,
+            `smirk ${beforeMouth.smirk} -> ${mouthNudged.smirk}, curve ${beforeMouth.curve} -> ${mouthNudged.curve}`);
+
+        // ---- Resize scales the whole glyph (/marks/face) ---------------------
+        // `size` is the head's radius AND the frame's half-size, so growing it must
+        // grow the eyes with it. That is the frame doing its job: the eye's rx is a
+        // FRACTION of the half-size, not a pixel count.
+        console.log('\nFace resize rescales the features (/marks/face)');
+        await open('/marks/face', '#head .chart svg');
+        const rzChart = page.locator('#head .chart').nth(1);
+        await rzChart.locator('svg circle.mark').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(150);
+        const rzData = () => rzChart.locator(':scope > div').first().evaluate((e) => e.getData());
+        const eyeWidth = () => rzChart.locator('svg ellipse.mark').first()
+            .evaluate((e) => +e.getAttribute('rx'));
+        const rzHead = await rzChart.locator('svg circle.mark').first().evaluate((c) => {
+            const r = c.getBoundingClientRect();
+            return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, r: Math.min(r.width, r.height) / 2 };
+        });
+        const magBefore = (await rzData())[0].mag;
+        const rxBefore = await eyeWidth();
+        // Drag outward from the centre: resize() reads the pointer's RADIUS.
+        await mouseDrag(rzHead.cx, rzHead.cy + rzHead.r * 0.72, rzHead.cx, rzHead.cy + rzHead.r * 1.4);
+        const magAfter = (await rzData())[0].mag;
+        const rxAfter = await eyeWidth();
+        check('face resize: dragging outward grows the head (resize on size)',
+            magAfter > magBefore + 1, `mag ${magBefore} -> ${magAfter}`);
+        check('face resize: the eyes grow with it (frame-relative geometry)',
+            rxAfter > rxBefore + 0.5, `eye rx ${rxBefore} -> ${rxAfter}`);
 
         // ---- Locked rows (spec.lock) --------------------------------------
         // The lock is half data-invariant, half pointer policy, and only the second
@@ -650,7 +849,8 @@ async function main() {
         await open('/marks/face', '#track .chart svg');
         const trackChart = page.locator('#track .chart').first();
         const trackRows = () => trackChart.locator(':scope > div').first().evaluate((e) => e.getData());
-        // Guide nodes are pointer-transparent lines carrying the guide dash.
+        // Guide nodes are pointer-transparent lines carrying the guide dash. Both
+        // brows carry the same declared travel, so both draw one.
         const trackLines = await trackChart.locator('svg line[stroke-dasharray="3 3"]').count();
         check('track: guide draws a segment per bound handle', trackLines >= 2, `${trackLines} tracks`);
         // The track's own on-screen box, rather than re-deriving the plot translate.
@@ -660,16 +860,18 @@ async function main() {
         await trackLine.scrollIntoViewIfNeeded();
         const trackBox = await trackLine.boundingBox();
         const tBefore = await trackRows();
-        // Grab the handle itself — it sits at its current value's point on the track,
-        // and both seed values are mid-range — then slide to the track's far end.
-        const grabDot = await trackChart.locator('svg circle').first().boundingBox();
+        // Grab the brow itself (it sits at its current value on the track, seeded
+        // mid-range) and drag PAST the track's top end. The whole claim of the guide
+        // is that the drawn segment IS the mapping — so overshooting it must land on
+        // the domain's end exactly, not somewhere beyond it.
+        const brow = await trackChart.locator('svg line.mark').first().boundingBox();
         await mouseDrag(
-            grabDot.x + grabDot.width / 2, grabDot.y + grabDot.height / 2,
-            trackBox.x + trackBox.width / 2, trackBox.y + 1);
+            brow.x + brow.width / 2, brow.y + brow.height / 2,
+            trackBox.x + trackBox.width / 2, trackBox.y - 40);
         const tEnd = await trackRows();
-        check('track: dragging along the drawn track moves the value it maps',
-            JSON.stringify(tEnd) !== JSON.stringify(tBefore),
-            `${JSON.stringify(tBefore)} -> ${JSON.stringify(tEnd)}`);
+        check('track: dragging past the drawn end clamps to the domain end',
+            Math.abs(tEnd[0].brow - 1) < 1e-6,
+            `brow ${tBefore[0].brow} -> ${tEnd[0].brow}`);
 
         // ---- Face create + unique per day (/marks/face) ----------------------
         // Create on an ordinal (band) x × numeric y: click an empty day to add a

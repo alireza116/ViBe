@@ -31,6 +31,15 @@ const BASELINE = {
  * Resolve a node's style channels against per-draw defaults, exactly like the D3
  * renderer's `_applyStyle`: per-node value wins, else the caller's default, else the
  * shared base (null).
+ *
+ * An interaction effect the engine's state pass stamped on the node
+ * (`node.effectStyle` — see core/effects.js) wins over all of it, which is this
+ * renderer's equivalent of a CSS style property beating an SVG presentation
+ * attribute. It cannot leak: a canvas is repainted from scene state every frame, so
+ * an effect that ended simply isn't there next pass. `filter` and `cursor` are the
+ * two properties with no canvas equivalent here (there is no element to hover and no
+ * per-shape filter), so they are skipped rather than faked — everything the effects
+ * vocabulary can PAINT works in both renderers.
  * @param {any} node
  * @param {Record<string, any>} defaults
  * @returns {Record<string, any>}
@@ -38,9 +47,12 @@ const BASELINE = {
 function styleOf(node, defaults) {
     /** @type {Record<string, any>} */
     const s = {};
+    const eff = node.effectStyle;
     for (const { field, base } of STYLE_FIELDS) {
         const def = field in defaults ? defaults[field] : base;
-        s[field] = node[field] != null ? node[field] : def;
+        s[field] = eff && eff[field] != null
+            ? eff[field]
+            : (node[field] != null ? node[field] : def);
     }
     return s;
 }
@@ -111,6 +123,17 @@ function circle(ctx, node, defaults) {
         const r = Math.max(0, node.r != null ? node.r : 5);
         ctx.beginPath();
         ctx.arc(node.cx, node.cy, r, 0, 2 * Math.PI);
+        paint(ctx, styleOf(node, defaults));
+    });
+}
+
+/** @param {CanvasRenderingContext2D} ctx @param {any} node @param {Record<string,any>} defaults */
+function ellipse(ctx, node, defaults) {
+    withAngle(ctx, node, () => {
+        const rx = Math.max(0, node.rx != null ? node.rx : 5);
+        const ry = Math.max(0, node.ry != null ? node.ry : 5);
+        ctx.beginPath();
+        ctx.ellipse(node.cx, node.cy, rx, ry, 0, 0, 2 * Math.PI);
         paint(ctx, styleOf(node, defaults));
     });
 }
@@ -220,6 +243,9 @@ function paintMark(ctx, n) {
         case 'circle':
             circle(ctx, n, { fill: 'black' });
             break;
+        case 'ellipse':
+            ellipse(ctx, n, { fill: 'black' });
+            break;
         case 'line':
             line(ctx, n, { stroke: 'black', strokeWidth: 1, opacity: 1 });
             break;
@@ -262,17 +288,32 @@ function paintGuideFront(ctx, n) {
 }
 
 /**
- * Paint an interaction-effect overlay (proximity ring / select outline).
+ * Paint an interaction-effect overlay (proximity ring / state outline).
+ *
+ * Every shape `outlineNodes` can emit, matching the D3 renderer's effect layer.
+ * Circle and rect were the only two, so an ellipse's or a path's outline was built
+ * and then dropped — the mark read as unresponsive. Each primitive routes through
+ * `withAngle`, so an overlay carrying its source's `angle` turns with the mark.
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} n
  */
 function paintEffect(ctx, n) {
+    const defaults = { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 };
     switch (n.type) {
         case 'circle':
-            circle(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 });
+            circle(ctx, n, defaults);
             break;
         case 'rect':
-            rect(ctx, n, { fill: 'none', stroke: 'none', strokeWidth: 1, opacity: 1 });
+            rect(ctx, n, defaults);
+            break;
+        case 'ellipse':
+            ellipse(ctx, n, defaults);
+            break;
+        case 'line':
+            line(ctx, n, defaults);
+            break;
+        case 'path':
+            path(ctx, n, defaults);
             break;
         default:
             break;

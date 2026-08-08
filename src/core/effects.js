@@ -31,8 +31,10 @@
 // Two mechanisms, and the constraint behind both is that an effect must NEVER
 // destroy data-driven style:
 //
-//   element effects — CSS style PROPERTIES set on the mark's own element
-//                     (filter/opacity/fill/stroke/strokeWidth/cursor). A CSS
+//   element effects — the mark's OWN node, restyled: the engine stamps the state's
+//                     filter/opacity/fill/stroke/strokeWidth/cursor onto the node as
+//                     `node.effectStyle`, and the renderer applies them as CSS style
+//                     PROPERTIES (SVG) or as a paint override (canvas). A CSS
 //                     property beats an SVG presentation attribute, so the effect
 //                     wins while it is set and the mark's real paint reappears the
 //                     moment it is removed. The renderer writes `_applyStyle` to
@@ -47,10 +49,27 @@
 //                     land in the behind-marks guide layer and draw UNDER the mark
 //                     it outlines.
 //
+// Why `outline` alone is an overlay: it is the one part of the vocabulary that needs
+// geometry the mark does not have — padding OUTSIDE the shape. Everything else has to
+// be the node itself, because a copy drawn on top cannot express half the vocabulary:
+// you cannot DIM a mark by drawing over it (`opacity`, `filter: brightness()`), and a
+// copied `fill` over a semi-transparent mark composites to the wrong colour. Restyling
+// the node is also aligned by construction — it IS the node, so it carries the node's
+// `angle` transform for free. An overlay has to be told (see `outlineNodes`).
+//
 // Every state accepts the same vocabulary, so there is one thing to learn:
 //   { filter, opacity, fill, stroke, strokeWidth, cursor,
 //     outline: { color, width, pad, dash, opacity } }
 // `false` for a state disables it.
+//
+// ── One decider ─────────────────────────────────────────────────────────────
+// The ENGINE's state pass owns both halves. It was split before: outlines came from
+// the state pass, while the element half was applied by the D3 renderer straight off
+// its own `pointerenter`/`d3.drag` — so `hovered: { fill }` painted only under SVG
+// direct pick (never on a proximity driver's hover, never on canvas), `selected:
+// { fill }` did nothing at all, and `grabbed` read `filter` and ignored the other
+// five. The renderer is now a dumb applier of `node.effectStyle`, which is what makes
+// the two hover sources paint identically the way this file always claimed.
 
 import { warn } from './dev.js';
 
@@ -185,12 +204,34 @@ export function elementEffectOf(state) {
 }
 
 /**
+ * The element-effect props for a node in several states at once, merged in
+ * EFFECT_STATES order so `grabbed` beats `selected` beats `hovered` — the more
+ * committed the interaction, the more it gets to say. Returns null when none of the
+ * states sets an element prop, so a caller can skip stamping anything.
+ * @param {any[]} states resolved state configs the node is currently in
+ * @returns {Record<string, any> | null}
+ */
+export function effectStyleFor(states) {
+    /** @type {Record<string, any>} */
+    const out = {};
+    let any = false;
+    for (const state of states || []) {
+        const props = elementEffectOf(state);
+        if (!props) continue;
+        Object.assign(out, props);
+        any = true;
+    }
+    return any ? out : null;
+}
+
+/**
  * An outline overlay around one scene node, in a state's appearance.
  *
  * Handles every node type a mark can emit. `circle`/`rect`/`line` were the only
- * three before, so outlining a `path` (an arc slice, a geo polygon, a needle) or a
- * `text` label produced nothing at all — the mark simply didn't respond, which
- * reads as a broken interaction rather than an unimplemented one.
+ * three before, so outlining a `path` (an arc slice, a geo polygon, a needle), an
+ * `ellipse` (a face's eye, a 2-D uncertainty blob) or a `text` label produced nothing
+ * at all — the mark simply didn't respond, which reads as a broken interaction rather
+ * than an unimplemented one.
  * @param {any} mark the scene node to outline
  * @param {any} state a resolved state config
  * @returns {import('../types').FeatureNode[]}
@@ -203,11 +244,29 @@ export function outlineNodes(mark, state) {
     const paint = {
         fill: 'none', stroke: color, strokeWidth: width, opacity,
         ...(dash ? { strokeDasharray: dash } : {}),
+        // Carry the mark's rotation. Both renderers rotate a node by -angle about
+        // `markCenter`, and every overlay below is CONCENTRIC with its source — a
+        // padded box keeps the box's centre, a line's bbox centre IS the segment
+        // midpoint, a text ring sits on the anchor, which is its own pivot — so
+        // markCenter resolves the same point for both and the outline turns in
+        // lockstep. Without this an outline stayed axis-aligned at the mark's
+        // unrotated position, which read as the effect tracking the wrong mark.
+        // Keep any new shape concentric with its source, or it needs a pivot too.
+        ...(mark.angle ? { angle: mark.angle } : {}),
         guide: true, effect: true, pointerEvents: 'none',
     };
 
     if (mark.type === 'circle') {
         return [{ type: 'circle', cx: mark.cx, cy: mark.cy, r: (mark.r || 5) + pad, ...paint }];
+    }
+    if (mark.type === 'ellipse') {
+        // Pad each radius in its own units, so a thin squinting eye gets a thin
+        // outline rather than being swallowed by a circular one.
+        return [{
+            type: 'ellipse', cx: mark.cx, cy: mark.cy,
+            rx: (mark.rx != null ? mark.rx : 5) + pad,
+            ry: (mark.ry != null ? mark.ry : 5) + pad, ...paint,
+        }];
     }
     if (mark.type === 'rect') {
         return [{

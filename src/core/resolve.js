@@ -29,6 +29,7 @@ import {
   channelRange,
   schemeRange,
   axisOf,
+  frameSpecOf,
 } from "./encoding.js";
 
 // Scales re-resolve on every render, so a warning would repeat forever — `warn`
@@ -103,6 +104,14 @@ export function resolveScales(features, dataset, spec, dims) {
       // pixel). No scale to build, so it contributes nothing — and needs no
       // schema entry.
       if (chSpec.scale === null) continue;
+
+      // `scale: 'frame'` is a group's LOCAL coordinate box (plot/group.js): the
+      // scale is built per datum from the group's own position and size, so
+      // there is no global one to resolve. Skipping BEFORE bucketOf is what
+      // keeps a glyph's internal geometry out of the chart's axes — a face's eye
+      // at local x -0.4 must not widen the x domain, demand a band, or conjure
+      // an axis for a box that isn't in the data's units at all.
+      if (frameSpecOf(chSpec)) continue;
 
       // A derived channel (`{ fn }`) is computed per datum in VISUAL space —
       // its result is used as-is, never scaled — so it declares no field and

@@ -1,9 +1,16 @@
 // @ts-check
-// drivers/ — self-describing interaction modes for plane-pick edits. Each driver
-// owns one multi-event lifecycle (hover/dragstart/drag/dragend). The engine
-// (dispatchPlaneEdits) simply asks each driver `wants(edit)` and hands it the
-// matching edits + a per-feature session; it never hard-codes a mode. Adding a
-// new interaction mode = adding a driver file here, not editing the engine.
+// drivers/ — self-describing interaction modes. Each driver owns one multi-event
+// lifecycle (hover/dragstart/drag/dragend). The engine (runDrivers) simply asks
+// each driver `wants(edit)` and hands it the matching edits + a per-feature
+// session; it never hard-codes a mode. Adding a new interaction mode = adding a
+// driver file here, not editing the engine.
+//
+// Most drivers serve PLANE-pick edits, where the gesture carries no node and the
+// driver resolves its own target. A driver may also claim a DIRECT-pick edit by
+// CAPABILITY rather than by pick name (see slide.js: a relative slide needs a
+// dragstart anchor but not a target search). Then `ctx.index` already names the
+// datum, and because the edit is still `pick: 'direct'` the plane is never raised
+// — so a lifecycle edit can sit on a glyph part beside other direct edits.
 //
 // A driver is:
 //   { name, wants(edit) -> bool, onEvent(ctx) -> boolean changed, selects? }
@@ -53,6 +60,10 @@ import { slideDriver } from './slide.js';
  * @property {any[]} marks
  * @property {any[]} data
  * @property {import('../../types').ScaleMap} scales
+ * @property {number | null} index the datum a DIRECT gesture landed on, or null
+ *   for a plane gesture — where the driver resolves its own target from the
+ *   pointer (nearestMark and friends). A driver that can serve a direct-pick edit
+ *   reads this first and skips its proximity search.
  * @property {DriverSession} session
  * @property {DriverPreview} preview
  * @property {DriverStage} stage

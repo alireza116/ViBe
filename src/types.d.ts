@@ -5,9 +5,15 @@ export type Datum = Record<string, any>;
 // How a channel DRAWS a field. Never written as `type` on a channel — that slot
 // holds the data type. A scale type is named by `scale` (a string, or the `type`
 // of a ScaleSpec). See scaleTypeFor in core/encoding.js for the routing.
+// 'frame' is the one CHANNEL-SIDE-ONLY member: it marks a channel as belonging to
+// an enclosing group()'s local coordinate box rather than a global axis (see
+// plot/group.js). The group builds a real per-datum linear scale for it
+// (createFrameScale), so no RESOLVED scale ever carries type 'frame' and nothing
+// downstream branches on it.
 export type ScaleType =
   | 'linear' | 'log' | 'symlog' | 'pow' | 'sqrt' | 'time'
-  | 'band' | 'point' | 'ordinal' | 'sequential' | 'diverging';
+  | 'band' | 'point' | 'ordinal' | 'sequential' | 'diverging'
+  | 'frame';
 
 // A field's MEASUREMENT type in the dataset schema (what the data means), as
 // opposed to a ScaleType (how a channel draws it). scaleTypeFor translates one to
@@ -226,7 +232,7 @@ export interface Edit {
   // isAxis — and the engine dev-warns when the mark it's attached to lacks it,
   // instead of leaving you a silently dead gesture. See SCOPE_CAPABILITY in
   // core/elicit.js.
-  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | 'trend' | 'face' | null;
+  scope: 'line' | 'axis' | 'arc' | 'waffle' | 'geo' | 'trend' | null;
   threshold: number;
   // anchor()/draw(): which line a new point joins.
   into?: 'nearest' | 'new';
@@ -356,12 +362,14 @@ export interface SlideOptions extends EditOptions {
   // The direction that RAISES the value: 'left'|'right' for axis:'x',
   // 'up'|'down' for axis:'y' (default 'left'/'up').
   increase?: 'left' | 'right' | 'up' | 'down';
-  // Pixel span that traverses the full domain (default 120).
+  // Pixel span that traverses the full domain. Defaults to the glyph radius for a
+  // channel resolved in a `group`'s local frame, else 120.
   extent?: number;
-  // 'absolute' (default): a fixed track at the mark centre; direct-pick, may jump
-  // to the pointer on grab; coexists with a mark's other direct edits (a face
-  // handle). 'relative': moves by the drag delta (no jump); rides the slide driver
-  // (plane-on-top), so it can't share a chart with direct-pick edits.
+  // 'relative' (default): the value moves by the drag DELTA from where you
+  // grabbed, so there is no jump. 'absolute': the value is read off the pointer's
+  // POSITION on a fixed track centred on the mark — stateless, but correct only
+  // when the handle already sits at its value's place on that track (a dot on a
+  // rail); otherwise pressing the mark teleports the value. Both are direct-pick.
   mode?: 'absolute' | 'relative';
 }
 
@@ -564,37 +572,42 @@ export interface MarkOptions {
   [key: string]: any;
 }
 
-// A face's parameter names. Each is a non-positional CHANNEL (declared like
-// `fill`/`size`): bind a field with `{ field }` to make it editable, or pin a
-// constant with `{ value }`. Unbound params render at neutral (0.5).
+// A face's parameter names. Each is a CHANNEL that the face preset forwards to a
+// concrete channel on one of its parts (mouthCurve -> the mouth curve's
+// `curvature`, eyeSquint -> the eyes' `ry`, browTilt -> the brows' `angle`, …).
+// Bind a field with `{ field }` and attach the edit you want; pin a fixed
+// expression with `{ value: 0..1 }` (a fraction of that parameter's travel);
+// leave it out for neutral (0.5).
 export type FaceParam =
-  | 'mouthCurve' | 'mouthOpen' | 'mouthAsym'
+  | 'mouthCurve' | 'mouthAsym'
   | 'eyeScale' | 'eyeSquint'
   | 'browHeight' | 'browTilt';
 
-// A face's channel map: the ordinary positional/style channels plus the seven face
-// params, each a linear [0,1] channel resolved and inverted the same way.
+// A face's channel map: the ordinary positional/style channels plus the face
+// params.
 export type FaceChannels = Channels & Partial<Record<FaceParam, ChannelSpec>>;
 
-// Options for a FACE mark (an emotion glyph): a single-datum, PARAMETRIC face whose
-// features encode data FIELDS and are DIRECTLY MANIPULATED to write them back (grab
-// the mouth, an eye, a brow). The seven params are CHANNELS — bind them in
-// `channels` (param -> `{ field }`), exactly like every other mark; there is no
-// bespoke `features` map. A feature carrying two params is a 2-D drag (mouth: ↕
-// curve, ↔ asym; brow: ↕ height, ↔ tilt), and the two "pull" params (eye squint,
-// mouth open) get a small eyelid/lip dot. Bind NO param for the emotion preset
-// (mouthCurve ← valence, eyeScale ← arousal); binding any one replaces it. The
-// centre is placed by the x/y channels when present, else the plot centre.
-// See plot/face.js.
+// Options for the FACE preset (an emotion glyph). `face()` is not a mark: it
+// returns a `group` of ordinary marks — a head `point`, two `ellipse` eyes, two
+// `tickY` brows and a `curveY` mouth — each placed in the group's local frame.
+// So every part is its own feature with its own direct-pick edit, and a parameter
+// is edited with the universal edits (`slide` on a curvature or a radius,
+// `rotate` on a brow's angle, `move`/`resize` on the head) rather than a
+// face-specific namespace.
+//
+// Bind NO param for the emotion preset (mouthCurve ← valence, eyeScale ←
+// arousal); binding any one replaces it. The centre is placed by the x/y channels
+// when present, else the plot centre; `size` is the face's radius and also the
+// frame's half-size, so every feature scales with it. See plot/face.js.
 export interface FaceOptions extends MarkOptions {
-  // The channel map, including the seven face params as `{ field }` / `{ value }`.
+  // The channel map, including the face params as `{ field }` / `{ value }`.
   channels?: FaceChannels;
-  // Face radius in px. Default min(width, height) * 0.35.
+  // Face radius in px (or a field, for a per-row size). Default: half a category
+  // slot when the face sits in one, else min(width, height) * 0.35.
   size?: number;
-  // Eyelid/lip grab-dot radius in px. Default 5.
-  handleSize?: number;
-  // Show the eyelid/lip dots (squint & open), or keep them grabbable but invisible.
-  handles?: boolean;
+  // The colour of the drawn FEATURES (eyes, brows, mouth). The head's own paint is
+  // the ordinary `fill` / `stroke`.
+  ink?: string;
 }
 
 // A parametric line's channel map: the ordinary positional/style channels plus the
@@ -689,6 +702,27 @@ export interface CompositeOptions {
   // Group-level data invariants; promoted to the dataset like any mark's.
   constraints?: Constraint[];
   [key: string]: any;
+}
+
+// Options for a GROUP — `composite` plus a per-datum LOCAL COORDINATE FRAME.
+//
+// The group's own `x`/`y`/`size` channels define, for each row, a box: an origin
+// and a half-size. A part's channel flagged `scale: 'frame'` (or
+// `scale: { type: 'frame', range: [...] }`) resolves against that box instead of
+// a global axis — local +1 on x is `origin + size`, local +1 on y is
+// `origin - size` (local y is UP), and a magnitude of 1 is `size`. Each such
+// channel becomes a real, invertible per-datum scale, so marks encode and edits
+// invert through the same object with no bespoke geometry on either side.
+//
+// Like `composite` this is a desugaring: it returns an inert frame ANCHOR feature
+// (which feeds the global resolver so the frame's origin has scales to measure
+// against) followed by the wrapped parts. See plot/group.js.
+export interface GroupOptions extends CompositeOptions {
+  // The group's frame-defining channels live here: `x`, `y` and `size`. Unlike
+  // CompositeOptions.channels, those three do NOT trickle into the parts —
+  // inheriting them would place every part at the anchor. Everything else
+  // (fill, opacity, …) trickles exactly as it does on a composite.
+  channels?: Channels;
 }
 
 /**
@@ -877,7 +911,7 @@ export interface Mark {
 }
 
 export interface FeatureNode {
-  type: 'circle' | 'rect' | 'line' | 'path' | 'text' | 'image';
+  type: 'circle' | 'ellipse' | 'rect' | 'line' | 'path' | 'text' | 'image';
   // Connecting-path geometry (line mark): the ordered pixel points and the curve
   // interpolation name (see the renderer's resolveCurve).
   points?: [number, number][];
@@ -888,6 +922,10 @@ export interface FeatureNode {
   cx?: number;
   cy?: number;
   r?: number;
+  // Ellipse radii, in px. A circle is the rx === ry case, but is kept its own node
+  // type: `r` is one number a `size` channel drives, and most marks want that.
+  rx?: number;
+  ry?: number;
   x?: number;
   y?: number;
   x1?: number;
@@ -925,7 +963,18 @@ export interface FeatureNode {
   // Orientation in math degrees (0° = +x, CCW). Any geometry node may carry it;
   // the renderer applies SVG rotate(-deg) about markCenter. Marks that bake
   // orientation into path geometry (needle) omit this to avoid double-rotating.
+  // Anything drawn ABOUT a rotated node has to carry it too, or it lands at the
+  // mark's unrotated position — that is why an effect outline copies it.
   angle?: number;
+  // The interaction-EFFECT restyle for this node, written by the engine's state pass
+  // (core/effects.js) from the states the node's datum is in: the merged
+  // filter/opacity/fill/stroke/strokeWidth/cursor of `hovered`/`selected`/`grabbed`.
+  // A renderer APPLIES it and decides nothing — as a CSS style property in SVG (so it
+  // beats the presentation attributes the mark's own style channels write, and
+  // removing it restores them), as a paint override on canvas. Absent on a node in no
+  // state, which is what takes the effect off. Never a data channel: nothing in a
+  // mark's build() writes this.
+  effectStyle?: Record<string, any>;
   editText?: boolean;
   data?: Datum;
   index?: number;
@@ -954,6 +1003,11 @@ export interface FeatureNode {
   bandAxis?: 'x' | 'y';
   channel?: string;
   cursor?: string;
+  // The per-datum LOCAL scales this node was encoded through, stamped by
+  // plot/group.js on every node a framed part emits. The engine overlays them on
+  // the global map when resolving an edit's channels, so a gesture inverts through
+  // the same mapping that drew the node (see frameScalesFor in core/elicit.js).
+  frame?: ScaleMap;
   [key: string]: any;
 }
 
@@ -1000,12 +1054,13 @@ export interface Session {
   grabValue?: any;
   pxPerUnit?: number;
   cursor?: string;
-  // slide driver (relative mode): the dragstart-locked target datum, the grab
-  // pixel on the edit's axis, and that datum's value when the grab began — the
-  // frozen anchor the value moves relative to (no jump on grab).
+  // slide driver (relative mode): the dragstart-locked target datum, plus one
+  // frozen anchor per edit — the grab pixel on that edit's axis and the datum's
+  // value when the grab began, which is what the value moves relative to (no jump
+  // on grab). Keyed by `${axis}:${field}` (edit/basic.js: slideAnchorKey) so two
+  // relative slides on one feature (an eye's rx and ry) keep separate anchors.
   index?: number | null;
-  startPx?: number;
-  startValue?: number;
+  slide?: Record<string, { startPx: number, startValue: number }>;
 }
 
 // Config for a single positional axis (the `axes` convenience, or an explicit
@@ -1044,9 +1099,9 @@ export interface AxisSpec {
 }
 
 // Interaction-effects layer: transient visual feedback for interaction STATE,
-// kept separate from mark style channels and customizable per chart. See
-// core/effects.js. `grab` is an element effect (CSS filter) on a dragged mark;
-// `select` is the proximity/nearest overlay (ring at the pointer + mark outline).
+// kept separate from mark style channels and customizable per chart. Three states —
+// `hovered`, `selected`, `grabbed` — each taking the same paint vocabulary. See
+// EffectsSpec below and core/effects.js.
 // Recursively-optional version of a type: what a caller MAY pass. `spec.theme`,
 // `setTheme()`, and the built-in `themes` are DeepPartial<Theme> — they name only
 // the tokens they change; resolveTheme deep-merges them over DEFAULT_THEME to a full
@@ -1142,10 +1197,24 @@ export interface GuideSpec {
 }
 
 /**
- * Interaction-feedback states. An effect paints as a CSS style PROPERTY on the
- * element or as an overlay node (`effect: true`) — never as a presentation
- * attribute that would wipe a mark's own stroke. Legacy `grab`/`select` keys are
- * still accepted at runtime and migrated with a warn (see core/effects.js).
+ * Interaction-feedback states. Every state takes the SAME vocabulary (EffectStyle),
+ * and every property of it works in both renderers, whichever way the state arose —
+ * a pointer over a mark and a proximity driver resolving that same row both paint
+ * `hovered` identically.
+ *
+ * Two mechanisms, decided in the engine's state pass, never by a renderer:
+ *   · `outline` draws an OVERLAY node (`effect: true`) — the one part that needs
+ *     geometry the mark hasn't got (padding outside the shape). It copies the mark's
+ *     `angle`, so it tracks a rotated mark.
+ *   · everything else RESTYLES the mark's own node, arriving as `FeatureNode
+ *     .effectStyle` and applied as a CSS style PROPERTY (never a presentation
+ *     attribute, which would wipe the mark's own stroke). It is the mark's node, so
+ *     it is aligned with the mark by construction.
+ * A copy-on-top was the alternative for the second half and cannot express it: you
+ * cannot dim a mark by drawing over it.
+ *
+ * Legacy `grab`/`select` keys are still accepted at runtime and migrated with a warn
+ * (see core/effects.js).
  */
 export interface EffectsSpec {
   /** Pointer is over / proximity has selected this mark. */
@@ -1160,7 +1229,12 @@ export interface EffectsSpec {
   select?: false | string | EffectStyle;
 }
 
-/** Paint vocabulary for one effect state (CSS property and/or outline overlay). */
+/**
+ * Paint vocabulary for one effect state. The first six RESTYLE the mark's own node;
+ * `outline` adds a padded overlay around it. Both halves work for all three states.
+ * `filter` and `cursor` are SVG-only (a canvas has no element to hover and no
+ * per-shape filter); everything else paints in both renderers.
+ */
 export interface EffectStyle {
   filter?: string | null;
   opacity?: number;

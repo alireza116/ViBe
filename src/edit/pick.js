@@ -5,6 +5,12 @@
 // marks are grabbable from nearby empty space (bars from anywhere in their
 // column, dots from adjacent space). This folds the old proximityDrag interactor
 // into the edit model — proximity is just how an edit picks its target.
+//
+// Every geometry test below runs on the mark's UNROTATED coordinates, with the
+// pointer brought into the mark's own frame first (`unrotate`). That keeps one set of
+// axis-aligned tests for shapes the renderers draw through a rotate transform.
+
+import { markCenter } from './shared.js';
 
 /**
  * Distance from pointer to a mark, per mark type:
@@ -23,38 +29,79 @@
  * @returns {number}
  */
 export function distanceToMark(mark, px, py) {
+    // Rotation is undone once, up front: the pointer moves into the mark's own frame
+    // and every test below stays the axis-aligned one it always was. A circle is
+    // rotation-invariant about its own centre, so this is a no-op there.
+    const p = unrotate(mark, px, py);
     if (mark.type === 'circle') {
         return Math.hypot(px - mark.cx, py - mark.cy);
+    }
+    if (mark.type === 'ellipse') {
+        // Distance to the CENTRE, like a circle — proximity ranks candidates, and an
+        // ellipse's centre is what a pointer is nearest to. Whether the pointer is
+        // INSIDE it is containsPoint's question, and that one is elliptical.
+        return Math.hypot(p.x - mark.cx, p.y - mark.cy);
     }
     if (mark.type === 'rect') {
         if (mark.bandAxis === 'y') {
             const top = mark.y;
             const bottom = mark.y + mark.height;
-            if (py < top) return top - py;
-            if (py > bottom) return py - bottom;
+            if (p.y < top) return top - p.y;
+            if (p.y > bottom) return p.y - bottom;
             return 0;
         }
         const left = mark.x;
         const right = mark.x + mark.width;
-        if (px < left) return left - px;
-        if (px > right) return px - right;
+        if (p.x < left) return left - p.x;
+        if (p.x > right) return p.x - right;
         return 0;
     }
     if (mark.type === 'line') {
-        return segDist(px, py, mark.x1, mark.y1, mark.x2, mark.y2);
+        return segDist(p.x, p.y, mark.x1, mark.y1, mark.x2, mark.y2);
     }
     if (mark.type === 'path') {
         // Distance to the polyline: the min over its consecutive segments, so a
         // click anywhere ALONG a connected line (not just at a vertex) is "on" it.
+        // A path bakes any rotation into its own points, so `p` is the raw pointer
+        // here (no path mark carries `angle` — see plot/curve.js).
         const pts = mark.points || [];
         let best = Infinity;
         for (let i = 1; i < pts.length; i++) {
-            const d = segDist(px, py, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+            const d = segDist(p.x, p.y, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
             if (d < best) best = d;
         }
         return best;
     }
     return Infinity;
+}
+
+/**
+ * The pointer in a rotated node's OWN frame — undo `node.angle` about its centre,
+ * so an axis-aligned geometry test still holds for a rotated shape. (The SVG
+ * renderer gets this from the DOM's own transform; canvas hit-testing has to do
+ * it here, or a tilted mark would be grabbable only where it used to be. Proximity
+ * picking has to do it under BOTH renderers — `nearestMark` measures geometry, not
+ * DOM.)
+ *
+ * The pivot is `markCenter`, the same function both renderers rotate about, so where
+ * a mark is PICKED and where it is PAINTED cannot drift apart. This used to demand
+ * `cx`/`cy` on the node and bail otherwise, which made it a structural no-op for
+ * every `rect`, `line` and `text` — i.e. for a rotated square point, a tilted tick
+ * and a face's brow, all of which were grabbable only at their unrotated position.
+ * @param {any} mark @param {number} px @param {number} py
+ * @returns {{ x: number, y: number }}
+ */
+function unrotate(mark, px, py) {
+    if (!mark.angle) return { x: px, y: py };
+    const c = markCenter(mark);
+    if (!c) return { x: px, y: py };
+    // The renderer draws with rotate(-angle); undoing it rotates by +angle.
+    const rad = (-mark.angle * Math.PI) / 180;
+    const dx = px - c.cx;
+    const dy = py - c.cy;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return { x: c.cx + dx * cos + dy * sin, y: c.cy - dx * sin + dy * cos };
 }
 
 /**
@@ -234,12 +281,23 @@ function containsPoint(mark, px, py) {
         const r = mark.r != null ? mark.r : 5;
         return distanceToMark(mark, px, py) <= r + HIT_TOLERANCE;
     }
+    if (mark.type === 'ellipse') {
+        // Normalized elliptical test in the mark's own (un-rotated) frame: the
+        // tolerance is granted in each radius' own units, so a thin squinting eye
+        // stays as grabbable as a round one.
+        const c = unrotate(mark, px, py);
+        const rx = Math.max(1e-6, (mark.rx != null ? mark.rx : 5) + HIT_TOLERANCE);
+        const ry = Math.max(1e-6, (mark.ry != null ? mark.ry : 5) + HIT_TOLERANCE);
+        return Math.hypot((c.x - mark.cx) / rx, (c.y - mark.cy) / ry) <= 1;
+    }
     if (mark.type === 'rect') {
         // Floor the hit box to MIN_GRAB first, THEN grant the outline tolerance, so a
         // zero-height/zero-width bar (value at the baseline) keeps a grabbable target.
+        // The box is the mark's UNROTATED one, so test the pointer in that frame.
         const box = rectHitBox(mark);
-        return px >= box.x - HIT_TOLERANCE && px <= box.x + box.w + HIT_TOLERANCE
-            && py >= box.y - HIT_TOLERANCE && py <= box.y + box.h + HIT_TOLERANCE;
+        const p = unrotate(mark, px, py);
+        return p.x >= box.x - HIT_TOLERANCE && p.x <= box.x + box.w + HIT_TOLERANCE
+            && p.y >= box.y - HIT_TOLERANCE && p.y <= box.y + box.h + HIT_TOLERANCE;
     }
     if (mark.type === 'line' || mark.type === 'path') {
         const half = (mark.strokeWidth || 1) / 2;

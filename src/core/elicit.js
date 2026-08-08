@@ -6,10 +6,10 @@ import { resolveLock, lockConstraint, isNodeLocked } from './lock.js';
 import { collectEdits, resolveChannels, warnMisplacedEdits } from '../edit/route.js';
 import { markCenter, nudgeTarget } from '../edit/shared.js';
 import { encodeChannel } from '../plot/mark.js';
-import { drivers, needsPlaneOnTop } from '../edit/drivers/index.js';
+import { drivers, driverFor, needsPlaneOnTop } from '../edit/drivers/index.js';
 import { autoEditGuides } from '../edit/guide.js';
 import { D3Renderer } from '../renderers/d3-renderer/index.js';
-import { resolveEffects, stateEffectNodes } from './effects.js';
+import { resolveEffects, stateEffectNodes, effectStyleFor, elementEffectOf } from './effects.js';
 import { resolveTheme } from './theme.js';
 import { autoAxes } from './axes.js';
 import { reserveLegends, autoLegends } from './legends.js';
@@ -53,7 +53,6 @@ const SCOPE_CAPABILITY = {
     waffle: { flag: 'supportsWaffle', expects: 'a waffle mark' },
     axis: { flag: 'isAxis', expects: 'an axis mark (axisX/axisY/axisRadial)' },
     trend: { flag: 'supportsTrend', expects: 'a trend mark (trend/trendBand)' },
-    face: { flag: 'supportsFace', expects: 'a face mark' },
 };
 
 // What a scale `kind` satisfies. A mark declares the CAPABILITY it needs, never a
@@ -546,6 +545,7 @@ export function Elicit(spec) {
         ui.session = {};
         ui.preview = null;
         ui.hover = null;
+        ui.grab = null;
         ui.selection.clear(); // selection is per-stage transient, like the session
         for (const cb of listeners.stage) cb(currentStage, stageLabelOf(currentStage));
     };
@@ -573,8 +573,14 @@ export function Elicit(spec) {
     // node. It feeds the same `hovered` effect a proximity driver's session does, so
     // "this is the mark you are about to touch" looks the same however it was
     // resolved. Cleared on hoverout, stage change and reseed, like `session`.
-    /** @type {{ session: Record<string, any>, preview: Record<string, any[]> | null, selection: Set<number>, hover: { featureId: string, index: number } | null }} */
-    const ui = { session: {}, preview: null, selection: new Set(), hover: null };
+    // `grab` is its mid-gesture counterpart: which feature+row a drag is currently on,
+    // bracketed by the same dragstart/dragend the undo transaction uses. It exists so
+    // the `grabbed` effect is decided in the state pass with the other two, rather
+    // than being painted by the renderer straight off d3.drag — that split is why
+    // `grabbed` used to honour `filter` and silently ignore the rest of its vocabulary
+    // (and never drew an outline at all).
+    /** @type {{ session: Record<string, any>, preview: Record<string, any[]> | null, selection: Set<number>, hover: { featureId: string, index: number } | null, grab: { featureId: string, index: number } | null }} */
+    const ui = { session: {}, preview: null, selection: new Set(), hover: null, grab: null };
 
     // The primary selected datum index (the sole member under single-exclusive
     // selection), or null. Stale indices — a selected row later removed — read as
@@ -709,6 +715,27 @@ export function Elicit(spec) {
     /** @type {Record<string, any[]>} */
     const featureNodes = {};
 
+    // The scale map an edit on this node should resolve against. A part of a
+    // `group` is drawn inside a per-datum local FRAME, and each of its nodes
+    // carries the frame scales it was encoded through — overlaying them is how a
+    // gesture inverts back through the same mapping. Returns null when no frame is
+    // in play, so the caller keeps the global map unchanged.
+    /**
+     * @param {any} feature
+     * @param {any} node the node a direct-pick gesture landed on, if any
+     * @param {number | null} [index] the datum, for a gesture that carries no node
+     * @returns {import('../types').ScaleMap | null}
+     */
+    const frameScalesFor = (feature, node, index) => {
+        let framed = node && node.frame ? node : null;
+        if (!framed && index != null && feature) {
+            framed = (featureNodes[feature.id] || []).find(
+                (/** @type {any} */ n) => n && n.index === index && n.frame
+            ) || null;
+        }
+        return framed ? { ...scales, ...framed.frame } : null;
+    };
+
     // 2. Calculate scales (Observable Plot model): one GLOBAL scale per channel,
     //    resolved from the union of every feature's channels, with the schema
     //    supplying each field's data type and domain. Recomputed each render so an
@@ -799,6 +826,10 @@ export function Elicit(spec) {
         // reserved non-Scale key, so a legend/mark reads "the selected row" from the
         // same object it already gets, without a widened build() signature.
         /** @type {any} */ (scales).selection = selectionPrimary();
+        // The dataset schema rides along as one more reserved non-Scale key. A
+        // group's frame scales are built inside build() (one per datum), and the
+        // DOMAIN of a frame channel is the field's — which only the schema knows.
+        /** @type {any} */ (scales).schema = schema;
         warnProjectionCartesianMix(features, scales);
 
         // Plane-on-top mode: when an ACTIVE edit resolves its target from an
@@ -944,9 +975,15 @@ export function Elicit(spec) {
         });
 
         // ── The interaction-STATE pass ───────────────────────────────────────
-        // One place decides what `hovered` and `selected` look like, for every
-        // feature, however the state arose. That matters most for HOVER, which has
-        // two sources that must be indistinguishable to a reader:
+        // ONE place decides what every interaction state looks like, for every
+        // feature, however the state arose — and for BOTH of the effects layer's
+        // mechanisms (the mark's own restyle and the outline overlay). The renderer
+        // used to own the restyle half off its own pointerenter/d3.drag, which is why
+        // `hovered: { fill }` painted only under SVG direct pick and `selected:
+        // { fill }` did nothing at all; it is a dumb applier of `node.effectStyle` now.
+        //
+        // That matters most for HOVER, which has two sources that must be
+        // indistinguishable to a reader:
         //
         //   · a proximity driver resolved this row as the one a gesture would take
         //     (session.activeIndex ?? session.hoverIndex), and
@@ -955,7 +992,10 @@ export function Elicit(spec) {
         // Both mean "this is the mark you are about to touch", so both feed the same
         // effect rather than one being a driver's private guide and the other not
         // existing at all. Selection is the committed answer and outranks hover, so a
-        // selected row is not also drawn as hovered.
+        // selected row is not also drawn as hovered. `grabbed` (ui.grab, bracketed by
+        // dragstart/dragend) is the in-flight one, and it STACKS: a mark you are
+        // dragging is still the selected one, so the two merge rather than compete
+        // (effectStyleFor resolves the overlap in EFFECT_STATES order).
         //
         // Drawn per FEATURE and keyed by DATUM index — one dataset, so hovering a bar
         // lights its label up too.
@@ -976,10 +1016,41 @@ export function Elicit(spec) {
             }
             for (const i of selected) hovered.delete(i);
 
-            for (const [indices, state] of /** @type {[Set<number>, any][]} */ ([
+            /** @type {Set<number>} */
+            const grabbed = new Set();
+            if (ui.grab && ui.grab.featureId === feature.id && ui.grab.index != null) {
+                grabbed.add(ui.grab.index);
+            }
+
+            /** @type {[Set<number>, any][]} */
+            const byState = [
                 [hovered, effects.hovered],
                 [selected, effects.selected],
-            ])) {
+                [grabbed, effects.grabbed],
+            ];
+
+            // Restyle half: merge the element props of every state a datum is in onto
+            // that datum's own nodes. Stamped on the node so it survives into both
+            // renderers and, being the mark's own node, lands on the mark's actual
+            // position however it is transformed.
+            /** @type {Map<number, any[]>} */
+            const statesByIndex = new Map();
+            for (const [indices, state] of byState) {
+                for (const i of indices) {
+                    const list = statesByIndex.get(i) || [];
+                    list.push(state);
+                    statesByIndex.set(i, list);
+                }
+            }
+            for (const node of marks) {
+                if (!node || node.ghost || node.index == null) continue;
+                const style = effectStyleFor(statesByIndex.get(node.index) || []);
+                if (style) node.effectStyle = style;
+            }
+
+            // Overlay half: the padded outline, the one part of the vocabulary that
+            // needs geometry the mark itself doesn't have.
+            for (const [indices, state] of byState) {
                 if (!indices.size) continue;
                 stateEffectNodes(marks, indices, state)
                     .forEach((/** @type {any} */ node) => { node.guide = true; scene.add(node); });
@@ -1025,7 +1096,15 @@ export function Elicit(spec) {
     const computeEdit = (feature, edit, event, index) => {
         const currentData = dataset;
         const markChannels = feature.channels || {};
-        const resolved = resolveChannels(edit.channels, markChannels, scales, feature.views === 'scale');
+        // A node built inside a group's local FRAME carries the very scales it was
+        // encoded through (plot/group.js stamps `node.frame`). Overlay them so the
+        // edit inverts through the same objects — "an edit is the inverse of
+        // encoding" holds per datum, with no second inversion path: this is channel
+        // resolution honouring which scale drew the thing you grabbed, not a new
+        // dispatch branch. A plane-pick gesture carries no node, so fall back to the
+        // framed node for this datum.
+        const editScales = frameScalesFor(feature, event.node, index) || scales;
+        const resolved = resolveChannels(edit.channels, markChannels, editScales, feature.views === 'scale');
         const ctx = {
             data: currentData,
             datum: index != null ? currentData[index] : undefined,
@@ -1036,7 +1115,7 @@ export function Elicit(spec) {
             // A non-pixel gesture payload (the text mark's `commit` typed string).
             value: event.value,
             channels: resolved,
-            scales,
+            scales: editScales,
             markChannels,
             // Chart projection context (null on cartesian charts). Geo edits invert
             // through the same object geo marks use for apply/path.
@@ -1252,30 +1331,48 @@ export function Elicit(spec) {
         const index = event.node ? event.node.index : undefined;
         if (index == null) return false;
         let changed = false;
-        activeEdits(feature)
-            // A gesture normally fans to EVERY direct edit sharing its type (arbitrated
-            // by each edit's `when`). An externally-driven event may ADDRESS one edit by
-            // name (event.editName), so a feature carrying several same-gesture edits —
-            // three `set()`s on a face's params — drives exactly the one asked for
-            // instead of all of them. Native pointer events set no editName, so their
-            // fan-out is unchanged.
-            .filter(e => e.pick === 'direct' && e.gesture === event.type
-                && (!event.editName || e.name === event.editName))
+        // A gesture normally fans to EVERY direct edit sharing its type (arbitrated
+        // by each edit's `when`). An externally-driven event may ADDRESS one edit by
+        // name (event.editName), so a feature carrying several same-gesture edits —
+        // three `set()`s on a face's params — drives exactly the one asked for
+        // instead of all of them. Native pointer events set no editName, so their
+        // fan-out is unchanged.
+        const direct = activeEdits(feature).filter(e => e.pick === 'direct'
+            && (!event.editName || e.name === event.editName));
+
+        // A direct edit may still need a multi-event LIFECYCLE — a relative `slide`
+        // has to remember the pixel and value it started from, or the value would
+        // jump to wherever the mark was pressed. Its driver owns that state exactly
+        // as it does for a plane edit; the only difference is that the target is the
+        // node under the pointer, so nothing is searched for and the plane stays
+        // down. This is the driver registry doing its job, not a pick branch: the
+        // engine asks `driverFor` and never names a mode.
+        const lifecycle = direct.filter(e => driverFor(e));
+        if (lifecycle.length && runDrivers(feature, event, lifecycle, index)) changed = true;
+
+        direct
+            .filter(e => e.gesture === event.type && !driverFor(e))
             .forEach(edit => { if (runEdit(feature, edit, event, index)) changed = true; });
         return changed;
     };
 
-    // Plane-pick edits: the gesture is on the plane (no node). Each interaction
-    // driver (edit/drivers) owns one pick-mode lifecycle; we hand every driver the
-    // edits it `wants` plus a per-feature session, and it runs them. The engine no
-    // longer knows any specific mode — adding one means adding a driver file.
+    // Hand a set of edits to the interaction drivers. Each driver (edit/drivers)
+    // owns one multi-event lifecycle; we give every driver the edits it `wants`
+    // plus a per-feature session, and it runs them. The engine knows no specific
+    // mode — adding one means adding a driver file.
+    //
+    // Both dispatch paths come through here. A PLANE gesture carries no node, so
+    // `index` is null and the driver resolves its own target from the pointer. A
+    // DIRECT gesture landed on a node, so `index` names the datum and the driver
+    // skips target selection entirely — same lifecycle, no raised plane.
     /**
      * @param {any} feature
      * @param {any} event
+     * @param {import('../types').Edit[]} edits
+     * @param {number | null} index the datum a direct gesture landed on, else null
      * @returns {boolean}
      */
-    const dispatchPlaneEdits = (feature, event) => {
-        const edits = activeEdits(feature).filter(e => e.pick !== 'direct');
+    const runDrivers = (feature, event, edits, index) => {
         if (edits.length === 0) return false;
         const fid = feature.id;
 
@@ -1327,6 +1424,7 @@ export function Elicit(spec) {
                 // pixel position for hit-zone classification, without reinventing
                 // scale lookup — the same global scales every edit already inverts through.
                 scales,
+                index: index != null ? index : null,
                 session,
                 preview,
                 stage,
@@ -1337,6 +1435,16 @@ export function Elicit(spec) {
         }
         return changed;
     };
+
+    // Plane-pick edits: the gesture is on the plane, so it carries no node and the
+    // driver resolves its own target.
+    /**
+     * @param {any} feature
+     * @param {any} event
+     * @returns {boolean}
+     */
+    const dispatchPlaneEdits = (feature, event) =>
+        runDrivers(feature, event, activeEdits(feature).filter(e => e.pick !== 'direct'), null);
 
     // 4. Event routing.
     //    - Events carrying a `node` are mark-scoped (change existing elements) and
@@ -1389,13 +1497,17 @@ export function Elicit(spec) {
             const feature = features.find((f) => f.id === node.featureId);
             const channels = (feature && feature.channels) || {};
             const datum = node.index != null ? dataset[node.index] : node.data;
-            const atX = datum ? encodeChannel(scales, channels, 'x', datum, from.cx) : from.cx;
-            const atY = datum ? encodeChannel(scales, channels, 'y', datum, from.cy) : from.cy;
+            // Inside a group's frame the datum's position is a LOCAL one, so read it
+            // (and step it) through the node's own frame scales — the same overlay
+            // computeEdit applies when the resulting drag arrives.
+            const ks = frameScalesFor(feature, node, node.index) || scales;
+            const atX = datum ? encodeChannel(ks, channels, 'x', datum, from.cx) : from.cx;
+            const atY = datum ? encodeChannel(ks, channels, 'y', datum, from.cy) : from.cy;
             event = {
                 type: 'drag',
                 node,
-                x: nudgeTarget(scales.x, atX, event.dx, event.coarse),
-                y: nudgeTarget(scales.y, atY, event.dy, event.coarse),
+                x: nudgeTarget(ks.x, atX, event.dx, event.coarse),
+                y: nudgeTarget(ks.y, atY, event.dy, event.coarse),
                 // One press = one complete gesture (there is no dragend coming), so
                 // it closes its own undo transaction below.
                 nudge: true,
@@ -1412,6 +1524,23 @@ export function Elicit(spec) {
         // arrived can't leak its stale "before" into the next gesture.
         if (event.type === 'dragstart') { endTxn(); beginTxn(); }
         else if (!txn) beginTxn();
+
+        // Grab state rides the SAME bracket as the transaction — one stroke, one
+        // grabbed row — so the state pass can draw `grabbed` beside the other two
+        // instead of the renderer painting it privately off d3.drag. Force a render
+        // when it changes and the state actually paints something: a press that
+        // moves no data (or none yet) still has to light the mark up, which is the
+        // whole point of pre-commit feedback.
+        if (event.type === 'dragstart' || event.type === 'dragend') {
+            const next = event.type === 'dragstart' && event.node && event.node.index != null
+                ? { featureId: event.node.featureId, index: event.node.index }
+                : null;
+            const changed = !!ui.grab !== !!next
+                || !!(ui.grab && next && (ui.grab.featureId !== next.featureId || ui.grab.index !== next.index));
+            ui.grab = next;
+            const g = effects.grabbed;
+            if (changed && g && g.enabled !== false && (g.outline || elementEffectOf(g))) shouldRender = true;
+        }
 
         if (event.node) {
             // Dispatch to the touched mark's feature (direct pick).
@@ -1456,6 +1585,7 @@ export function Elicit(spec) {
         seedCount = dataset.length;
         ui.preview = null;
         ui.hover = null;   // the pointer's row index is new too
+        ui.grab = null;    // and any in-flight grab points at a row that just moved
         ui.selection.clear(); // a reseed's row indices are new; drop the old selection
         // A reseed is a new starting point, not an edit: there is nothing sensible
         // to undo BACK to (and undoing past it would resurrect rows the caller
@@ -1531,14 +1661,23 @@ export function Elicit(spec) {
     const findNamedEdit = (/** @type {string} */ name) => {
         /** @type {{ feature: any, edit: any } | null} */
         let hit = null;
-        let count = 0;
+        // Count DISTINCT edits, by their `apply` — the one part of a descriptor that
+        // survives collectEdits' channel-injecting copy and is unique per factory
+        // call. The name is ambiguous only when two edits that do different things
+        // answer to it; ONE edit declared on several parts of a glyph (a face's two
+        // eyes, its two brows) is not a collision, and "driving the first" is exactly
+        // right there — they are the same edit over the same column.
+        /** @type {Set<any>} */
+        const distinct = new Set();
         for (const feature of features) {
             for (const edit of collectEdits(feature)) {
-                if (edit.name === name) { count++; if (!hit) hit = { feature, edit }; }
+                if (edit.name !== name) continue;
+                distinct.add(edit.apply);
+                if (!hit) hit = { feature, edit };
             }
         }
-        if (count === 0) warn(`control:none:${name}`, `el.control("${name}"): no edit is named "${name}".`);
-        if (count > 1) warn(`control:many:${name}`, `el.control("${name}"): ${count} edits share the name "${name}"; driving the first.`);
+        if (distinct.size === 0) warn(`control:none:${name}`, `el.control("${name}"): no edit is named "${name}".`);
+        if (distinct.size > 1) warn(`control:many:${name}`, `el.control("${name}"): ${distinct.size} different edits share the name "${name}"; driving the first.`);
         return hit;
     };
 
@@ -1561,11 +1700,14 @@ export function Elicit(spec) {
             const center = markCenter(node);
             const datum = dataset[index];
             const channels = feature.channels || {};
+            // Forward-encode through the SAME scales the edit will invert — which,
+            // inside a group's frame, are the node's own (see frameScalesFor).
+            const editScales = frameScalesFor(feature, node, index) || scales;
             // Base: where the datum currently sits, so a single-axis set doesn't move
             // the other axis.
-            let x = datum ? encodeChannel(scales, channels, 'x', datum, center ? center.cx : 0) : (center ? center.cx : 0);
-            let y = datum ? encodeChannel(scales, channels, 'y', datum, center ? center.cy : 0) : (center ? center.cy : 0);
-            const resolved = resolveChannels(edit.channels, channels, scales, feature.views === 'scale');
+            let x = datum ? encodeChannel(editScales, channels, 'x', datum, center ? center.cx : 0) : (center ? center.cx : 0);
+            let y = datum ? encodeChannel(editScales, channels, 'y', datum, center ? center.cy : 0) : (center ? center.cy : 0);
+            const resolved = resolveChannels(edit.channels, channels, editScales, feature.views === 'scale');
             // `value` is either a scalar (single-channel edit) or a { channelName: v }
             // / { field: v } map for a multi-channel edit (a 2-D drag).
             const valueFor = (/** @type {any} */ ch) => {
@@ -1654,7 +1796,8 @@ export function Elicit(spec) {
                 const found = findNamedEdit(name);
                 if (!found) return null;
                 const { feature, edit } = found;
-                const ch = resolveChannels(edit.channels, feature.channels || {}, scales, feature.views === 'scale')[0];
+                const editScales = frameScalesFor(feature, null, index) || scales;
+                const ch = resolveChannels(edit.channels, feature.channels || {}, editScales, feature.views === 'scale')[0];
                 const scale = /** @type {any} */ (ch && ch.scale);
                 const fieldSpec = (schema && ch && ch.field && schema[ch.field]) || null;
                 const measure = (fieldSpec && fieldSpec.type) || null;

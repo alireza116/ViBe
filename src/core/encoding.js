@@ -189,6 +189,68 @@ export function axisOf(channelName) {
     return AXIS_OF[channelName];
 }
 
+// ── FRAME channels: a group's LOCAL coordinate box ──────────────────────────
+// `scale: 'frame'` (or `scale: { type: 'frame', range: [...] }`) says: this
+// channel is not on a global axis — resolve it against the enclosing group()'s
+// per-datum frame. The marker is CHANNEL-side only: core/plot/group.js turns it
+// into an ordinary linear scale (createFrameScale), so no resolved scale object
+// ever carries type 'frame' and nothing downstream branches on it. The global
+// resolver skips a flagged channel entirely, which is what keeps a glyph's local
+// geometry out of the chart's x/y buckets (no phantom axis, no band demand).
+
+/**
+ * The frame ScaleSpec of a channel, or null when the channel isn't frame-scaled.
+ * Accepts both spellings; the object form carries a local `range`.
+ * @param {any} chSpec a ChannelSpec
+ * @returns {{ range?: number[], [k: string]: any } | null}
+ */
+export function frameSpecOf(chSpec) {
+    if (!chSpec) return null;
+    const s = chSpec.scale;
+    if (s === 'frame') return {};
+    if (s && typeof s === 'object' && s.type === 'frame') return s;
+    return null;
+}
+
+// Channels whose frame output is a MAGNITUDE (a length from the frame's origin,
+// not a position in it): a radius scales with the frame, it doesn't sit somewhere
+// in it. Everything else positional goes through axisOf; the rest is 'plain'.
+const FRAME_MAGNITUDE = new Set(['size', 'rx', 'ry', 'strokeWidth']);
+
+/**
+ * How a channel reads the frame:
+ *   'x'     pixel = originX + u * halfSize
+ *   'y'     pixel = originY - u * halfSize   (local y is UP)
+ *   'size'  pixel = u * halfSize             (a length, no origin)
+ *   'plain' pixel = u                        (already in its own output units —
+ *                                             `angle` in degrees, `curvature`)
+ * @param {string} channelName
+ * @returns {'x' | 'y' | 'size' | 'plain'}
+ */
+export function frameFamilyOf(channelName) {
+    const axis = axisOf(channelName);
+    if (axis) return axis;
+    if (FRAME_MAGNITUDE.has(channelName)) return 'size';
+    return 'plain';
+}
+
+/**
+ * The default LOCAL range of a frame channel — the box a group's parts are
+ * placed in. Positional channels span [-1, 1] (the frame is centred on the
+ * group's anchor and one unit wide in each direction); magnitudes span [0, 1]
+ * (zero to the frame's half-size). A 'plain' channel has no local box — its
+ * units are its own — so it returns null and the caller falls back to the
+ * channel's ordinary default range.
+ * @param {string} channelName
+ * @returns {number[] | null}
+ */
+export function frameLocalRange(channelName) {
+    const family = frameFamilyOf(channelName);
+    if (family === 'x' || family === 'y') return [-1, 1];
+    if (family === 'size') return [0, 1];
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // Inference. The engine's resolver (core/resolve.js) unions a field's values
 // across marks and asks these two questions in order: what IS this data, and
@@ -290,6 +352,12 @@ export function channelRange(channelName, type, dims, theme) {
         case 'x': return [0, dims.width];
         case 'y': return [dims.height, 0];   // pixel y is inverted
         case 'size': return [3, 18];         // radius, px
+        // An ellipse's two radii are the size family, one per axis.
+        case 'rx': return [3, 18];
+        case 'ry': return [3, 18];
+        // How far a `curve` bows off its chord, as a fraction of the half-chord:
+        // 0 is a straight segment, ±1 bows out by the half-chord's length.
+        case 'curvature': return [-1, 1];
         // Degrees in math convention (y-up). Default matches arcSpan semi/`orient:
         // 'top'` — left (180°) → right (0°) through the top (NYT / speedometer).
         case 'angle': return [180, 0];

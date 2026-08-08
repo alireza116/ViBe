@@ -63,7 +63,7 @@ import { normalizeMarkOptions } from './mark.js';
  * @param {boolean} keepEdit
  * @returns {Record<string, any>}
  */
-function mergeChannels(groupChannels, partChannels, keepEdit) {
+export function mergeChannels(groupChannels, partChannels, keepEdit) {
     /** @type {Record<string, any>} */
     const merged = {};
     for (const [name, spec] of Object.entries(groupChannels || {})) {

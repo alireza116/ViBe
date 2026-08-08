@@ -6,7 +6,7 @@ Miro board with faces that can be manipulated and resized.
 
 Find waldo? People can use their keyboard to find waldo?
 
-Make a snake game? Generalize this to not just elicitation. --> make the keyboard interaction composeable.
+eneralize this to not just elicitation. --> make the keyboard interaction composeable.
 
 uncertainty inside face? Can we do that?
 

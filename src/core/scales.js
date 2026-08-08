@@ -206,6 +206,44 @@ export function createScale(spec, range) {
     return stamp(scale, type);
 }
 
+/**
+ * Build the scale for ONE frame channel of ONE datum — a group's local
+ * coordinate box, expressed as a real scale.
+ *
+ * A group (plot/group.js) places its parts in a box centred on the group's
+ * encoded position and sized by its encoded `size`. Both are per-DATUM (a face
+ * per row sits somewhere different and may be a different size), so the box
+ * cannot be a global scale. It is instead one ordinary linear scale per datum,
+ * built here: `domain` is the field's own units (the schema's), `localRange` is
+ * where in the box the channel's extremes land, and `family` says how a local
+ * unit becomes a pixel (see frameFamilyOf).
+ *
+ * The point of routing this through `createScale` rather than a bespoke helper
+ * is that the result is a genuine Scale — capability-stamped, invertible, with a
+ * `domainConfig` — so the edit layer inverts a gesture through the SAME object
+ * that encoded it and nothing about "an edit is the inverse of encoding" needs a
+ * special case. The scales this returns carry type 'linear' (or 'time'); 'frame'
+ * is a channel-side marker and never reaches a resolved scale.
+ * @param {{ domain: any[], localRange: number[], origin?: number, halfSize?: number, family?: 'x' | 'y' | 'size' | 'plain' }} opts
+ * @returns {import('../types').Scale | null}
+ */
+export function createFrameScale({ domain, localRange, origin = 0, halfSize = 1, family = 'plain' }) {
+    /** @type {(u: number) => number} */
+    const toPixel = family === 'x' ? (u) => origin + u * halfSize
+        : family === 'y' ? (u) => origin - u * halfSize   // local y is UP
+            : family === 'size' ? (u) => u * halfSize
+                : (u) => u;                               // already in output units
+    const type = domain.some((/** @type {any} */ v) => v instanceof Date) ? 'time' : 'linear';
+    const scale = createScale({ type, domain }, localRange.map(toPixel));
+    // The glyph's radius, carried on the scale so a GESTURE can size itself to the
+    // glyph. A `slide` on a frame channel sweeps the domain in one radius instead
+    // of a fixed 120px, which is far too coarse on a small glyph and too fine on a
+    // large one (see edit/basic.js: slideExtent). Not a scale capability — nothing
+    // branches on it; it is the one number an edit would otherwise have to guess.
+    /** @type {any} */ (scale).frameExtent = Math.abs(halfSize) || undefined;
+    return scale;
+}
+
 // --- Scale helpers shared by marks -----------------------------------------
 // These let marks be composed across scale types (band vs linear) and axis
 // orientations without special-casing each mark.

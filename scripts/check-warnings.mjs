@@ -43,6 +43,7 @@ const BASE = `http://localhost:${PORT}`;
 const routes = [
     '/', '/overview', '/concepts', '/concepts/contracts', '/sizing', '/renderers', '/authoring',
     '/marks/bar', '/marks/rect', '/marks/area', '/marks/tick', '/marks/point',
+    '/marks/ellipse', '/marks/curve', '/marks/group',
     '/marks/symbol', '/marks/face', '/marks/text', '/marks/line', '/marks/composite',
     '/marks/dotstack', '/marks/waffle', '/marks/needle',
     '/marks/axis-radial', '/marks/arc', '/marks/geo', '/marks/trend', '/marks/axes',

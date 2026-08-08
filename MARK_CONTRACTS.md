@@ -68,10 +68,26 @@ N/A = use a different edit family (documented).
 <tr>
 <td><code>tick</code> / <code>tickX</code> / <code>tickY</code></td>
 <td>data</td>
-<td>value + band span</td>
+<td>value + span: band, <code>length</code>, or an explicit x1/x2 (y1/y2) pair</td>
 <td>natural</td>
 <td>whole tick</td>
-<td>band on category</td>
+<td>band on category (unless the span is stated)</td>
+</tr>
+<tr>
+<td><code>ellipse</code></td>
+<td>data</td>
+<td>x, y, <b>rx / ry</b> (independent radii, <code>size</code> fallback), angle</td>
+<td>natural</td>
+<td>whole mark; each radius its own magnitude edit</td>
+<td><code>discreteScale: point</code></td>
+</tr>
+<tr>
+<td><code>curve</code> / <code>curveX</code> / <code>curveY</code></td>
+<td>data</td>
+<td>chord (x1/x2 or <code>length</code>) + position; <b><code>curvature</code></b> (half-chord fractions), angle</td>
+<td>create less natural</td>
+<td>visible path inert; fat transparent HIT path (sampled <code>points</code>, <code>cx</code>/<code>cy</code> stamped)</td>
+<td><code>discreteScale: point</code></td>
 </tr>
 <tr>
 <td><code>text</code> / <code>textX</code> / <code>textY</code></td>
@@ -145,6 +161,14 @@ N/A = use a different edit family (documented).
 <td>per-part features</td>
 <td>stamps <code>discreteScale</code></td>
 </tr>
+<tr>
+<td><code>group</code></td>
+<td>data</td>
+<td>composite + a per-datum LOCAL FRAME: group x/y/size define the box (they do <b>not</b> trickle); a part's <code>scale: 'frame'</code> channel resolves in it</td>
+<td>depends on parts (mark-level edits ride the LAST part)</td>
+<td>per-part features; <code>node.frame</code> carries the scales an edit inverts through; <code>node.dm</code> for positional frame channels</td>
+<td>emits an inert frame ANCHOR; stamps <code>discreteScale</code></td>
+</tr>
 </tbody>
 </table>
 
@@ -180,11 +204,11 @@ N/A = use a different edit family (documented).
 </tr>
 <tr>
 <td><code>face</code></td>
-<td>parametric</td>
-<td>seven face params; emotion preset binds valence/arousal if unbound</td>
-<td>N/A</td>
-<td><b>shape is the control</b> (<code>dm</code>); <code>handles</code> gates eyelid/lip/size dots only</td>
-<td><code>supportsFace</code></td>
+<td><b>preset</b> → <code>group</code></td>
+<td>six params forwarded to a part's channel (mouthCurve→curvature, eyeScale/eyeSquint→rx/ry, browHeight→y, browTilt/mouthAsym→angle); emotion preset binds valence/arousal if unbound</td>
+<td>natural via the HEAD part (mark-level edits ride there)</td>
+<td><b>shape is the control</b> — each feature is its own mark, so no arbitration and no <code>handles</code> option</td>
+<td>none (it is a desugaring; there is no <code>edit.face.*</code>)</td>
 </tr>
 </tbody>
 </table>

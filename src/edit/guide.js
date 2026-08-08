@@ -15,6 +15,7 @@ import { resolveChannels, collectEdits } from './route.js';
 import { driverFor } from './drivers/index.js';
 import { isBand, isDiscrete, rangeExtent } from '../core/scales.js';
 import { axisOf } from '../core/encoding.js';
+import { markCenter } from './shared.js';
 
 const DEFAULT_CONSTRAINT_COLOR = '#e4572e';
 
@@ -38,7 +39,7 @@ const DEFAULT_CONSTRAINT_COLOR = '#e4572e';
  * `catchment`— the reach of a proximity pick: the radius within which a free
  *              pointer resolves to a mark. Only drawn by drivers that select one.
  * `track`    — where a handle can travel. Marks that derive a handle's range
- *              (face, trend, arc, axis, legend) compute it already; this draws it.
+ *              (trend, arc, axis, legend) compute it already; this draws it.
  * @type {any}
  */
 const GUIDE_PARTS = {
@@ -217,10 +218,10 @@ export function buildEditGuide(feature, edit, ctx) {
  * already uses to map a pointer back to a value. So the track is not re-derived
  * here: it IS the mapping the edit will use, drawn.
  *
- * `face` stamps these today (seven parameters, each with a derived range that no
- * scale describes). Any mark with a handle whose range isn't obvious from the chart
- * can opt in the same way — which is the point of making it a declared contract
- * rather than a per-mark drawing.
+ * A mark with a handle whose travel range isn't a scale opts in this way — which is
+ * the point of making it a declared contract rather than a per-mark drawing. (A
+ * handle whose range IS a scale needs nothing: `group`'s frame channels are real
+ * scales, so a glyph part's travel is already the mapping.)
  * @param {any} feature
  * @param {import('../types').Edit} edit
  * @param {any} ctx
@@ -242,13 +243,19 @@ function trackGuide(feature, edit, ctx, style) {
     for (const mark of marks) {
         const dm = mark && mark.dm;
         if (!dm) continue;
+        // The track runs ALONG one axis, so the other coordinate is wherever the
+        // handle currently sits. `markCenter` rather than a raw cx/cy read, so a
+        // handle drawn as a line or a rect (a glyph's brow, a bar) gets a track too
+        // — a bare cx/cy read put those at NaN and drew nothing.
+        const c = markCenter(mark);
+        if (!c) continue;
         for (const axis of /** @type {const} */ (['x', 'y'])) {
             const spec = dm[axis];
             if (!spec || spec.pxAt0 == null || spec.pxAt1 == null) continue;
             if (claims && !claims.includes(spec.channel)) continue;
             nodes.push(axis === 'x'
-                ? { type: 'line', x1: spec.pxAt0, x2: spec.pxAt1, y1: mark.cy, y2: mark.cy, ...paint }
-                : { type: 'line', x1: mark.cx, x2: mark.cx, y1: spec.pxAt0, y2: spec.pxAt1, ...paint });
+                ? { type: 'line', x1: spec.pxAt0, x2: spec.pxAt1, y1: c.cy, y2: c.cy, ...paint }
+                : { type: 'line', x1: c.cx, x2: c.cx, y1: spec.pxAt0, y2: spec.pxAt1, ...paint });
         }
     }
     return nodes;

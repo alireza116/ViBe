@@ -40,6 +40,18 @@ import { encodeChannel, categoryOf, encodeAngle, resolveStyle, normalizeMarkOpti
  * @returns {[number, number]}
  */
 function resolveSpan(spanAxis, scale, channels, scales, datum, key, fullLength, inset, length, index, data) {
+    // An explicit endpoint PAIR states the span outright — the same x1/x2 (y1/y2)
+    // spelling bar/rect/area/rule use. It wins over the band, because a glyph part
+    // whose span is stated in its group's local frame has no band to sit in and a
+    // fixed px `length` would not scale with the glyph.
+    const lo = channels[`${spanAxis}1`];
+    const hi = channels[`${spanAxis}2`];
+    if (lo && hi) {
+        return [
+            encodeChannel(scales, channels, `${spanAxis}1`, datum, 0, index, data),
+            encodeChannel(scales, channels, `${spanAxis}2`, datum, fullLength, index, data),
+        ];
+    }
     // A fixed-length tick with a positional channel on the span axis: centre on
     // the datum (scatter / composite glyph), not on the band or plot midpoint.
     if (length != null && channels[spanAxis]) {

@@ -1,8 +1,6 @@
 // @ts-check
-// face.js — an expressive, PARAMETRIC emotion face (a Chernoff-style glyph). A
-// datum's emotion FIELDS are encoded into facial geometry, and you edit them by
-// DIRECTLY MANIPULATING the features: grab the mouth and pull it into a smile,
-// drag an eye wider, tilt a brow. "An edit is the inverse of encoding" made a face.
+// face.js — an expressive emotion face (a Chernoff-style glyph), built out of
+// ordinary marks.
 //
 //   Elicit({
 //     schema: { valence: { type: 'quantitative', domain: [-1, 1] },
@@ -11,90 +9,116 @@
 //     marks: [ face() ],                // preset: mouth = valence, eyes = arousal
 //   })
 //
-// ── Parameters are CHANNELS ──────────────────────────────────────────────────
-// A face has seven independent PARAMETERS, and each is a non-positional channel
-// declared exactly like `fill`/`size`/`x` — there is no bespoke `features` map.
-// Bind a field with `{ field }` (the param becomes EDITABLE, drag it to write the
-// field back); pin a fixed expression with a constant `{ value }` (rendered but not
-// elicited). An unbound param renders at neutral (0.5), so a partial face is still
-// a whole face.
+// ── A PRESET, not a mark ────────────────────────────────────────────────────
+// `face()` returns a `group` (plot/group.js): a head `point`, two `ellipse`
+// eyes, two `tickY` brows and a `curveY` mouth, each a real feature placed in
+// the group's local frame. It draws nothing a spec author couldn't assemble
+// themselves — assembling it is the point, and the parts are the documentation
+// of how a frame-scaled glyph is put together.
 //
-//   face()                                   // emotion preset (see below)
-//   face({ channels: {                       // a full Chernoff glyph
-//     mouthCurve: { field: 'joy' },
-//     browTilt:   { field: 'anger' },
-//     eyeScale:   { field: 'shock' },
+// The old face was one feature carrying seven handles over one datum, arbitrated
+// through a private `dm` descriptor and a private `edit.face.*` namespace, for
+// parameters that are all plain fields. That is precisely the case the glyph rule
+// says to build as a group of marks (see CLAUDE.md), and it cost the face
+// everything the ordinary path gives for free: per-part direct-pick isolation,
+// the standard edits, hover/effects per feature, and an author's ability to
+// replace one part.
+//
+// So there is no `edit.face.*` any more. Each parameter is a channel on a
+// concrete part, edited with the universal edits:
+//
+//   PARAM        PART / CHANNEL              MEANING                  natural edit
+//   mouthCurve   mouth  curvature   deep frown ∩ ↔ deep smile ∪   slide({ axis:'y', increase:'up' })
+//   mouthAsym    mouth  angle       centred ↔ smirk               rotate({ pivot:'mark', pick:'direct' })
+//   eyeScale     eyes   rx          pinpricks ↔ wide              slide({ axis:'x', increase:'right' })
+//   eyeSquint    eyes   ry          round ↔ flat/squished         slide({ axis:'y', increase:'down' })
+//   browHeight   brows  y           slammed down ↔ high arch      slide({ axis:'y', increase:'up' })
+//   browTilt     brows  angle       outer-down (sad) ↔ inner-down rotate({ pivot:'mark', pick:'direct' })
+//   x / y        head   x / y       where the face sits           move()
+//   size         head   size        how big it is                 resize()
+//
+// (`mouthOpen` is gone. Its filled cavity was a second derived path over the
+// same curve, not a mark, and it was the one parameter that could not be
+// expressed as a channel on a simple shape.)
+//
+// The face is INERT until an edit names a column, like every other mark: bind a
+// param to a field and attach the edit you want.
+//
+//   face({ channels: {
+//     mouthCurve: { field: 'valence', edit: slide({ axis: 'y', increase: 'up' }) },
+//     browTilt:   { field: 'anger',   edit: rotate({ pivot: 'mark', pick: 'direct' }) },
 //   } })
 //
-// Zero-config `face()` applies the emotion preset (mouthCurve ← valence, eyeScale
-// ← arousal). Binding ANY param channel REPLACES the preset outright, so an unbound
-// preset default never references a field the schema lacks.
+// ── Parameters are still CHANNELS ───────────────────────────────────────────
+// Bind a field with `{ field }` to elicit it; pin a fixed expression with
+// `{ value: 0..1 }` (a fraction of the parameter's visual travel — 0.5 is
+// neutral); leave it out for neutral. Zero-config `face()` applies the emotion
+// preset (mouthCurve ← valence, eyeScale ← arousal); binding ANY param replaces
+// the preset outright, so an unbound default never names a field the schema lacks.
 //
-//   PARAM        FEATURE / MEANING                         low  ↔  high
-//   mouthCurve   mouth curvature   deep frown ∩ ↔ deep smile U
-//   mouthOpen    mouth openness    closed line ↔ wide cavity
-//   mouthAsym    mouth asymmetry   centred ↔ pulled to one side (smirk)
-//   eyeScale     eye aperture      pinpricks ↔ huge
-//   eyeSquint    eye squint        round ↔ flat/squished
-//   browHeight   brow height       slammed down ↔ high arch
-//   browTilt     brow tilt         outer-down (sad) ↔ inner-down (angry)
-//
-// ── Direct manipulation (intentional handle-contract exception) ──────────────
-// A face is a single-datum glyph, like `trend`: its parts share ONE feature over
-// ONE datum. The SHAPE is the affordance — eyes / brows / mouth carry `dm` tracks
-// and stay grabbable regardless of `handles`. That is deliberate direct
-// manipulation (the face IS the control), not a silent bypass of the shared
-// contract. The `handles` option gates only the SUPPLEMENTAL eyelid/lip/size
-// dots (`true` / `false` / `'hit'`), same vocabulary as every other mark.
-//
-// Affordance map (with edit.face.expression / edit.face.move attached):
-//   mouth hit-path     → mouthCurve + mouthAsym (dm)
-//   eye ellipses       → eyeScale (dm)
-//   brows              → browHeight + browTilt (dm)
-//   eyelid/lip dots    → eyeSquint / mouthOpen (handles option)
-//   outline (x+y bound)→ edit.face.move
-//   right-rim size dot → size channel (handles option)
-// Pair with `guide: { track: true }` to draw the dm travel ranges.
-//
-// The centre is placed through the global x/y scales when those channels carry
-// fields (small-multiples / an emotion-space scatter), else parked at the plot
-// centre. The outline is a PATH (not a circle) so the mouth path, drawn after it,
-// is not hidden beneath it — the renderer paints all circles above all paths.
+// ── Geometry ────────────────────────────────────────────────────────────────
+// Every constant below is in the group's LOCAL frame: x and y in [-1, 1] from
+// the face's centre with y UP, magnitudes as a fraction of its radius. They are
+// the same proportions the hand-built face drew at, now stated as data rather
+// than as arithmetic on R — which is what lets each one be a scale a gesture
+// inverts through.
 
-import { encodeChannel, resolveStyle, normalizeMarkOptions, markDefaults, positionalKeys, resolveHandles } from './mark.js';
+import { group } from './group.js';
+import { point } from './point.js';
+import { ellipse } from './ellipse.js';
+import { tickY } from './tick.js';
+import { curveY } from './curve.js';
+import { normalizeMarkOptions } from './mark.js';
 
 /** @param {number} x @returns {number} */
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
-// The seven facial parameters, each a non-positional channel. If the author binds
-// none of them, the emotion preset (mouthCurve ← valence, eyeScale ← arousal) fills
-// in; binding any one replaces the preset.
+// The face's parameters. Binding none of them applies the emotion preset.
 /** @type {string[]} */
-const FACE_PARAMS = ['mouthCurve', 'mouthOpen', 'mouthAsym', 'eyeScale', 'eyeSquint', 'browHeight', 'browTilt'];
+const FACE_PARAMS = ['mouthCurve', 'mouthAsym', 'eyeScale', 'eyeSquint', 'browHeight', 'browTilt'];
 
-/** An SVG path for a circle / ellipse centred at (cx, cy). */
-const ellipsePath = (/** @type {number} */ cx, /** @type {number} */ cy, /** @type {number} */ rx, /** @type {number} */ ry) =>
-    `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`;
+// Local-frame geometry. x/y in frame units (y up), radii as a fraction of R.
+const G = {
+    ink: '#1f2937',
+    headFill: '#FFD666',
+    headStroke: '#B7791F',
+    headStrokeWidth: 0.03,
+    lineWidth: 0.055,
+    // Eyes
+    eyeX: 0.40,
+    eyeY: 0.16,
+    // rx: pinprick → wide. ry runs the other way: squint FLATTENS the eye. Its top
+    // is the NEUTRAL rx, not the widest one, so an unsquinted eye is round at
+    // neutral aperture and a widened one reads as wide-eyed rather than merely big.
+    eyeRx: [0.055, 0.185],
+    eyeRy: [0.12, 0.03],
+    eyeNeutral: 0.12,
+    // Brows: inner and outer ends, and the height they travel through.
+    browInner: 0.14,
+    browOuter: 0.50,
+    browY: [0.23, 0.57],
+    // Tilt in degrees about the brow's own midpoint, mirrored left/right so a
+    // rising value tilts both brows into the same EXPRESSION rather than the same
+    // direction. Two private frame scales, so the mirroring is in the mapping.
+    browTiltRight: [-45, 45],
+    browTiltLeft: [45, -45],
+    // Mouth: the chord, and how far it bows. Positive curvature bows to the left
+    // of travel (up, for a rightward chord), so a smile is NEGATIVE — hence the
+    // descending range: a rising valence deepens the ∪.
+    mouthY: -0.34,
+    mouthX: 0.36,
+    mouthCurve: [0.67, -0.67],
+    mouthAsym: [-20, 20],
+};
 
 /**
  * @param {any} [options]
- * @returns {import('../types').Mark}
+ * @returns {any[]} the group's features, for Elicit's flattened list
  */
 export function face(options = {}) {
-    const opts = normalizeMarkOptions(options, { mark: 'face', allow: ['handles', 'handleSize', 'handleColor'] });
-    const {
-        id,
-        edits,
-        constraints,
-        handles = true,
-        handleSize,
-        handleColor,
-    } = opts;
+    const opts = normalizeMarkOptions(options, { mark: 'face', allow: ['ink'] });
+    const { id, edits, constraints, ink = G.ink } = opts;
 
-    // The params are ordinary channels (declared in `channels`, or via the x/y
-    // shorthands opts already merged). If the author bound none of the seven, apply
-    // the emotion preset; binding any one replaces it, so an unbound preset default
-    // never points at a field the schema lacks.
     /** @type {Record<string, any>} */
     const channels = { ...opts.channels };
     if (!FACE_PARAMS.some((p) => channels[p])) {
@@ -102,217 +126,135 @@ export function face(options = {}) {
         channels.eyeScale = { field: 'arousal' };
     }
 
-    // A face positioned in a PLANE (both x AND y bound to fields — an emotion-space
-    // scatter, not a small-multiples row) can be MOVED by dragging the head. That is
-    // a property of the ENCODING, so the mark still decides whether to draw a
-    // grabbable outline; whether a drag there actually writes is up to the author's
-    // `edit.face.move()`. A single-axis face (a face per category) has nowhere to
-    // move to, so its outline stays inert and a stray drag can't drift it off slot.
-    const fieldBound = (/** @type {string} */ p) => !!(channels[p] && channels[p].field != null);
-    const movable = fieldBound('x') && fieldBound('y');
-
-    return {
-        id,
-        markName: 'face',
-        channels,
-        constraints,
-        // Verbatim, like every other mark. A face draws its handles but writes
-        // nothing until `edit.face.expression()` / `edit.face.move()` says which
-        // columns a gesture touches — see the header.
-        edits,
-        // Capability flag for the engine's scope guard (SCOPE_CAPABILITY): this mark
-        // is what stamps the `dm` drag tracks edit.face.expression reads.
-        supportsFace: true,
-        ...positionalKeys(channels),
-        /**
-         * @param {any[]} currentData
-         * @param {import('../types').ScaleMap} scales
-         * @param {number} width
-         * @param {number} height
-         * @returns {import('../types').FeatureNode[]}
-         */
-        build: (currentData, scales, width, height) => {
-            // A face's radius comes from the `size` channel like every other shape
-            // mark's does — so `size: 40` (a constant) and `size: { field: 'n' }`
-            // (a scaled radius per face) both work. Resolved per datum, since a
-            // field-driven size differs row to row.
-            const defaultR = Math.min(width, height) * 0.35;
-            const ink = '#1f2937';
-
-            // A dm-axis descriptor for `param`, or undefined when it isn't bound
-            // (so an unbound param is neutral and non-editable). loVal/hiVal fall
-            // back the linear invert when a scale is somehow missing.
-            /** @param {string} param @param {number} pxAt0 @param {number} pxAt1 */
-            const axisSpec = (param, pxAt0, pxAt1) => {
-                // Editable only when bound to a FIELD — a constant `{ value }` param
-                // is rendered but not elicited (nothing to write back).
-                if (!channels[param] || channels[param].field === undefined) return undefined;
-                const scale = scales[param];
-                const dom = scale && scale.domainConfig;
-                return {
-                    channel: param, field: channels[param].field, pxAt0, pxAt1,
-                    loVal: Array.isArray(dom) ? dom[0] : 0,
-                    hiVal: Array.isArray(dom) ? dom[dom.length - 1] : 1,
-                };
-            };
-
-            /** @type {import('../types').FeatureNode[]} */
-            const nodes = [];
-            // The shared handle contract (plot/mark.js): one radius default, one
-            // meaning per `handles` value, and paint from the theme. A face's dots
-            // used to be a literal 'rgba(15,23,42,0.5)' on '#fff', which is
-            // invisible on a dark theme and unreachable from the API.
-            const handleStyle = resolveHandles(scales, { handles, handleSize, handleColor });
-
-            currentData.forEach((/** @type {any} */ d, /** @type {number} */ i) => {
-                const cx = encodeChannel(scales, channels, 'x', d, width / 2, i, currentData);
-                const cy = encodeChannel(scales, channels, 'y', d, height / 2, i, currentData);
-                const R = encodeChannel(scales, channels, 'size', d, defaultR, i, currentData);
-                // Every feature is drawn relative to R, so the ink scales with the
-                // face rather than turning spidery on a big one / blotting a small one.
-                const stroke = Math.max(2, R * 0.055);
-                const style = resolveStyle(scales, channels, d, markDefaults(scales, 'face', { fill: '#FFD666', stroke: '#B7791F' }), i, currentData);
-
-                // Each param in [0,1] through its scale; unbound -> 0.5 (neutral).
-                /** @param {string} p */
-                const P = (p) => clamp01(encodeChannel(scales, channels, p, d, 0.5, i, currentData));
-                const pC = P('mouthCurve'), pO = P('mouthOpen'), pAs = P('mouthAsym');
-                const pS = P('eyeScale'), pSq = P('eyeSquint');
-                const pH = P('browHeight'), pT = P('browTilt');
-
-                // Attach `dm` to a node, and make it a grab target — unless no axis
-                // is bound, in which case it is an inert visual (pointer-transparent),
-                // like trend's line.
-                /** @param {any} node @param {any} [dmX] @param {any} [dmY] */
-                const editable = (node, dmX, dmY) => {
-                    if (dmX || dmY) { node.dm = { x: dmX, y: dmY }; node.cursor = 'grab'; }
-                    else node.pointerEvents = 'none';
-                    node.data = d; node.index = i;
-                    return node;
-                };
-
-                // ── Outline (a PATH so the mouth, drawn after, isn't hidden under a
-                //    filled circle). Inert, UNLESS the centre is bound to fields — then
-                //    it's the head's move target (the eyes/mouth/brows, drawn later, sit
-                //    on top, so grabbing THEM still resizes/tilts rather than moves). ──
-                /** @type {any} */
-                const outline = {
-                    type: 'path', d: ellipsePath(cx, cy, R, R),
-                    fill: style.fill || '#FFD666',
-                    stroke: style.stroke || '#B7791F',
-                    strokeWidth: Math.max(1.5, R * 0.03),
-                };
-                if (movable) { outline.role = 'outline'; outline.cursor = 'grab'; outline.data = d; outline.index = i; }
-                else outline.pointerEvents = 'none';
-                nodes.push(outline);
-
-                // ── Mouth (path). ↕ = curve (up = smile), ↔ = asymmetry. Open >0.1
-                //    draws a filled cavity, else a stroked curve. ────────────────
-                const mouthBaseY = cy + 0.34 * R;
-                const lift = (pC - 0.5) * 2 * 0.24 * R;   // + = corners up (smile)
-                const asymOff = (pAs - 0.5) * 2 * 0.14 * R;
-                const xL = cx - 0.36 * R, xR = cx + 0.36 * R;
-                const yL = mouthBaseY - lift + asymOff;
-                const yR = mouthBaseY - lift - asymOff;
-                const ctrlY = mouthBaseY + lift;
-                const upperD = `M ${xL} ${yL} Q ${cx} ${ctrlY} ${xR} ${yR}`;
-                // Visible mouth (inert): a stroked curve, or a filled cavity when open.
-                if (channels.mouthOpen && pO > 0.1) {
-                    const gap = pO * 0.34 * R;
-                    nodes.push({
-                        type: 'path',
-                        d: `M ${xL} ${yL} Q ${cx} ${ctrlY - gap * 0.25} ${xR} ${yR} Q ${cx} ${ctrlY + gap} ${xL} ${yL} Z`,
-                        fill: '#8a3d3d', stroke: ink, strokeWidth: stroke * 0.8, pointerEvents: 'none',
-                    });
-                } else {
-                    nodes.push({ type: 'path', d: upperD, fill: 'none', stroke: ink, strokeWidth: stroke, pointerEvents: 'none' });
-                }
-                // A fat, invisible hit-path along the mouth carries the drag — a thin
-                // stroked mouth is otherwise a tiny target (only its stroke hit-tests).
-                const mouthDmX = axisSpec('mouthAsym', cx - 0.4 * R, cx + 0.4 * R);
-                const mouthDmY = axisSpec('mouthCurve', mouthBaseY + 0.30 * R, mouthBaseY - 0.30 * R);
-                if (mouthDmX || mouthDmY) {
-                    const hit = editable(
-                        { type: 'path', d: upperD, fill: 'none', stroke: 'transparent', strokeWidth: Math.max(18, R * 0.34) },
-                        mouthDmX, mouthDmY);
-                    hit.pointerEvents = 'stroke';
-                    nodes.push(hit);
-                }
-
-                // ── Eyes (ellipse paths). ↕ = aperture; squint flattens ry. A tiny
-                //    eyelid handle drives squint (drag down = squint). ───────────
-                const eyeDX = 0.40 * R;
-                const eyeY = cy - 0.16 * R;
-                const rx = 0.055 * R + 0.13 * R * pS;
-                const ry = rx * (1 - 0.82 * pSq);
-                for (const sign of [-1, 1]) {
-                    const ex = cx + sign * eyeDX;
-                    nodes.push(editable(
-                        { type: 'path', d: ellipsePath(ex, eyeY, rx, ry), fill: ink, stroke: 'none' },
-                        undefined,
-                        axisSpec('eyeScale', eyeY + 0.30 * R, eyeY - 0.45 * R)));
-                }
-
-                // ── Brows (lines). ↕ = height, ↔ = tilt (drag right = inner-down /
-                //    angry). Both brows carry the same 2-D descriptor. ───────────
-                const browBaseY = cy - 0.40 * R;
-                const browY = browBaseY - (pH - 0.5) * 0.34 * R;
-                const tiltOff = (pT - 0.5) * 0.42 * R;
-                const browDmY = axisSpec('browHeight', browBaseY + 0.17 * R, browBaseY - 0.17 * R);
-                const browDmX = axisSpec('browTilt', cx - 0.30 * R, cx + 0.30 * R);
-                for (const sign of [-1, 1]) {
-                    const inner = cx + sign * 0.14 * R, outer = cx + sign * 0.5 * R;
-                    nodes.push(editable(
-                        { type: 'line', x1: inner, y1: browY + tiltOff, x2: outer, y2: browY - tiltOff, stroke: ink, strokeWidth: stroke },
-                        browDmX, browDmY));
-                }
-
-                // ── Eyelid / lip dots for the two "pull" params. Gated by the
-                //    shared `handles` contract; the eye/mouth/brow SHAPES above
-                //    stay the primary affordances (see header). ─
-                /** @param {number} hx @param {number} hy @param {any} dmY */
-                const pushHandle = (hx, hy, dmY) => {
-                    if (!dmY || !handleStyle.grabbable) return;
-                    nodes.push(editable({
-                        type: 'circle', cx: hx, cy: hy, r: handleStyle.size,
-                        fill: handleStyle.fill,
-                        stroke: handleStyle.stroke,
-                        strokeWidth: handleStyle.strokeWidth,
-                    }, undefined, dmY));
-                };
-                // Squint: eyelid of the right eye, drag DOWN to squint.
-                pushHandle(cx + eyeDX, eyeY - ry, axisSpec('eyeSquint', eyeY - 0.16 * R, eyeY + 0.30 * R));
-                // Open: lower lip, drag DOWN to open.
-                pushHandle(cx, mouthBaseY + (channels.mouthOpen && pO > 0.1 ? pO * 0.34 * R : 0) + 0.02 * R,
-                    axisSpec('mouthOpen', mouthBaseY + 0.02 * R, mouthBaseY + 0.42 * R));
-
-                // Size: a handle on the right rim resizes the head — an absolute-mode
-                // slide along +x (drag OUT to grow). Only when `size` is bound to a
-                // field (a constant size is drawn but not elicited). The track runs
-                // from the rim at the domain's MIN radius to its MAX radius (through
-                // the size scale itself), so the handle — which sits on the current
-                // rim (cx + R) — maps straight back to the current value: no jump on
-                // grab, and the mapping honours whatever range the size scale uses.
-                const sizeCh = channels.size;
-                if (sizeCh && sizeCh.field != null && handleStyle.grabbable) {
-                    const sScale = scales.size;
-                    const dom = sScale && sScale.domainConfig;
-                    const loVal = Array.isArray(dom) ? dom[0] : 0;
-                    const hiVal = Array.isArray(dom) ? dom[dom.length - 1] : 1;
-                    const rLo = sScale ? sScale.encode(loVal) : 0;
-                    const rHi = sScale ? sScale.encode(hiVal) : defaultR;
-                    const sizeSpec = { channel: 'size', field: sizeCh.field, pxAt0: cx + rLo, pxAt1: cx + rHi, loVal, hiVal };
-                    nodes.push(editable({
-                        type: 'circle', cx: cx + R, cy, r: handleStyle.size,
-                        fill: handleStyle.fill,
-                        stroke: handleStyle.stroke,
-                        strokeWidth: handleStyle.strokeWidth,
-                        cursor: 'ew-resize',
-                    }, sizeSpec, undefined));
-                }
-            });
-
-            return nodes;
-        },
+    // A parameter as a part's channel. A field goes through a PRIVATE frame scale
+    // mapping the field's declared domain onto this feature's travel — private so
+    // the two brows can mirror each other, and so a face's `angle` can't collide
+    // with a needle's. A `{ value }` is a fraction of that same travel (0.5 is
+    // neutral), which is what an unbound param falls back to.
+    /**
+     * @param {string} name @param {number[]} range @param {number} [neutral]
+     * @returns {any}
+     */
+    const param = (name, range, neutral = 0.5) => {
+        const spec = channels[name];
+        const scale = { type: 'frame', range };
+        if (spec && spec.field != null) {
+            // An author-declared scale wins — that is how a range is overridden.
+            return spec.scale !== undefined ? spec : { ...spec, scale };
+        }
+        const t = spec && spec.value !== undefined ? clamp01(+spec.value) : neutral;
+        // A DATA-space constant on the same frame scale, not a `{ value }`: the
+        // number is a position in the glyph's local box, and `{ value }` would put
+        // a brow at pixel 0.4 instead of 40% of the way up the face.
+        return { datum: range[0] + t * (range[1] - range[0]), scale };
     };
+
+    /** A pinned position in the local frame. @param {number} u */
+    const at = (u) => ({ datum: u, scale: 'frame' });
+    /** A magnitude as a fraction of the face's radius. @param {number} u */
+    const of = (u) => ({ datum: u, scale: 'frame' });
+
+    // The frame is defined by the author's placement channels, minus any edit —
+    // the edit belongs on the head, which is the node you actually grab. (The
+    // anchor draws nothing, so an edit there would be dead; group warns about it.)
+    /** @param {any} spec */
+    const bare = (spec) => {
+        if (!spec) return spec;
+        const { edit: _edit, ...rest } = spec;
+        return rest;
+    };
+
+    // The head is exactly the frame's half-size. When the author bound `size` to a
+    // field the head reads that field (so a `resize()` on it is elicited and the
+    // frame follows); otherwise it takes the frame's own radius.
+    const headSize = channels.size || of(1);
+
+    const eyeRx = param('eyeScale', G.eyeRx, (G.eyeNeutral - G.eyeRx[0]) / (G.eyeRx[1] - G.eyeRx[0]));
+    // An unbound squint leaves a ROUND eye, so ry follows rx rather than sitting at
+    // its own neutral — otherwise widening the eyes would also un-round them. Its
+    // EDIT is stripped, though: rx already carries it, and the same edit on both
+    // radii would fire twice per drag and make the field doubly addressable.
+    const eyeRy = channels.eyeSquint
+        ? param('eyeSquint', G.eyeRy)
+        : bare(eyeRx);
+
+    const browHeight = param('browHeight', G.browY);
+    const lineWidth = of(G.lineWidth);
+
+    // Every part is named, so a dev warning and the DOM both say which feature of
+    // the face they mean rather than `face/3`.
+    const glyph = id || 'face';
+    /** @param {string} part */
+    const partId = (part) => `${glyph}/${part}`;
+    /** @param {number} sign */
+    const side = (sign) => (sign < 0 ? 'left' : 'right');
+
+    /** @param {number} sign @param {number[]} tilt */
+    const brow = (sign, tilt) => tickY({
+        id: partId(`brow-${side(sign)}`),
+        channels: {
+            x1: at(sign * G.browInner),
+            x2: at(sign * G.browOuter),
+            y: browHeight,
+            angle: param('browTilt', tilt),
+            stroke: { value: ink },
+            strokeWidth: lineWidth,
+        }
+    });
+
+    /** @param {number} sign */
+    const eye = (sign) => ellipse({
+        id: partId(`eye-${side(sign)}`),
+        channels: {
+            x: at(sign * G.eyeX),
+            y: at(G.eyeY),
+            rx: eyeRx,
+            ry: eyeRy,
+            fill: { value: ink },
+            stroke: { value: 'none' },
+        }
+    });
+
+    return group({
+        id: glyph,
+        constraints,
+        channels: {
+            x: bare(channels.x),
+            y: bare(channels.y),
+            size: bare(channels.size),
+        },
+        parts: [
+            // Head. Carries the author's placement/size channels verbatim, so their
+            // edits (move / resize) grab the glyph itself.
+            point({
+                id: partId('head'),
+                edits,
+                channels: {
+                    x: channels.x,
+                    y: channels.y,
+                    size: headSize,
+                    fill: channels.fill || { value: G.headFill },
+                    stroke: channels.stroke || { value: G.headStroke },
+                    strokeWidth: channels.strokeWidth || of(G.headStrokeWidth),
+                }
+            }),
+            eye(-1),
+            eye(1),
+            brow(-1, G.browTiltLeft),
+            brow(1, G.browTiltRight),
+            // Mouth last, so its stroke reads over the head's fill.
+            curveY({
+                id: partId('mouth'),
+                channels: {
+                    x1: at(-G.mouthX),
+                    x2: at(G.mouthX),
+                    y: at(G.mouthY),
+                    curvature: param('mouthCurve', G.mouthCurve),
+                    angle: param('mouthAsym', G.mouthAsym),
+                    stroke: { value: ink },
+                    strokeWidth: lineWidth,
+                }
+            }),
+        ],
+    });
 }

@@ -1,6 +1,6 @@
 // @ts-check
 import * as d3 from "d3";
-import { DEFAULT_EFFECTS, elementEffectOf } from "../../core/effects.js";
+import { DEFAULT_EFFECTS, ELEMENT_EFFECT_PROPS } from "../../core/effects.js";
 import { markCenter } from "../../edit/shared.js";
 import { rectHitBox, MIN_GRAB } from "../../edit/pick.js";
 import { resolveCurve, STYLE_FIELDS, partitionScene } from "../shared.js";
@@ -82,7 +82,7 @@ export class D3Renderer {
 
     this._bindPlaneGestures(plane, pointer, onEvent, planeOnTop);
 
-    const drag = this._makeDrag(onEvent, effects.grabbed);
+    const drag = this._makeDrag(onEvent);
     // Hover rides along with drag: the same nodes, so anything you can grab
     // responds before you press it. See _makeHover.
     const hover = this._makeHover(onEvent, effects.hovered);
@@ -133,6 +133,12 @@ export class D3Renderer {
       ofType(marks, "circle"),
       { drag, markClick, keys, hover },
     );
+    this._drawEllipses(layers.marks, ofType(marks, "ellipse"), {
+      drag,
+      markClick,
+      keys,
+      hover,
+    });
     this._drawLines(layers.marks, ofType(marks, "line"), {
       drag,
       markClick,
@@ -514,36 +520,27 @@ export class D3Renderer {
    * a draggable bar, a trend handle — gave no pre-press signal at all. A cursor
    * change was the entire vocabulary.
    *
-   * Two halves, matching the effects layer's two mechanisms:
-   *   · element effects here, as CSS style PROPERTIES, so they override the
-   *     presentation attributes `_applyStyle` writes and vanish cleanly on exit
-   *     without touching the mark's real paint.
-   *   · an `pointerover`/`pointerout` event to the engine, which records ui.hover
-   *     and draws the overlay half (the outline) in its state pass — the same one
-   *     a proximity driver's selection feeds.
+   * This REPORTS, it does not paint. `pointerover`/`pointerout` go to the engine,
+   * which records ui.hover and decides both halves of the effect in its state pass —
+   * the outline overlay AND the mark's own restyle, which arrives back here as
+   * `node.effectStyle` for `_applyEffectStyle` to apply. The renderer used to paint
+   * the element half itself, straight off these two events; that was a second painter
+   * with a different source of truth, so `hovered: { fill }` lit up under a direct
+   * pick and stayed dark under a proximity driver's hover of the very same row.
    * @param {(e: any) => void} onEvent
    * @param {any} hovered the resolved `hovered` effect config
    * @returns {(sel: any) => void}
    */
   _makeHover(onEvent, hovered) {
-    const props = elementEffectOf(hovered);
     const enabled = !hovered || hovered.enabled !== false;
     return (sel) => {
       sel
-        .on("pointerenter", /** @this {any} */ function (/** @type {any} */ _event, /** @type {any} */ d) {
+        .on("pointerenter", /** @type {any} */ (/** @type {any} */ _event, /** @type {any} */ d) => {
           if (!enabled || !d || !d.editable) return;
-          if (props) {
-            const el = d3.select(this);
-            for (const [k, v] of Object.entries(props)) el.style(cssProp(k), v);
-          }
           onEvent({ type: "pointerover", node: d });
         })
-        .on("pointerleave", /** @this {any} */ function (/** @type {any} */ _event, /** @type {any} */ d) {
+        .on("pointerleave", /** @type {any} */ (/** @type {any} */ _event, /** @type {any} */ d) => {
           if (!enabled || !d || !d.editable) return;
-          if (props) {
-            const el = d3.select(this);
-            for (const k of Object.keys(props)) el.style(cssProp(k), null);
-          }
           onEvent({ type: "pointerout", node: d });
         });
     };
@@ -551,23 +548,16 @@ export class D3Renderer {
 
   /**
    * @param {(e: any) => void} onEvent
-   * @param {any} grab
    * @returns {any}
    */
-  _makeDrag(onEvent, grab) {
-    // Grab feedback via CSS `filter` (an ELEMENT effect), NOT via the
-    // `stroke`/`fill` paint attributes — those are real style channels the
-    // mark may set, and mutating them here would clobber the mark's own
-    // stroke (and leave it wiped until the next full re-render). `filter`
-    // is not a style channel, so `_applyStyle` never touches it: it rides
-    // through the mid-drag re-renders and is cleared on end with no redraw.
-    // The filter string is customizable via the effects layer (core/effects.js).
-    const filter =
-      grab && grab.filter != null
-        ? grab.filter
-        : grab === undefined
-          ? DEFAULT_EFFECTS.grab.filter
-          : null;
+  _makeDrag(onEvent) {
+    // Grab feedback is NOT painted here. dragstart/dragend tell the engine where the
+    // gesture is, it records ui.grab, and the state pass resolves `grabbed` beside
+    // `hovered`/`selected` — arriving back as `node.effectStyle` (and, now, an
+    // outline, which this path could never draw). Painting it here read only
+    // `grabbed.filter` and silently dropped the other five properties of a
+    // vocabulary core/effects.js documents as uniform across the three states.
+    //
     // dragstart/dragend bracket the stroke. No edit declares them as a `gesture`
     // (they match nothing in dispatch), but they tell the engine where one
     // continuous gesture begins and ends — which is what lets undo step back a
@@ -577,7 +567,6 @@ export class D3Renderer {
       .drag()
       .clickDistance(4)
       .on("start", function (event, d) {
-        if (filter) d3.select(this).style("filter", filter);
         onEvent({
           type: "dragstart",
           x: event.x,
@@ -597,7 +586,6 @@ export class D3Renderer {
         });
       })
       .on("end", function (event, d) {
-        if (filter) d3.select(this).style("filter", null);
         onEvent({
           type: "dragend",
           x: event.x,
@@ -632,6 +620,38 @@ export class D3Renderer {
   }
 
   /**
+   * Apply the interaction-effect restyle the engine's state pass stamped on a node
+   * (`node.effectStyle` — see core/effects.js). Call it right after `_applyStyle` on
+   * every interactive mark join.
+   *
+   * Two things make this safe to run on every node, every render:
+   *   · CSS style PROPERTIES, never attributes. `_applyStyle` writes the mark's real
+   *     paint to attributes, so a property beats it while the effect is on and the
+   *     data's own paint reappears the instant it comes off.
+   *   · every property resolves to `null` when the node is in no state, which is what
+   *     REMOVES it. There is no teardown path that can fall out of sync with the
+   *     set-up path, because there is only one path.
+   * `cursor` is the exception: the joins already set it from the mark's own `cursor`,
+   * so the effect layers OVER that rather than nulling it back to nothing.
+   * @param {any} sel
+   * @param {string} [cursorDefault] the join's own cursor for an editable node
+   * @returns {any}
+   */
+  _applyEffectStyle(sel, cursorDefault = "move") {
+    for (const key of ELEMENT_EFFECT_PROPS) {
+      if (key === "cursor") continue;
+      sel.style(cssProp(key), (/** @type {any} */ d) =>
+        d.effectStyle && d.effectStyle[key] != null ? d.effectStyle[key] : null,
+      );
+    }
+    sel.style("cursor", (/** @type {any} */ d) => {
+      if (d.effectStyle && d.effectStyle.cursor != null) return d.effectStyle.cursor;
+      return d.editable ? d.cursor || cursorDefault : "default";
+    });
+    return sel;
+  }
+
+  /**
    * SVG transform for a node that carries math-degree `angle` (0° = +x, CCW).
    * SVG's rotate() is clockwise in y-down space, so we negate. Pivot is the
    * mark's own centre (rect bbox, line midpoint, text anchor, …).
@@ -661,6 +681,17 @@ export class D3Renderer {
       .attr("cx", (/** @type {any} */ d) => d.cx)
       .attr("cy", (/** @type {any} */ d) => d.cy)
       .attr("r", (/** @type {any} */ d) => Math.max(0, d.r != null ? d.r : 5))
+      .attr("transform", (/** @type {any} */ d) => this._angleTransform(d));
+  }
+
+  /** @param {any} sel */
+  _geomEllipse(sel) {
+    sel
+      .attr("cx", (/** @type {any} */ d) => d.cx)
+      .attr("cy", (/** @type {any} */ d) => d.cy)
+      .attr("rx", (/** @type {any} */ d) => Math.max(0, d.rx != null ? d.rx : 5))
+      .attr("ry", (/** @type {any} */ d) => Math.max(0, d.ry != null ? d.ry : 5))
+      // markCenter reads cx/cy first, so an ellipse rotates about its own centre.
       .attr("transform", (/** @type {any} */ d) => this._angleTransform(d));
   }
 
@@ -907,9 +938,18 @@ export class D3Renderer {
   }
 
   /**
-   * Interaction-effect overlays (proximity snap ring, select outline). Topmost
-   * paint layer — above marks and guides. Nodes are circles (point highlight /
-   * snap ring) or rects (bar / tick outline); always pointer-transparent.
+   * Interaction-effect overlays (proximity snap ring, state outlines). Topmost
+   * paint layer — above marks and guides; always pointer-transparent.
+   *
+   * Every shape `outlineNodes` can emit is joined here. Only circle and rect were
+   * before, so an outline built for a `path` (an arc slice, a geo polygon, a needle)
+   * or an `ellipse` was constructed by the effects layer and then silently dropped on
+   * the floor — the mark simply didn't respond to hover or selection, which reads as
+   * a broken interaction rather than an unimplemented one.
+   *
+   * The geometry helpers apply `_angleTransform`, so a rotated mark's outline rotates
+   * with it as long as the overlay carries the source's `angle` (it does — see
+   * outlineNodes). Paths need no transform: a path node bakes its rotation into `d`.
    * @param {any} layer
    * @param {any[]} nodes
    */
@@ -917,6 +957,12 @@ export class D3Renderer {
     /** @param {string} t */
     const ofType = (t) =>
       nodes.filter((/** @type {any} */ n) => n.type === t);
+    const effectPaint = {
+      fill: "none",
+      stroke: "none",
+      strokeWidth: 1,
+      opacity: 1,
+    };
 
     const circleSel = layer
       .selectAll("circle.effect")
@@ -925,12 +971,7 @@ export class D3Renderer {
       .attr("class", "effect")
       .style("pointer-events", "none");
     this._geomCircle(circleSel);
-    this._applyStyle(circleSel, {
-      fill: "none",
-      stroke: "none",
-      strokeWidth: 1,
-      opacity: 1,
-    });
+    this._applyStyle(circleSel, effectPaint);
 
     const rectSel = layer
       .selectAll("rect.effect")
@@ -939,19 +980,45 @@ export class D3Renderer {
       .attr("class", "effect")
       .style("pointer-events", "none");
     this._geomRect(rectSel);
-    this._applyStyle(rectSel, {
-      fill: "none",
-      stroke: "none",
-      strokeWidth: 1,
-      opacity: 1,
-    });
+    this._applyStyle(rectSel, effectPaint);
+
+    const ellipseSel = layer
+      .selectAll("ellipse.effect")
+      .data(ofType("ellipse"))
+      .join("ellipse")
+      .attr("class", "effect")
+      .style("pointer-events", "none");
+    this._geomEllipse(ellipseSel);
+    this._applyStyle(ellipseSel, effectPaint);
+
+    const lineSel = layer
+      .selectAll("line.effect")
+      .data(ofType("line"))
+      .join("line")
+      .attr("class", "effect")
+      .style("pointer-events", "none");
+    this._geomLine(lineSel);
+    this._applyStyle(lineSel, effectPaint);
+
+    const pathSel = layer
+      .selectAll("path.effect")
+      .data(ofType("path"))
+      .join("path")
+      .attr("class", "effect")
+      .style("pointer-events", "none")
+      .attr("d", (/** @type {any} */ d) =>
+        d.d ? d.d : d3.line().curve(resolveCurve(d.curve))(d.points || []),
+      );
+    this._applyStyle(pathSel, effectPaint);
 
     // Type joins append in call order; restore scene order (ring under outline).
     const order = new Map(
       nodes.map((/** @type {any} */ n, /** @type {number} */ i) => [n, i]),
     );
     layer
-      .selectAll("circle.effect, rect.effect")
+      .selectAll(
+        "circle.effect, rect.effect, ellipse.effect, line.effect, path.effect",
+      )
       .filter((/** @type {any} */ d) => order.has(d))
       .sort(
         (/** @type {any} */ a, /** @type {any} */ b) =>
@@ -993,6 +1060,7 @@ export class D3Renderer {
       .call(keys);
     this._geomRect(rectSel);
     this._applyStyle(rectSel, { fill: "black" });
+    this._applyEffectStyle(rectSel, "ns-resize");
 
     // Grab overlay for collapsed bars. A rect whose value sits at the baseline is
     // drawn at zero height (or width) and so takes NO pointer events — the browser
@@ -1019,6 +1087,10 @@ export class D3Renderer {
       .attr("y", (/** @type {any} */ d) => rectHitBox(d).y)
       .attr("width", (/** @type {any} */ d) => rectHitBox(d).w)
       .attr("height", (/** @type {any} */ d) => rectHitBox(d).h)
+      // Follow the bar's own rotation. rectHitBox is the UNROTATED box (it is the
+      // same one the canvas hit-tester unrotates the pointer into), so without this
+      // a tilted collapsed bar hands its grab area to the wrong patch of the plane.
+      .attr("transform", (/** @type {any} */ d) => this._angleTransform(d))
       .on("click", markClick)
       .call(drag)
       .call(hover);
@@ -1046,6 +1118,38 @@ export class D3Renderer {
       .call(keys);
     this._geomCircle(circleSel);
     this._applyStyle(circleSel, { fill: "black" });
+    this._applyEffectStyle(circleSel, "move");
+  }
+
+  /**
+   * Interactive ellipses. Same wiring as the circle branch of `_drawMarks` — an
+   * ellipse is a circle whose two radii are independent channels, so each is its
+   * own draggable magnitude (an eye that widens on x and squints on y). Kept a
+   * separate join because SVG binds shape to element type.
+   * @param {any} layer
+   * @param {any[]} ellipses
+   * @param {{ drag: any, markClick: (e: any, d: any) => void, keys: (sel: any) => void, hover: (sel: any) => void }} io
+   */
+  _drawEllipses(layer, ellipses, { drag, markClick, keys, hover }) {
+    const sel = layer
+      .selectAll("ellipse.mark")
+      .data(ellipses)
+      .join("ellipse")
+      .attr("class", "mark")
+      .style(
+        "pointer-events",
+        (/** @type {any} */ d) => d.pointerEvents || "auto",
+      )
+      .style("cursor", (/** @type {any} */ d) =>
+        d.editable ? d.cursor || "move" : "default",
+      )
+      .on("click", markClick)
+      .call(drag)
+      .call(hover)
+      .call(keys);
+    this._geomEllipse(sel);
+    this._applyStyle(sel, { fill: "black" });
+    this._applyEffectStyle(sel, "move");
   }
 
   /**
@@ -1078,6 +1182,7 @@ export class D3Renderer {
       .call(keys);
     this._geomLine(sel);
     this._applyStyle(sel, { stroke: "black", strokeWidth: 1, opacity: 1 });
+    this._applyEffectStyle(sel, "move");
   }
 
   /**
@@ -1113,6 +1218,7 @@ export class D3Renderer {
       strokeWidth: 1,
       opacity: 1,
     });
+    this._applyEffectStyle(sel, "pointer");
     if (io) {
       sel.on("click", io.markClick).call(io.drag).call(io.hover).call(io.keys);
     }
@@ -1152,6 +1258,7 @@ export class D3Renderer {
       .call(keys);
     this._geomText(sel, "middle");
     this._applyStyle(sel, { fill: "black", opacity: 1 });
+    this._applyEffectStyle(sel, "move");
   }
 
   /**
